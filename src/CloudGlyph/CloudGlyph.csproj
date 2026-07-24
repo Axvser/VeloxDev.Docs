@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="AvalonMarkdown" />
+    <PackageReference Include="VeloxDev.Avalonia" />
+  </ItemGroup>
+
+  <!-- Auto-generate languages_index.json and embed as AvaloniaResource before build -->
+  <Target Name="GenerateLanguagesJson" BeforeTargets="BeforeBuild">
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)/Assets/Docs/scripts/gen_lang_index.py&quot;" 
+		  ConsoleToMSBuild="true" 
+		  LogStandardErrorAsError="false" 
+		  StandardOutputImportance="normal" />
+  </Target>
+
+  <!-- Auto-generate tree.json index from directory structure before build -->
+  <Target Name="GenerateTreeJson" BeforeTargets="BeforeBuild">
+    <Exec Command="python &quot;$(MSBuildProjectDirectory)/Assets/Docs/scripts/gen_tree.py&quot;" 
+		  ConsoleToMSBuild="true" 
+		  LogStandardErrorAsError="false" 
+		  StandardOutputImportance="normal" />
+  </Target>
+</Project>

@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/Core/">
+    <Project Path="src/CloudGlyph/CloudGlyph.csproj" />
+  </Folder>
+  <Folder Name="/Platforms/">
+    <Project Path="src/CloudGlyph.Browser/CloudGlyph.Browser.csproj" />
+    <Project Path="src/CloudGlyph.Desktop/CloudGlyph.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/Repo/">
+    <File Path=".gitignore" />
+    <File Path="Directory.Packages.props" />
+    <File Path="README.md" />
+  </Folder>
+</Solution>
