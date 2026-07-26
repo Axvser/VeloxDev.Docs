@@ -16,18 +16,6 @@ namespace CloudGlyph.Views
 
             InitializeTheme();
 
-            MarkdownPreview.OnReady += async (_, _) =>
-            {
-                if (DataContext is MainViewModel vm)
-                {
-                    vm.Document.RenderMarkdownAsync = async md =>
-                    {
-                        await MarkdownPreview.RenderMarkdownAsync(md);
-                    };
-                    vm.Document.MarkdownViewReady();
-                }
-            };
-
             Loaded += (s, e) =>
             {
                 var settings = this.GetPlatformSettings();

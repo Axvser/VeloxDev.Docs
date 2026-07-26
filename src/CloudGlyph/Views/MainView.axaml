@@ -74,6 +74,7 @@
 						   Opacity="0.5"
 						   FontSize="18" />
 				<md:MarkdownView x:Name="MarkdownPreview"
+								 Text="{Binding Document.Content}"
 								 HorizontalAlignment="Stretch"
 								 VerticalAlignment="Stretch"
 								 Background="Transparent" />

@@ -33,8 +33,6 @@ public partial class DocumentViewModel : ObservableObject
         ? _loadedLanguages
         : [new(DefaultLanguage, "🌐 English")];
 
-    private bool _markdownViewReady;
-
     [ObservableProperty]
     private ObservableCollection<PageNode> _nodes = [];
 
@@ -82,17 +80,6 @@ public partial class DocumentViewModel : ObservableObject
         if (value is not null)
             _ = LoadContentAsync(value);
     }
-
-    /// <summary>
-    public void MarkdownViewReady()
-    {
-        _markdownViewReady = true;
-        if (SelectedNode is not null)
-            _ = LoadContentAsync(SelectedNode);
-    }
-
-    /// <summary>Called by the view to render the current content when ready.</summary>
-    public Func<string, Task>? RenderMarkdownAsync { get; set; }
 
     /// <summary>
     /// Loads the auto-generated <c>languages_index.json</c> from assets and populates
@@ -175,25 +162,13 @@ public partial class DocumentViewModel : ObservableObject
 
     private async Task ReloadAsync()
     {
-        _markdownViewReady = false;
         Content = string.Empty;
         SelectedNode = null;
         await LoadTreeAsync();
-        // Restore ready state: the MarkdownView WebView was not destroyed,
-        // only the tree/content was reloaded.
-        _markdownViewReady = true;
-        // LoadTreeAsync auto-selected the first node, but OnSelectedNodeChanged
-        // fired while _markdownViewReady was still false and returned early.
-        // Re-trigger content loading for the now-selected node.
-        if (SelectedNode is not null)
-            await LoadContentAsync(SelectedNode);
     }
 
     private async Task LoadContentAsync(PageNode node)
     {
-        if (!_markdownViewReady || RenderMarkdownAsync is null)
-            return;
-
         IsLoading = true;
         try
         {
@@ -214,12 +189,10 @@ public partial class DocumentViewModel : ObservableObject
             }
 
             Content = markdown;
-            await RenderMarkdownAsync(markdown);
         }
         catch (Exception ex)
         {
             Content = $"# Error\n\nFailed to load content: {ex.Message}";
-            await RenderMarkdownAsync(Content);
         }
         finally
         {
