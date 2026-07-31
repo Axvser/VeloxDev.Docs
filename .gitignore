@@ -455,4 +455,7 @@ $RECYCLE.BIN/
 
 ## Build-generated languages_index.json and tree.json (regenerated on each build)
 src/CloudGlyph/Assets/Docs/content/languages_index.json
+
+## Generated SKILL.md (assembled from TEMPLATE.md + sub-skills)
+skills/SKILL.md
 src/CloudGlyph/Assets/Docs/content/*/tree.json

@@ -19,9 +19,21 @@ The Architecture section is organized into the following pages. Each page after 
 |---|---|---|---|
 | `0_file_structure/index.md` | Repository layout, directory tree, project-to-folder mapping | Mermaid flowchart + tree | Single overview page |
 | `1_functional_structure/index.md` | Module responsibility boundaries, feature-to-project mapping, entry point identification | Mermaid flowchart + tables | Single overview page |
-| `2_design_patterns/index.md` | **Design pattern analysis** — one sub-page per feature/module | Mermaid classDiagram + tables | `2_design_patterns/{Feature}/index.md` — one sub-page per feature |
-| `3_data_flow/index.md` | **Data flow analysis** — sequence diagrams for each feature's API call chain | **PlantUML** sequence diagrams | `3_data_flow/{Feature}/index.md` — one sub-page per feature |
-| `4_complexity/index.md` | **Complexity analysis** — time/space complexity for each feature's core operations | KaTeX + tables | `4_complexity/{Feature}/index.md` — one sub-page per feature |
+| `2_design_patterns/index.md` | **Design pattern analysis** — one sub-page per feature/module | Mermaid classDiagram + tables | `2_design_patterns/{Feature}/index.md`, may be further subdivided for complex features |
+| `3_data_flow/index.md` | **Data flow analysis** — sequence diagrams for each feature's API call chain | **PlantUML** sequence diagrams | `3_data_flow/{Feature}/index.md`, may be further subdivided for complex features |
+| `4_complexity/index.md` | **Complexity analysis** — time/space complexity for each feature's core operations | KaTeX + tables | `4_complexity/{Feature}/index.md`, may be further subdivided for complex features |
+
+### Sub-page Depth Rules
+
+Under each `{Feature}/` directory, **further nesting is allowed and encouraged** when necessary to keep each page focused and readable.
+
+**Recommended subdivision dimensions:**
+- `2_design_patterns/{Feature}/` can split by: `0_{PatternName}/index.md` (e.g., `0_Singleton/index.md`, `1_Factory/index.md`)
+- `3_data_flow/{Feature}/` can split by: `0_{APIEndpoint}/index.md` or `0_{OperationName}/index.md` (e.g., `0_UserRegistration/index.md`, `1_OrderQuery/index.md`)
+- `4_complexity/{Feature}/` can split by: `0_{CoreOperation}/index.md` (e.g., `0_Search/index.md`, `1_Sort/index.md`)
+
+> Guiding principle: when a single page exceeds **500 lines** or covers **more than 3 distinct topics**, it should be split into sub-pages.
+> The parent directory's `index.md` serves as the feature overview/table of contents, linking to each sub-page.
 
 ### Page Detail
 
@@ -69,9 +81,9 @@ Repo --> Svc: User?
 deactivate Repo
 
 alt User exists
-	Svc --> Ctrl: 200 OK + User
+    Svc --> Ctrl: 200 OK + User
 else User not found
-	Svc --> Ctrl: 404 Not Found
+    Svc --> Ctrl: 404 Not Found
 end
 
 Ctrl --> User: JSON response
@@ -97,31 +109,31 @@ activate Auth
 
 Auth -> Auth: Validate JWT Token
 alt Invalid token
-	Auth --> Client: 401 Unauthorized
-	deactivate Auth
-	note right: Pipeline short-circuits
+    Auth --> Client: 401 Unauthorized
+    deactivate Auth
+    note right: Pipeline short-circuits
 else Valid token
-	Auth -> Log: Forward request
-	deactivate Auth
-	activate Log
+    Auth -> Log: Forward request
+    deactivate Auth
+    activate Log
 
-	Log -> Log: Log request
-	Log -> Ctrl: Invoke Action
-	activate Ctrl
+    Log -> Log: Log request
+    Log -> Ctrl: Invoke Action
+    activate Ctrl
 
-	Ctrl -> Svc: Execute business logic
-	activate Svc
-	Svc -> Db: Query/Write
-	activate Db
-	Db --> Svc: Result
-	deactivate Db
-	Svc --> Ctrl: Business result
-	deactivate Svc
+    Ctrl -> Svc: Execute business logic
+    activate Svc
+    Svc -> Db: Query/Write
+    activate Db
+    Db --> Svc: Result
+    deactivate Db
+    Svc --> Ctrl: Business result
+    deactivate Svc
 
-	Ctrl --> Log: ActionResult
-	deactivate Ctrl
-	Log --> Client: HTTP Response
-	deactivate Log
+    Ctrl --> Log: ActionResult
+    deactivate Ctrl
+    Log --> Client: HTTP Response
+    deactivate Log
 end
 @enduml
 ```
@@ -178,23 +190,23 @@ deactivate Handler
 
 ```mermaid
 classDiagram
-	class IUserService {
-		<<interface>>
-		+GetUserAsync(int id) Task~User?~
-		+CreateUserAsync(User user) Task~User~
-	}
-	class UserService {
-		-IUserRepository _repo
-		-ILogger _logger
-		+GetUserAsync(int id) Task~User?~
-		+CreateUserAsync(User user) Task~User~
-	}
-	class UserController {
-		+GetUser(int id) IActionResult
-		+CreateUser(CreateUserRequest req) IActionResult
-	}
-	IUserService <|.. UserService
-	UserController --> IUserService
+    class IUserService {
+        <<interface>>
+        +GetUserAsync(int id) Task~User?~
+        +CreateUserAsync(User user) Task~User~
+    }
+    class UserService {
+        -IUserRepository _repo
+        -ILogger _logger
+        +GetUserAsync(int id) Task~User?~
+        +CreateUserAsync(User user) Task~User~
+    }
+    class UserController {
+        +GetUser(int id) IActionResult
+        +CreateUser(CreateUserRequest req) IActionResult
+    }
+    IUserService <|.. UserService
+    UserController --> IUserService
 ```
 
 > Source: `src/MyApp.Web/Services/UserService.cs` lines 15-45
@@ -203,15 +215,15 @@ classDiagram
 
 ```mermaid
 flowchart TD
-	A[Receive HTTP Request] --> B{Auth Passed?}
-	B -->|No| C[Return 401]
-	B -->|Yes| D[Execute Middleware Pipeline]
-	D --> E{Route Matched?}
-	E -->|No| F[Return 404]
-	E -->|Yes| G[Invoke Controller]
-	G --> H[Execute Action]
-	H --> I[Serialize JSON]
-	I --> J[Return Response]
+    A[Receive HTTP Request] --> B{Auth Passed?}
+    B -->|No| C[Return 401]
+    B -->|Yes| D[Execute Middleware Pipeline]
+    D --> E{Route Matched?}
+    E -->|No| F[Return 404]
+    E -->|Yes| G[Invoke Controller]
+    G --> H[Execute Action]
+    H --> I[Serialize JSON]
+    I --> J[Return Response]
 ```
 
 ## Output Location
@@ -228,4 +240,4 @@ For **Framework/Monorepo** tier: `content/{lang}/{category}/architecture/{page_g
 After writing SE Analysis content:
 
 - [ ] **Regenerate navigation index** — Run the tree generator script (e.g. `python gen_tree.py`) to rebuild tree.json
-- [ ] **Build the project** — Run `dotnet build` to verify the new content embeds correctly
+- [ ] **Build the project** — Run the project's build command to verify the new content embeds correctly

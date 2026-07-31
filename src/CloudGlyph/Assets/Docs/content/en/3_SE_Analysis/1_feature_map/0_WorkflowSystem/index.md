@@ -1,70 +1,82 @@
 # Feature Map — WorkflowSystem
 
-## Responsibility
+## Responsibility Boundaries
 
-The WorkflowSystem provides the foundational building blocks for visual workflow editing on any .NET UI platform. It owns the canvas abstraction, spatial indexing, node/slot/link lifecycle, undo/redo, and the compilation pipeline.
+The WorkflowSystem feature is split into three layers:
 
-## Feature Breakdown
+1. **Core (`VeloxDev.Core`)** — owns the component model (Tree / Node / Slot / Link), the source generator attributes, undo/redo, spatial indexing, the selector system and the compilation pipeline. It is UI-framework-agnostic.
+2. **Adapters (`VeloxDev.WPF`, `VeloxDev.Avalonia`, …)** — attached behaviors (`WorkflowSurfaceBehavior`, `WorkflowNodeDragBehavior`, `WorkflowSlotConnectionBehavior`, `WorkflowSlotLayoutBehavior`, `ViewPool`, `WorkflowMinimapOverlay`) that render and virtualize the graph.
+3. **AI / Agent (`VeloxDev.Core.Extension`)** — `WorkflowAgentScope` (fluent context + tools), `WorkflowAgentToolkit` (~60 tools), `WorkflowStateTracker` and the MCP loader (`McpScope`).
 
-### 1. Tree Management (`IWorkflowTreeViewModel`)
-- **Owner**: `VeloxDev.WorkflowSystem` namespace
-- **Key file**: `Interfaces/WorkflowSystem/IWorkflowTreeViewModel.cs`
-- **Purpose**: Root container holding all nodes, links, and layout state. Provides commands for node creation, connection building, undo/redo, and serialization.
-- **Commands**: `CreateNode`, `SetPointer`, `SendConnection`, `ReceiveConnection`, `Submit`, `Undo`, `Redo`
-
-### 2. Node Management (`IWorkflowNodeViewModel`)
-- **Key file**: `Interfaces/WorkflowSystem/IWorkflowNodeViewModel.cs`
-- **Purpose**: Represents a visual node with position (`Anchor`), size (`Size`), and a collection of slots. Each node has a `WorkCommand` for executing business logic.
-- **Commands**: `Move`, `SetAnchor`, `SetSize`, `CreateSlot`, `Delete`, `Work`, `Broadcast`, `ReverseBroadcast`
-
-### 3. Slot Management (`IWorkflowSlotViewModel`)
-- **Key file**: `Interfaces/WorkflowSystem/IWorkflowSlotViewModel.cs`
-- **Purpose**: Connection points on nodes. Each slot has a channel direction (`Input`/`Output`) and maintains lists of connected source/target slots.
-- **Commands**: `SetChannel`, `SendConnection`, `ReceiveConnection`, `Delete`, `Close`
-
-### 4. Link Management (`IWorkflowLinkViewModel`)
-- **Key file**: `Interfaces/WorkflowSystem/IWorkflowLinkViewModel.cs`
-- **Purpose**: Visual connections between slots. Supports Bezier and polyline rendering modes.
-
-### 5. Canvas Layout (`CanvasLayout`)
-- **Key file**: `WorkflowSystem/CanvasLayout.cs`
-- **Purpose**: Manages canvas dimensions (`ActualSize`, `OriginSize`) and scroll/viewport offsets (`ViewportOffset`, `ActualOffset`). Provides `UpdateCommand` to recalculate after changes.
-
-### 6. Spatial Indexing (`SpatialGridHashMap<T>` / `WorkflowSpatialManager`)
-- **Key files**: `WorkflowSystem/SpatialGridHashMap.cs`, `WorkflowSystem/WorkflowSpatialManager.cs`
-- **Purpose**: Grid-based spatial hash for efficient viewport queries. `WorkflowSpatialManager` wraps this at the tree level, indexing both nodes and node pairs (links).
-
-### 7. Helper System
-- **Key files**: `Templates/Helpers/TreeHelper.cs`, `NodeHelper.cs`, `SlotHelper.cs`, `LinkHelper.cs`
-- **Purpose**: Lifecycle hooks (`Install`/`Uninstall`) and behavior overrides. Each component type has a corresponding Helper base class.
-
-### 8. Compilation Pipeline
-- **Key files**: `WorkflowSystem/Compilation/`
-- **Purpose**: Compiles the workflow graph into an executable form. Supports different `CompileMode`, `CompileDirection`, `CompileScope`, and `CycleHandling` strategies.
-
-### 9. Undo/Redo (`WorkflowActionPair`)
-- **Key file**: `WorkflowSystem/WorkflowActionPair.cs`
-- **Purpose**: Encapsulates a single reversible action. The Tree's `SubmitCommand` / `UndoCommand` / `RedoCommand` form the undo stack.
-
-### 10. Conditional/Selector Slots (`SelectorEx`)
-- **Key files**: `WorkflowSystem/SelectorEx/`
-- **Purpose**: Advanced slot types that route execution based on conditions (e.g., `BoolSelectorNode`, `EnumSelectorNode`). Uses `SlotEnumerator` and `ConditionalSlot` to dynamically select output paths.
-
-## Dependency Relationships
-
+```mermaid
+flowchart TB
+    subgraph Core["VeloxDev.Core"]
+        B["WorkflowBuilder attributes"]
+        I["I*ViewModel + helpers"]
+        S["SpatialGridHashMap / WorkflowSpatialManager"]
+        C["WorkflowCompiler + CompilationResult"]
+        SL["SlotEnumerator / selector"]
+        UR["WorkflowActionPair undo/redo"]
+    end
+    subgraph Ext["VeloxDev.Core.Extension"]
+        AS["WorkflowAgentScope"]
+        TK["WorkflowAgentToolkit (~60 tools)"]
+        ST["WorkflowStateTracker"]
+        MCP["McpScope / McpServerConfiguration"]
+    end
+    subgraph UI["Adapters (WPF / Avalonia / ...)"]
+        AB["AttachedBehaviors: Surface / NodeDrag / SlotConnection / SlotLayout / ViewPool / Minimap"]
+    end
+    UI -->|binds VisibleItems + Layout| Core
+    UI -->|commands| I
+    Ext -->|AsAgentScope| I
+    C -->|orders| SL
+    S -->|visible subset| UI
 ```
-IWorkflowTreeViewModel  ──contains──▶ IWorkflowNodeViewModel[]
-								  ──contains──▶ IWorkflowLinkViewModel[]
-								  ──uses──▶ CanvasLayout
-								  ──uses──▶ WorkflowSpatialManager
-								  ──uses──▶ IWorkflowTreeViewModelHelper
 
-IWorkflowNodeViewModel  ──contains──▶ IWorkflowSlotViewModel[]
-						──uses──▶ Anchor, Size
-						──uses──▶ IVeloxCommand (Work, Broadcast, etc.)
-						──uses──▶ IWorkflowNodeViewModelHelper
+## Feature → Project → Dependency Table
 
-IWorkflowSlotViewModel  ──references──▶ IWorkflowSlotViewModel[] (Targets/Sources)
-						──uses──▶ SlotChannel, SlotState
-						──uses──▶ IWorkflowSlotViewModelHelper
-```
+| Feature | Namespace | Project | Depends on |
+|---|---|---|---|
+| Builder attributes | `VeloxDev.WorkflowSystem` | Core | `VeloxDev.MVVM` |
+| Component interfaces | `VeloxDev.WorkflowSystem` | Core | `VeloxDev.AI` (metadata), `VeloxDev.MVVM` |
+| Default VMs + helpers | `VeloxDev.WorkflowSystem` | Core | StandardEx |
+| Value types / enums | `VeloxDev.WorkflowSystem` | Core | `VeloxDev.TransitionSystem` (Anchor) |
+| Undo / redo | `VeloxDev.WorkflowSystem.StandardEx` | Core | `WorkflowActionPair` |
+| Spatial index | `VeloxDev.WorkflowSystem` | Core | `ISpatialMap<T>`, `ISpatialBoundsProvider` |
+| Selector | `VeloxDev.WorkflowSystem` | Core | `ISlotProvider`, `[SlotSelectors]` |
+| Compiler | `VeloxDev.WorkflowSystem.Compilation` | Core | `ICompileTimeRouter`, `ICompileTimePriority`, `ICompileTimeSink` |
+| Agent scope + toolkit | `VeloxDev.AI.Workflow` / `.Functions` | Core.Extension | Core + `Microsoft.Extensions.AI` |
+| MCP | `VeloxDev.AI.MCP` | Core.Extension | `ModelContextProtocol.Client`, `CliWrap` |
+| Serialization | `VeloxDev.MVVM.Serialization` | Core.Extension | Newtonsoft.Json |
+| Attached behaviors | `VeloxDev.WorkflowSystem.AttachedBehaviors` | Adapters | Core |
+
+## Entry Points
+
+| Scenario | Entry point |
+|---|---|
+| Define a Tree | `[WorkflowBuilder.Tree<THelper>]` + `InitializeWorkflow()` |
+| Define a Node | `[WorkflowBuilder.Node<THelper>(workSemaphore: n)]` |
+| Build a graph | `tree.GetHelper().CreateNode(node)` → `SendConnection` / `ReceiveConnection` |
+| Undo / redo | `tree.UndoCommand` / `tree.RedoCommand` |
+| Compile & execute | `new WorkflowCompiler().Compile(start, ...)` → `CompilationResult.ExecuteAsync(parameter, ct)` |
+| Virtualize | `TreeHelper(cellSize)` → `tree.EnableMap(cellSize, VisibleItems)` → `Virtualize(viewport)` |
+| Route branches | `ICompileTimeRouter.GetRouteTable()` / `SlotEnumerator.SetSelector(type)` |
+| Let AI drive it | `tree.AsAgentScope().With...().ProvideProgressiveContextPrompt()` + `ProvideTools()` |
+| Persist | `tree.Serialize()` / `json.Deserialize<T>()` |
+
+## Key Files
+
+| Concern | Files |
+|---|---|
+| Attributes | `WorkflowSystem/Templates/WorkflowBuilder.cs` |
+| Interfaces | `Interfaces/WorkflowSystem/IWorkflow*.cs` |
+| Standard behavior | `WorkflowSystem/StandardEx/WorkflowTreeEx.cs` (connections, undo), `WorkflowNodeEx.cs`, `WorkflowSlotEx.cs`, `WorkflowLinkEx.cs`, `WorkflowSpatialEx.cs` |
+| Defaults | `WorkflowSystem/Templates/ViewModels/*.cs`, `Templates/Helpers/*.cs` |
+| Spatial | `WorkflowSystem/SpatialGridHashMap.cs`, `WorkflowSpatialManager.cs`, `NodeBoundsProvider.cs`, `NodePairBoundsProvider.cs` |
+| Selector | `WorkflowSystem/SelectorEx/SlotEnumerator.cs`, `ConditionalSlot.cs`, `SlotDefinition.cs` |
+| Compiler | `WorkflowSystem/Compilation/Compiler.cs`, `Models/CompilationResult.cs`, `Models/CompiledItem.cs`, `Enums/*.cs` |
+| Agent | `VeloxDev.Core.Extension/Agent/Workflow/WorkflowAgentScope.cs`, `WorkflowStateTracker.cs`, `Functions/WorkflowAgentToolkit.cs` |
+| MCP | `VeloxDev.Core.Extension/Agent/MCP/McpScope.cs`, `McpServerConfiguration.cs`, `McpServerRunMode.cs` |
+| Serialization | `VeloxDev.Core.Extension/ComponentModelEx.cs` |
+| Demo evidence | `Examples/Workflow/Common/Lib/ViewModels/Workflow/**`, `Examples/Workflow/WPF/Demo/Views/Workflow/**` |

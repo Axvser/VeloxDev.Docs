@@ -1,55 +1,76 @@
-# Feature Map — TransitionSystem
+# Feature Map — Transition System
 
-## Responsibility
+## Responsibility Boundaries
 
-The TransitionSystem provides a cross-platform property animation engine. It handles value interpolation, easing curves, state snapshots, scheduling, and visual transition effects.
+The Transition System is a **cross-platform, code-driven interpolation animation engine**. Its guiding principle is *"everything is a state"*: an animation is a *state snapshot* describing target property values; the engine interpolates every recorded property from its current value to the target over a timed, eased, frame-based timeline. It is split across the core engine (`VeloxDev.Core`) and per-platform adapters.
 
-## Feature Breakdown
+```mermaid
+flowchart TD
+    subgraph Core [VeloxDev.Core]
+        T[Transition~T~] --> SS[StateSnapshot<br/>fluent builder]
+        SS --> ST[StateCore / IFrameState]
+        SS --> TP[TransitionProperty<br/>nested path]
+        IC[InterpolatorCore] --> NI[NativeInterpolators<br/>15 built-in]
+        SE[TransitionEffectCore] --> EA[Eases<br/>30 curves]
+        SC[TransitionSchedulerCore] --> CW[ConditionalWeakTable<br/>mutual schedulers]
+        TI[TransitionInterpreterCore] --> FP[frame pump]
+        SH[TransitionSnapshotHelper] --> DI[DiscoverAnimatableProperties]
+    end
 
-### 1. Easing Functions (`Eases`, `IEaseCalculator`)
-- **Key files**: `TransitionSystem/Eases.cs`, `Interfaces/TransitionSystem/IEaseCalculator.cs`
-- **Purpose**: 30 easing functions across 10 categories (Sine, Quad, Cubic, Quart, Quint, Expo, Circ, Back, Elastic, Bounce), each with In/Out/InOut variants. The `Eases` static class provides typed factory access.
+    subgraph Adapters [VeloxDev.WPF / Avalonia / WinUI / MAUI / WinForms / Razor]
+        AX[TransitionEx<br/>Snapshot / SnapshotAll / SnapshotExcept]
+        AI[Interpolator<br/>platform types]
+        AE[TransitionEffect<br/>priority]
+        AU[UIThreadInspector<br/>UI-thread marshalling]
+    end
 
-### 2. Interpolator System (`InterpolatorCore`, `IValueInterpolator`)
-- **Key files**: `TransitionSystem/Interpolator.cs`, `TransitionSystem/InterpolatorOutputCore.cs`
-- **Purpose**: Pluggable interpolation engine. `InterpolatorCore` maintains a global registry of type-to-interpolator mappings. 15 native interpolators are pre-registered.
-
-### 3. State Snapshots (`StateSnapshotCore<TTarget>`)
-- **Key files**: `TransitionSystem/State.cs`, `TransitionSystem/StateSnapshot.cs`
-- **Purpose**: Captures the property values to animate and their target values. Supports fluent configuration: `.Property<T>() → .To() → .Duration() → .Ease() → .Delay()`.
-
-### 4. Property Path Resolution (`TransitionProperty`)
-- **Key file**: `TransitionSystem/TransitionProperty.cs`
-- **Purpose**: Resolves deep property access paths (e.g., `Background.Color`) using reflection. Supports read/write through a chain of `PropertyInfo` segments.
-
-### 5. Transition Scheduler (`TransitionSchedulerCore`)
-- **Key file**: `TransitionSystem/TransitionScheduler.cs`
-- **Purpose**: Manages the execution timeline. Supports `Start`, `Pause`, `Resume`, `Exit`. Uses `IUIThreadInspector` to ensure thread-safe property updates.
-
-### 6. Transition Effects (`TransitionEffect`, `TransitionEx`)
-- **Key files**: `TransitionSystem/TransitionEffect.cs`, `TransitionSystem/TransitionEx.cs`
-- **Purpose**: Higher-level orchestration for multi-property, multi-target transitions. Includes built-in effect types.
-
-### 7. Native Interpolators Library
-- **Key files**: `TransitionSystem/NativeInterpolators/*.cs` (15 files)
-- **Purpose**: Concrete interpolators for primitive and common .NET types.
-
-### 8. Platform Adapter Interpolators
-- **Key files**: `Adapters/VeloxDev.Avalonia/PlatformAdapters/Interpolators/*.cs` (and WPF/WinUI equivalents)
-- **Purpose**: Platform-specific interpolators for UI types like `Brush`, `Thickness`, `CornerRadius`, `Transform`, etc.
-
-## Dependency Map
-
+    SS --> TP
+    IC --> SS
+    SE --> IC
+    SC --> TI
+    T --> SC
+    AX --> T
+    AI --> IC
+    AU --> TI
 ```
-TransitionSystem (core)
-├── Eases (self-contained, no dependencies)
-├── InterpolatorCore (registry pattern)
-│   └── NativeInterpolators (15 built-in)
-├── StateSnapshotCore → TransitionProperty → Reflection
-├── TransitionSchedulerCore → IUIThreadInspector
-└── TransitionEffect → TransitionEx
 
-Platform Adapters:
-VeloxDev.Avalonia
-└── PlatformAdapters/Interpolators/  ← Platform-specific types
-```
+## Feature → Project → Dependency Mapping
+
+| Feature | Owning Project | Public API Surface | Dependencies | Evidence |
+|---|---|---|---|---|
+| Fluent animation API | `VeloxDev.Core` | `Transition<T>.StateSnapshot` (`Property`/`Effect`/`Await`/`Then`/`AwaitThen`/`Execute`) | — | Demo |
+| State model | `VeloxDev.Core` | `StateCore`, `IFrameState`, `TransitionProperty`, `ITransitionProperty` | `System.Reflection` | Demo + Test |
+| Interpolation registry | `VeloxDev.Core` | `InterpolatorCore` (`Register/TryGet/Unregister`), `IValueInterpolator`, `IInterpolable` | — | Demo |
+| Native interpolators | `VeloxDev.Core` | 15 interpolators in `VeloxDev.TransitionSystem.NativeInterpolators` | `System.Drawing`, `System.Numerics` | Test |
+| Easing | `VeloxDev.Core` | `Eases`, `IEaseCalculator` | — | Demo |
+| Effect model | `VeloxDev.Core` | `TransitionEffectCore`, `ITransitionEffectCore`, `TransitionEventArgs` | `WeakTypes.WeakDelegate` | Demo |
+| Scheduler | `VeloxDev.Core` | `TransitionSchedulerCore` (`FindOrCreate`, `Execute`, `Exit`) | `ConditionalWeakTable` | Test |
+| Interpreter (frame pump) | `VeloxDev.Core` | `TransitionInterpreterCore`, `ITransitionInterpreterCore` | `TimeLine` events | Test |
+| Snapshot capture | `VeloxDev.Core` | `TransitionSnapshotHelper` (`CaptureAll`, `CaptureSpecific`, `DiscoverAnimatableProperties`) | `InterpolatorCore` | Demo |
+| Platform wiring | each adapter | `TransitionEx`, `Transition`, `Interpolator`, `TransitionEffect`, `TransitionEffects`, `UIThreadInspector` | `VeloxDev.Core` | Demo |
+
+## Entry Points
+
+| Entry Point | Signature | Purpose |
+|---|---|---|
+| `Transition<T>.Create()` | `StateSnapshot Create()` | Build an animation definition |
+| `.Property(...)` / `.Effect(...)` | fluent | Record target values + timing/easing |
+| `.Execute(target, CanMutualTask)` | `void Execute(T target, bool CanMutualTask = true)` | Run the animation (may be called from a background thread) |
+| `target.Snapshot(All/Except)` | `Transition<T>.StateSnapshot` | Capture the object's current values |
+| `Transition.Exit(target, ...)` | `static void Exit<T>(T, bool IncludeMutual, bool IncludeNoMutual)` | Stop running animations |
+| `UIThreadInspector.SetWindow/CaptureUIThread` | platform | Required wiring on WinUI / WinForms / Razor |
+
+## Key Files
+
+| File | Role |
+|---|---|
+| `Src/Core/VeloxDev.Core/TransitionSystem/Transition.cs` | Entry point `Transition<T>`, `Exit`, `Execute` |
+| `Src/Core/VeloxDev.Core/TransitionSystem/StateSnapshot.cs` | Fluent builder + segment linking |
+| `Src/Core/VeloxDev.Core/TransitionSystem/State.cs` | `IFrameState` implementation |
+| `Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs` | Interpolator registry + resolution order |
+| `Src/Core/VeloxDev.Core/TransitionSystem/TransitionScheduler.cs` | Mutual/non-mutual schedulers |
+| `Src/Core/VeloxDev.Core/TransitionSystem/TransitionInterpreter.cs` | Frame pump + auto-reverse/loop |
+| `Src/Core/VeloxDev.Core/TransitionSystem/TransitionProperty.cs` | Nested property path resolution |
+| `Src/Core/VeloxDev.Core/TransitionSystem/TransitionSnapshotHelper.cs` | State capture |
+| `Src/Core/VeloxDev.Core/TransitionSystem/NativeInterpolators/*.cs` | Built-in value interpolators |
+| `Src/Adapters/VeloxDev.{WPF,...}/PlatformAdapters/*.cs` | Per-platform `Interpolator`, `TransitionEffect`, `UIThreadInspector` |

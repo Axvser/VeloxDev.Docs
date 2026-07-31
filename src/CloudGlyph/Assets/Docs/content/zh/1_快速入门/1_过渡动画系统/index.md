@@ -1,157 +1,150 @@
 # 过渡动画系统 — 快速入门
 
-VeloxDev 过渡动画系统是一个跨平台的属性动画引擎。它提供了插值器、缓动函数、状态快照和调度器，用于在属性值之间创建平滑的动画过渡。
+本指南让你用**过渡动画系统**（VeloxDev 的跨平台、代码驱动插值引擎）驱动 UI 属性动画。核心理念是**「一切皆状态」**：将目标的属性值记录为*状态快照*，描述对象应到达的最终状态，然后执行 —— 引擎会把每个记录的属性从当前值插值到目标值，经过一条定时、带缓动、按帧的时间线。
 
-## 安装
+> 示例源码：`Examples/Transition/{WPF, Avalonia, WinUI, WinForms, MAUI, Blazor}/Demo`
 
-过渡动画系统属于 `VeloxDev.Core`：
+## 1. 安装 / 添加依赖
 
-```xml
-<PackageReference Include="VeloxDev.Core" Version="6.0.82" />
+为你的 GUI 框架添加适配器包 —— 它包含过渡引擎与平台插值器：
+
+```bash
+# WPF
+dotnet add package VeloxDev.WPF
+
+# Avalonia
+dotnet add package VeloxDev.Avalonia
+
+# 亦支持 WinUI / MAUI / WinForms / Razor
 ```
 
-## 基本用法
+## 2. 基本设置 / 注册
 
-### 1. 创建状态快照
-
-状态快照捕获一个或多个属性的当前值，并定义它们的动画目标值。
+**第 1 步 — 使用 `Transition<T>.Create()` 创建状态快照**并记录目标属性值。属性 lambda 可以是**嵌套路径**（如 `r => ((TranslateTransform)r.RenderTransform).X`）：
 
 ```csharp
-using VeloxDev.TransitionSystem.Abstractions;
+using VeloxDev.TransitionSystem;
 
-// 为特定目标类型创建状态快照
-var state = TransitionCore<MyControl, StateSnapshotCore<MyControl>>.Create();
-
-// 配置属性过渡
-state.Property<double>(ctrl => ctrl.Opacity)
-	.To(0.5)              // 目标值
-	.Duration(300)         // 持续时间（毫秒）
-	.Ease(Eases.Sine.Out); // 缓动函数
+// 流式构建器：记录目标值 + 效果，然后执行
+private static readonly Transition<Rectangle>.StateSnapshot Animation0 =
+    Transition<Rectangle>.Create()
+        .Property(r => r.Opacity, 0)
+        .Property(r => ((TranslateTransform)r.RenderTransform).X, 800)
+        .Property(r => r.Fill, new SolidColorBrush(Colors.Orange))
+        .Effect(new TransitionEffect()
+        {
+            Duration = TimeSpan.FromSeconds(2),
+            IsAutoReverse = true,
+            LoopTime = 2,
+        });
 ```
 
-### 2. 执行过渡
+**第 2 步 — 平台接线（仅部分平台需要）：**
+
+- WPF / Avalonia：无需接线 —— 甚至可以从后台线程启动动画，适配器的 `UIThreadInspector` 会把更新调度回 UI 线程。
+- WinUI：**必需** —— 调用一次 `UIThreadInspector.SetWindow(this);`，且不要在非 UI 线程上创建 `Transition<T>` 静态字段。
+- WinForms / Razor：**必需** —— 在 UI 线程调用 `UIThreadInspector.CaptureUIThread();`（WinForms 在 `OnLoad`；Razor 在 `OnInitialized`）。
+
+## 3. 核心用法（逐步）
+
+**执行快照** —— 默认一个对象同时只允许一个动画（`CanMutualTask: true`，新动画会打断正在执行的）。传 `CanMutualTask: false` 可并行：
 
 ```csharp
-// 将过渡应用到目标对象
-TransitionCore<MyControl, StateSnapshotCore<MyControl>>
-	.Execute(myControl, state);
+Animation0.Execute(Rec0);                 // 默认：互斥
+Animation0.Execute(Rec0, CanMutualTask: false);
 
-// 或使用扩展方法
-state.Execute(myControl);
-```
-
-### 3. 平台设置（Avalonia 示例）
-
-每个平台适配器都提供了平台特定的插值器。在启动时注册一次：
-
-```csharp
-// 在 App.axaml.cs 或 Program.cs 中
-using VeloxDev.DynamicTheme;
-
-// 注册 Avalonia 插值器
-ThemeManager.SetPlatformInterpolator(new VeloxDev.Avalonia.Interpolator());
-```
-
-### 4. 多属性动画
-
-```csharp
-var snapshot = TransitionCore<MyControl, StateSnapshotCore<MyControl>>.Create();
-
-// 同时动画多个属性
-snapshot.Property<double>(ctrl => ctrl.Opacity)
-	.To(0.0)
-	.Duration(500)
-	.Ease(Eases.Quad.In);
-
-snapshot.Property<double>(ctrl => ctrl.Width)
-	.To(300)
-	.Duration(1000)
-	.Ease(Eases.Elastic.Out);
-
-snapshot.Property<Brush>(ctrl => ctrl.Background)
-	.To(new SolidColorBrush(Colors.Red))
-	.Duration(300);
-
-// 一次性执行
-snapshot.Execute(myControl);
-```
-
-### 5. 使用调度器
-
-为了更好地控制时间和生命周期，使用 `TransitionScheduler`：
-
-```csharp
-using VeloxDev.TransitionSystem.Abstractions;
-
-var scheduler = new TransitionSchedulerCore();
-
-// 调度过渡
-scheduler.Add(snapshot, myControl);
-scheduler.Start();
-
-// 稍后...
-scheduler.Pause();
-scheduler.Resume();
-scheduler.Exit();  // 停止所有过渡
-```
-
-## 缓动函数
-
-VeloxDev 通过 `Eases` 静态类提供全面的缓动函数集合：
-
-| 类别 | 函数 |
-|---|---|
-| Sine | `Eases.Sine.In`, `.Out`, `.InOut` |
-| Quad | `Eases.Quad.In`, `.Out`, `.InOut` |
-| Cubic | `Eases.Cubic.In`, `.Out`, `.InOut` |
-| Quart | `Eases.Quart.In`, `.Out`, `.InOut` |
-| Quint | `Eases.Quint.In`, `.Out`, `.InOut` |
-| Expo | `Eases.Expo.In`, `.Out`, `.InOut` |
-| Circ | `Eases.Circ.In`, `.Out`, `.InOut` |
-| Back | `Eases.Back.In`, `.Out`, `.InOut` |
-| Elastic | `Eases.Elastic.In`, `.Out`, `.InOut` |
-| Bounce | `Eases.Bounce.In`, `.Out`, `.InOut` |
-
-## 原生插值器
-
-`VeloxDev.TransitionSystem.NativeInterpolators` 中的内置插值器：
-
-| 类型 | 插值器 |
-|---|---|
-| `double` | `DoubleInterpolator` |
-| `float` | `FloatInterpolator` |
-| `int` | `IntInterpolator` |
-| `long` | `LongInterpolator` |
-| `System.Drawing.Point` | `PointInterpolator` |
-| `System.Drawing.PointF` | `PointFInterpolator` |
-| `System.Drawing.Size` | `SizeInterpolator` |
-| `System.Drawing.SizeF` | `SizeFInterpolator` |
-| `System.Drawing.Rectangle` | `RectangleInterpolator` |
-| `System.Drawing.RectangleF` | `RectangleFInterpolator` |
-| `System.Numerics.Vector2` | `Vector2Interpolator` |
-| `System.Numerics.Vector3` | `Vector3Interpolator` |
-| `System.Numerics.Vector4` | `Vector4Interpolator` |
-| `System.Numerics.Quaternion` | `QuaternionInterpolator` |
-| `System.Drawing.Color` | `ColorInterpolator` |
-
-## 自定义插值器
-
-实现 `IValueInterpolator` 以添加自定义类型支持：
-
-```csharp
-public class MyCustomInterpolator : IValueInterpolator
+// 也可在非 UI 线程启动
+_ = Task.Run(() =>
 {
-	public IList<object?> Interpolate(object? from, object? to, int steps)
-	{
-		// 生成中间值
-	}
-}
-
-// 全局注册
-InterpolatorCore.RegisterInterpolator(typeof(MyType), new MyCustomInterpolator());
+    Animation0.Execute(Rec0);
+    Animation1.Execute(Rec1);
+    Animation2.Execute(Rec2);
+});
 ```
 
-## 进一步阅读
+**拼接多段动画** — 使用 `.Await`、`.Then`、`.AwaitThen`，每段可有独立效果与缓动：
 
-- 查看 [API 参考](../../2_API参考/1_过渡动画系统/index.md) 了解详细接口文档
-- 查看 [动态主题](../2_动态主题/index.md) 快速入门了解主题动画集成
+```csharp
+private static readonly Transition<Rectangle>.StateSnapshot Animation2 =
+    Transition<Rectangle>.Create()
+        .Property(r => r.RenderTransform,
+        [
+            new TranslateTransform(200, 0),
+            new ScaleTransform(1.3, 1.3)
+        ])
+        .Effect(new TransitionEffect()
+        {
+            Duration = TimeSpan.FromSeconds(2),
+            IsAutoReverse = true,
+            FPS = 144,
+            Ease = Eases.Circ.InOut,
+            LoopTime = 2,
+        })
+        .AwaitThen(TimeSpan.FromSeconds(5)) // 等待 5 秒再开始下一段
+        .Property(r => r.Fill, new SolidColorBrush(Colors.Yellow))
+        .Effect(new TransitionEffect()
+        {
+            Duration = TimeSpan.FromSeconds(2),
+            Ease = Eases.Sine.In
+        });
+```
+
+**捕获实时快照**（记录对象*当前*值，用于重置/撤销）：
+
+```csharp
+var snapshot0 = Rec0.SnapshotAll();                                    // 所有可动画属性
+var snapshot1 = Rec0.Snapshot(x => x.RenderTransform, x => x.Fill);    // 指定属性
+var snapshot2 = Rec0.SnapshotExcept(x => x.Visibility);                // 排除某些属性
+
+// 将对象立即恢复到捕获的状态
+btnReset.Click += (s, e) => snapshot1.Effect(TransitionEffects.Empty).Execute(Rec0);
+```
+
+**停止动画**：
+
+```csharp
+// IncludeMutual   -> 停止 CanMutualTask: true 的动画
+// IncludeNoMutual -> 停止 CanMutualTask: false 的动画
+Transition.Exit(Rec0, IncludeMutual: true, IncludeNoMutual: false);
+Transition.Exit(Rec1);
+```
+
+## 4. 验证
+
+运行应用：
+
+- `Rec0` 在 2 秒内动画透明度、位置与填充色，然后自动往返两次（`IsAutoReverse + LoopTime: 2`）。
+- 多段 `Animation2` 先位移+缩放，等待 5 秒，再以不同缓动动画填充色。
+- 重置按钮将 `Rec1` 立即恢复到捕获状态。
+- 打断按钮调用 `Transition.Exit(...)`，矩形就地停止。
+- 六个平台示例（WPF、Avalonia、WinUI、WinForms、MAUI、Blazor）运行相同的动画定义 —— Blazor 示例动画一个普通 `BoxModel` 视图模型，通过 `INotifyPropertyChanged` 触发重渲染。
+
+## 5. 完整代码
+
+一个最小化的 WPF 窗口动画一个矩形：
+
+```csharp
+public partial class MainWindow : Window
+{
+    private static readonly Transition<Rectangle>.StateSnapshot Animation0 =
+        Transition<Rectangle>.Create()
+            .Property(r => r.Opacity, 0)
+            .Property(r => ((TranslateTransform)r.RenderTransform).X, 800)
+            .Effect(new TransitionEffect()
+            {
+                Duration = TimeSpan.FromSeconds(2),
+                IsAutoReverse = true,
+                LoopTime = 2,
+                Ease = Eases.Sine.InOut,
+            });
+
+    public MainWindow()
+    {
+        InitializeComponent();
+        Loaded += (s, e) => Animation0.Execute(Rec0);
+        btnExit.Click += (s, e) => Transition.Exit(Rec0);
+    }
+}
+```
+
+> **提示：** Razor 适配器额外提供 `string?` 的 `Property` 重载，可动画 CSS 颜色字符串（`"#ff7043"`、`rgb(...)`、命名颜色）。WinForms 动画 `IInterpolable`、`Padding` 及常用数值类型；MAUI 动画 MAUI 类型（`Brush`、`Shadow`、`PointF`、`RectF`...）。

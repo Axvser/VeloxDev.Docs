@@ -18,91 +18,44 @@
 
 > **🌐 Live site:** [https://axvser.github.io/CloudGlyph/](https://axvser.github.io/CloudGlyph/)
 >
-> Use this template and follow this guide to get your own Agent-driven Wiki site.
+> Use this template to get your own Agent-driven Wiki site.
 
 ---
 
-## 🤖 Agent Instructions
+## 🚀 Quick Start for Humans
 
-> **If you are an AI coding agent reading this README:** your task is to build Wiki documentation using this skill system.
+1. **Create your Wiki repo** from this template on GitHub
+2. **Clone** it locally
+3. **Tell your Agent** to read this README
+4. **Push** — the GitHub Action auto-deploys to Pages
+
+---
+
+## 🤖 For AI Coding Agents
+
+> If you are an AI coding agent reading this, assist your owner with the steps below:
+> **obtain or update Cloud Glyph itself** so you can use its skill system.
 >
-> Read **`skills/SKILL.md`** and follow the pipeline.
+> 1. **Assume your owner has already created a repo from the Cloud Glyph template and cloned it locally**
+>    1.1 Run `python sync_template.py <your-wiki-path>` to sync files
+>    1.2 If you are Claude, run `python <repo-root>/skills/claude_install.py <claude-dir>` to install the SKILL into `.claude/`
+>    1.3 For non-Claude agents: `python <repo-root>/skills/gen_skill.py --lang <en|zh>` to output `skills/SKILL.md`, then handle it per your own conventions
+> 2. **If you are accessing this file remotely via any tool or MCP service without a local repo**
+>    2.1 Tell the user to create their own repo from this template and clone it locally
+>    2.2 Confirm the user has done so, then return to scenario 1 and execute
 
 ---
 
-## 🚀 Two Usage Modes
+## 📤 Publishing
 
-This template supports two deployment modes. The Agent detects which mode you're in automatically.
-
-| Mode | Scenario | Agent Behavior |
-|---|---|---|
-| **Nested** | Wiki repo cloned **inside** your project as a subdirectory | Auto-discovers your project and documents it (excludes itself) |
-| **Standalone** | Wiki repo used independently (no surrounding project) | Asks you to provide the project path to document |
-
----
-
-## 📁 Mode 1: Nested (Wiki Inside Your Project)
-
-Clone the Wiki repo into your project as a subdirectory. The Agent accesses both your source code and the Wiki instructions from a single workspace.
-
-### Setup
-
-```bash
-# In your project repo, create a branch for Wiki work
-git checkout -b docs/wiki-content
-
-# Clone your Wiki repo as a subdirectory
-git clone https://github.com/<your-username>/MyProject-Wiki.git docs/wiki
-```
-
-Your project structure:
-
-```
-your-main-project/                     ← Your actual code (Agent documents this)
-├── src/
-├── tests/
-├── docs/wiki/                         ← Your Wiki repo (Agent excludes this from docs)
-│   ├── skills/
-│   │   ├── SKILL.md                   ← Entry point
-│   │   └── ...
-│   └── src/CloudGlyph/Assets/Docs/content/
-└── README.md
-```
-
-> **⚠️ .gitignore risk:** If your `.gitignore` contains patterns like `src/` or `**/Docs/**`, the Wiki output files may become invisible. Add `!docs/wiki/**` to exempt the Wiki directory.
-
-### Command Your Agent
-
-> "Read `docs/wiki/skills/SKILL.md` and follow the pipeline."
-
----
-
-## 🏠 Mode 2: Standalone (Wiki as a Separate Repo)
-
-Use the Wiki repo on its own — for example, to document a project whose source code you want to keep separate.
-
-### Setup
-
-Open this repository in your workspace (no project nesting needed). Optionally place the target project alongside it.
-
-### Command Your Agent
-
-> "Read `skills/SKILL.md` and follow the pipeline."
-
-The Agent will detect **Standalone** mode and ask you for the project path to document.
-
----
-
-## 📤 Publish
-
-### 1. Configure GitHub Pages
+### Configure GitHub Pages
 
 In your Wiki repo's GitHub **Settings → Pages**, set **Build and deployment → Source** to **`GitHub Actions`**.
 
-### 2. Push
+### Push
 
 ```bash
-cd docs/wiki       # or your wiki path
+cd <your-wiki-path>
 git add .
 git commit -m "Add Wiki content"
 git push origin master
@@ -124,17 +77,21 @@ CloudGlyph's `skills/` directory may receive updates. To sync your Wiki repo wit
 
 ```bash
 cd <your-wiki-path>
-python sync_template.py
+python sync_template.py <your-wiki-path>
 ```
 
 The script will fetch the latest template from GitHub, synchronize all files (skills, configs, workflows), and preserve your existing content under `src/CloudGlyph/Assets/Docs/content/`.
 
-> **Note:** `sync_template.py` is a **user-facing** tool. After syncing, regenerate the skill index for each language:
->
-> ```bash
-> python skills/gen_skill.py --lang en
-> python skills/gen_skill.py --lang zh
-> ```
->
-> `gen_skill.py` is an internal development tool.
-</p>
+After syncing, regenerate the SKILL for each language:
+
+```bash
+python skills/gen_skill.py --lang en
+python skills/gen_skill.py --lang zh
+```
+
+Then reinstall if using Claude:
+
+```bash
+python skills/claude_install.py <claude-working-dir> --lang en
+```
+```

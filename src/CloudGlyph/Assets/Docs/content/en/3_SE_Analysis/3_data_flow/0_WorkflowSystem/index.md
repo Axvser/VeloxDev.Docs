@@ -1,122 +1,214 @@
 # Data Flow — WorkflowSystem
 
-## 1. Node Work Execution Flow
+Four sequence diagrams trace the main data flows. PlantUML syntax is used so the diagrams can be rendered by any PlantUML server.
 
-When a node's `WorkCommand` is triggered, the following sequence occurs:
+## 1. CreateNode + Undo / Redo
 
-```mermaid
-sequenceDiagram
-	participant T as TreeViewModel
-	participant N as NodeViewModel
-	participant NH as NodeHelper
-	participant Cmd as WorkCommand
-	participant S as Slot System
-	participant SN as Sibling Nodes
+`helper.CreateNode(node)` funnels into `StandardCreateNode`, which submits an undoable `WorkflowActionPair`. Undo and redo pop the stacks and run the paired actions.
 
-	Note over T,SN: Step 1: Work Execution
-	T->>N: WorkCommand.Execute(parameter)
-	N->>Cmd: Enqueue (if semaphore limits)
-	Cmd-->>T: Enqueued event
-	Cmd->>Cmd: Wait for semaphore
-	Cmd-->>T: Dequeued event
-	Cmd->>NH: WorkAsync(parameter, ct)
-	NH->>NH: Business logic
-	NH-->>Cmd: Task completed
-	Cmd-->>T: Exited event
+```plantuml
+@startuml
+    participant Caller
+    participant Helper as TreeHelper
+    participant Tree as IWorkflowTreeViewModel
+    participant Cache as TreeCache(UndoStack/RedoStack)
+    participant Pair as WorkflowActionPair
+    participant Node as IWorkflowNodeViewModel
 
-	Note over T,SN: Step 2: Broadcast (if configured)
-	T->>N: BroadcastCommand.Execute(result)
-	N->>S: For each output slot with targets...
-	S->>SN: Forward data to connected node
-	SN->>SN: Execute WorkCommand (recursive)
+    Caller -> Helper: CreateNode(node)
+    activate Helper
+    Helper -> Tree: StandardCreateNode(node)
+    activate Tree
+    Tree -> Node: GetHelper().Delete()
+    Tree -> Tree: new WorkflowActionPair(redo, undo)
+    Tree -> Cache: StandardSubmit(pair)
+    activate Cache
+    Cache -> Pair: pair.Redo.Invoke()
+    activate Pair
+    Pair -> Tree: redo: Nodes.Add(node); node.Parent = tree
+    deactivate Pair
+    Cache -> Cache: UndoStack.Push(pair)
+    deactivate Cache
+    deactivate Tree
+    deactivate Helper
+
+    Caller -> Tree: UndoCommand.Execute(null)
+    activate Tree
+    Tree -> Cache: StandardUndo()
+    activate Cache
+    Cache -> Cache: UndoStack.TryPop(out pair)
+    Cache -> Pair: pair.Undo.Invoke()
+    activate Pair
+    Pair -> Tree: undo: Nodes.Remove(node); node.Parent = oldParent
+    deactivate Pair
+    Cache -> Cache: RedoStack.Push(pair)
+    deactivate Cache
+    deactivate Tree
+
+    Caller -> Tree: RedoCommand.Execute(null)
+    activate Tree
+    Tree -> Cache: StandardRedo()
+    activate Cache
+    Cache -> Cache: RedoStack.TryPop(out pair)
+    Cache -> Pair: pair.Redo.Invoke()
+    activate Pair
+    Pair -> Tree: redo: Nodes.Add(node); node.Parent = tree
+    deactivate Pair
+    Cache -> Cache: UndoStack.Push(pair)
+    deactivate Cache
+    deactivate Tree
+@enduml
 ```
 
-## 2. Connection Establishment Flow
+Error path: if `pair.Redo.Invoke()` throws, `StandardSubmit`/`StandardUndo`/`StandardRedo` catch the exception and log via `Debug.WriteLine` — the stack is left unchanged.
 
-```mermaid
-sequenceDiagram
-	participant T as TreeViewModel
-	participant S1 as Source Slot
-	participant S2 as Target Slot
-	participant TH as TreeHelper
+*Source: `Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowTreeEx.cs`, lines 27-35, 181-234.*
 
-	Note over T,TH: Phase 1: Virtual connection
-	T->>T: SendConnectionCommand.Execute(sourceSlot)
-	T->>TH: SendConnection(slot)
-	TH->>T: Set VirtualLink with sender
-	T->>S1: Mark slot as connecting
+## 2. SendConnection / ReceiveConnection
 
-	Note over T,TH: Phase 2: Complete connection
-	T->>T: ReceiveConnectionCommand.Execute(targetSlot)
-	T->>TH: ReceiveConnection(slot)
-	TH->>TH: ValidateConnection(sender, receiver)
-	alt Valid connection
-		TH->>TH: CreateLink(sender, receiver)
-		TH->>T: Add link to Links collection
-		TH->>S1: Add target to Targets
-		TH->>S2: Add source to Sources
-		TH->>TH: ResetVirtualLink()
-	else Invalid connection
-		TH->>TH: ResetVirtualLink()
-		Note over T: Connection rejected
-	end
+A connection is built in two phases. `SendConnection(sender)` checks sender capacity, shows the virtual link and sets `PreviewSender`. `ReceiveConnection(receiver)` validates capacity + `ValidateConnection`, cleans up conflicting same-direction links, creates the link, and submits the whole connection as one undoable action.
+
+```plantuml
+@startuml
+    participant Caller
+    participant Tree as IWorkflowTreeViewModel
+    participant Sender as Slot(sender)
+    participant Receiver as Slot(receiver)
+    participant Link as IWorkflowLinkViewModel
+
+    Caller -> Tree: SendConnectionCommand.Execute(sender)
+    activate Tree
+    Tree -> Sender: StandardCanBeSender()
+    alt not canBeSender
+        Tree -> Tree: ResetVirtualLink(); CurrentSender = null
+    else canBeSender
+        Tree -> Tree: SmartCleanupSenderConnections(sender)
+        Tree -> Tree: VirtualLink.IsVisible = true
+        Tree -> Sender: State = PreviewSender; UpdateState()
+        Tree --> Caller: CurrentSender = sender
+    end
+    deactivate Tree
+
+    Caller -> Tree: ReceiveConnectionCommand.Execute(receiver)
+    activate Tree
+    alt CurrentSender == null
+        Tree --> Caller: return (no-op)
+    else CurrentSender != null
+        Tree -> Receiver: StandardCanBeReceiver()
+        Tree -> Tree: GetHelper().ValidateConnection(CurrentSender, receiver)
+        alt invalid (capacity / validation / same parent)
+            Tree -> Tree: ResetVirtualLink(); CurrentSender = null
+        else valid
+            Tree -> Tree: CleanupSameDirectionConnections / SmartCleanupReceiver
+            Tree -> Link: CreateLink(sender, receiver) via GetHelper()
+            Tree -> Tree: StandardSubmit(WorkflowActionPair)
+            Tree -> Tree: redo: LinksMap[sender][receiver] = link; Links.Add; Sender.Targets.Add; Receiver.Sources.Add
+            Tree -> Tree: ResetVirtualLink(); CurrentSender = null
+        end
+    end
+    deactivate Tree
+@enduml
 ```
 
-## 3. Spatial Query Flow (Viewport Culling)
+Error path: any failed validation (capacity, custom `ValidateConnection`, same-node connection) resets the virtual link and leaves no connection; existing same-direction connections are atomically replaced through a submitted `WorkflowActionPair`.
 
-```mermaid
-sequenceDiagram
-	participant View as UI ScrollViewer
-	participant Tree as TreeViewModel
-	participant TH as TreeHelper
-	participant SM as WorkflowSpatialManager
-	participant Grid as SpatialGridHashMap
-	participant Items as VisibleItems
+*Source: `Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowTreeEx.cs`, lines 92-177, 363-416.*
 
-	Note over View,Items: On Scroll / Zoom
-	View->>TH: Viewport changes
-	TH->>SM: Query(viewport)
-	SM->>Grid: Query(viewport)
-	Grid-->>SM: Intersecting nodes + pairs
-	SM-->>TH: Result set
-	TH->>Items: Replace VisibleItems
-	Items-->>View: UI recycles views
+## 3. Compile + ExecuteAsync with WorkCommand lifecycle
+
+`WorkflowCompiler.Compile` traverses the graph (BFS or DFS) and produces `CompilationResult` items with `Order`/`Depth`. `ExecuteAsync` runs each item by dispatching `WorkCommand` (fire-and-forget) and waiting for the `Exited` event, then forwards the parameter to the next item. Router branches are skipped via `BranchExclusiveItems`.
+
+```plantuml
+@startuml
+    participant Caller
+    participant Compiler as WorkflowCompiler
+    participant Tree as IWorkflowTreeViewModel
+    participant Result as CompilationResult
+    participant Item as CompiledItem
+    participant Cmd as WorkCommand
+    participant Helper as NodeHelper
+
+    Caller -> Compiler: Compile(start, mode, dir, scope, cycle)
+    activate Compiler
+    Compiler -> Tree: read Nodes / Slots / Targets
+    Compiler -> Compiler: build adjacency, detect cycle, traverse
+    alt CycleHandling.Throw and cycle found
+        Compiler --> Caller: throw InvalidOperationException
+    else ok
+        Compiler --> Caller: IReadOnlyList<CompilationResult>
+    end
+    deactivate Compiler
+
+    Caller -> Result: ExecuteAsync(parameter, ct)
+    activate Result
+    loop each item in Items
+        Result -> Item: item.SubscribeError()
+        Result -> Cmd: WorkCommand.ExecuteAsync(currentParam)
+        activate Cmd
+        Cmd -> Helper: WorkAsync(parameter, ct)
+        activate Helper
+        Helper --> Helper: mutate context in place (e.g. NetworkFlowContext)
+        Helper --> Cmd: complete
+        deactivate Helper
+        Cmd --> Result: Exited event -> tcs completes
+        deactivate Cmd
+        alt FailureException != null and ErrorRedirectId set
+            Result -> Item: execute ErrorRedirect target with WorkContext(errorCtx)
+        else success and ICompileTimeRouter
+            Result -> Item: skip BranchExclusiveItems of unchosen key
+        end
+        Result -> Result: currentParam = item.Result ?? currentParam
+        Result -> Item: item.UnsubscribeError()
+    end
+    Result --> Caller: return last result / parameter
+    deactivate Result
+@enduml
 ```
 
-## 4. Undo/Redo Flow
+Cancellation path: `ct.ThrowIfCancellationRequested()` at the top of each loop iteration aborts the whole chain; an `OperationCanceledException` from a node rethrows immediately.
 
-```mermaid
-sequenceDiagram
-	participant User
-	participant Tree as TreeViewModel
-	participant Stack as Undo Stack
-	participant Pair as WorkflowActionPair
+*Source: `Src/Core/VeloxDev.Core/WorkflowSystem/Compilation/Compiler.cs`, lines 54-149; `Models/CompilationResult.cs`, lines 157-260; `Models/CompiledItem.cs`, lines 104-121.*
 
-	User->>Tree: SubmitCommand.Execute(pair)
-	Tree->>Pair: pair.Do()
-	Tree->>Stack: Push(pair)
+## 4. Agent tool call flow
 
-	Note over User,Stack: Later...
-	User->>Tree: UndoCommand.Execute(null)
-	Tree->>Stack: Pop → pair
-	Tree->>Pair: pair.Undo()
-	Tree->>RedoStack: Push(pair)
+The chat client drives an `IAIAgent`. On a tool call, `WorkflowAgentToolkit` invokes the underlying `AIFunction`, tracks the call, and the tool mutates the tree through helpers/commands. Interaction tools (`RequestSelection` / `RequestConfirmation`) can pause for the user.
 
-	Note over User,Stack: Or...
-	User->>Tree: RedoCommand.Execute(null)
-	Tree->>RedoStack: Pop → pair
-	Tree->>Pair: pair.Do()
-	Tree->>Stack: Push(pair)
+```plantuml
+@startuml
+    participant User
+    participant Agent as ChatClientAgent
+    participant Scope as WorkflowAgentScope
+    participant Toolkit as WorkflowAgentToolkit
+    participant Tool as TrackedAIFunction
+    participant Tree as IWorkflowTreeViewModel
+    participant Helper as TreeHelper
+
+    User -> Agent: agent.RunAsync(message, session)
+    activate Agent
+    Agent -> Tool: invoke tool (e.g. MoveNode, CreateNode)
+    activate Tool
+    Tool -> Toolkit: base.InvokeCoreAsync(args)
+    activate Toolkit
+    alt RequestSelection / RequestConfirmation
+        Toolkit -> Scope: SelectionHandler / ConfirmationHandler
+        Scope --> User: dialog via View (AgentSelectionEventArgs / AgentConfirmationEventArgs)
+        User --> Toolkit: result
+    end
+    Toolkit -> Tree: node.MoveCommand.Execute(offset) / CreateNodeCommand.Execute(node)
+    activate Tree
+    Tree -> Helper: StandardMove / StandardCreateNode
+    Helper --> Tree: mutation + MarkDirty
+    deactivate Tree
+    Toolkit --> Tool: result JSON
+    deactivate Toolkit
+    Tool -> Toolkit: TrackAsync(name, result)
+    Toolkit -> Scope: RaiseToolCalledAsync -> ToolCalled event + callback
+    deactivate Tool
+    Agent --> User: response text / streaming
+    deactivate Agent
+@enduml
 ```
 
-## 5. Serialization Flow
+Error path: `TrackedAIFunction.InvokeCoreAsync` catches exceptions and returns a JSON `{"error": "..."}` instead of throwing; when `MaxToolCalls` is reached, subsequent calls return `"Tool call limit exceeded"`.
 
-```mermaid
-flowchart LR
-	A[TreeViewModel] -->|Serialize| B[JSON]
-	B -->|Deserialize| C[TreeViewModel copy]
-	C -->|UpdateCommand.Execute| D[Layout restored]
-	D -->|WorkflowBehaviors.Refresh| E[UI re-renders]
-```
-
-The `VeloxDev.MVVM.Serialization` namespace provides `Serialize()` and `Deserialize<T>()` extension methods. Serialization preserves the full object graph: nodes, slots, links, layout state, and custom data properties.
+*Source: `Src/Core/VeloxDev.Core.Extension/Agent/Workflow/Functions/WorkflowAgentToolkit.cs`, lines 146-195; `Workflow/WorkflowAgentScope.cs`, lines 276-297.*

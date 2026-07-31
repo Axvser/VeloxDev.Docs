@@ -1,122 +1,214 @@
 # 数据流 — 工作流系统
 
-## 1. 节点工作执行流程
+四个时序图追踪主要数据流。使用 PlantUML 语法，可在任意 PlantUML 服务器渲染。
 
-当节点的 `WorkCommand` 被触发时，执行以下序列：
+## 1. CreateNode + 撤销 / 重做
 
-```mermaid
-sequenceDiagram
-	participant T as TreeViewModel
-	participant N as NodeViewModel
-	participant NH as NodeHelper
-	participant Cmd as WorkCommand
-	participant S as Slot System
-	participant SN as 相邻节点
+`helper.CreateNode(node)` 汇入 `StandardCreateNode`，提交可撤销的 `WorkflowActionPair`。撤销和重做弹出栈并运行配对的操作。
 
-	Note over T,SN: 步骤 1：工作执行
-	T->>N: WorkCommand.Execute(parameter)
-	N->>Cmd: 入队（如果受信号量限制）
-	Cmd-->>T: Enqueued 事件
-	Cmd->>Cmd: 等待信号量
-	Cmd-->>T: Dequeued 事件
-	Cmd->>NH: WorkAsync(parameter, ct)
-	NH->>NH: 业务逻辑
-	NH-->>Cmd: Task 完成
-	Cmd-->>T: Exited 事件
+```plantuml
+@startuml
+    participant Caller
+    participant Helper as TreeHelper
+    participant Tree as IWorkflowTreeViewModel
+    participant Cache as TreeCache(UndoStack/RedoStack)
+    participant Pair as WorkflowActionPair
+    participant Node as IWorkflowNodeViewModel
 
-	Note over T,SN: 步骤 2：广播（如果配置）
-	T->>N: BroadcastCommand.Execute(result)
-	N->>S: 对每个有目标的输出槽位...
-	S->>SN: 转发数据到连接节点
-	SN->>SN: 执行 WorkCommand（递归）
+    Caller -> Helper: CreateNode(node)
+    activate Helper
+    Helper -> Tree: StandardCreateNode(node)
+    activate Tree
+    Tree -> Node: GetHelper().Delete()
+    Tree -> Tree: new WorkflowActionPair(redo, undo)
+    Tree -> Cache: StandardSubmit(pair)
+    activate Cache
+    Cache -> Pair: pair.Redo.Invoke()
+    activate Pair
+    Pair -> Tree: redo: Nodes.Add(node); node.Parent = tree
+    deactivate Pair
+    Cache -> Cache: UndoStack.Push(pair)
+    deactivate Cache
+    deactivate Tree
+    deactivate Helper
+
+    Caller -> Tree: UndoCommand.Execute(null)
+    activate Tree
+    Tree -> Cache: StandardUndo()
+    activate Cache
+    Cache -> Cache: UndoStack.TryPop(out pair)
+    Cache -> Pair: pair.Undo.Invoke()
+    activate Pair
+    Pair -> Tree: undo: Nodes.Remove(node); node.Parent = oldParent
+    deactivate Pair
+    Cache -> Cache: RedoStack.Push(pair)
+    deactivate Cache
+    deactivate Tree
+
+    Caller -> Tree: RedoCommand.Execute(null)
+    activate Tree
+    Tree -> Cache: StandardRedo()
+    activate Cache
+    Cache -> Cache: RedoStack.TryPop(out pair)
+    Cache -> Pair: pair.Redo.Invoke()
+    activate Pair
+    Pair -> Tree: redo: Nodes.Add(node); node.Parent = tree
+    deactivate Pair
+    Cache -> Cache: UndoStack.Push(pair)
+    deactivate Cache
+    deactivate Tree
+@enduml
 ```
 
-## 2. 连接建立流程
+错误路径：若 `pair.Redo.Invoke()` 抛出异常，`StandardSubmit`/`StandardUndo`/`StandardRedo` 会捕获并通过 `Debug.WriteLine` 记录 —— 栈保持不变。
 
-```mermaid
-sequenceDiagram
-	participant T as TreeViewModel
-	participant S1 as 源槽位
-	participant S2 as 目标槽位
-	participant TH as TreeHelper
+*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowTreeEx.cs`，第 27-35、181-234 行。*
 
-	Note over T,TH: 阶段 1：虚拟连接
-	T->>T: SendConnectionCommand.Execute(sourceSlot)
-	T->>TH: SendConnection(slot)
-	TH->>T: 设置带发送方的 VirtualLink
-	T->>S1: 标记槽位为连接中
+## 2. SendConnection / ReceiveConnection
 
-	Note over T,TH: 阶段 2：完成连接
-	T->>T: ReceiveConnectionCommand.Execute(targetSlot)
-	T->>TH: ReceiveConnection(slot)
-	TH->>TH: ValidateConnection(sender, receiver)
-	alt 有效连接
-		TH->>TH: CreateLink(sender, receiver)
-		TH->>T: 添加 Link 到 Links 集合
-		TH->>S1: 将 target 添加到 Targets
-		TH->>S2: 将 source 添加到 Sources
-		TH->>TH: ResetVirtualLink()
-	else 无效连接
-		TH->>TH: ResetVirtualLink()
-		Note over T: 连接被拒绝
-	end
+连接分两个阶段建立。`SendConnection(sender)` 检查发送端容量、显示虚拟连接并设置 `PreviewSender`。`ReceiveConnection(receiver)` 校验容量 + `ValidateConnection`、清理冲突的同向连接、创建连接，并把整个连接作为一个可撤销操作提交。
+
+```plantuml
+@startuml
+    participant Caller
+    participant Tree as IWorkflowTreeViewModel
+    participant Sender as Slot(sender)
+    participant Receiver as Slot(receiver)
+    participant Link as IWorkflowLinkViewModel
+
+    Caller -> Tree: SendConnectionCommand.Execute(sender)
+    activate Tree
+    Tree -> Sender: StandardCanBeSender()
+    alt not canBeSender
+        Tree -> Tree: ResetVirtualLink(); CurrentSender = null
+    else canBeSender
+        Tree -> Tree: SmartCleanupSenderConnections(sender)
+        Tree -> Tree: VirtualLink.IsVisible = true
+        Tree -> Sender: State = PreviewSender; UpdateState()
+        Tree --> Caller: CurrentSender = sender
+    end
+    deactivate Tree
+
+    Caller -> Tree: ReceiveConnectionCommand.Execute(receiver)
+    activate Tree
+    alt CurrentSender == null
+        Tree --> Caller: return (no-op)
+    else CurrentSender != null
+        Tree -> Receiver: StandardCanBeReceiver()
+        Tree -> Tree: GetHelper().ValidateConnection(CurrentSender, receiver)
+        alt invalid (capacity / validation / same parent)
+            Tree -> Tree: ResetVirtualLink(); CurrentSender = null
+        else valid
+            Tree -> Tree: CleanupSameDirectionConnections / SmartCleanupReceiver
+            Tree -> Link: CreateLink(sender, receiver) via GetHelper()
+            Tree -> Tree: StandardSubmit(WorkflowActionPair)
+            Tree -> Tree: redo: LinksMap[sender][receiver] = link; Links.Add; Sender.Targets.Add; Receiver.Sources.Add
+            Tree -> Tree: ResetVirtualLink(); CurrentSender = null
+        end
+    end
+    deactivate Tree
+@enduml
 ```
 
-## 3. 空间查询流程（视口裁剪）
+错误路径：任何校验失败（容量、自定义 `ValidateConnection`、同节点连接）都会重置虚拟连接且不建立连接；已有的同向连接通过提交的 `WorkflowActionPair` 被原子替换。
 
-```mermaid
-sequenceDiagram
-	participant View as UI ScrollViewer
-	participant Tree as TreeViewModel
-	participant TH as TreeHelper
-	participant SM as WorkflowSpatialManager
-	participant Grid as SpatialGridHashMap
-	participant Items as VisibleItems
+*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowTreeEx.cs`，第 92-177、363-416 行。*
 
-	Note over View,Items: 滚动 / 缩放时
-	View->>TH: 视口变化
-	TH->>SM: Query(viewport)
-	SM->>Grid: Query(viewport)
-	Grid-->>SM: 相交的节点 + 节点对
-	SM-->>TH: 结果集
-	TH->>Items: 替换 VisibleItems
-	Items-->>View: UI 回收视图
+## 3. Compile + ExecuteAsync 与 WorkCommand 生命周期
+
+`WorkflowCompiler.Compile` 遍历图（BFS 或 DFS）并生成带 `Order`/`Depth` 的 `CompilationResult` 项目。`ExecuteAsync` 逐个项目派发 `WorkCommand`（fire-and-forget）并等待 `Exited` 事件，然后把参数转发给下一个项目。路由器分支通过 `BranchExclusiveItems` 跳过。
+
+```plantuml
+@startuml
+    participant Caller
+    participant Compiler as WorkflowCompiler
+    participant Tree as IWorkflowTreeViewModel
+    participant Result as CompilationResult
+    participant Item as CompiledItem
+    participant Cmd as WorkCommand
+    participant Helper as NodeHelper
+
+    Caller -> Compiler: Compile(start, mode, dir, scope, cycle)
+    activate Compiler
+    Compiler -> Tree: read Nodes / Slots / Targets
+    Compiler -> Compiler: build adjacency, detect cycle, traverse
+    alt CycleHandling.Throw and cycle found
+        Compiler --> Caller: throw InvalidOperationException
+    else ok
+        Compiler --> Caller: IReadOnlyList<CompilationResult>
+    end
+    deactivate Compiler
+
+    Caller -> Result: ExecuteAsync(parameter, ct)
+    activate Result
+    loop each item in Items
+        Result -> Item: item.SubscribeError()
+        Result -> Cmd: WorkCommand.ExecuteAsync(currentParam)
+        activate Cmd
+        Cmd -> Helper: WorkAsync(parameter, ct)
+        activate Helper
+        Helper --> Helper: mutate context in place (e.g. NetworkFlowContext)
+        Helper --> Cmd: complete
+        deactivate Helper
+        Cmd --> Result: Exited event -> tcs completes
+        deactivate Cmd
+        alt FailureException != null and ErrorRedirectId set
+            Result -> Item: execute ErrorRedirect target with WorkContext(errorCtx)
+        else success and ICompileTimeRouter
+            Result -> Item: skip BranchExclusiveItems of unchosen key
+        end
+        Result -> Result: currentParam = item.Result ?? currentParam
+        Result -> Item: item.UnsubscribeError()
+    end
+    Result --> Caller: return last result / parameter
+    deactivate Result
+@enduml
 ```
 
-## 4. 撤销/重做流程
+取消路径：循环顶部 `ct.ThrowIfCancellationRequested()` 会中止整条链；节点抛出的 `OperationCanceledException` 立即重抛。
 
-```mermaid
-sequenceDiagram
-	participant User
-	participant Tree as TreeViewModel
-	participant Stack as 撤销栈
-	participant Pair as WorkflowActionPair
+*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/Compilation/Compiler.cs`，第 54-149 行；`Models/CompilationResult.cs`，第 157-260 行；`Models/CompiledItem.cs`，第 104-121 行。*
 
-	User->>Tree: SubmitCommand.Execute(pair)
-	Tree->>Pair: pair.Do()
-	Tree->>Stack: Push(pair)
+## 4. Agent 工具调用流
 
-	Note over User,Stack: 稍后...
-	User->>Tree: UndoCommand.Execute(null)
-	Tree->>Stack: Pop → pair
-	Tree->>Pair: pair.Undo()
-	Tree->>RedoStack: Push(pair)
+聊天客户端驱动 `IAIAgent`。工具被调用时，`WorkflowAgentToolkit` 调用底层 `AIFunction`、追踪调用，工具通过 helper/命令变更树。交互工具（`RequestSelection` / `RequestConfirmation`）可暂停等待用户。
 
-	Note over User,Stack: 或...
-	User->>Tree: RedoCommand.Execute(null)
-	Tree->>RedoStack: Pop → pair
-	Tree->>Pair: pair.Do()
-	Tree->>Stack: Push(pair)
+```plantuml
+@startuml
+    participant User
+    participant Agent as ChatClientAgent
+    participant Scope as WorkflowAgentScope
+    participant Toolkit as WorkflowAgentToolkit
+    participant Tool as TrackedAIFunction
+    participant Tree as IWorkflowTreeViewModel
+    participant Helper as TreeHelper
+
+    User -> Agent: agent.RunAsync(message, session)
+    activate Agent
+    Agent -> Tool: invoke tool (e.g. MoveNode, CreateNode)
+    activate Tool
+    Tool -> Toolkit: base.InvokeCoreAsync(args)
+    activate Toolkit
+    alt RequestSelection / RequestConfirmation
+        Toolkit -> Scope: SelectionHandler / ConfirmationHandler
+        Scope --> User: dialog via View (AgentSelectionEventArgs / AgentConfirmationEventArgs)
+        User --> Toolkit: result
+    end
+    Toolkit -> Tree: node.MoveCommand.Execute(offset) / CreateNodeCommand.Execute(node)
+    activate Tree
+    Tree -> Helper: StandardMove / StandardCreateNode
+    Helper --> Tree: mutation + MarkDirty
+    deactivate Tree
+    Toolkit --> Tool: result JSON
+    deactivate Toolkit
+    Tool -> Toolkit: TrackAsync(name, result)
+    Toolkit -> Scope: RaiseToolCalledAsync -> ToolCalled event + callback
+    deactivate Tool
+    Agent --> User: response text / streaming
+    deactivate Agent
+@enduml
 ```
 
-## 5. 序列化流程
+错误路径：`TrackedAIFunction.InvokeCoreAsync` 捕获异常并返回 JSON `{"error": "..."}` 而非抛出；达到 `MaxToolCalls` 后，后续调用返回 `"Tool call limit exceeded"`。
 
-```mermaid
-flowchart LR
-	A[TreeViewModel] -->|Serialize| B[JSON]
-	B -->|Deserialize| C[TreeViewModel copy]
-	C -->|UpdateCommand.Execute| D[Layout restored]
-	D -->|WorkflowBehaviors.Refresh| E[UI re-renders]
-```
-
-`VeloxDev.MVVM.Serialization` 命名空间提供 `Serialize()` 和 `Deserialize<T>()` 扩展方法。序列化保留完整的对象图：节点、槽位、连接线、布局状态和自定义数据属性。
+*源码：`Src/Core/VeloxDev.Core.Extension/Agent/Workflow/Functions/WorkflowAgentToolkit.cs`，第 146-195 行；`Workflow/WorkflowAgentScope.cs`，第 276-297 行。*

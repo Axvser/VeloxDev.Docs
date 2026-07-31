@@ -6,90 +6,100 @@
 VeloxDev/
 ├── Src/
 │   ├── Core/
-│   │   ├── VeloxDev.Core/                 ← Core engine (netstandard2.0, net4.6.1, net5, netcoreapp3.0)
-│   │   │   ├── WorkflowSystem/            ← Workflow editing engine
-│   │   │   ├── TransitionSystem/          ← Property animation system
-│   │   │   ├── DynamicTheme/              ← Dynamic theme switching
-│   │   │   ├── MVVM/                      ← MVVM infrastructure
-│   │   │   ├── AspectOriented/            ← AOP proxy system
-│   │   │   ├── AI/                        ← AI Agent integration
-│   │   │   ├── TimeLine/                  ← MonoBehaviour system
-│   │   │   ├── WeakTypes/                 ← Weak reference collections
-│   │   │   └── Interfaces/                ← Public API interfaces
-│   │   ├── VeloxDev.Core.Extension/       ← Optional extensions (AI/MCP/Workflow resources)
+│   │   ├── VeloxDev.Core/                 ← Core engine (multi-target)
+│   │   │   ├── WorkflowSystem/            ← Workflow editor: Templates, StandardEx, Compilation, SelectorEx
+│   │   │   ├── TransitionSystem/          ← Animation engine + NativeInterpolators/
+│   │   │   ├── DynamicTheme/              ← Theme switching (ThemeManager, ThemeCache)
+│   │   │   ├── MVVM/                      ← VeloxProperty/VeloxCommand runtime + IVeloxCommand
+│   │   │   ├── AspectOriented/            ← AOP proxies (#if NET)
+│   │   │   ├── AI/                        ← Agent attributes + reflection utilities
+│   │   │   ├── TimeLine/                  ← MonoBehaviour frame loop (MonoBehaviourManager)
+│   │   │   ├── WeakTypes/                 ← WeakQueue/WeakStack/WeakCache/WeakDelegate
+│   │   │   └── Interfaces/                ← Public API contracts (WorkflowSystem, TransitionSystem, ...)
+│   │   ├── VeloxDev.Core.Extension/       ← Workflow Agent (AI.Workflow), MCP, ComponentModelEx serialization
 │   │   ├── VeloxDev.Core.Test/            ← MSTest unit tests
-│   │   └── VeloxDev.Core.Generator/       ← Roslyn source generator
-│   ├── Adapters/
-│   │   ├── VeloxDev.WPF/                  ← WPF adapter
-│   │   ├── VeloxDev.Avalonia/             ← Avalonia adapter
-│   │   ├── VeloxDev.WinUI/               ← WinUI adapter
-│   │   ├── VeloxDev.MAUI/                ← .NET MAUI adapter
-│   │   ├── VeloxDev.WinForms/            ← Windows Forms adapter
-│   │   └── VeloxDev.Razor/               ← Blazor/Razor adapter
-│   └── Templates/                         ← Project templates
-├── Examples/
-│   ├── Workflow/                          ← Workflow demos (all platforms)
-│   ├── Transition/                        ← Animation demos (all platforms)
-│   ├── Theme/                             ← Theme demos
-│   ├── MVVM/                              ← MVVM demos
-│   ├── AOP/                               ← AOP demos
-│   └── MonoBehaviour/                     ← MonoBehaviour demos
+│   │   └── VeloxDev.Core.Extension.Test/  ← Extension unit tests
+│   ├── Adapters/                          ← Per-GUI adapters
+│   │   ├── VeloxDev.WPF/                  ← WPF (Attached/Workflow behaviors, PlatformAdapters)
+│   │   ├── VeloxDev.Avalonia/             ← Avalonia
+│   │   ├── VeloxDev.WinUI/                ← WinUI 3
+│   │   ├── VeloxDev.MAUI/                 ← .NET MAUI
+│   │   ├── VeloxDev.WinForms/             ← Windows Forms
+│   │   └── VeloxDev.Razor/                ← Razor / Blazor
+│   ├── Generators/
+│   │   └── VeloxDev.Core.Generator/       ← Roslyn source generators (WorkflowBuilder, MVVM, Command, AOP, Theme, MonoBehaviour)
+│   └── Templates/                         ← dotnet new item templates (WPF/Avalonia/MAUI/WinUI)
+├── Examples/                              ← Demos (primary evidence)
+│   ├── Workflow/   WPF · Avalonia · WinUI · MAUI · WinForms · Blazor + Common/Lib
+│   ├── Transition/ WPF · Avalonia · WinUI · WinForms · MAUI · Blazor
+│   ├── Theme/      WPF · Avalonia
+│   ├── MVVM/       WPF · Avalonia
+│   ├── AOP/        WPF · Avalonia
+│   └── MonoBehaviour/ WPF
 ├── Docs/
-│   └── VeloxDev.Docs/                     ← Wiki documentation (CloudGlyph)
-└── Assets/                                ← Shared assets (logo, icons)
+│   └── VeloxDev.Docs/                     ← CloudGlyph Wiki repository (content, skills, app)
+├── Assets/                                ← Shared assets
+├── TestResults/                           ← Test output
+└── VeloxDev.slnx
 ```
 
-## Core Module Structure (`VeloxDev.Core`)
+## Project-to-Folder Mapping
 
-```
-VeloxDev.Core/
-├── Interfaces/WorkflowSystem/      ← Public API contracts
-│   ├── IWorkflowTreeViewModel.cs
-│   ├── IWorkflowNodeViewModel.cs
-│   ├── IWorkflowSlotViewModel.cs
-│   ├── IWorkflowLinkViewModel.cs
-│   └── ... (helpers, spatial, etc.)
-├── WorkflowSystem/                  ← Implementation
-│   ├── Anchor.cs / Size.cs / Offset.cs / Viewport.cs / CellKey.cs
-│   ├── CanvasLayout.cs / WorkContext.cs / NodeBoundsProvider.cs
-│   ├── SpatialGridHashMap.cs       ← Spatial indexing
-│   ├── WorkflowSpatialManager.cs   ← Spatial management
-│   ├── WorkflowActionPair.cs       ← Undo/redo actions
-│   ├── Templates/                  ← Builder attributes + default VMs
-│   │   ├── WorkflowBuilder.cs      ← [Tree<T>], [Node<T>], [Slot<T>], [Link<T>]
-│   │   ├── ViewModels/             ← Default ViewModel implementations
-│   │   └── Helpers/                ← Default Helper implementations
-│   ├── StandardEx/                 ← Standard extension methods
-│   ├── Compilation/                ← Workflow compiler
-│   └── SelectorEx/                 ← Conditional slot selectors
-├── TransitionSystem/               ← Animation engine
-├── DynamicTheme/                   ← Theme system
-├── MVVM/                           ← VeloxCommand, attributes
-├── AI/                             ← Agent integration
-├── AspectOriented/                 ← AOP
-├── TimeLine/                       ← MonoBehaviour
-└── WeakTypes/                      ← Weak collections
-```
+| Project | Path | Role |
+|---|---|---|
+| `VeloxDev.Core` | `Src/Core/VeloxDev.Core` | All feature cores; multi-targets `netstandard2.0; netframework4.6.1; net5.0; netcoreapp3.0` |
+| `VeloxDev.Core.Extension` | `Src/Core/VeloxDev.Core.Extension` | Workflow Agent (AI tools), MCP scope, JSON serialization (`netstandard2.0`) |
+| `VeloxDev.Core.Generator` | `Src/Generators/VeloxDev.Core.Generator` | Roslyn incremental generators (analyzer package, `netstandard2.0`) |
+| `VeloxDev.WPF` | `Src/Adapters/VeloxDev.WPF` | WPF adapter (`UseWPF`) |
+| `VeloxDev.Avalonia` | `Src/Adapters/VeloxDev.Avalonia` | Avalonia adapter |
+| `VeloxDev.WinUI` | `Src/Adapters/VeloxDev.WinUI` | WinUI 3 adapter (`UseWinUI`) |
+| `VeloxDev.MAUI` | `Src/Adapters/VeloxDev.MAUI` | .NET MAUI adapter (`UseMaui`) |
+| `VeloxDev.WinForms` | `Src/Adapters/VeloxDev.WinForms` | Windows Forms adapter (`UseWindowsForms`) |
+| `VeloxDev.Razor` | `Src/Adapters/VeloxDev.Razor` | Razor/Blazor adapter (Razor SDK) |
+| `VeloxDev.*.Templates` | `Src/Templates` | `dotnet new` item templates |
 
-## Adapter Structure (e.g. `VeloxDev.Avalonia`)
+## Adapter Internal Layout (`VeloxDev.Avalonia` example)
 
 ```
 VeloxDev.Avalonia/
-├── Attached/Workflow/              ← XAML attached behaviors
-│   ├── WorkflowSurfaceBehavior.cs
-│   ├── WorkflowNodeDragBehavior.cs
-│   ├── WorkflowSlotConnectionBehavior.cs
-│   ├── WorkflowSlotLayoutBehavior.cs
+├── Attached/Workflow/               ← XAML attached behaviors (namespace VeloxDev.WorkflowSystem.AttachedBehaviors)
+│   ├── WorkflowSurfaceBehavior.cs   ← surface host, panning, viewport → Helper.Viewport
+│   ├── WorkflowNodeDragBehavior.cs  ← drag → MoveCommand
+│   ├── WorkflowSlotConnectionBehavior.cs ← pointer down/up → Send/ReceiveConnectionCommand
+│   ├── WorkflowSlotLayoutBehavior.cs ← recompute slot anchors after layout
 │   ├── WorkflowCanvasTransformBehavior.cs
-│   ├── ViewPool.cs / ViewManager.cs
-│   └── WorkflowMinimapOverlay.cs
-├── PlatformAdapters/               ← Platform-specific implementations
+│   ├── ViewPool.cs / ViewManager.cs ← pooled virtualized ItemsSource
+│   ├── WorkflowMinimapOverlay.cs
+│   └── IWorkflowGridDecorator.cs / IWorkflowMinimapOverlay.cs
+├── PlatformAdapters/                ← Transition/Theme platform wiring
 │   ├── Interpolator.cs / InterpolatorOutput.cs
-│   ├── Interpolators/              ← Type-specific interpolators
-│   ├── Transition.cs / TransitionScheduler.cs
-│   ├── TransitionEffect.cs
-│   ├── State.cs
+│   ├── Interpolators/               ← per-type interpolators (IBrush, ITransform, BoxShadows, ...)
+│   ├── Transition.cs / TransitionScheduler.cs / TransitionInterpreter.cs
+│   ├── TransitionEffect.cs / TransitionEffects.cs / State.cs
 │   ├── ThemeValueConverters.cs
 │   └── UIThreadInspector.cs
 └── GlobalUsings.cs
+```
+
+## Core Engine Dependencies
+
+```mermaid
+flowchart LR
+    subgraph Core [VeloxDev.Core]
+        WF[WorkflowSystem] --> GEN[VeloxDev.Core.Generator<br/>source generators]
+        MV[MVVM] --> GEN
+        TH[DynamicTheme] --> GEN
+        TR[TransitionSystem] --> WD[WeakTypes.WeakDelegate]
+        AI[AI utilities] --> MV
+    end
+    EXT[VeloxDev.Core.Extension] --> Core
+    EXT --> MCP[ModelContextProtocol]
+    EXT --> EXAI[Microsoft.Extensions.AI]
+    EXT --> NJ[Newtonsoft.Json]
+    WPF[VeloxDev.WPF] --> Core
+    AV[VeloxDev.Avalonia] --> Core
+    WU[VeloxDev.WinUI] --> Core
+    MA[VeloxDev.MAUI] --> Core
+    WF2[VeloxDev.WinForms] --> Core
+    RA[VeloxDev.Razor] --> Core
 ```

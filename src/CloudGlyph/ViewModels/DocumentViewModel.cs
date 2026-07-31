@@ -176,7 +176,7 @@ public partial class DocumentViewModel : ObservableObject
             var mdPath = $"{node.Path}/index.md";
             var uri = new Uri($"avares://CloudGlyph/Assets/Docs/content/{code}/{mdPath.Replace('\\', '/')}");
 
-            string markdown;
+            string? markdown;
             try
             {
                 using var stream = AssetLoader.Open(uri);
@@ -185,10 +185,18 @@ public partial class DocumentViewModel : ObservableObject
             }
             catch (FileNotFoundException)
             {
-                markdown = $"# {node.Title}\n\n*Content not available in this language.*";
+                markdown = null;
             }
 
-            Content = markdown;
+            // If the page has no real content and has children,
+            // auto-redirect to the first child page.
+            if (string.IsNullOrWhiteSpace(markdown) && node.Children.Count > 0)
+            {
+                SelectedNode = node.Children[0];
+                return;
+            }
+
+            Content = markdown ?? $"# {node.Title}\n\n*Content not available in this language.*";
         }
         catch (Exception ex)
         {

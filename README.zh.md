@@ -18,91 +18,44 @@
 
 > **🌐 线上站点：** [https://axvser.github.io/CloudGlyph/](https://axvser.github.io/CloudGlyph/)
 >
-> 使用本模板并按照本指南操作，即可获得你自己的 Agent 驱动 Wiki 站点。
+> 使用本模板即可获得你自己的 Agent 驱动 Wiki 站点。
 
 ---
 
-## 🤖 Agent 说明
+## 🚀 人类快速上手
 
-> **如果你是一个正在阅读本 README 的 AI 编码 Agent：** 你的任务是使用本技能系统构建 Wiki 文档。
+1. **创建你的 Wiki 仓库** — 从本模板在 GitHub 上创建
+2. **克隆**到本地
+3. **告诉你的 Agent** 阅读本 README
+4. **推送** — GitHub Action 自动部署到 Pages
+
+---
+
+## 🤖 给 AI 编码 Agent
+
+> 如果你是一个正在阅读本文的 AI 编码 Agent，请协助你的主人完成下述步骤：
+> **获取或更新 Cloud Glyph 自身**，以便使用其技能系统。
 >
-> 读取 **`skills/SKILL.md`** 并按照管线执行。
-
----
-
-## 🚀 两种使用模式
-
-本模板支持两种部署模式。Agent 会自动检测当前模式。
-
-| 模式 | 场景 | Agent 行为 |
-|---|---|---|
-| **嵌套** | Wiki 仓库作为子目录克隆到项目内部 | 自动发现项目并为其写文档（排除自身） |
-| **独立** | Wiki 仓库独立使用（周围没有项目） | 询问用户要文档化的项目路径 |
-
----
-
-## 📁 模式一：嵌套（Wiki 放在项目内）
-
-将 Wiki 仓库作为子目录克隆到你的项目中。Agent 可在同一工作区中同时访问源代码和 Wiki 指令。
-
-### 设置
-
-```bash
-# 在你的项目仓库中，创建一个用于 Wiki 的分支
-git checkout -b docs/wiki-content
-
-# 将你的 Wiki 仓库克隆为子目录
-git clone https://github.com/<你的用户名>/MyProject-Wiki.git docs/wiki
-```
-
-项目结构如下：
-
-```
-your-main-project/                     ← 你的实际代码（Agent 文档化此部分）
-├── src/
-├── tests/
-├── docs/wiki/                         ← 你的 Wiki 仓库（Agent 排除此目录）
-│   ├── skills/
-│   │   ├── SKILL.md                   ← 入口点
-│   │   └── ...
-│   └── src/CloudGlyph/Assets/Docs/content/
-└── README.md
-```
-
-> **⚠️ .gitignore 风险：** 如果你项目的 `.gitignore` 包含 `src/` 或 `**/Docs/**` 等模式，Wiki 输出文件可能被忽略。添加 `!docs/wiki/**` 来豁免 Wiki 目录。
-
-### 指挥 Agent
-
-> "读取 `docs/wiki/skills/SKILL.md` 并按照管线执行。"
-
----
-
-## 🏠 模式二：独立（Wiki 作为独立仓库）
-
-单独使用 Wiki 仓库——例如为不想修改源代码的项目编写文档。
-
-### 设置
-
-将本仓库直接在工作区中打开（无需嵌套项目）。如果愿意，可以将目标项目源码一同放在工作区中。
-
-### 指挥 Agent
-
-> "读取 `skills/SKILL.md` 并按照管线执行。"
-
-Agent 会检测到**独立**模式，并询问你要文档化的项目路径。
+> 1. **假定你的主人已经完成从Cloud Glyph模板仓库创建独立仓库并克隆到本地**
+>	1.1 执行 `python sync_template.py <your-wiki-path>` 来同步文件
+>	1.2 若你是Claude，可运行 `python <仓库根目录>/skills/claude_install.py <claude-dir>`，这将在 .claude/ 所在目录下，执行skills安装操作
+>	1.3 非Claude用：`python <仓库根目录>/skills/gen_skill.py --lang <en|zh>`直接获取SKILL.md，并按你自己的规范去处置这个文件
+> 2. **如果你是基于任何工具、MCP服务远程访问到这个文件而无本地仓库**
+>	2.1 告诉用户从本模板创建自己的仓库并克隆到本地
+>   2.2 确认用户操作完成后再返回到第一种情况并执行
 
 ---
 
 ## 📤 发布
 
-### 1. 配置 GitHub Pages
+### 配置 GitHub Pages
 
 在你的 Wiki 仓库的 GitHub **Settings → Pages** 中，将 **Build and deployment → Source** 设置为 **`GitHub Actions`**。
 
-### 2. 推送
+### 推送
 
 ```bash
-cd docs/wiki       # 或你的 wiki 路径
+cd <your-wiki-path>
 git add .
 git commit -m "添加 Wiki 内容"
 git push origin master
@@ -124,16 +77,20 @@ CloudGlyph 的 `skills/` 目录可能会收到更新。要将你的 Wiki 仓库�
 
 ```bash
 cd <your-wiki-path>
-python sync_template.py
+python sync_template.py <your-wiki-path>
 ```
 
 该脚本会从 GitHub 拉取最新模板，同步所有文件（skills、配置、工作流等），并保留 `src/CloudGlyph/Assets/Docs/content/` 下你已有的内容。
 
-> **注意：** `sync_template.py` 是**面向用户**的工具。同步后，为每种语言重新生成技能索引：
->
-> ```bash
-> python skills/gen_skill.py --lang en
-> python skills/gen_skill.py --lang zh
-> ```
->
-> `gen_skill.py` 是内部开发工具。
+同步后，为每种语言重新生成 SKILL：
+
+```bash
+python skills/gen_skill.py --lang en
+python skills/gen_skill.py --lang zh
+```
+
+如果使用 Claude，重新安装：
+
+```bash
+python skills/claude_install.py <claude-working-dir> --lang en
+```

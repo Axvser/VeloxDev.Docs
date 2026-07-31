@@ -22,6 +22,14 @@ _SKIP_DIRS = {"__pycache__"}
 
 
 def main():
+    # Cross-platform: force UTF-8 on stdout/stderr so Chinese output survives
+    # Windows pipe redirection (MSBuild ConsoleToMSBuild, CI, etc.).
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError):
+            pass
+
     master_path = os.path.join(DOCS_ROOT, "config", "languages.json")
     if not os.path.isfile(master_path):
         print(
@@ -51,7 +59,8 @@ def main():
         found.append({"code": entry, "displayName": display_name})
 
     indexPath = os.path.join(CONTENT_DIR, "languages_index.json")
-    with open(indexPath, "w", encoding="utf-8") as f:
+    # newline="\n" keeps languages_index.json byte-identical across platforms.
+    with open(indexPath, "w", encoding="utf-8", newline="\n") as f:
         json.dump(found, f, ensure_ascii=False, indent=2)
 
     print(

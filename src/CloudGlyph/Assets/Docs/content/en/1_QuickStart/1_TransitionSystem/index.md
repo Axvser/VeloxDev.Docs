@@ -1,157 +1,150 @@
-# TransitionSystem — Quick Start
+# Transition System — Quick Start
 
-VeloxDev TransitionSystem is a cross-platform property animation engine. It provides interpolators, easing functions, state snapshots, and schedulers for creating smooth animated transitions between property values.
+This guide gets you animating UI properties with the **Transition System** — VeloxDev's cross-platform, code-driven interpolation engine. The core idea is **"everything is a state"**: you record a target's property values into a *state snapshot*, describe where the object should end up, and execute it — the engine interpolates every recorded property from its current value to the target over a timed, eased, frame-based timeline.
 
-## Installation
+> Demo source: `Examples/Transition/{WPF, Avalonia, WinUI, WinForms, MAUI, Blazor}/Demo`
 
-The TransitionSystem is part of `VeloxDev.Core`:
+## 1. Install / Add Dependency
 
-```xml
-<PackageReference Include="VeloxDev.Core" Version="6.0.82" />
+Add the adapter package for your GUI framework — it brings the Transition engine plus platform interpolators:
+
+```bash
+# WPF
+dotnet add package VeloxDev.WPF
+
+# Avalonia
+dotnet add package VeloxDev.Avalonia
+
+# WinUI / MAUI / WinForms / Razor also available
 ```
 
-## Basic Usage
+## 2. Basic Setup / Registration
 
-### 1. Create a State Snapshot
-
-A state snapshot captures the current values of one or more properties and defines their target values for animation.
+**Step 1 — create a state snapshot** with `Transition<T>.Create()` and record target property values. Property lambdas may be **nested paths** (e.g. `r => ((TranslateTransform)r.RenderTransform).X`):
 
 ```csharp
-using VeloxDev.TransitionSystem.Abstractions;
+using VeloxDev.TransitionSystem;
 
-// Create a state snapshot for a specific target type
-var state = TransitionCore<MyControl, StateSnapshotCore<MyControl>>.Create();
-
-// Configure property transitions
-state.Property<double>(ctrl => ctrl.Opacity)
-	.To(0.5)              // Target value
-	.Duration(300)         // Duration in milliseconds
-	.Ease(Eases.Sine.Out); // Easing function
+// The fluent builder: record target values + an effect, then execute
+private static readonly Transition<Rectangle>.StateSnapshot Animation0 =
+    Transition<Rectangle>.Create()
+        .Property(r => r.Opacity, 0)
+        .Property(r => ((TranslateTransform)r.RenderTransform).X, 800)
+        .Property(r => r.Fill, new SolidColorBrush(Colors.Orange))
+        .Effect(new TransitionEffect()
+        {
+            Duration = TimeSpan.FromSeconds(2),
+            IsAutoReverse = true,
+            LoopTime = 2,
+        });
 ```
 
-### 2. Execute a Transition
+**Step 2 — platform wiring (only some platforms need it):**
+
+- WPF / Avalonia: no wiring required — animations may even be started from a background thread; the adapter's `UIThreadInspector` marshals updates to the UI thread.
+- WinUI: **required** — call `UIThreadInspector.SetWindow(this);` once, and do not create `Transition<T>` static fields on non-UI threads.
+- WinForms / Razor: **required** — call `UIThreadInspector.CaptureUIThread();` on the UI thread (WinForms: in `OnLoad`; Razor: in `OnInitialized`).
+
+## 3. Core Usage (Step by Step)
+
+**Execute a snapshot** — by default one object runs only one animation at a time (`CanMutualTask: true`; a new animation cancels the running one). Pass `CanMutualTask: false` to allow parallel animations:
 
 ```csharp
-// Apply the transition to a target object
-TransitionCore<MyControl, StateSnapshotCore<MyControl>>
-	.Execute(myControl, state);
+Animation0.Execute(Rec0);                 // default: mutual-exclusive
+Animation0.Execute(Rec0, CanMutualTask: false);
 
-// Or use the extension method
-state.Execute(myControl);
-```
-
-### 3. Platform Setup (Avalonia Example)
-
-Each platform adapter provides a platform-specific interpolator. Register it once at startup:
-
-```csharp
-// In App.axaml.cs or Program.cs
-using VeloxDev.DynamicTheme;
-
-// Register the Avalonia interpolator
-ThemeManager.SetPlatformInterpolator(new VeloxDev.Avalonia.Interpolator());
-```
-
-### 4. Multiple Property Animation
-
-```csharp
-var snapshot = TransitionCore<MyControl, StateSnapshotCore<MyControl>>.Create();
-
-// Animate multiple properties simultaneously
-snapshot.Property<double>(ctrl => ctrl.Opacity)
-	.To(0.0)
-	.Duration(500)
-	.Ease(Eases.Quad.In);
-
-snapshot.Property<double>(ctrl => ctrl.Width)
-	.To(300)
-	.Duration(1000)
-	.Ease(Eases.Elastic.Out);
-
-snapshot.Property<Brush>(ctrl => ctrl.Background)
-	.To(new SolidColorBrush(Colors.Red))
-	.Duration(300);
-
-// Execute all at once
-snapshot.Execute(myControl);
-```
-
-### 5. Using the Scheduler
-
-For more control over timing and lifecycle, use `TransitionScheduler`:
-
-```csharp
-using VeloxDev.TransitionSystem.Abstractions;
-
-var scheduler = new TransitionSchedulerCore();
-
-// Schedule a transition
-scheduler.Add(snapshot, myControl);
-scheduler.Start();
-
-// Later...
-scheduler.Pause();
-scheduler.Resume();
-scheduler.Exit();  // Stop all transitions
-```
-
-## Easing Functions
-
-VeloxDev provides a comprehensive set of easing functions via the `Eases` static class:
-
-| Category | Functions |
-|---|---|
-| Sine | `Eases.Sine.In`, `.Out`, `.InOut` |
-| Quad | `Eases.Quad.In`, `.Out`, `.InOut` |
-| Cubic | `Eases.Cubic.In`, `.Out`, `.InOut` |
-| Quart | `Eases.Quart.In`, `.Out`, `.InOut` |
-| Quint | `Eases.Quint.In`, `.Out`, `.InOut` |
-| Expo | `Eases.Expo.In`, `.Out`, `.InOut` |
-| Circ | `Eases.Circ.In`, `.Out`, `.InOut` |
-| Back | `Eases.Back.In`, `.Out`, `.InOut` |
-| Elastic | `Eases.Elastic.In`, `.Out`, `.InOut` |
-| Bounce | `Eases.Bounce.In`, `.Out`, `.InOut` |
-
-## Native Interpolators
-
-Built-in interpolators in `VeloxDev.TransitionSystem.NativeInterpolators`:
-
-| Type | Interpolator |
-|---|---|
-| `double` | `DoubleInterpolator` |
-| `float` | `FloatInterpolator` |
-| `int` | `IntInterpolator` |
-| `long` | `LongInterpolator` |
-| `System.Drawing.Point` | `PointInterpolator` |
-| `System.Drawing.PointF` | `PointFInterpolator` |
-| `System.Drawing.Size` | `SizeInterpolator` |
-| `System.Drawing.SizeF` | `SizeFInterpolator` |
-| `System.Drawing.Rectangle` | `RectangleInterpolator` |
-| `System.Drawing.RectangleF` | `RectangleFInterpolator` |
-| `System.Numerics.Vector2` | `Vector2Interpolator` |
-| `System.Numerics.Vector3` | `Vector3Interpolator` |
-| `System.Numerics.Vector4` | `Vector4Interpolator` |
-| `System.Numerics.Quaternion` | `QuaternionInterpolator` |
-| `System.Drawing.Color` | `ColorInterpolator` |
-
-## Custom Interpolators
-
-Implement `IValueInterpolator` to add support for custom types:
-
-```csharp
-public class MyCustomInterpolator : IValueInterpolator
+// Can be started from a non-UI thread
+_ = Task.Run(() =>
 {
-	public IList<object?> Interpolate(object? from, object? to, int steps)
-	{
-		// Generate intermediate values
-	}
-}
-
-// Register globally
-InterpolatorCore.RegisterInterpolator(typeof(MyType), new MyCustomInterpolator());
+    Animation0.Execute(Rec0);
+    Animation1.Execute(Rec1);
+    Animation2.Execute(Rec2);
+});
 ```
 
-## Next Steps
+**Chain multiple segments** with `.Await`, `.Then`, `.AwaitThen`, each with its own effect and easing:
 
-- See the [API Reference](../../2_API/1_TransitionSystem/index.md) for detailed interface documentation
-- See the [DynamicTheme](../2_DynamicTheme/index.md) Quick Start for theme animation integration
+```csharp
+private static readonly Transition<Rectangle>.StateSnapshot Animation2 =
+    Transition<Rectangle>.Create()
+        .Property(r => r.RenderTransform,
+        [
+            new TranslateTransform(200, 0),
+            new ScaleTransform(1.3, 1.3)
+        ])
+        .Effect(new TransitionEffect()
+        {
+            Duration = TimeSpan.FromSeconds(2),
+            IsAutoReverse = true,
+            FPS = 144,
+            Ease = Eases.Circ.InOut,
+            LoopTime = 2,
+        })
+        .AwaitThen(TimeSpan.FromSeconds(5)) // wait 5s before the next segment
+        .Property(r => r.Fill, new SolidColorBrush(Colors.Yellow))
+        .Effect(new TransitionEffect()
+        {
+            Duration = TimeSpan.FromSeconds(2),
+            Ease = Eases.Sine.In
+        });
+```
+
+**Capture a live snapshot** (record the object's *current* values for reset/undo):
+
+```csharp
+var snapshot0 = Rec0.SnapshotAll();                                    // every animatable property
+var snapshot1 = Rec0.Snapshot(x => x.RenderTransform, x => x.Fill);    // specific properties
+var snapshot2 = Rec0.SnapshotExcept(x => x.Visibility);                // all but these
+
+// Reset the object back to the captured state instantly
+btnReset.Click += (s, e) => snapshot1.Effect(TransitionEffects.Empty).Execute(Rec0);
+```
+
+**Stop animations**:
+
+```csharp
+// IncludeMutual    -> stops animations created with CanMutualTask: true
+// IncludeNoMutual  -> stops animations created with CanMutualTask: false
+Transition.Exit(Rec0, IncludeMutual: true, IncludeNoMutual: false);
+Transition.Exit(Rec1);
+```
+
+## 4. Verification
+
+Run the app:
+
+- `Rec0` animates opacity, position and fill over 2 s, then auto-reverses twice (`IsAutoReverse + LoopTime: 2`).
+- The multi-segment `Animation2` moves + scales, waits 5 s, then animates the fill color with a different easing.
+- The Reset button restores `Rec1` to its captured state instantly.
+- Interrupt buttons call `Transition.Exit(...)` and the rectangles freeze in place.
+- All six platform demos (WPF, Avalonia, WinUI, WinForms, MAUI, Blazor) run the same animation definitions — the Blazor demo animates a plain `BoxModel` view-model and re-renders via `INotifyPropertyChanged`.
+
+## 5. Complete Code
+
+A minimal WPF window animating a rectangle:
+
+```csharp
+public partial class MainWindow : Window
+{
+    private static readonly Transition<Rectangle>.StateSnapshot Animation0 =
+        Transition<Rectangle>.Create()
+            .Property(r => r.Opacity, 0)
+            .Property(r => ((TranslateTransform)r.RenderTransform).X, 800)
+            .Effect(new TransitionEffect()
+            {
+                Duration = TimeSpan.FromSeconds(2),
+                IsAutoReverse = true,
+                LoopTime = 2,
+                Ease = Eases.Sine.InOut,
+            });
+
+    public MainWindow()
+    {
+        InitializeComponent();
+        Loaded += (s, e) => Animation0.Execute(Rec0);
+        btnExit.Click += (s, e) => Transition.Exit(Rec0);
+    }
+}
+```
+
+> **Note:** the Razor adapter adds a `string?` `Property` overload for animating CSS color strings (`"#ff7043"`, `rgb(...)`, named colors). WinForms animates `IInterpolable` + `Padding` + common numerics; MAUI animates MAUI types (`Brush`, `Shadow`, `PointF`, `RectF`, ...).

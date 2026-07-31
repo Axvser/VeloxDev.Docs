@@ -6,90 +6,100 @@
 VeloxDev/
 ├── Src/
 │   ├── Core/
-│   │   ├── VeloxDev.Core/                 ← 核心引擎 (netstandard2.0, net4.6.1, net5, netcoreapp3.0)
-│   │   │   ├── WorkflowSystem/            ← 工作流编辑引擎
-│   │   │   ├── TransitionSystem/          ← 属性动画系统
-│   │   │   ├── DynamicTheme/              ← 动态主题切换
-│   │   │   ├── MVVM/                      ← MVVM 基础设施
-│   │   │   ├── AspectOriented/            ← AOP 代理系统
-│   │   │   ├── AI/                        ← AI Agent 集成
-│   │   │   ├── TimeLine/                  ← MonoBehaviour 系统
-│   │   │   ├── WeakTypes/                 ← 弱引用集合
-│   │   │   └── Interfaces/                ← 公共 API 接口
-│   │   ├── VeloxDev.Core.Extension/       ← 可选扩展（AI/MCP/工作流资源）
+│   │   ├── VeloxDev.Core/                 ← 核心引擎（多目标框架）
+│   │   │   ├── WorkflowSystem/            ← 工作流编辑器：Templates、StandardEx、Compilation、SelectorEx
+│   │   │   ├── TransitionSystem/          ← 动画引擎 + NativeInterpolators/
+│   │   │   ├── DynamicTheme/              ← 主题切换（ThemeManager、ThemeCache）
+│   │   │   ├── MVVM/                      ← VeloxProperty/VeloxCommand 运行时 + IVeloxCommand
+│   │   │   ├── AspectOriented/            ← AOP 代理（#if NET）
+│   │   │   ├── AI/                        ← Agent 特性 + 反射工具
+│   │   │   ├── TimeLine/                  ← MonoBehaviour 帧循环（MonoBehaviourManager）
+│   │   │   ├── WeakTypes/                 ← WeakQueue/WeakStack/WeakCache/WeakDelegate
+│   │   │   └── Interfaces/                ← 公共 API 契约（WorkflowSystem、TransitionSystem...）
+│   │   ├── VeloxDev.Core.Extension/       ← Workflow Agent（AI.Workflow）、MCP、ComponentModelEx 序列化
 │   │   ├── VeloxDev.Core.Test/            ← MSTest 单元测试
-│   │   └── VeloxDev.Core.Generator/       ← Roslyn 源生成器
-│   ├── Adapters/
-│   │   ├── VeloxDev.WPF/                  ← WPF 适配器
-│   │   ├── VeloxDev.Avalonia/             ← Avalonia 适配器
-│   │   ├── VeloxDev.WinUI/               ← WinUI 适配器
-│   │   ├── VeloxDev.MAUI/                ← .NET MAUI 适配器
-│   │   ├── VeloxDev.WinForms/            ← Windows Forms 适配器
-│   │   └── VeloxDev.Razor/               ← Blazor/Razor 适配器
-│   └── Templates/                         ← 项目模板
-├── Examples/
-│   ├── Workflow/                          ← 工作流示例（所有平台）
-│   ├── Transition/                        ← 动画示例（所有平台）
-│   ├── Theme/                             ← 主题示例
-│   ├── MVVM/                              ← MVVM 示例
-│   ├── AOP/                               ← AOP 示例
-│   └── MonoBehaviour/                     ← MonoBehaviour 示例
+│   │   └── VeloxDev.Core.Extension.Test/  ← 扩展单元测试
+│   ├── Adapters/                          ← 各 GUI 适配器
+│   │   ├── VeloxDev.WPF/                  ← WPF（Attached/Workflow 行为、PlatformAdapters）
+│   │   ├── VeloxDev.Avalonia/             ← Avalonia
+│   │   ├── VeloxDev.WinUI/                ← WinUI 3
+│   │   ├── VeloxDev.MAUI/                 ← .NET MAUI
+│   │   ├── VeloxDev.WinForms/             ← Windows Forms
+│   │   └── VeloxDev.Razor/                ← Razor / Blazor
+│   ├── Generators/
+│   │   └── VeloxDev.Core.Generator/       ← Roslyn 源生成器（WorkflowBuilder、MVVM、Command、AOP、Theme、MonoBehaviour）
+│   └── Templates/                         ← dotnet new 项模板（WPF/Avalonia/MAUI/WinUI）
+├── Examples/                              ← 示例（主要证据）
+│   ├── Workflow/   WPF · Avalonia · WinUI · MAUI · WinForms · Blazor + Common/Lib
+│   ├── Transition/ WPF · Avalonia · WinUI · WinForms · MAUI · Blazor
+│   ├── Theme/      WPF · Avalonia
+│   ├── MVVM/       WPF · Avalonia
+│   ├── AOP/        WPF · Avalonia
+│   └── MonoBehaviour/ WPF
 ├── Docs/
-│   └── VeloxDev.Docs/                     ← Wiki 文档（CloudGlyph）
-└── Assets/                                ← 共享资源（logo, 图标）
+│   └── VeloxDev.Docs/                     ← CloudGlyph Wiki 仓库（content、skills、app）
+├── Assets/                                ← 共享资源
+├── TestResults/                           ← 测试输出
+└── VeloxDev.slnx
 ```
 
-## 核心模块结构（`VeloxDev.Core`）
+## 项目到目录映射
 
-```
-VeloxDev.Core/
-├── Interfaces/WorkflowSystem/      ← 公共 API 契约
-│   ├── IWorkflowTreeViewModel.cs
-│   ├── IWorkflowNodeViewModel.cs
-│   ├── IWorkflowSlotViewModel.cs
-│   ├── IWorkflowLinkViewModel.cs
-│   └── ...（helpers, spatial 等）
-├── WorkflowSystem/                  ← 实现
-│   ├── Anchor.cs / Size.cs / Offset.cs / Viewport.cs / CellKey.cs
-│   ├── CanvasLayout.cs / WorkContext.cs / NodeBoundsProvider.cs
-│   ├── SpatialGridHashMap.cs       ← 空间索引
-│   ├── WorkflowSpatialManager.cs   ← 空间管理
-│   ├── WorkflowActionPair.cs       ← 撤销/重做操作
-│   ├── Templates/                  ← 构建器属性 + 默认 ViewModel
-│   │   ├── WorkflowBuilder.cs      ← [Tree<T>], [Node<T>], [Slot<T>], [Link<T>]
-│   │   ├── ViewModels/             ← 默认 ViewModel 实现
-│   │   └── Helpers/                ← 默认 Helper 实现
-│   ├── StandardEx/                 ← 标准扩展方法
-│   ├── Compilation/                ← 工作流编译器
-│   └── SelectorEx/                 ← 条件槽位选择器
-├── TransitionSystem/               ← 动画引擎
-├── DynamicTheme/                   ← 主题系统
-├── MVVM/                           ← VeloxCommand, 属性
-├── AI/                             ← Agent 集成
-├── AspectOriented/                 ← AOP
-├── TimeLine/                       ← MonoBehaviour
-└── WeakTypes/                      ← 弱引用集合
-```
+| 项目 | 路径 | 职责 |
+|---|---|---|
+| `VeloxDev.Core` | `Src/Core/VeloxDev.Core` | 全部功能核心；多目标 `netstandard2.0; netframework4.6.1; net5.0; netcoreapp3.0` |
+| `VeloxDev.Core.Extension` | `Src/Core/VeloxDev.Core.Extension` | Workflow Agent（AI 工具）、MCP scope、JSON 序列化（`netstandard2.0`） |
+| `VeloxDev.Core.Generator` | `Src/Generators/VeloxDev.Core.Generator` | Roslyn 增量生成器（分析器包，`netstandard2.0`） |
+| `VeloxDev.WPF` | `Src/Adapters/VeloxDev.WPF` | WPF 适配器（`UseWPF`） |
+| `VeloxDev.Avalonia` | `Src/Adapters/VeloxDev.Avalonia` | Avalonia 适配器 |
+| `VeloxDev.WinUI` | `Src/Adapters/VeloxDev.WinUI` | WinUI 3 适配器（`UseWinUI`） |
+| `VeloxDev.MAUI` | `Src/Adapters/VeloxDev.MAUI` | .NET MAUI 适配器（`UseMaui`） |
+| `VeloxDev.WinForms` | `Src/Adapters/VeloxDev.WinForms` | Windows Forms 适配器（`UseWindowsForms`） |
+| `VeloxDev.Razor` | `Src/Adapters/VeloxDev.Razor` | Razor/Blazor 适配器（Razor SDK） |
+| `VeloxDev.*.Templates` | `Src/Templates` | `dotnet new` 项模板 |
 
-## 适配器结构（例如 `VeloxDev.Avalonia`）
+## 适配器内部布局（`VeloxDev.Avalonia` 示例）
 
 ```
 VeloxDev.Avalonia/
-├── Attached/Workflow/              ← XAML 附加行为
-│   ├── WorkflowSurfaceBehavior.cs
-│   ├── WorkflowNodeDragBehavior.cs
-│   ├── WorkflowSlotConnectionBehavior.cs
-│   ├── WorkflowSlotLayoutBehavior.cs
+├── Attached/Workflow/               ← XAML 附加行为（命名空间 VeloxDev.WorkflowSystem.AttachedBehaviors）
+│   ├── WorkflowSurfaceBehavior.cs   ← 表面宿主、平移、视口 → Helper.Viewport
+│   ├── WorkflowNodeDragBehavior.cs  ← 拖拽 → MoveCommand
+│   ├── WorkflowSlotConnectionBehavior.cs ← 按下/松开 → Send/ReceiveConnectionCommand
+│   ├── WorkflowSlotLayoutBehavior.cs ← 布局后重算槽位锚点
 │   ├── WorkflowCanvasTransformBehavior.cs
-│   ├── ViewPool.cs / ViewManager.cs
-│   └── WorkflowMinimapOverlay.cs
-├── PlatformAdapters/               ← 平台特定实现
+│   ├── ViewPool.cs / ViewManager.cs ← 池化虚拟化 ItemsSource
+│   ├── WorkflowMinimapOverlay.cs
+│   └── IWorkflowGridDecorator.cs / IWorkflowMinimapOverlay.cs
+├── PlatformAdapters/                ← Transition/Theme 平台接线
 │   ├── Interpolator.cs / InterpolatorOutput.cs
-│   ├── Interpolators/              ← 类型特定插值器
-│   ├── Transition.cs / TransitionScheduler.cs
-│   ├── TransitionEffect.cs
-│   ├── State.cs
+│   ├── Interpolators/               ← 按类型插值器（IBrush、ITransform、BoxShadows...）
+│   ├── Transition.cs / TransitionScheduler.cs / TransitionInterpreter.cs
+│   ├── TransitionEffect.cs / TransitionEffects.cs / State.cs
 │   ├── ThemeValueConverters.cs
 │   └── UIThreadInspector.cs
 └── GlobalUsings.cs
+```
+
+## 核心引擎依赖
+
+```mermaid
+flowchart LR
+    subgraph Core [VeloxDev.Core]
+        WF[WorkflowSystem] --> GEN[VeloxDev.Core.Generator<br/>源生成器]
+        MV[MVVM] --> GEN
+        TH[DynamicTheme] --> GEN
+        TR[TransitionSystem] --> WD[WeakTypes.WeakDelegate]
+        AI[AI 工具] --> MV
+    end
+    EXT[VeloxDev.Core.Extension] --> Core
+    EXT --> MCP[ModelContextProtocol]
+    EXT --> EXAI[Microsoft.Extensions.AI]
+    EXT --> NJ[Newtonsoft.Json]
+    WPF[VeloxDev.WPF] --> Core
+    AV[VeloxDev.Avalonia] --> Core
+    WU[VeloxDev.WinUI] --> Core
+    MA[VeloxDev.MAUI] --> Core
+    WF2[VeloxDev.WinForms] --> Core
+    RA[VeloxDev.Razor] --> Core
 ```

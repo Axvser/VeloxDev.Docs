@@ -1,67 +1,32 @@
-# Module Discovery
+# Feature Inventory Discovery
 
 ## Responsibility
 
-Analyze the solution structure to systematically discover all functional modules and their responsibility boundaries. This skill provides the module inventory for subsequent Quick Start, API documentation, and software engineering analysis.
+Execute the discovery flow defined in 【TEMPLATE · Analysis Paradigm】 and produce the「Feature Inventory」as the unified input for Quick Start, API Reference, and SE Analysis
 
 ## Workflow
 
-### 1. Scan Project Structure
+### 1. Follow the Analysis Paradigm
 
-List all projects/directories under Solution_Root and read each project's definition file:
+Strictly follow the discovery order defined in the Analysis Paradigm, regardless of project size; never infer features from directory structure alone:
 
-```
-# .NET example
-Solution: MyApp.slnx
-├── src/MyApp.Core/          ← Class library
-│   └── MyApp.Core.csproj
-├── src/MyApp.Web/           ← Web application
-│   └── MyApp.Web.csproj
-└── tests/MyApp.Tests/       ← Test project
-	└── MyApp.Tests.csproj
-```
+1. **Entry-point understanding** — read README, entry files, build scripts, etc., to form a candidate feature list
+2. **Demo / Example first** — fully read all source files under Examples/, samples/, demo, etc., and extract feature and API evidence
+3. **Test-driven** — when a Demo is missing, fully read the corresponding test files and extract feature boundaries and typical usage
+4. **Source fallback** — only when the above are absent, infer from source and explicitly mark as *inferred*
 
-### 2. Identify Module Responsibilities
+### 2. Record Ownership and Dependencies
 
-For each project, read its internal directory structure and representative files:
+Read the dependency declarations from project definition files (build manifests, dependency manifests, etc.) and record each feature's owning project and dependencies; the exact file format and fields depend on the project's actual tech stack.
 
-```
-# Read MyApp.Web's Controllers/ directory
-# Confirms this is an ASP.NET Core Web API module
-# Purpose: Provides RESTful API endpoints
-```
+### 3. Generate the Feature Inventory
 
-**Critical: Also check for Demo/Example and Test projects related to each module.** These reveal the actual API surface and idiomatic usage patterns:
-
-```
-# Examples/MyApp.Web/ contains a working REST API demo
-# → Extract endpoint patterns, middleware setup, DI registration
-
-# tests/MyApp.Web.Tests/ has controller tests
-# → Extract request construction, status code assertions
-```
-
-### 3. Map Dependencies
-
-Read ProjectReference and PackageReference from `.csproj` / equivalent files:
-
-```xml
-<ItemGroup>
-  <ProjectReference Include="..\MyApp.Core\MyApp.Core.csproj" />
-  <PackageReference Include="Serilog.AspNetCore" Version="8.0.0" />
-</ItemGroup>
-```
-
-### 4. Generate Module Responsibility Table
-
-| Module | Type | Responsibility | Dependencies |
-|---|---|---|---|
-| MyApp.Core | Class Library | Domain models, business logic | None |
-| MyApp.Web | Web Application | REST API, middleware | MyApp.Core, Serilog |
-| MyApp.Tests | Tests | Unit tests, integration tests | xUnit, MyApp.Core |
+| Feature | Owning Project | Public API Surface | Dependencies | Evidence |
+|---|---|---|---|---|
+| User registration | auth service | register(credentials) | database driver | Demo |
+| Data export | report module | export(format) | template engine | Test |
 
 ## Output
 
-- Complete module list (name, path, type)
-- Confirmed responsibility for each module (based on file content, not guesswork)
-- Inter-project dependency graph
+- 「Feature Inventory」table (feature / owning project / public API surface / dependencies / evidence source)
+- This inventory is the single feature input for the subsequent Quick Start / API Reference / SE Analysis phases — they must not introduce a different feature breakdown

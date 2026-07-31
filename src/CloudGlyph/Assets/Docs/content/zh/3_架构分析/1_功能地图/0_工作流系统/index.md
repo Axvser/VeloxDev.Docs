@@ -1,70 +1,82 @@
 # 功能地图 — 工作流系统
 
-## 职责
+## 职责边界
 
-工作流系统提供了在任何 .NET UI 平台上构建可视化工作流编辑器的基本构建块。它拥有画布抽象、空间索引、节点/槽位/连接线生命周期、撤销/重做以及编译管道。
+工作流系统分为三层：
 
-## 功能分解
+1. **核心（`VeloxDev.Core`）** —— 拥有组件模型（Tree / Node / Slot / Link）、源生成器属性、撤销/重做、空间索引、选择器系统和编译管道。与 UI 框架无关。
+2. **适配器（`VeloxDev.WPF`、`VeloxDev.Avalonia`、……）** —— 附加行为（`WorkflowSurfaceBehavior`、`WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`、`ViewPool`、`WorkflowMinimapOverlay`）渲染并虚拟化图。
+3. **AI / Agent（`VeloxDev.Core.Extension`）** —— `WorkflowAgentScope`（流式上下文与工具）、`WorkflowAgentToolkit`（约 60 个工具）、`WorkflowStateTracker` 与 MCP 加载器（`McpScope`）。
 
-### 1. Tree 管理（`IWorkflowTreeViewModel`）
-- **所属**: `VeloxDev.WorkflowSystem` 命名空间
-- **关键文件**: `Interfaces/WorkflowSystem/IWorkflowTreeViewModel.cs`
-- **用途**: 根容器，持有所有节点、连接线和布局状态。提供节点创建、连接构建、撤销/重做和序列化命令。
-- **命令**: `CreateNode`, `SetPointer`, `SendConnection`, `ReceiveConnection`, `Submit`, `Undo`, `Redo`
-
-### 2. Node 管理（`IWorkflowNodeViewModel`）
-- **关键文件**: `Interfaces/WorkflowSystem/IWorkflowNodeViewModel.cs`
-- **用途**: 表示具有位置（`Anchor`）、尺寸（`Size`）和槽位集合的可视节点。每个节点有 `WorkCommand` 用于执行业务逻辑。
-- **命令**: `Move`, `SetAnchor`, `SetSize`, `CreateSlot`, `Delete`, `Work`, `Broadcast`, `ReverseBroadcast`
-
-### 3. Slot 管理（`IWorkflowSlotViewModel`）
-- **关键文件**: `Interfaces/WorkflowSystem/IWorkflowSlotViewModel.cs`
-- **用途**: 节点上的连接点。每个槽位有通道方向（`Input`/`Output`）并维护连接的源/目标槽位列表。
-- **命令**: `SetChannel`, `SendConnection`, `ReceiveConnection`, `Delete`, `Close`
-
-### 4. Link 管理（`IWorkflowLinkViewModel`）
-- **关键文件**: `Interfaces/WorkflowSystem/IWorkflowLinkViewModel.cs`
-- **用途**: 槽位之间的可视化连接。支持贝塞尔曲线和折线渲染模式。
-
-### 5. 画布布局（`CanvasLayout`）
-- **关键文件**: `WorkflowSystem/CanvasLayout.cs`
-- **用途**: 管理画布尺寸（`ActualSize`, `OriginSize`）和滚动/视口偏移（`ViewportOffset`, `ActualOffset`）。提供 `UpdateCommand` 在变更后重新计算。
-
-### 6. 空间索引（`SpatialGridHashMap<T>` / `WorkflowSpatialManager`）
-- **关键文件**: `WorkflowSystem/SpatialGridHashMap.cs`, `WorkflowSystem/WorkflowSpatialManager.cs`
-- **用途**: 基于网格的空间哈希，用于高效视口查询。`WorkflowSpatialManager` 在 Tree 级别封装此功能，索引节点和节点对（连接线）。
-
-### 7. Helper 系统
-- **关键文件**: `Templates/Helpers/TreeHelper.cs`, `NodeHelper.cs`, `SlotHelper.cs`, `LinkHelper.cs`
-- **用途**: 生命周期钩子（`Install`/`Uninstall`）和行为覆写。每个组件类型都有对应的 Helper 基类。
-
-### 8. 编译管道
-- **关键文件**: `WorkflowSystem/Compilation/`
-- **用途**: 将工作流程图编译为可执行形式。支持不同的 `CompileMode`、`CompileDirection`、`CompileScope` 和 `CycleHandling` 策略。
-
-### 9. 撤销/重做（`WorkflowActionPair`）
-- **关键文件**: `WorkflowSystem/WorkflowActionPair.cs`
-- **用途**: 封装单一可逆操作。Tree 的 `SubmitCommand` / `UndoCommand` / `RedoCommand` 构成撤销栈。
-
-### 10. 条件/选择器槽位（`SelectorEx`）
-- **关键文件**: `WorkflowSystem/SelectorEx/`
-- **用途**: 基于条件路由执行路径的高级槽位类型（例如 `BoolSelectorNode`、`EnumSelectorNode`）。使用 `SlotEnumerator` 和 `ConditionalSlot` 动态选择输出路径。
-
-## 依赖关系
-
+```mermaid
+flowchart TB
+    subgraph Core["VeloxDev.Core"]
+        B["WorkflowBuilder attributes"]
+        I["I*ViewModel + helpers"]
+        S["SpatialGridHashMap / WorkflowSpatialManager"]
+        C["WorkflowCompiler + CompilationResult"]
+        SL["SlotEnumerator / selector"]
+        UR["WorkflowActionPair undo/redo"]
+    end
+    subgraph Ext["VeloxDev.Core.Extension"]
+        AS["WorkflowAgentScope"]
+        TK["WorkflowAgentToolkit (~60 tools)"]
+        ST["WorkflowStateTracker"]
+        MCP["McpScope / McpServerConfiguration"]
+    end
+    subgraph UI["Adapters (WPF / Avalonia / ...)"]
+        AB["AttachedBehaviors: Surface / NodeDrag / SlotConnection / SlotLayout / ViewPool / Minimap"]
+    end
+    UI -->|binds VisibleItems + Layout| Core
+    UI -->|commands| I
+    Ext -->|AsAgentScope| I
+    C -->|orders| SL
+    S -->|visible subset| UI
 ```
-IWorkflowTreeViewModel  ──包含──▶ IWorkflowNodeViewModel[]
-								  ──包含──▶ IWorkflowLinkViewModel[]
-								  ──使用──▶ CanvasLayout
-								  ──使用──▶ WorkflowSpatialManager
-								  ──使用──▶ IWorkflowTreeViewModelHelper
 
-IWorkflowNodeViewModel  ──包含──▶ IWorkflowSlotViewModel[]
-						──使用──▶ Anchor, Size
-						──使用──▶ IVeloxCommand (Work, Broadcast 等)
-						──使用──▶ IWorkflowNodeViewModelHelper
+## 功能 → 项目 → 依赖表
 
-IWorkflowSlotViewModel  ──引用──▶ IWorkflowSlotViewModel[] (Targets/Sources)
-						──使用──▶ SlotChannel, SlotState
-						──使用──▶ IWorkflowSlotViewModelHelper
-```
+| 功能 | 命名空间 | 项目 | 依赖 |
+|---|---|---|---|
+| 构建器属性 | `VeloxDev.WorkflowSystem` | Core | `VeloxDev.MVVM` |
+| 组件接口 | `VeloxDev.WorkflowSystem` | Core | `VeloxDev.AI`（元数据）、`VeloxDev.MVVM` |
+| 默认 VM + Helper | `VeloxDev.WorkflowSystem` | Core | StandardEx |
+| 值类型 / 枚举 | `VeloxDev.WorkflowSystem` | Core | `VeloxDev.TransitionSystem`（Anchor） |
+| 撤销 / 重做 | `VeloxDev.WorkflowSystem.StandardEx` | Core | `WorkflowActionPair` |
+| 空间索引 | `VeloxDev.WorkflowSystem` | Core | `ISpatialMap<T>`、`ISpatialBoundsProvider` |
+| 选择器 | `VeloxDev.WorkflowSystem` | Core | `ISlotProvider`、`[SlotSelectors]` |
+| 编译器 | `VeloxDev.WorkflowSystem.Compilation` | Core | `ICompileTimeRouter`、`ICompileTimePriority`、`ICompileTimeSink` |
+| Agent 作用域 + 工具集 | `VeloxDev.AI.Workflow` / `.Functions` | Core.Extension | Core + `Microsoft.Extensions.AI` |
+| MCP | `VeloxDev.AI.MCP` | Core.Extension | `ModelContextProtocol.Client`、`CliWrap` |
+| 序列化 | `VeloxDev.MVVM.Serialization` | Core.Extension | Newtonsoft.Json |
+| 附加行为 | `VeloxDev.WorkflowSystem.AttachedBehaviors` | 适配器 | Core |
+
+## 入口点
+
+| 场景 | 入口点 |
+|---|---|
+| 定义 Tree | `[WorkflowBuilder.Tree<THelper>]` + `InitializeWorkflow()` |
+| 定义 Node | `[WorkflowBuilder.Node<THelper>(workSemaphore: n)]` |
+| 构建图 | `tree.GetHelper().CreateNode(node)` → `SendConnection` / `ReceiveConnection` |
+| 撤销 / 重做 | `tree.UndoCommand` / `tree.RedoCommand` |
+| 编译与执行 | `new WorkflowCompiler().Compile(start, ...)` → `CompilationResult.ExecuteAsync(parameter, ct)` |
+| 虚拟化 | `TreeHelper(cellSize)` → `tree.EnableMap(cellSize, VisibleItems)` → `Virtualize(viewport)` |
+| 分支路由 | `ICompileTimeRouter.GetRouteTable()` / `SlotEnumerator.SetSelector(type)` |
+| 让 AI 驱动 | `tree.AsAgentScope().With...().ProvideProgressiveContextPrompt()` + `ProvideTools()` |
+| 持久化 | `tree.Serialize()` / `json.Deserialize<T>()` |
+
+## 关键文件
+
+| 关注点 | 文件 |
+|---|---|
+| 属性 | `WorkflowSystem/Templates/WorkflowBuilder.cs` |
+| 接口 | `Interfaces/WorkflowSystem/IWorkflow*.cs` |
+| 标准行为 | `WorkflowSystem/StandardEx/WorkflowTreeEx.cs`（连接、撤销）、`WorkflowNodeEx.cs`、`WorkflowSlotEx.cs`、`WorkflowLinkEx.cs`、`WorkflowSpatialEx.cs` |
+| 默认实现 | `WorkflowSystem/Templates/ViewModels/*.cs`、`Templates/Helpers/*.cs` |
+| 空间 | `WorkflowSystem/SpatialGridHashMap.cs`、`WorkflowSpatialManager.cs`、`NodeBoundsProvider.cs`、`NodePairBoundsProvider.cs` |
+| 选择器 | `WorkflowSystem/SelectorEx/SlotEnumerator.cs`、`ConditionalSlot.cs`、`SlotDefinition.cs` |
+| 编译 | `WorkflowSystem/Compilation/Compiler.cs`、`Models/CompilationResult.cs`、`Models/CompiledItem.cs`、`Enums/*.cs` |
+| Agent | `VeloxDev.Core.Extension/Agent/Workflow/WorkflowAgentScope.cs`、`WorkflowStateTracker.cs`、`Functions/WorkflowAgentToolkit.cs` |
+| MCP | `VeloxDev.Core.Extension/Agent/MCP/McpScope.cs`、`McpServerConfiguration.cs`、`McpServerRunMode.cs` |
+| 序列化 | `VeloxDev.Core.Extension/ComponentModelEx.cs` |
+| 演示证据 | `Examples/Workflow/Common/Lib/ViewModels/Workflow/**`、`Examples/Workflow/WPF/Demo/Views/Workflow/**` |

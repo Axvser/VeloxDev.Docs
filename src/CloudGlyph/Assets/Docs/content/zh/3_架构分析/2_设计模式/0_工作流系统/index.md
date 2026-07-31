@@ -1,101 +1,249 @@
 # 设计模式 — 工作流系统
 
-## 1. 构建器模式（源生成器）
+## 类图
 
-`[WorkflowBuilder.Tree<T>]`、`[WorkflowBuilder.Node<T>]`、`[WorkflowBuilder.Slot<T>]` 和 `[WorkflowBuilder.Link<T>]` 属性由 Roslyn 源生成器（`VeloxDev.Core.Generator`）处理，生成完整的 ViewModel 实现。
+```mermaid
+classDiagram
+    class IWorkflowViewModel {
+        <<interface>>
+        +InitializeWorkflow()
+        +OnPropertyChanged(name)
+        +CloseCommand
+    }
+    class IWorkflowTreeViewModel {
+        <<interface>>
+        +Layout
+        +Nodes
+        +Links
+        +LinksMap
+        +CreateNodeCommand
+        +UndoCommand
+    }
+    class IWorkflowNodeViewModel {
+        <<interface>>
+        +Anchor
+        +Size
+        +Slots
+        +WorkCommand
+        +BroadcastCommand
+    }
+    class IWorkflowSlotViewModel {
+        <<interface>>
+        +Targets
+        +Sources
+        +Channel
+        +State
+    }
+    class IWorkflowLinkViewModel {
+        <<interface>>
+        +Sender
+        +Receiver
+    }
+    class IWorkflowTreeViewModelHelper {
+        <<interface>>
+        +NodeAdded
+        +VisibleItems
+        +CreateNode()
+        +SendConnection()
+        +Submit()
+    }
+    class IWorkflowNodeViewModelHelper {
+        <<interface>>
+        +WorkAsync()
+        +ReceiveAsync()
+        +BroadcastAsync()
+    }
+    class TreeHelper~T~ {
+        +Install(tree)
+        +CreateLink() : IWorkflowLinkViewModel
+        +SendConnection(slot)
+    }
+    class NodeHelper~T~ {
+        +WorkAsync(parameter, ct)
+        +SetAnchor(anchor)
+        +MarkDirty()
+    }
+    class SlotHelper~T~ {
+        +UpdateState()
+        +SetChannel(channel)
+    }
+    class WorkflowActionPair {
+        +Redo : Action
+        +Undo : Action
+    }
+    class WorkflowCompiler {
+        +Compile(start, mode, dir, scope, cycle) : IReadOnlyList~CompilationResult~
+    }
+    class CompilationResult {
+        +Items
+        +ExecuteAsync(parameter, ct)
+    }
+
+    IWorkflowViewModel <|-- IWorkflowTreeViewModel
+    IWorkflowViewModel <|-- IWorkflowNodeViewModel
+    IWorkflowViewModel <|-- IWorkflowSlotViewModel
+    IWorkflowViewModel <|-- IWorkflowLinkViewModel
+    IWorkflowTreeViewModelHelper <|-- TreeHelper~T~
+    IWorkflowNodeViewModelHelper <|-- NodeHelper~T~
+    IWorkflowSlotViewModelHelper <|-- SlotHelper~T~
+    IWorkflowTreeViewModel "1" *-- "many" IWorkflowNodeViewModel
+    IWorkflowNodeViewModel "1" *-- "many" IWorkflowSlotViewModel
+    WorkflowCompiler ..> CompilationResult
+    WorkflowActionPair ..> IWorkflowTreeViewModelHelper : Submit/Undo/Redo
+```
+
+## 识别到的模式
+
+### 1. 模板方法 —— Helper
+
+每个组件的 Helper 基类定义生命周期骨架（`Install` → 订阅集合、`Uninstall` → 取消订阅、`Closing/CloseAsync/Closed`）并暴露可覆写的钩子。`TreeHelper<T>` 调用 `base.Install` 后启用虚拟化；`HttpHelper<T>` 覆写 `Install` 订阅 `WorkCommand` 事件、`WorkAsync` 执行业务逻辑。
+
+> 源码：`Src/Core/VeloxDev.Core/WorkflowSystem/Templates/Helpers/TreeHelper.cs`，第 109-124 行
 
 ```csharp
-// 用户编写：
-[WorkflowBuilder.Tree<MyTreeHelper>]
-public partial class MyTree { }
+public virtual void Install(IWorkflowTreeViewModel tree)
+{
+    Component = tree as T;
+    commands = tree.GetStandardCommands();
+    VisibleItems = [];
+    tree.Nodes.CollectionChanged += OnNodesChanged;
+    tree.Links.CollectionChanged += OnLinksChanged;
 
-// 生成器生成：
-//   - 实现 IWorkflowTreeViewModel
-//   - InitializeWorkflow() 方法
-//   - 所有必需属性（Nodes, Links, Layout...）
-//   - 所有必需命令
-//   - 序列化支持
-//   - Agent 上下文元数据
+    if (!useVirtualization) return;
+
+    if (Component is null || tree.EnableMap(CellSize, VisibleItems) < 0)
+    {
+        Debug.Fail("EnableMap did not return a non-negative value as expected...");
+    }
+    InitializeMonoBehaviour();
+}
 ```
 
-**原因**: 大幅减少样板代码。用户只需编写特定于结构的逻辑（Helper）。重复的属性+命令模式由分析器一次性生成。
+### 2. 命令模式 —— `IVeloxCommand` + 撤销/重做
 
-## 2. 策略模式（Helper 系统）
+每个变更都经过命令对象。可撤销操作通过 `StandardSubmit` 把 `WorkflowActionPair(redo, undo)` 提交到撤销栈；`StandardUndo` 弹出并执行 `Undo`，压入重做栈。`StandardCreateNode` 是典型示例：
 
-每个组件类型将其行为委托给 **Helper** 对象：
+> 源码：`Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowTreeEx.cs`，第 27-35 与 238-248 行
 
-```
-组件             Helper
-─────────       ──────
-TreeViewModel  → TreeHelper<T>      : CreateLink, CreateNode, ValidateConnection
-NodeViewModel  → NodeHelper<T>      : WorkAsync, ValidateBroadcastAsync
-SlotViewModel  → SlotHelper<T>      : ValidateConnection
-LinkViewModel  → LinkHelper<T>      : （仅生命周期）
-```
-
-Helper 是一个可插拔的策略，可以在运行时通过 `SetHelper()` 替换。这将 ViewModel 的结构代码（位置、集合）与其行为代码（业务逻辑、验证）分离。
-
-## 3. 中介者模式（基于命令的通信）
-
-组件不直接调用彼此的方法。而是通过共享的命令接口（`IVeloxCommand`）进行通信：
-
-```
-Node.MoveCommand.Execute(offset)    → Helper 处理空间更新
-Tree.SendConnectionCommand.Execute(slot) → Helper 管理连接协议
-Slot.DeleteCommand.Execute(null)    → Helper 移除连接并通知 Tree
+```csharp
+public static void StandardCreateNode(this IWorkflowTreeViewModel component, IWorkflowNodeViewModel node)
+{
+    var oldParent = node.Parent;
+    var newParent = component;
+    node.GetHelper().Delete();
+    component.StandardSubmit(new WorkflowActionPair(
+        () => CreateNodeRedo(component, node, newParent),
+        () => CreateNodeUndo(component, node, oldParent)));
+}
 ```
 
-这解耦了发送者和接收者。命令可以通过 `SubmitCommand`/`UndoCommand` 机制被拦截、排队、记录或撤销。
+### 3. 观察者模式 —— 集合与命令事件
 
-## 4. 命令模式（撤销/重做）
+Helper 观察 `ObservableCollection` 变化和命令生命周期事件。`TreeHelper` 从 `CollectionChanged` 处理器中引发 `NodeAdded/NodeRemoved/LinkAdded/LinkRemoved`；`HttpHelper<T>` 订阅 `WorkCommand.Started/Exited/Enqueued/Dequeued` 更新运行时计数器：
 
-每个变更操作都包装在 `IWorkflowActionPair` 中：
+> 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/HttpHelper.cs`，第 42-82 行
 
-```
-用户操作 → SubmitCommand(pair) → pair.Do()  → 记录到撤销栈
-用户撤销 → UndoCommand(null)   → pair.Undo() → 移动到重做栈
-用户重做 → RedoCommand(null)   → pair.Do()  → 移回撤销栈
-```
-
-**栈结构**: Tree 维护一个撤销栈和一个重做栈。操作可以批处理以实现复合操作的原子撤销/重做。
-
-## 5. 观察者模式（事件驱动生命周期）
-
-Helper 订阅组件事件：
-
-```
-TreeHelper.NodeAdded    → 空间管理器索引该节点
-TreeHelper.LinkAdded    → 空间管理器索引连接线对
-NodeHelper.WorkCommand  → Started / Completed / Failed / Exited 事件
+```csharp
+_startedHandler = e => { Interlocked.Increment(ref _activeRuns); ... };
+_exitedHandler   = e => { ... if (Interlocked.Decrement(ref _activeRuns) <= 0) StopRuntimeTicker(); };
+_viewModel.WorkCommand.Started += _startedHandler;
+_viewModel.WorkCommand.Exited  += _exitedHandler;
 ```
 
-`HttpHelper<T>` 示例订阅 `WorkCommand.Started`、`.Exited`、`.Enqueued`、`.Dequeued` 来跟踪运行时计数器并显示 UI 状态。
+### 4. 策略模式 —— SlotEnumerator / 选择器 + `ICompileTimeRouter`
 
-## 6. 虚拟代理模式（ViewPool + 虚拟化）
+`SlotEnumerator<TSlot>` 通过 `SetSelector(type)` 交换输出槽策略。`BoolSelectorNodeViewModel` 与 `EnumSelectorNodeViewModel` 实现 `ICompileTimeRouter`，让编译器预先收集路由表（`GetRouteTable`），执行器跳过未选中分支（`GetCurrentRouteKey`）：
 
-`ViewPool` 附加行为充当虚拟代理。仅当前 `Viewport` 内的项目被渲染：
+> 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/BoolSelectorNodeViewModel.cs`，第 70-91 行
 
-```
-IWorkflowTreeViewModelHelper.Viewport  → 定义可见区域
-IWorkflowTreeViewModelHelper.VisibleItems → 计算的可见子集
-ViewPool.ItemsSource = {Binding Helper.VisibleItems}  → 仅渲染这些
-```
+```csharp
+public object? GetCurrentRouteKey() => Condition ? (object)true : (object)false;
 
-当用户平移/缩放时，视口变化 → `VisibleItems` 重新计算 → UI 回收离屏项目的视图。
-
-## 7. 空间哈希模式（基于网格的索引）
-
-`SpatialGridHashMap<T>` 使用基于网格的空间哈希实现 O(1) 的插入/移除和高效范围查询：
-
-```
-网格单元 [x, y] → 该单元中的项目哈希集
-插入: 计算单元键 → 添加到哈希集 (O(1))
-查询: 枚举视口中的单元 → 收集项目 (O(视口中单元数))
-移除: 计算单元键 → 从哈希集移除 (O(1))
+public IReadOnlyDictionary<object, IWorkflowNodeViewModel> GetRouteTable()
+{
+    var dict = new Dictionary<object, IWorkflowNodeViewModel>();
+    if (TrueSlot is not null)
+        foreach (var target in TrueSlot.Targets)
+            if (target.Parent is not null)
+                dict[true] = target.Parent;
+    // ... false 分支同理
+    return dict;
+}
 ```
 
-网格单元大小可配置。较大的单元大小减少内存但增加查询中的误报。
+### 5. 代理 / 装饰器 —— 源生成的 partial ViewModel
 
-## 8. 层级/锚点模式（Z 索引管理）
+`[WorkflowBuilder.Node<THelper>]` 等把用户的 `partial` 类作为被装饰的表面；生成器产生属性/命令成员，而 Helper（通过 `SetHelper` 注入的独立对象）拥有行为。演示 `ControllerViewModel` 在生成命令之外暴露了额外的实例属性作为 ComboBox 数据源：
 
-每个节点都有一个带有 `Layer`（Z 索引）的 `Anchor`。当节点重叠时，层级决定哪个节点显示在前面。层级在创建时自动管理，并可在节点移动时调整。
+> 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/ControllerViewModel.cs`，第 47-57 行
+
+```csharp
+public CompileMode[] CompileModeOptions => [CompileMode.BFS, CompileMode.DFS];
+public CompileDirection[] CompileDirectionOptions => [CompileDirection.Forward, CompileDirection.Reverse];
+public CompileScope[] CompileScopeOptions => [CompileScope.FromNode, CompileScope.Omni];
+public CycleHandling[] CycleHandlingOptions => [CycleHandling.Throw, CycleHandling.Trim, CycleHandling.Allow];
+```
+
+### 6. 门面 —— `WorkflowBuilder`
+
+`WorkflowBuilder` 的嵌套属性类型（`TreeAttribute<T>`、`NodeAttribute<T>`、`SlotAttribute<T>`、`LinkAttribute<T>`）构成整个组件系统的紧凑门面：一个属性选择 Helper 类型、并发度、虚拟连接类型等，生成器生成其余部分。
+
+### 7. 组合 —— 节点包含槽位
+
+`IWorkflowNodeViewModel.Slots` 拥有 `IWorkflowSlotViewModel` 实例；连接由 `sender.Targets` / `receiver.Sources` 派生，并由 `WorkflowSpatialManager` 以节点对（`NodePairBoundsProvider`）索引：
+
+> 源码：`Src/Core/VeloxDev.Core/WorkflowSystem/WorkflowSpatialManager.cs`，第 142-164 行
+
+```csharp
+private void InsertLink(IWorkflowLinkViewModel link)
+{
+    if (link == null || _nodePairProviders.ContainsKey(link)) return;
+    if (link.Sender?.Parent is IWorkflowNodeViewModel nodeA &&
+        link.Receiver?.Parent is IWorkflowNodeViewModel nodeB &&
+        nodeA != nodeB &&
+        _nodeProviders.TryGetValue(nodeA, out var providerA) &&
+        _nodeProviders.TryGetValue(nodeB, out var providerB))
+    {
+        var pairProvider = new NodePairBoundsProvider(nodeA, nodeB, providerA, providerB);
+        _nodePairProviders[link] = pairProvider;
+        _pairToLink[pairProvider] = link;
+        _nodePairMap.Insert(pairProvider);
+        AddToNodeIndex(nodeA, pairProvider);
+        AddToNodeIndex(nodeB, pairProvider);
+    }
+}
+```
+
+### 8. 虚拟代理 —— `ViewPool` + 空间虚拟化
+
+`WorkflowSpatialEx.Virtualize` 查询空间映射并原地调整 `VisibleItems`，使 UI 只渲染与视口相交的项目（外加一层的连接）。可重入由每个树的标志守卫：
+
+> 源码：`Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowSpatialEx.cs`，第 93-111 行
+
+```csharp
+public static void Virtualize(this IWorkflowTreeViewModel tree, Viewport viewport)
+{
+    if (viewport.Width <= 0 || viewport.Height <= 0) return;
+    if (!Virtualizing.TryAdd(tree, 0)) return;
+    try { VirtualizeCore(tree, viewport); }
+    finally { Virtualizing.TryRemove(tree, out _); }
+}
+```
+
+### 9. 构建者 —— 流式 `WorkflowAgentScope`
+
+`tree.AsAgentScope().WithPromptLanguage(...).WithAutoDiscovery(...).WithMaxToolCalls(...)` 链式配置，最终物化为提示词与工具（`ProvideProgressiveContextPrompt()`、`ProvideTools()`）：
+
+> 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`，第 86-121 行
+
+```csharp
+var scope = tree.AsAgentScope()
+    .WithPromptLanguage(AgentLanguages.English)
+    .WithOutputLanguage(AgentLanguages.Chinese)
+    .WithAutoDiscovery(assemblyName: "VeloxDev.Core")
+    .WithAutoDiscovery(assemblyName: "Lib")
+    .WithMaxToolCalls(200)
+    .WithToolCallCallback(args => { helper.ToolCalled?.Invoke(); return Task.CompletedTask; });
+var contextPrompt = scope.ProvideProgressiveContextPrompt();
+var tools = scope.ProvideTools();
+```

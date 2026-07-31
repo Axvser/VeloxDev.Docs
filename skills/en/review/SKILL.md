@@ -2,14 +2,14 @@
 
 ## Responsibility
 
-Systematically review **all** generated Wiki content to ensure quality, accuracy, and consistency. This is a **full audit** of every page, every code sample, and every diagram — not a spot check. Only pass the quality gate when every checklist item is marked ✅.
+Review and correct each deliverable one by one
 
 ## Checklist
 
-### Module Coverage Audit
+### Feature Inventory Coverage Audit
 
-- [ ] Cross-reference the module list produced by Phase 3, verifying each source module along the priority chain **Demo → Tests → Self-discovered** has been documented
-- [ ] Immediately fill any missing modules
+- [ ] Cross-reference the「Feature Inventory」produced by the Analysis Paradigm, verifying every feature is documented across Quick Start / API Reference / SE Analysis
+- [ ] Immediately fill any missing features
 
 ---
 
@@ -37,11 +37,11 @@ For **every page** in the Wiki, extract all code blocks containing API reference
 
 - [ ] **Discovery Priority compliance** — Verify that code samples came from Demo projects (Priority 1) or Tests (Priority 2) first. If only Priority 3 (inferred from source) was used, confirm it is explicitly marked as *inferred*.
 - [ ] **Class/method names** — search the codebase to confirm each type and member exists **with the documented signature**
-- [ ] **Namespace/module paths** — verify they match the actual project structure (e.g. `global::VeloxDev.MVVM` not `VeloxDev.MVVM.Abstractions`)
+- [ ] **Namespace/module paths** — verify they match the actual project structure and source declarations; never invent paths
 - [ ] **Method parameters and return types** — cross-check against the source declaration; document must match reality
-- [ ] **Exception declarations** — if the doc lists thrown exceptions, confirm they exist in the method signature or XML comments
+- [ ] **Exception declarations** — if the doc lists thrown exceptions, confirm they exist in the method signature or doc comments
 - [ ] **Property/field names** — every property or field referenced must be present on the declared type
-- [ ] **Removed/deprecated APIs** — flag any doc references to `[Obsolete]` or removed members for correction
+- [ ] **Removed/deprecated APIs** — flag any doc references to deprecated or removed members for correction
 - [ ] **No fabricated code** — every code block must trace back to a real source file
 
 ---
@@ -58,7 +58,9 @@ For **every page** in the Wiki, extract all code blocks containing API reference
 
 - [ ] Numeric prefixes follow conventions (e.g. `01_`, `02_`)
 - [ ] `index.md` exists in **every** page directory (root and sub-pages)
+- [ ] Code block indentation uses real spaces, not tab characters, matching the Code Style Conventions
 - [ ] No local Markdown links (`[text](local/path/)`) — use relative navigation via the tree instead
+- [ ] **Prune untracked entries** — Any document page or directory **not produced by the current workflow** must be deleted. If removing all affected files empties a parent directory and that does not break the current output structure, the empty directory must also be removed.
 
 ---
 
@@ -73,7 +75,7 @@ For **every page** in the Wiki, extract all code blocks containing API reference
 
 - [ ] **Run navigation script** — Execute `python gen_tree.py` (or the actual script for the project) to rebuild `tree.json`
 - [ ] **Verify script output** — Confirm the generated `tree.json` includes **all** new pages with correct nesting
-- [ ] **Build the project** — Run `dotnet build` to verify compilation
+- [ ] **Build the project** — Run the project's build command to verify compilation
 
 ---
 
@@ -83,5 +85,5 @@ For **every page** in the Wiki, extract all code blocks containing API reference
 2. Code authenticity issues → search source to confirm signatures, then fix docs
 3. Diagram syntax issues → fix and re-validate
 4. Run `python gen_tree.py`, confirm no pages are missing
-5. Run `dotnet build`, confirm compilation succeeds
+5. Run the project's build command, confirm compilation succeeds
 6. Only after all items are ✅, mark the quality gate as passed

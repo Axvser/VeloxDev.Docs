@@ -1,4 +1,4 @@
-﻿<style>
+<style>
   @keyframes float {
     0%, 100% { transform: translateY(0px); }
     50% { transform: translateY(-9px); }
@@ -147,70 +147,69 @@
 
 <div class="cg-wrapper">
 
+  <!-- Project name and description -->
   <h1 class="cg-title">
-    <span class="gradient-text">Cloud Glyph</span>
+    <span class="gradient-text">VeloxDev</span>
   </h1>
   <p class="cg-subtitle">
-    AI‑Powered Markdown Wiki · Desktop + Browser
+    Build modern, AI-controllable workflow editors on any .NET GUI
   </p>
 
   <hr class="gradient-rule" />
 
-  <!-- How it works: 3 steps -->
+  <!-- Three-step workflow -->
   <div class="cg-steps">
     <div class="step-card cg-step" style="animation-delay: 0s;">
-      <div class="step-icon" style="font-size: clamp(1.4em, 4vw, 2em); margin-bottom: 6px;">✍️</div>
-      <div style="font-weight: 600; font-size: clamp(0.8em, 2vw, 0.95em);">Write</div>
-      <div style="font-size: clamp(0.65em, 1.6vw, 0.78em); opacity: 0.7; margin-top: 4px;"><code>content/{lang}/**/index.md</code></div>
+      <div class="step-icon" style="font-size: clamp(1.4em, 4vw, 2em); margin-bottom: 6px;">⛓️</div>
+      <div style="font-weight: 600; font-size: clamp(0.8em, 2vw, 0.95em);">Design</div>
+      <div style="font-size: clamp(0.65em, 1.6vw, 0.78em); opacity: 0.7; margin-top: 4px;"><code>Workflow · Tree · Node · Slot</code></div>
     </div>
     <div class="step-card cg-step" style="animation-delay: 0.12s;">
-      <div class="step-icon-delayed" style="font-size: clamp(1.4em, 4vw, 2em); margin-bottom: 6px;">⚙️</div>
-      <div style="font-weight: 600; font-size: clamp(0.8em, 2vw, 0.95em);">Build</div>
-      <div style="font-size: clamp(0.65em, 1.6vw, 0.78em); opacity: 0.7; margin-top: 4px;">Auto‑index → JSON</div>
+      <div class="step-icon-delayed" style="font-size: clamp(1.4em, 4vw, 2em); margin-bottom: 6px;">🤖</div>
+      <div style="font-weight: 600; font-size: clamp(0.8em, 2vw, 0.95em);">Automate</div>
+      <div style="font-size: clamp(0.65em, 1.6vw, 0.78em); opacity: 0.7; margin-top: 4px;"><code>60+ Agent tools · MCP</code></div>
     </div>
     <div class="step-card cg-step" style="animation-delay: 0.24s;">
       <div class="step-icon-slow" style="font-size: clamp(1.4em, 4vw, 2em); margin-bottom: 6px;">🚀</div>
-      <div style="font-weight: 600; font-size: clamp(0.8em, 2vw, 0.95em);">View</div>
-      <div style="font-size: clamp(0.65em, 1.6vw, 0.78em); opacity: 0.7; margin-top: 4px;">Desktop + Browser</div>
+      <div style="font-weight: 600; font-size: clamp(0.8em, 2vw, 0.95em);">Run</div>
+      <div style="font-size: clamp(0.65em, 1.6vw, 0.78em); opacity: 0.7; margin-top: 4px;"><code>WPF · Avalonia · WinUI · MAUI</code></div>
     </div>
   </div>
 
-  <!-- Feature flex -->
+  <!-- Feature grid -->
   <div class="cg-feats">
     <div class="feat-card cg-feat" style="animation-delay: 0s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📝</span> Markdown<br><span style="opacity: 0.6;">footnotes · tables · tasks</span>
+      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">⛓️</span> Workflow<br><span style="opacity: 0.6;">Tree · Node · Slot · Link · Undo/Redo</span>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.05s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🧮</span> KaTeX<br><span style="opacity: 0.6;">inline $ $ · display $$ $$</span>
+      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🤖</span> Workflow Agent<br><span style="opacity: 0.6;">60+ tools · MCP · Compiler</span>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.1s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🔍</span> Code Highlight<br><span style="opacity: 0.6;">highlight.js · VS Code style</span>
+      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🪶</span> MVVM<br><span style="opacity: 0.6;">Source generators · Async commands</span>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.15s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📊</span> Mermaid<br><span style="opacity: 0.6;">flow · sequence · class · git</span>
+      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎞️</span> Transition<br><span style="opacity: 0.6;">Interpolation · Easing · Fluent API</span>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.2s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌿</span> PlantUML<br><span style="opacity: 0.6;">auto dark/light SVG</span>
+      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎨</span> Theme<br><span style="opacity: 0.6;">Runtime switching · Animated</span>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.25s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎬</span> Video<br><span style="opacity: 0.6;">YouTube · Bilibili · Vimeo</span>
+      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌀</span> AOP<br><span style="opacity: 0.6;">Aspect proxies · Start/Coverage/End</span>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.3s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌐</span> Multi‑language<br><span style="opacity: 0.6;">per‑locale content dirs</span>
+      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">⚙️</span> MonoBehaviour<br><span style="opacity: 0.6;">Frame-driven loop · Tick-based</span>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.35s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎨</span> Theme Editor<br><span style="opacity: 0.6;">RGB sliders · live preview</span>
+      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🧩</span> Adapters<br><span style="opacity: 0.6;">WPF · Avalonia · WinUI · MAUI · WinForms · Razor</span>
     </div>
   </div>
 
   <p style="opacity: 0.4; font-size: 0.85em; margin-top: 1em;">
     <span class="glow-dot" style="background: #4a9eff; animation-delay: 0s;"></span>
-    Agent‑friendly
+    Agent-friendly
     <span class="glow-dot" style="background: #a78bfa; animation-delay: 0.3s;"></span>
-    No database
+    No DB required
     <span class="glow-dot" style="background: #f472b6; animation-delay: 0.6s;"></span>
-    Open source · MIT
+    Open Source · MIT
   </p>
 </div>
-
-

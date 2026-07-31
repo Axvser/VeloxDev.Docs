@@ -30,28 +30,12 @@ def run_git(cmd: list[str], cwd: Path | None = None, check: bool = True) -> subp
     except FileNotFoundError:
         log("ERROR: 'git' command not found. Please install Git.")
         sys.exit(1)
-
-
-def check_sync(repo_root: Path) -> bool:
-    """Return True if local master matches remote origin/master."""
-    # Ensure remote info is fresh
-    log("Fetching remote origin...")
-    run_git(["fetch", "origin"], cwd=repo_root)
-
-    # Get local HEAD commit
-    local = run_git(["rev-parse", BRANCH], cwd=repo_root).stdout.strip()
-    remote = run_git(["rev-parse", f"origin/{BRANCH}"], cwd=repo_root).stdout.strip()
-
-    if not local or not remote:
-        log("ERROR: Could not resolve branches.")
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.strip() if exc.stderr else "(no stderr)"
+        log(f"ERROR: git {' '.join(cmd)} failed (exit {exc.returncode}):")
+        for line in stderr.splitlines():
+            log(f"  git: {line}")
         sys.exit(1)
-
-    synced = local == remote
-    if synced:
-        log(f"Local {BRANCH} is up-to-date with origin/{BRANCH}.")
-    else:
-        log(f"Local {BRANCH} ({local[:8]}) differs from origin/{BRANCH} ({remote[:8]}).")
-    return synced
 
 
 def clone_to_temp(repo_root: Path) -> Path:
@@ -146,9 +130,9 @@ def sync_files(source: Path, target: Path) -> None:
 def main() -> None:
     repo_root = Path(__file__).resolve().parent
 
-    if not (repo_root / ".git").is_dir():
-        log("ERROR: This script must be run from within a Git repository.")
-        sys.exit(1)
+    has_git = (repo_root / ".git").is_dir()
+    if not has_git:
+        log("Warning: No .git directory found. Template files will be synced, but version history (.git) will not be copied.")
 
     if not shutil.which("git"):
         log("ERROR: Git is not installed or not in PATH.")
@@ -156,16 +140,11 @@ def main() -> None:
 
     log(f"Repository root: {repo_root}")
 
-    # Step 1: Check sync status
-    if check_sync(repo_root):
-        log("No update needed.")
-        return
-
-    # Step 2: Clone to temp
+    # Clone template to temp directory and sync
     tmp = clone_to_temp(repo_root)
 
     try:
-        # Step 3: Sync files
+        # Sync files from template to local repository
         sync_files(tmp, repo_root)
     finally:
         # Cleanup temp directory

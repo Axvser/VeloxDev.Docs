@@ -1,124 +1,88 @@
-# APIs
+# API 参考
 
 ## 职责
 
-为每个功能模块编写完整的 API 参考文档。比 Quick Start 更深入，展示所有使用模式（声明式 + 命令式），包含安全覆盖。
+对每个功能模块的所有**接口、类型、函数**进行全量展开，提供完整的 API 目录与签名参考。
 
-## 编写要求
+## 编写原则
 
-### API 发现优先级
+### 全量覆盖
 
-提取 API 文档时，遵循以下严格优先层级：
+API 参考不追求"深入"或"多种风格"，而是追求**不打折扣的完整性**：
 
-> **优先级 1 — Demo/示例项目**
-> 扫描 `Examples/` 目录中该 API 的真实使用代码，**完整读取所有源文件**。Demo 项目揭示了预期的公共 API 表面和最惯用的调用模式。
->
-> **优先级 2 — 单元测试**
-> **完整读取所有测试文件**，提取 API 签名、典型输入/输出和边界情况。测试提供了真实的参数值、断言期望和异常路径。
->
-> **优先级 3（兜底）— 源码接口自行发现**
-> 仅在 Demo 和测试都不存在时：直接从源文件中读取公共 API 签名。这些必须明确标注为*推断所得*。
+- 列举模块中所有公开的类型（类、结构体、接口、枚举）
+- 对每个类型，列出所有公开成员（方法、属性、事件、字段）
+- 包含完整的签名、参数说明、返回值说明、异常声明
 
-### 语义层面
+### API 来源
 
-- 此 API 解决什么问题？（高级意图，非方法名本身）
-- 何时使用 vs 替代方案
-- 前置条件和后置条件
+以【分析范式】产出的「功能清单」为准：证据来源为 Demo / Test 的功能，其 API 表面直接从对应 Demo、测试中提取；标注「推断所得」的功能，从源码签名整理并在文档中标注。
 
-### 完整代码层面
+### 条目模板
 
-```csharp
-/// <summary>
-/// 异步获取用户信息
-/// </summary>
-/// <param name="userId">用户唯一标识</param>
-/// <param name="cancellationToken">取消令牌</param>
-/// <returns>用户对象，未找到时返回 null</returns>
-/// <exception cref="ArgumentException">userId 无效时抛出</exception>
-/// <exception cref="HttpRequestException">网络错误时抛出</exception>
-public async Task<User?> GetUserAsync(
-    int userId,
-    CancellationToken cancellationToken = default)
-```
-
-### 异常表
-
-| 异常 | 条件 |
-|---|---|
-| `ArgumentException` | `userId <= 0` |
-| `HttpRequestException` | 网络请求失败 |
-| `TimeoutException` | 超过 30 秒未响应 |
-
-### 多种使用风格
-
-展示声明式和命令式两种用法：
-
-```csharp
-// 声明式（Quick Start 风格）
-[HttpGet("users/{id}")]
-public async Task<IActionResult> GetUser(int id)
-
-// 命令式（完整控制）
-var endpoint = app.MapGet("/users/{id}", async (int id) => { ... });
-endpoint.WithName("GetUser");
-endpoint.WithOpenApi();
-```
-
-### 安全覆盖
-
-- 认证/授权要求
-- 输入验证逻辑
-- 数据敏感性说明
-- 安全默认值
-
-## 输出位置
-
-`content/{lang}/{category}/1_API参考/{Feature}/index.md`
-
-每个功能模块对应一个子目录：
-
-```
-# 示例：1_核心 的 API 参考
-content/zh/1_核心/1_API参考/
-├── index.md                    ← 概览
-├── 0_工作流/                   ← 工作流系统 API
-│   └── index.md
-├── 1_MVVM/                     ← MVVM API
-│   └── index.md
-├── 2_过渡动画/                  ← 过渡动画 API
-│   └── index.md
-└── ...
-```
-3. **Extract API signatures** — Method name, parameter types, return type, exception declarations
-4. **Record typical input/output** — Extract real invocation examples from test cases
-5. **Capture edge cases** — `null`, empty collections, boundary values, error paths
-6. **Generate documentation** — API signature → parameter table → return value → example code → notes/caveats
-
-## Document Template
+每个公开成员按以下结构记录：
 
 ```markdown
-## ClassName.MethodName
+### {TypeName}.{MemberName}
 
-**Signature:** `ReturnType MethodName(ParamType1 param1, ParamType2 param2)`
+**签名：**
+`{返回类型} {成员名称}({参数列表})`
 
-| Parameter | Type | Description |
+| 参数 | 类型 | 说明 |
 |---|---|---|
-| `param1` | `ParamType1` | Description of param1 |
-| `param2` | `ParamType2` | Description of param2 |
+| `{param}` | `{Type}` | {说明} |
 
-**Returns:** `ReturnType` — Description of return value
+**返回值：** `{Type}` — {说明}
 
-**Example:**
+**异常：**
+| 异常 | 条件 |
+|---|---|
+| `{ExceptionType}` | {触发条件} |
 
-```csharp
-// From test: TestClass.Should_X_When_Y
-var result = instance.MethodName(value1, value2);
-Assert.Equal(expected, result);
+**代码示例：**
+```text
+// 来源：[Demo/测试/源码推断]
+result = instance.method(value);
 ```
 
-**Notes:**
-- May throw YException when X occurs
-- Null values cause Z behavior
+**备注：**
+- {补充说明}
+```
+
+### 组织方式
+
+按类型分组，类型内按成员类型排序（属性优先，方法次之）：
+
+```markdown
+## {包/命名空间}
+
+### 类：{ClassName}
+
+#### 属性
+
+| 名称 | 类型 | 说明 |
+|---|---|---|
+| `{Name}` | `{Type}` | {说明} |
+
+#### 方法
+
+（按条目模板逐个展开）
+
+### 接口：{InterfaceName}
+
+...
+```
+
+### 输出位置
+
+```
+content/{lang}/{category}/1_API参考/{Feature}/
+├── index.md                    ← 概览
+├── 0_{包/命名空间A}/
+│   └── index.md
+├── 1_{包/命名空间B}/
+│   └── index.md
+└── ...
 ```
 
 ## 写入后操作
@@ -126,4 +90,4 @@ Assert.Equal(expected, result);
 编写 API 文档后：
 
 - [ ] **重新生成导航索引** — 运行树生成脚本（如 `python gen_tree.py`）重建 tree.json
-- [ ] **构建项目** — 运行 `dotnet build` 验证新内容正确嵌入
+- [ ] **构建项目** — 运行项目的构建命令验证新内容正确嵌入

@@ -10,6 +10,7 @@ are stripped in the displayed title but preserved in the path for file loading.
 import json
 import os
 import re
+import sys
 
 # __file__ is under scripts/, so content/ is two levels up: ../../
 CONTENT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "content"))
@@ -29,20 +30,31 @@ def _title(name: str) -> str:
     return m.group(1) if m else name
 
 
+def _ensure_index_md(dir_path: str) -> None:
+    """Create a blank index.md if missing. This ensures the directory
+    appears in the navigation tree even when content hasn't been written yet.
+    """
+    index_path = os.path.join(dir_path, "index.md")
+    if not os.path.isfile(index_path):
+        with open(index_path, "w", encoding="utf-8") as f:
+            f.write("")
+        print(f"[gen_tree] Created blank: {index_path}")
+
+
 def _scan(dir_path: str, lang_root: str) -> list[dict]:
     """Scan *dir_path* for subdirectories that contain index.md and return
     them as a list of ``{title, path, children}`` dicts.
 
     Sorting is natural (OS order) — use numeric prefixes to control sequence.
     *lang_root* is the language root — paths are computed relative to it.
+    Missing index.md files are auto-created as blank.
     """
     nodes: list[dict] = []
     for entry in sorted(os.listdir(dir_path)):
         child_path = os.path.join(dir_path, entry)
         if not os.path.isdir(child_path):
             continue
-        if not os.path.isfile(os.path.join(child_path, "index.md")):
-            continue
+        _ensure_index_md(child_path)
 
         rel_path = os.path.relpath(child_path, lang_root).replace("\\", "/")
         children = _scan(child_path, lang_root)
@@ -56,6 +68,14 @@ def _scan(dir_path: str, lang_root: str) -> list[dict]:
 
 
 def main():
+    # Cross-platform: force UTF-8 on stdout/stderr so Chinese paths survive
+    # Windows pipe redirection (MSBuild ConsoleToMSBuild, CI, etc.).
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError):
+            pass
+
     for lang in sorted(os.listdir(CONTENT_DIR)):
         lang_dir = os.path.join(CONTENT_DIR, lang)
         if not os.path.isdir(lang_dir):
@@ -68,8 +88,7 @@ def main():
             child_path = os.path.join(lang_dir, entry)
             if not os.path.isdir(child_path):
                 continue
-            if not os.path.isfile(os.path.join(child_path, "index.md")):
-                continue
+            _ensure_index_md(child_path)
 
             children = _scan(child_path, lang_dir)
             pages.append({
@@ -80,7 +99,8 @@ def main():
 
         tree = {"Pages": pages}
         tree_path = os.path.join(lang_dir, "tree.json")
-        with open(tree_path, "w", encoding="utf-8") as f:
+        # newline="\n" keeps tree.json byte-identical across platforms.
+        with open(tree_path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(tree, f, ensure_ascii=False, indent=2)
         n = len(pages)
         print(f"[gen_tree] Updated: {tree_path} ({n} root pages)")

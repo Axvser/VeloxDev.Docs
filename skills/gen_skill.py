@@ -1,9 +1,10 @@
 """
 gen_skill.py
 
-Collects Meta.md from each sub-skill directory, parses [#Tag] markers,
-groups skills by [#group], and injects the generated Sub-Skill Directory
-Index into Base.md to produce the final SKILL.md.
+Scans skills/{lang}/ for skill directories containing Meta.md,
+parses [#pipeline] and [#description] tags, dynamically constructs
+the workflow section, and inlines each skill's SKILL.md content
+after its corresponding workflow step.
 
 Supports multiple languages via --lang parameter.
 
@@ -17,42 +18,52 @@ to the skills/ folder.
 """
 
 import argparse
+import json
 import os
 import re
 import sys
 from typing import Optional
 
-# ── Paths ──────────────────────────────────────────────────────────────
-
 # Script lives in skills/ — use that as the root
 SKILLS_ROOT = os.path.abspath(os.path.dirname(__file__))
 
-def get_paths(lang: str) -> tuple[str, str]:
-    """Return (template_path, skill_output_path) for the given language.
+WORKFLOW_PLACEHOLDER = "<!-- WORKFLOW -->"
 
-    Template is read from {lang}/TEMPLATE.md.
-    Output is written to skills/SKILL.md (the root entry point).
+_SKIP_DIRS = {"__pycache__", ".git", ".github"}
+
+_TAG_RE = re.compile(r"^\[#(\w+)\](?:\s+(.*))?$")
+
+_HEADING_RE = re.compile(r"^(#{1,6})\s")
+
+# Indentation convention: code blocks MUST use spaces, never tabs.
+TAB_WIDTH = 4
+
+
+def expand_tabs(text: str, width: int = TAB_WIDTH) -> str:
+    """Expand leading tab characters to *width* spaces.
+
+    Enforces the indentation convention at assembly time so the generated
+    SKILL.md never contains tab indentation, regardless of source files.
+    Inline tabs (not at line start) are left untouched.
     """
+    lines = text.split("\n")
+    out: list[str] = []
+    for line in lines:
+        stripped = line.lstrip("\t")
+        n_tabs = len(line) - len(stripped)
+        if n_tabs:
+            line = " " * (n_tabs * width) + stripped
+        out.append(line)
+    return "\n".join(out)
+
+
+def get_paths(lang: str) -> tuple[str, str]:
     template_path = os.path.join(SKILLS_ROOT, lang, "TEMPLATE.md")
     skill_output = os.path.join(SKILLS_ROOT, "SKILL.md")
     return template_path, skill_output
 
-# Directories to skip when scanning for sub-skills
-_SKIP_DIRS = {"__pycache__", ".git", ".github"}
-
-# Regex to detect a [#Tag] at the start of a line
-_TAG_RE = re.compile(r"^\[#(\w+)\](?:\s+(.*))?$")
-
-
-# ── Meta.md Parser ────────────────────────────────────────────────────
 
 def parse_meta(path: str) -> dict[str, str]:
-    """Parse a Meta.md file and return a dict of {tag: content}.
-
-    Tags are identified by ``[#tagname]`` at the start of a line.
-    Content continues until the next ``[#tagname]`` or EOF.
-    Leading/trailing blank lines are stripped from each tag's content.
-    """
     result: dict[str, str] = {}
     current_tag: Optional[str] = None
     current_lines: list[str] = []
@@ -84,298 +95,175 @@ def parse_meta(path: str) -> dict[str, str]:
     return result
 
 
-# ── Table Generator ───────────────────────────────────────────────────
+def demote_headings(text: str, levels: int = 1) -> str:
+    if levels <= 0:
+        return text
 
-def escape_pipe(text: str) -> str:
-    """Escape pipe characters for markdown table cells."""
-    return text.replace("|", "\\|")
-
-
-# Preferred group display order (canonical: Chinese tags from Meta.md)
-_GROUP_ORDER = [
-    "基础设置",
-    "约束加载",
-    "内容编写",
-    "质量保障",
-]
-
-# Language-specific display configs for the generated index
-_LANG_CONFIG = {
-    "en": {
-        "intro": (
-            "Sub-skills are organized into independent directories by scenario. "
-            "The Agent should only load a sub-skill's `SKILL.md` when the user's request "
-            "matches the corresponding scenario \u2014 do not pre-load."
-        ),
-        "columns": ["Path", "Scenario", "Trigger Keywords"],
-        "groups": {
-            "基础设置": "Foundation Setup",
-            "约束加载": "Constraint Loading",
-            "内容编写": "Content Writing",
-            "质量保障": "Quality Assurance",
-        },
-    },
-    "zh": {
-        "intro": (
-            "子技能按场景组织到独立目录中。Agent 仅在用户请求匹配对应场景时加载子技能的 "
-            "`SKILL.md`，切勿预加载。"
-        ),
-        "columns": ["路径", "场景", "触发关键词"],
-        "groups": {
-            "基础设置": "基础设置",
-            "约束加载": "约束加载",
-            "内容编写": "内容编写",
-            "质量保障": "质量保障",
-        },
-    },
-}
-
-
-def _get_lang_text(lang: str, key: str, group_name: str | None = None) -> str:
-    """Get language-specific display text.
-
-    If *group_name* is given, looks up the group display name.
-    Otherwise looks up *key* (e.g. 'intro', 'columns').
-    """
-    cfg = _LANG_CONFIG.get(lang) or _LANG_CONFIG["en"]
-    if group_name is not None:
-        return cfg["groups"].get(group_name, group_name)
-    return cfg.get(key, "")  # type: ignore[return-value]
-
-
-def _get_lang_columns(lang: str) -> list[str]:
-    """Get the column header strings for the given language."""
-    return _LANG_CONFIG.get(lang, _LANG_CONFIG["en"])["columns"]
-
-
-def _group_sort_key(group: str) -> int:
-    try:
-        return _GROUP_ORDER.index(group)
-    except ValueError:
-        return len(_GROUP_ORDER)
-
-
-def generate_skill_index(skills: list[dict], lang: str = "en") -> str:
-    """Generate the full Sub-Skill Directory Index markdown section.
-
-    *skills* is a list of dicts with keys: group, route, description, workflow, phase, rules.
-    Skills are grouped by [group] in the order defined by _GROUP_ORDER.
-    *lang* controls the display language (intro text, column headers, group names).
-    Returns the markdown string (without the surrounding --- separators).
-    """
-    # Group by [group]
-    groups: dict[str, list[dict]] = {}
-    for s in skills:
-        group = s.get("group", "Uncategorized")
-        groups.setdefault(group, []).append(s)
-
-    # Sort groups by preferred order
-    sorted_groups = sorted(groups.items(), key=lambda kv: _group_sort_key(kv[0]))
-
-    # Sort skills within each group by route
-    for group_name in groups:
-        groups[group_name].sort(key=lambda s: s.get("route", ""))
-
-    columns = _get_lang_columns(lang)
-    parts: list[str] = []
-    parts.append(_get_lang_text(lang, "intro"))
-    parts.append("")
-
-    for group_name, items in sorted_groups:
-        display_group = _get_lang_text(lang, "groups", group_name)
-        parts.append(f"### {display_group}")
-        parts.append("")
-        parts.append(f"| {columns[0]} | {columns[1]} | {columns[2]} |")
-        parts.append("|---|---|---|")
-
-        for s in items:
-            route = s.get("route", "")
-            description = s.get("description", "")
-            workflow = s.get("workflow", "")
-            phase = s.get("phase", "")
-            depth = s.get("depth", 0)
-
-            # Indent route by nesting depth
-            indent = "  " * depth
-            display_route = route
-            if depth > 0:
-                display_route = f"{indent}{route}"
-
-            # Combine description + phase info
-            scenario = description
-            if phase:
-                scenario = f"{description} — {phase}"
-
-            # Trigger keywords from workflow lines
-            triggers = _format_workflow(workflow)
-
-            parts.append(
-                f"| `{escape_pipe(display_route)}`"
-                f" | {escape_pipe(scenario)}"
-                f" | {escape_pipe(triggers)} |"
-            )
-
-        parts.append("")
-
-    return "\n".join(parts).rstrip("\n") + "\n"
-
-
-def generate_flat_table(skills: list[dict]) -> str:
-    """Generate a standalone mapping table Markdown file.
-
-    Produces a single flat table with columns: 分组, 路径, 场景, 触发关键词.
-    """
-    # Group and sort same as generate_skill_index
-    groups: dict[str, list[dict]] = {}
-    for s in skills:
-        group = s.get("group", "Uncategorized")
-        groups.setdefault(group, []).append(s)
-
-    sorted_groups = sorted(groups.items(), key=lambda kv: _group_sort_key(kv[0]))
-
-    for group_name in groups:
-        groups[group_name].sort(key=lambda s: s.get("route", ""))
-
-    parts: list[str] = []
-    parts.append("# 技能索引 — 对照表")
-    parts.append("")
-    parts.append("| 分组 | 路径 | 场景 | 触发关键词 |")
-    parts.append("|---|---|---|---|")
-
-    for group_name, items in sorted_groups:
-        first = True
-        for s in items:
-            route = s.get("route", "")
-            description = s.get("description", "")
-            workflow = s.get("workflow", "")
-            phase = s.get("phase", "")
-            depth = s.get("depth", 0)
-
-            indent = "  " * depth
-            display_route = route
-            if depth > 0:
-                display_route = f"{indent}{route}"
-
-            scenario = description
-            if phase:
-                scenario = f"{description} — {phase}"
-
-            triggers = _format_workflow(workflow)
-
-            cell_group = group_name if first else ""
-            parts.append(
-                f"| {escape_pipe(cell_group)}"
-                f" | `{escape_pipe(display_route)}`"
-                f" | {escape_pipe(scenario)}"
-                f" | {escape_pipe(triggers)} |"
-            )
-            first = False
-
-    parts.append("")
-    return "\n".join(parts) + "\n"
-
-
-def _format_workflow(workflow_text: str) -> str:
-    """Format workflow trigger keywords into a comma-separated string.
-
-    Handles various list formats:
-    - "- \"keyword\"" (markdown list with quoted strings)
-    - "- keyword" (plain markdown list)
-    - "keyword1, keyword2" (comma-separated)
-    """
-    if not workflow_text:
-        return ""
-
-    lines = workflow_text.strip().split("\n")
-    keywords: list[str] = []
-
+    lines = text.split("\n")
+    result: list[str] = []
     for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        # Remove leading "- " or "* " (markdown list markers)
-        if line.startswith("- "):
-            line = line[2:]
-        elif line.startswith("* "):
-            line = line[2:]
-        # Strip surrounding quotes
-        line = line.strip('"').strip("'")
-        if line:
-            keywords.append(line)
-
-    return ", ".join(keywords)
+        m = _HEADING_RE.match(line)
+        if m:
+            prefix = m.group(1)
+            rest = line[m.end() - 1:]
+            result.append(f"{'#' * (len(prefix) + levels)}{rest}")
+        else:
+            result.append(line)
+    return "\n".join(result)
 
 
-# ── Main ──────────────────────────────────────────────────────────────
+def collect_skills(lang: str) -> list[dict]:
+    lang_root = os.path.join(SKILLS_ROOT, lang)
+    skills: list[dict] = []
 
-def _collect_skills_recursive(
-    search_root: str,
-    skills: list[dict],
-    lang: str,
-    lang_root: str,
-    parent_meta: Optional[dict] = None,
-    depth: int = 0,
-) -> None:
-    """Recursively walk *search_root* subdirectories and collect Meta.md data.
-
-    *parent_meta* is the parsed Meta.md of the parent directory (used for
-    group inheritance). *depth* tracks nesting level for indented display.
-    *lang* is the language code used to prefix routes (e.g. 'en', 'zh').
-    """
-    for entry in sorted(os.listdir(search_root)):
-        sub_path = os.path.join(search_root, entry)
+    for entry in sorted(os.listdir(lang_root)):
+        sub_path = os.path.join(lang_root, entry)
         if not os.path.isdir(sub_path):
             continue
         if entry.startswith(".") or entry in _SKIP_DIRS:
             continue
 
         meta_path = os.path.join(sub_path, "Meta.md")
-        meta = parse_meta(meta_path) if os.path.isfile(meta_path) else {}
+        if not os.path.isfile(meta_path):
+            continue
 
-        # Build skill entry if Meta.md exists and has at minimum a description
-        if meta:
-            # Inherit group from parent if not explicitly set
-            group = meta.get("group") or (parent_meta.get("group") if parent_meta else None) or "Uncategorized"
+        meta = parse_meta(meta_path)
+        pipeline = meta.get("pipeline", "")
+        description = meta.get("description", "")
 
-            # Auto-generate route relative to SKILLS_ROOT if not explicitly set
-            route = meta.get("route")
-            if not route:
-                rel = os.path.relpath(sub_path, lang_root).replace("\\", "/")
-                route = f"skills/{lang}/{rel}/SKILL.md"
-                meta["route"] = route
+        if not pipeline:
+            print(f"[gen_skill] WARNING: {entry}/Meta.md has no [#pipeline] - skipping", file=sys.stderr)
+            continue
 
-            skill = {
-                "group": group,
-                "route": route,
-                "description": meta.get("description", ""),
-                "workflow": meta.get("hook", "") or meta.get("workflow", ""),
-                "rules": meta.get("rules", ""),
-                "phase": meta.get("phase", ""),
-                "depth": depth,
-            }
-            skills.append(skill)
-            print(
-                f"[gen_skill] Collected: {'  ' * depth}{os.path.relpath(sub_path, lang_root)}"
-                f" → group={group} (depth={depth})"
-            )
+        skill_path = os.path.join(sub_path, "SKILL.md")
+        if not os.path.isfile(skill_path):
+            print(f"[gen_skill] WARNING: {entry}/SKILL.md not found - skipping", file=sys.stderr)
+            continue
 
-        # Recurse into this subdirectory (pass current meta for group inheritance)
-        _collect_skills_recursive(sub_path, skills, lang, lang_root, meta if meta else parent_meta, depth + 1)
+        skills.append({
+            "pipeline": pipeline,
+            "description": description,
+            "sub_dir": entry,
+            "skill_path": skill_path,
+        })
+        print(f"[gen_skill] Collected: {entry} -> pipeline={pipeline}")
 
-
-def collect_skills(lang: str) -> list[dict]:
-    """Walk the language-specific subdirectory, collect Meta.md data.
-
-    Scans SKILLS_ROOT/{lang}/ for sub-skill directories with Meta.md files.
-    """
-    lang_root = os.path.join(SKILLS_ROOT, lang)
-    skills: list[dict] = []
-    _collect_skills_recursive(lang_root, skills, lang, lang_root, parent_meta=None, depth=0)
+    skills.sort(key=lambda s: int(s["pipeline"]))
     return skills
 
 
-def assemble_skill_md(skills: list[dict], lang: str) -> str:
-    """Read TEMPLATE.md for the given language, inject the generated skill index, return full content."""
+def parse_template_file(path: str) -> Optional[tuple[str, str]]:
+    """Parse a template file under a skill's Templates/ directory.
+
+    Returns (when, content) from the leading [#when] tag and the remaining
+    body text; returns None if the file has no [#when] tag.
+    """
+    when = ""
+    body_lines: list[str] = []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.rstrip("\n")
+                m = _TAG_RE.match(line)
+                if m and m.group(1) == "when":
+                    when = (m.group(2) or "").strip()
+                else:
+                    body_lines.append(line)
+    except Exception as e:
+        print(f"[gen_skill] WARNING: Error reading template {path}: {e}", file=sys.stderr)
+        return None
+
+    if not when:
+        print(f"[gen_skill] WARNING: Template {path} has no [#when] tag - skipping", file=sys.stderr)
+        return None
+    return when, expand_tabs("\n".join(body_lines).strip())
+
+
+def collect_templates(skills: list[dict]) -> list[dict]:
+    """Scan each skill directory for an optional Templates/ folder.
+
+    Every *.md inside it must start with a [#when] tag describing when that
+    template applies. Returns a list of {skill, pipeline, file, when, content}.
+    """
+    templates: list[dict] = []
+    for s in skills:
+        skill_dir = os.path.dirname(s["skill_path"])
+        templates_dir = os.path.join(skill_dir, "Templates")
+        if not os.path.isdir(templates_dir):
+            continue
+        for fname in sorted(os.listdir(templates_dir)):
+            if not fname.lower().endswith(".md"):
+                continue
+            parsed = parse_template_file(os.path.join(templates_dir, fname))
+            if parsed is None:
+                continue
+            when, content = parsed
+            templates.append({
+                "skill": s["sub_dir"],
+                "pipeline": s["pipeline"],
+                "file": fname,
+                "when": when,
+                "content": content,
+            })
+            print(f"[gen_skill] Template: {s['sub_dir']}/{fname} -> when={when}")
+    return templates
+
+
+def generate_template_table(templates: list[dict], lang: str) -> str:
+    """Build the When | Template mapping table appended at the end of SKILL.md.
+
+    The Template column is the template body serialized as a single-line JSON
+    string (newlines as \\n, pipes escaped as \\|) so the markdown table stays
+    well-formed. Parsers read the column as a JSON literal.
+    """
+    if not templates:
+        return ""
+
+    if lang == "zh":
+        heading = "## 模板索引"
+        header = "| 适用时机 (When) | 模板内容 (Template) |"
+        note = (
+            "> 模板内容为 JSON 转义的单行字符串：`\\n` 表示换行，`\\|` 表示字面量 `|`。"
+            "读取时按 JSON 字符串解析即可还原原文。"
+        )
+    else:
+        heading = "## Template Index"
+        header = "| When | Template |"
+        note = (
+            "> Template cells are single-line JSON-escaped strings: `\\n` is a newline, "
+            "`\\|` is a literal `|`. Parse as a JSON string to restore the original text."
+        )
+
+    sep = "|---|---|"
+    parts = [heading, "", note, "", header, sep]
+    for t in templates:
+        single_line = json.dumps(t["content"], ensure_ascii=False).replace("|", "\\|")
+        when_label = f"[{t['skill']}] {t['when']}"
+        parts.append(f"| {when_label} | {single_line} |")
+    return "\n".join(parts) + "\n"
+
+
+def generate_workflow_with_content(skills: list[dict]) -> str:
+    parts: list[str] = []
+
+    for s in skills:
+        parts.append(f"> {s['pipeline']}.{s['description']}")
+        parts.append("")
+
+        try:
+            with open(s["skill_path"], "r", encoding="utf-8") as f:
+                content = f.read()
+            content = expand_tabs(content)
+            content = demote_headings(content, levels=1)
+            parts.append(content)
+            parts.append("")
+        except Exception as e:
+            print(f"[gen_skill] WARNING: Error reading {s['skill_path']}: {e}", file=sys.stderr)
+
+    return "\n".join(parts).rstrip("\n") + "\n"
+
+
+def assemble_skill_md(skills: list[dict], templates: list[dict], lang: str) -> str:
     template_path, _ = get_paths(lang)
     if not os.path.isfile(template_path):
         print(f"[gen_skill] ERROR: TEMPLATE.md not found at {template_path}", file=sys.stderr)
@@ -384,19 +272,30 @@ def assemble_skill_md(skills: list[dict], lang: str) -> str:
     with open(template_path, "r", encoding="utf-8") as f:
         template_content = f.read()
 
-    index_md = generate_skill_index(skills, lang=lang)
-    placeholder = "<!-- SKILL_INDEX -->"
-    if placeholder not in template_content:
-        print(
-            f"[gen_skill] ERROR: Placeholder '{placeholder}' not found in TEMPLATE.md",
-            file=sys.stderr,
-        )
+    if WORKFLOW_PLACEHOLDER not in template_content:
+        print(f"[gen_skill] ERROR: Placeholder '{WORKFLOW_PLACEHOLDER}' not found in TEMPLATE.md", file=sys.stderr)
         sys.exit(1)
 
-    return template_content.replace(placeholder, index_md, 1)
+    workflow_md = generate_workflow_with_content(skills)
+    template_content = template_content.replace(WORKFLOW_PLACEHOLDER, workflow_md, 1)
+
+    # Append the When | Template mapping table at the very end of SKILL.md
+    template_table = generate_template_table(templates, lang)
+    if template_table:
+        template_content = template_content.rstrip("\n") + "\n\n" + template_table
+
+    return template_content
 
 
 def main():
+    # Cross-platform: force UTF-8 on stdout/stderr so Chinese output survives
+    # Windows pipe redirection (MSBuild ConsoleToMSBuild, CI, etc.).
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError):
+            pass  # Python < 3.7 or non-text stream: keep platform default
+
     parser = argparse.ArgumentParser(description="Generate SKILL.md from Meta.md files")
     parser.add_argument("--lang", default="en", help="Language code (e.g. 'en', 'zh'). Default: en")
     args = parser.parse_args()
@@ -411,14 +310,19 @@ def main():
     skills = collect_skills(lang)
 
     if not skills:
-        print("[gen_skill] No sub-skills with Meta.md found — SKILL.md will have an empty index.")
-    else:
-        print(f"[gen_skill] Found {len(skills)} sub-skill(s) with Meta.md")
+        print("[gen_skill] No skills with Meta.md found.")
+        sys.exit(1)
 
-    # Generate SKILL.md (_template.md + skill index)
-    full_content = assemble_skill_md(skills, lang)
+    print(f"[gen_skill] Found {len(skills)} skill(s)")
 
-    with open(skill_output_path, "w", encoding="utf-8") as f:
+    templates = collect_templates(skills)
+    if templates:
+        print(f"[gen_skill] Found {len(templates)} template(s)")
+
+    full_content = assemble_skill_md(skills, templates, lang)
+
+    # newline="\n" keeps the generated SKILL.md byte-identical across platforms.
+    with open(skill_output_path, "w", encoding="utf-8", newline="\n") as f:
         f.write(full_content)
 
     print(f"[gen_skill] Generated: {skill_output_path}")

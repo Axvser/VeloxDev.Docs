@@ -1,101 +1,249 @@
 # Design Patterns — WorkflowSystem
 
-## 1. Builder Pattern (Source Generator)
+## Class Diagram
 
-The `[WorkflowBuilder.Tree<T>]`, `[WorkflowBuilder.Node<T>]`, `[WorkflowBuilder.Slot<T>]`, and `[WorkflowBuilder.Link<T>]` attributes are processed by the Roslyn source generator (`VeloxDev.Core.Generator`) to emit the full ViewModel implementation.
+```mermaid
+classDiagram
+    class IWorkflowViewModel {
+        <<interface>>
+        +InitializeWorkflow()
+        +OnPropertyChanged(name)
+        +CloseCommand
+    }
+    class IWorkflowTreeViewModel {
+        <<interface>>
+        +Layout
+        +Nodes
+        +Links
+        +LinksMap
+        +CreateNodeCommand
+        +UndoCommand
+    }
+    class IWorkflowNodeViewModel {
+        <<interface>>
+        +Anchor
+        +Size
+        +Slots
+        +WorkCommand
+        +BroadcastCommand
+    }
+    class IWorkflowSlotViewModel {
+        <<interface>>
+        +Targets
+        +Sources
+        +Channel
+        +State
+    }
+    class IWorkflowLinkViewModel {
+        <<interface>>
+        +Sender
+        +Receiver
+    }
+    class IWorkflowTreeViewModelHelper {
+        <<interface>>
+        +NodeAdded
+        +VisibleItems
+        +CreateNode()
+        +SendConnection()
+        +Submit()
+    }
+    class IWorkflowNodeViewModelHelper {
+        <<interface>>
+        +WorkAsync()
+        +ReceiveAsync()
+        +BroadcastAsync()
+    }
+    class TreeHelper~T~ {
+        +Install(tree)
+        +CreateLink() : IWorkflowLinkViewModel
+        +SendConnection(slot)
+    }
+    class NodeHelper~T~ {
+        +WorkAsync(parameter, ct)
+        +SetAnchor(anchor)
+        +MarkDirty()
+    }
+    class SlotHelper~T~ {
+        +UpdateState()
+        +SetChannel(channel)
+    }
+    class WorkflowActionPair {
+        +Redo : Action
+        +Undo : Action
+    }
+    class WorkflowCompiler {
+        +Compile(start, mode, dir, scope, cycle) : IReadOnlyList~CompilationResult~
+    }
+    class CompilationResult {
+        +Items
+        +ExecuteAsync(parameter, ct)
+    }
+
+    IWorkflowViewModel <|-- IWorkflowTreeViewModel
+    IWorkflowViewModel <|-- IWorkflowNodeViewModel
+    IWorkflowViewModel <|-- IWorkflowSlotViewModel
+    IWorkflowViewModel <|-- IWorkflowLinkViewModel
+    IWorkflowTreeViewModelHelper <|-- TreeHelper~T~
+    IWorkflowNodeViewModelHelper <|-- NodeHelper~T~
+    IWorkflowSlotViewModelHelper <|-- SlotHelper~T~
+    IWorkflowTreeViewModel "1" *-- "many" IWorkflowNodeViewModel
+    IWorkflowNodeViewModel "1" *-- "many" IWorkflowSlotViewModel
+    WorkflowCompiler ..> CompilationResult
+    WorkflowActionPair ..> IWorkflowTreeViewModelHelper : Submit/Undo/Redo
+```
+
+## Patterns Identified
+
+### 1. Template Method — Helpers
+
+Each component's Helper base class defines the lifecycle skeleton (`Install` → subscribe collections, `Uninstall` → unsubscribe, `Closing/CloseAsync/Closed`) and exposes overridable hooks. `TreeHelper<T>` calls `base.Install` then enables virtualization; `HttpHelper<T>` overrides `Install` to subscribe `WorkCommand` events and `WorkAsync` to run business logic.
+
+> Source: `Src/Core/VeloxDev.Core/WorkflowSystem/Templates/Helpers/TreeHelper.cs`, lines 109-124
 
 ```csharp
-// User writes:
-[WorkflowBuilder.Tree<MyTreeHelper>]
-public partial class MyTree { }
+public virtual void Install(IWorkflowTreeViewModel tree)
+{
+    Component = tree as T;
+    commands = tree.GetStandardCommands();
+    VisibleItems = [];
+    tree.Nodes.CollectionChanged += OnNodesChanged;
+    tree.Links.CollectionChanged += OnLinksChanged;
 
-// Generator emits:
-//   - Implement IWorkflowTreeViewModel
-//   - InitializeWorkflow() method
-//   - All required properties (Nodes, Links, Layout...)
-//   - All required commands
-//   - Serialization support
-//   - Agent context metadata
+    if (!useVirtualization) return;
+
+    if (Component is null || tree.EnableMap(CellSize, VisibleItems) < 0)
+    {
+        Debug.Fail("EnableMap did not return a non-negative value as expected...");
+    }
+    InitializeMonoBehaviour();
+}
 ```
 
-**Why**: Reduces boilerplate dramatically. The user writes only the structure-specific logic (helpers). The repetitive property+command pattern is generated once by the analyzer.
+### 2. Command Pattern — `IVeloxCommand` + Undo/Redo
 
-## 2. Strategy Pattern (Helper System)
+Every mutation goes through a command object. Undoable mutations submit a `WorkflowActionPair(redo, undo)` to the tree's undo stack via `StandardSubmit`; `StandardUndo` pops and runs `Undo`, pushing onto the redo stack. `StandardCreateNode` is a canonical example:
 
-Each component type delegates its behavior to a **Helper** object:
+> Source: `Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowTreeEx.cs`, lines 27-35 and 238-248
 
-```
-Component        Helper
-─────────       ──────
-TreeViewModel  → TreeHelper<T>      : CreateLink, CreateNode, ValidateConnection
-NodeViewModel  → NodeHelper<T>      : WorkAsync, ValidateBroadcastAsync
-SlotViewModel  → SlotHelper<T>      : ValidateConnection
-LinkViewModel  → LinkHelper<T>      : (lifecycle only)
-```
-
-The Helper is a pluggable strategy that can be replaced at runtime via `SetHelper()`. This separates the ViewModel's structural code (positions, collections) from its behavioral code (business logic, validation).
-
-## 3. Mediator Pattern (Command-Based Communication)
-
-Components do not call each other's methods directly. Instead, they communicate through a shared command interface (`IVeloxCommand`):
-
-```
-Node.MoveCommand.Execute(offset)  → Helper handles spatial update
-Tree.SendConnectionCommand.Execute(slot) → Helper manages connection protocol
-Slot.DeleteCommand.Execute(null)   → Helper removes links and notifies tree
+```csharp
+public static void StandardCreateNode(this IWorkflowTreeViewModel component, IWorkflowNodeViewModel node)
+{
+    var oldParent = node.Parent;
+    var newParent = component;
+    node.GetHelper().Delete();
+    component.StandardSubmit(new WorkflowActionPair(
+        () => CreateNodeRedo(component, node, newParent),
+        () => CreateNodeUndo(component, node, oldParent)));
+}
 ```
 
-This decouples the sender from the receiver. Commands can be intercepted, queued, logged, or undone via the `SubmitCommand`/`UndoCommand` mechanism.
+### 3. Observer Pattern — Collections and Command Events
 
-## 4. Command Pattern (Undo/Redo)
+Helpers observe `ObservableCollection` changes and command lifecycle events. `TreeHelper` raises `NodeAdded/NodeRemoved/LinkAdded/LinkRemoved` from `CollectionChanged` handlers; `HttpHelper<T>` subscribes `WorkCommand.Started/Exited/Enqueued/Dequeued` to update runtime counters:
 
-Every mutating operation is wrapped in an `IWorkflowActionPair`:
+> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/HttpHelper.cs`, lines 42-82
 
-```
-User action → SubmitCommand(pair) → pair.Do()  → recorded in undo stack
-User undo   → UndoCommand(null)   → pair.Undo() → moved to redo stack
-User redo   → RedoCommand(null)   → pair.Do()  → moved back to undo stack
-```
-
-**Stack structure**: The tree maintains an undo stack and a redo stack. Actions can be batched for atomic undo/redo of compound operations.
-
-## 5. Observer Pattern (Event-Driven Lifecycle)
-
-Helpers subscribe to component events:
-
-```
-TreeHelper.NodeAdded    → Spatial manager indexes the node
-TreeHelper.LinkAdded    → Spatial manager indexes the link pair
-NodeHelper.WorkCommand  → Started / Completed / Failed / Exited events
+```csharp
+_startedHandler = e => { Interlocked.Increment(ref _activeRuns); ... };
+_exitedHandler   = e => { ... if (Interlocked.Decrement(ref _activeRuns) <= 0) StopRuntimeTicker(); };
+_viewModel.WorkCommand.Started += _startedHandler;
+_viewModel.WorkCommand.Exited  += _exitedHandler;
 ```
 
-The `HttpHelper<T>` example subscribes to `WorkCommand.Started`, `.Exited`, `.Enqueued`, `.Dequeued` to track runtime counters and display UI state.
+### 4. Strategy Pattern — SlotEnumerator / Selectors + `ICompileTimeRouter`
 
-## 6. Virtual Proxy Pattern (ViewPool + Virtualization)
+A `SlotEnumerator<TSlot>` swaps its output-slot strategy via `SetSelector(type)`. `BoolSelectorNodeViewModel` and `EnumSelectorNodeViewModel` implement `ICompileTimeRouter`, letting the compiler pre-collect the routing table (`GetRouteTable`) and the executor skip unchosen branches (`GetCurrentRouteKey`):
 
-The `ViewPool` attached behavior acts as a virtual proxy. Only items within the current `Viewport` are rendered:
+> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/BoolSelectorNodeViewModel.cs`, lines 70-91
 
-```
-IWorkflowTreeViewModelHelper.Viewport  → defines visible region
-IWorkflowTreeViewModelHelper.VisibleItems → computed visible subset
-ViewPool.ItemsSource = {Binding Helper.VisibleItems}  → only renders these
-```
+```csharp
+public object? GetCurrentRouteKey() => Condition ? (object)true : (object)false;
 
-When the user pans/zooms, the viewport changes → `VisibleItems` recomputes → UI recycles views for off-screen items.
-
-## 7. Spatial Hash Pattern (Grid-Based Indexing)
-
-`SpatialGridHashMap<T>` uses a grid-based spatial hash for O(1) insertion/removal and efficient range queries:
-
-```
-Grid cell [x, y] → hashset of items in that cell
-Insert: compute cell key → add to hashset (O(1))
-Query: enumerate cells in viewport → collect items (O(cells_in_viewport))
-Remove: compute cell key → remove from hashset (O(1))
+public IReadOnlyDictionary<object, IWorkflowNodeViewModel> GetRouteTable()
+{
+    var dict = new Dictionary<object, IWorkflowNodeViewModel>();
+    if (TrueSlot is not null)
+        foreach (var target in TrueSlot.Targets)
+            if (target.Parent is not null)
+                dict[true] = target.Parent;
+    // ... false branch likewise
+    return dict;
+}
 ```
 
-Grid cell size is configurable. A larger cell size reduces memory but increases false positives during queries.
+### 5. Proxy / Decorator — Source-Generated Partial ViewModels
 
-## 8. Layer/Anchor Pattern (Z-Index Management)
+`[WorkflowBuilder.Node<THelper>]` etc. make the user's `partial` class the decorated surface; the generator emits property/command members while the Helper (a separate object injected via `SetHelper`) owns behavior. The demo `ControllerViewModel` exposes extra instance properties for ComboBox sources alongside generated commands:
 
-Each node has an `Anchor` with `Layer` (Z-index). When nodes overlap, the layer determines which node appears on top. The layer is automatically managed during creation and can be adjusted when nodes are moved.
+> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/ControllerViewModel.cs`, lines 47-57
+
+```csharp
+public CompileMode[] CompileModeOptions => [CompileMode.BFS, CompileMode.DFS];
+public CompileDirection[] CompileDirectionOptions => [CompileDirection.Forward, CompileDirection.Reverse];
+public CompileScope[] CompileScopeOptions => [CompileScope.FromNode, CompileScope.Omni];
+public CycleHandling[] CycleHandlingOptions => [CycleHandling.Throw, CycleHandling.Trim, CycleHandling.Allow];
+```
+
+### 6. Facade — `WorkflowBuilder`
+
+The `WorkflowBuilder` nested attribute types (`TreeAttribute<T>`, `NodeAttribute<T>`, `SlotAttribute<T>`, `LinkAttribute<T>`) form a compact façade over the whole component system: one attribute selects helper type, concurrency, virtual-link type, etc., and the generator produces the rest.
+
+### 7. Composition — Node contains Slots
+
+`IWorkflowNodeViewModel.Slots` owns `IWorkflowSlotViewModel` instances; links are derived from `sender.Targets` / `receiver.Sources` and are indexed as node pairs (`NodePairBoundsProvider`) by `WorkflowSpatialManager`:
+
+> Source: `Src/Core/VeloxDev.Core/WorkflowSystem/WorkflowSpatialManager.cs`, lines 142-164
+
+```csharp
+private void InsertLink(IWorkflowLinkViewModel link)
+{
+    if (link == null || _nodePairProviders.ContainsKey(link)) return;
+    if (link.Sender?.Parent is IWorkflowNodeViewModel nodeA &&
+        link.Receiver?.Parent is IWorkflowNodeViewModel nodeB &&
+        nodeA != nodeB &&
+        _nodeProviders.TryGetValue(nodeA, out var providerA) &&
+        _nodeProviders.TryGetValue(nodeB, out var providerB))
+    {
+        var pairProvider = new NodePairBoundsProvider(nodeA, nodeB, providerA, providerB);
+        _nodePairProviders[link] = pairProvider;
+        _pairToLink[pairProvider] = link;
+        _nodePairMap.Insert(pairProvider);
+        AddToNodeIndex(nodeA, pairProvider);
+        AddToNodeIndex(nodeB, pairProvider);
+    }
+}
+```
+
+### 8. Virtual Proxy — `ViewPool` + Spatial Virtualization
+
+`WorkflowSpatialEx.Virtualize` queries the spatial map and reconciles `VisibleItems` in-place, so the UI only renders what intersects the viewport (plus one depth of connected links). Re-entrancy is guarded by a per-tree flag:
+
+> Source: `Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowSpatialEx.cs`, lines 93-111
+
+```csharp
+public static void Virtualize(this IWorkflowTreeViewModel tree, Viewport viewport)
+{
+    if (viewport.Width <= 0 || viewport.Height <= 0) return;
+    if (!Virtualizing.TryAdd(tree, 0)) return;
+    try { VirtualizeCore(tree, viewport); }
+    finally { Virtualizing.TryRemove(tree, out _); }
+}
+```
+
+### 9. Builder — Fluent `WorkflowAgentScope`
+
+`tree.AsAgentScope().WithPromptLanguage(...).WithAutoDiscovery(...).WithMaxToolCalls(...)` chains configuration and finally materializes prompt + tools (`ProvideProgressiveContextPrompt()`, `ProvideTools()`):
+
+> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`, lines 86-121
+
+```csharp
+var scope = tree.AsAgentScope()
+    .WithPromptLanguage(AgentLanguages.English)
+    .WithOutputLanguage(AgentLanguages.Chinese)
+    .WithAutoDiscovery(assemblyName: "VeloxDev.Core")
+    .WithAutoDiscovery(assemblyName: "Lib")
+    .WithMaxToolCalls(200)
+    .WithToolCallCallback(args => { helper.ToolCalled?.Invoke(); return Task.CompletedTask; });
+var contextPrompt = scope.ProvideProgressiveContextPrompt();
+var tools = scope.ProvideTools();
+```
