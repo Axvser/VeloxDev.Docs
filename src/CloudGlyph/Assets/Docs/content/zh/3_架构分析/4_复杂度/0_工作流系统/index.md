@@ -34,7 +34,7 @@ $$T_{\text{compile}} = O(V + E)$$
 
 ## 顺序执行
 
-`CompilationResult.ExecuteAsync` 恰好遍历一次有序项目，逐个等待节点 `WorkCommand.Exited`。设编译项目数为 $N$：
+`CompilationResult.ExecuteAsync` 恰好遍历一次有序项目，逐个等待节点 `ReceiveAsync` 的返回值。设编译项目数为 $N$：
 
 $$T_{\text{execute}} = \sum_{i=1}^{N} T_{\text{work}}(i) = O(N)$$
 

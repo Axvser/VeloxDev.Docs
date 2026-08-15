@@ -64,7 +64,7 @@ public partial class NodeViewModel : ICompileTimePriority
 }
 ```
 
-`workSemaphore: 5` is the concurrency capacity of the node's `WorkCommand`. Slots and links are even simpler:
+`workSemaphore: 5` is the concurrency capacity of the node's `ReceiveCommand`. Slots and links are even simpler:
 
 > Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/SlotViewModel.cs`, lines 6-13 and `LinkViewModel.cs`, lines 7-14
 

@@ -114,9 +114,9 @@ Error path: any failed validation (capacity, custom `ValidateConnection`, same-n
 
 *Source: `Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowTreeEx.cs`, lines 92-177, 363-416.*
 
-## 3. Compile + ExecuteAsync with WorkCommand lifecycle
+## 3. Compile + ExecuteAsync with ReceiveCommand lifecycle
 
-`WorkflowCompiler.Compile` traverses the graph (BFS or DFS) and produces `CompilationResult` items with `Order`/`Depth`. `ExecuteAsync` runs each item by dispatching `WorkCommand` (fire-and-forget) and waiting for the `Exited` event, then forwards the parameter to the next item. Router branches are skipped via `BranchExclusiveItems`.
+`WorkflowCompiler.Compile` traverses the graph (BFS or DFS) and produces `CompilationResult` items with `Order`/`Depth`. `ExecuteAsync` runs each item by driving the node's `ReceiveCommand → ReceiveAsync(context, ct)` and uses its return value to chain data to the next item. Router branches are skipped via `BranchExclusiveItems`.
 
 ```plantuml
 @startuml
@@ -125,7 +125,7 @@ Error path: any failed validation (capacity, custom `ValidateConnection`, same-n
     participant Tree as IWorkflowTreeViewModel
     participant Result as CompilationResult
     participant Item as CompiledItem
-    participant Cmd as WorkCommand
+    participant Cmd as ReceiveCommand
     participant Helper as NodeHelper
 
     Caller -> Compiler: Compile(start, mode, dir, scope, cycle)
@@ -143,17 +143,17 @@ Error path: any failed validation (capacity, custom `ValidateConnection`, same-n
     activate Result
     loop each item in Items
         Result -> Item: item.SubscribeError()
-        Result -> Cmd: WorkCommand.ExecuteAsync(currentParam)
+        Result -> Cmd: ReceiveCommand.ExecuteAsync(context)
         activate Cmd
-        Cmd -> Helper: WorkAsync(parameter, ct)
+        Cmd -> Helper: ReceiveAsync(context, ct)
         activate Helper
         Helper --> Helper: mutate context in place (e.g. NetworkFlowContext)
-        Helper --> Cmd: complete
+        Helper --> Cmd: return result
         deactivate Helper
-        Cmd --> Result: Exited event -> tcs completes
+        Cmd --> Result: returns result
         deactivate Cmd
         alt FailureException != null and ErrorRedirectId set
-            Result -> Item: execute ErrorRedirect target with WorkContext(errorCtx)
+            Result -> Item: execute ErrorRedirect target with TaskContext(errorCtx)
         else success and ICompileTimeRouter
             Result -> Item: skip BranchExclusiveItems of unchosen key
         end

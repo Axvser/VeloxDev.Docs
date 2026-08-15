@@ -114,9 +114,9 @@
 
 *源码：`Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowTreeEx.cs`，第 92-177、363-416 行。*
 
-## 3. Compile + ExecuteAsync 与 WorkCommand 生命周期
+## 3. Compile + ExecuteAsync 与 ReceiveCommand 生命周期
 
-`WorkflowCompiler.Compile` 遍历图（BFS 或 DFS）并生成带 `Order`/`Depth` 的 `CompilationResult` 项目。`ExecuteAsync` 逐个项目派发 `WorkCommand`（fire-and-forget）并等待 `Exited` 事件，然后把参数转发给下一个项目。路由器分支通过 `BranchExclusiveItems` 跳过。
+`WorkflowCompiler.Compile` 遍历图（BFS 或 DFS）并生成带 `Order`/`Depth` 的 `CompilationResult` 项目。`ExecuteAsync` 逐个项目驱动节点的 `ReceiveCommand → ReceiveAsync(context, ct)`，并用其返回值把数据链式传给下一个项目。路由器分支通过 `BranchExclusiveItems` 跳过。
 
 ```plantuml
 @startuml
@@ -125,7 +125,7 @@
     participant Tree as IWorkflowTreeViewModel
     participant Result as CompilationResult
     participant Item as CompiledItem
-    participant Cmd as WorkCommand
+    participant Cmd as ReceiveCommand
     participant Helper as NodeHelper
 
     Caller -> Compiler: Compile(start, mode, dir, scope, cycle)
@@ -143,17 +143,17 @@
     activate Result
     loop each item in Items
         Result -> Item: item.SubscribeError()
-        Result -> Cmd: WorkCommand.ExecuteAsync(currentParam)
+        Result -> Cmd: ReceiveCommand.ExecuteAsync(context)
         activate Cmd
-        Cmd -> Helper: WorkAsync(parameter, ct)
+        Cmd -> Helper: ReceiveAsync(context, ct)
         activate Helper
         Helper --> Helper: mutate context in place (e.g. NetworkFlowContext)
-        Helper --> Cmd: complete
+        Helper --> Cmd: return result
         deactivate Helper
-        Cmd --> Result: Exited event -> tcs completes
+        Cmd --> Result: returns result
         deactivate Cmd
         alt FailureException != null and ErrorRedirectId set
-            Result -> Item: execute ErrorRedirect target with WorkContext(errorCtx)
+            Result -> Item: execute ErrorRedirect target with TaskContext(errorCtx)
         else success and ICompileTimeRouter
             Result -> Item: skip BranchExclusiveItems of unchosen key
         end

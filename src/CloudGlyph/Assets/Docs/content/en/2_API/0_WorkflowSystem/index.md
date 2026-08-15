@@ -9,7 +9,7 @@ Partial classes decorated with these attributes receive generated properties, co
 | Attribute | Target | Generic constraint | Notes |
 |---|---|---|---|
 | `[WorkflowBuilder.Tree<T>]` | class | `T : IWorkflowTreeViewModelHelper, new()` | Optional ctor args `virtualLinkType`, `virtualSlotType` |
-| `[WorkflowBuilder.Node<T>(workSemaphore = 1)]` | class | `T : IWorkflowNodeViewModelHelper, new()` | `workSemaphore` = concurrent capacity of `WorkCommand` |
+| `[WorkflowBuilder.Node<T>(workSemaphore = 1)]` | class | `T : IWorkflowNodeViewModelHelper, new()` | `workSemaphore` = concurrent capacity of `ReceiveCommand` |
 | `[WorkflowBuilder.Slot<T>]` | class | `T : IWorkflowSlotViewModelHelper, new()` | — |
 | `[WorkflowBuilder.Link<T>(slotType = null)]` | class | `T : IWorkflowLinkViewModelHelper, new()` | `slotType` = initial slot type |
 
@@ -54,11 +54,11 @@ Every component derives from `IWorkflowViewModel` (`InitializeWorkflow()`, `OnPr
 | `SetSizeCommand` | `IVeloxCommand` | param `Size` |
 | `CreateSlotCommand` | `IVeloxCommand` | param `IWorkflowSlotViewModel` |
 | `DeleteCommand` | `IVeloxCommand` | param null; cascades to slots and links |
-| `WorkCommand` | `IVeloxCommand` | param nullable |
+| `ReceiveCommand` | `IVeloxCommand` | param nullable |
 | `BroadcastCommand` | `IVeloxCommand` | forward broadcast |
 | `ReverseBroadcastCommand` | `IVeloxCommand` | backward broadcast |
 
-`IWorkflowNodeViewModelHelper : IWorkflowHelper` adds `SlotAdded/SlotRemoved`, `Install/Uninstall`, `CreateSlot`, `Move`, `SetAnchor`, `SetSize`, `WorkAsync(parameter, ct)`, `ReceiveAsync(parameter, sender, receiver, ct)`, `BroadcastAsync`, `ReverseBroadcastAsync`, `ValidateBroadcastAsync`, `Delete`.
+`IWorkflowNodeViewModelHelper : IWorkflowHelper` adds `SlotAdded/SlotRemoved`, `Install/Uninstall`, `CreateSlot`, `Move`, `SetAnchor`, `SetSize`, `ReceiveAsync(context, ct)` — the single execution entry (nullable data/sender/receiver), `BroadcastAsync`, `ReverseBroadcastAsync`, `ValidateBroadcastAsync`, `Delete`.
 
 *Source: `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowNodeViewModel.cs`.*
 
@@ -101,24 +101,24 @@ Every component derives from `IWorkflowViewModel` (`InitializeWorkflow()`, `OnPr
 | `Viewport(x, y, width, height)` | Rectangle; `IsEmpty`, `Contains`, `IntersectsWith`, static `Union`, `Empty` |
 | `CanvasLayout` | `OriginSize`, `PositiveOffset`, `NegativeOffset`, `ActualSize`, `ActualOffset`, `ViewportOffset`; `AdaptTo(Size)`; `UpdateCommand` |
 | `CellKey(x, y)` | Grid cell coordinate |
-| `WorkContext(parameter, sender, receiver)` | Payload passed to `WorkCommand`; `Deconstruct` |
+| `TaskContext(parameter, sender, receiver)` | Payload passed to `ReceiveCommand`; `Deconstruct` |
 | `WorkflowActionPair(redo, undo)` | `readonly struct` implementing `IWorkflowActionPair` |
 | `SlotChannel` | `[Flags]`: `None`, `OneTarget`, `OneSource`, `OneBoth`, `MultipleTargets`, `MultipleSources`, `MultipleBoth` |
 | `SlotState` | `[Flags]`: `StandBy`, `PreviewSender`, `PreviewReceiver`, `Sender`, `Receiver` |
 | `IWorkflowIdentifiable` | `RuntimeId` string, stable for the component lifetime |
 
-*Sources: `Anchor.cs`, `Size.cs`, `Offset.cs`, `Viewport.cs`, `CanvasLayout.cs`, `CellKey.cs`, `WorkContext.cs`, `WorkflowActionPair.cs`, `Enums/Slot.cs`, `Interfaces/WorkflowSystem/IWorkflowIdentifiable.cs`.*
+*Sources: `Anchor.cs`, `Size.cs`, `Offset.cs`, `Viewport.cs`, `CanvasLayout.cs`, `CellKey.cs`, `TaskContext.cs`, `WorkflowActionPair.cs`, `Enums/Slot.cs`, `Interfaces/WorkflowSystem/IWorkflowIdentifiable.cs`.*
 
 ### Default ViewModels and Helpers
 
 | Default ViewModel | Default Helper | Purpose |
 |---|---|---|
 | `TreeDefaultViewModel` | `TreeHelper<T>` | Root container; `CreateLink` returns `LinkDefaultViewModel` |
-| `NodeDefaultViewModel` | `NodeHelper<T>` | Node with `Move/SetAnchor/SetSize/CreateSlot/Work/Broadcast/ReverseBroadcast/Delete` |
+| `NodeDefaultViewModel` | `NodeHelper<T>` | Node with `Move/SetAnchor/SetSize/CreateSlot/Receive/Broadcast/ReverseBroadcast/Delete` |
 | `SlotDefaultViewModel` | `SlotHelper<T>` | Slot with channel/state handling |
 | `LinkDefaultViewModel` | `LinkHelper<T>` | Link with `Delete` |
 
-`TreeHelper(double cellSize)` enables spatial virtualization; the type is annotated `[MonoBehaviour(channel: nameof(TreeHelper), fps: 10)]` and calls `tree.EnableMap(CellSize, VisibleItems)` on `Install`. `NodeHelper.SetAnchor/SetSize/Move` call `Parent.GetHelper().MarkDirty()` after mutating. `NodeDefaultViewModel.Work` forwards `WorkContext` to `ReceiveAsync` or falls back to `WorkAsync` (see `Work` command, `NodeDefaultViewModel.cs` lines 67-78).
+`TreeHelper(double cellSize)` enables spatial virtualization; the type is annotated `[MonoBehaviour(channel: nameof(TreeHelper), fps: 10)]` and calls `tree.EnableMap(CellSize, VisibleItems)` on `Install`. `NodeHelper.SetAnchor/SetSize/Move` call `Parent.GetHelper().MarkDirty()` after mutating. `NodeDefaultViewModel.ReceiveCommand` wraps the parameter into `TaskContext` and calls `ReceiveAsync(context, ct)` — a single receive path carrying nullable data/sender/receiver (see `NodeDefaultViewModel.cs` lines 67-78).
 
 *Sources: `Templates/ViewModels/*.cs`, `Templates/Helpers/*.cs`.*
 
@@ -224,7 +224,7 @@ Static extension classes that implement the standard behavior invoked by generat
 
 ## Namespace: `VeloxDev.AI.Workflow.Functions`
 
-`WorkflowAgentToolkit(WorkflowAgentScope)` — `CreateTools()` returns ~60 `AITool`s wrapped in call-tracking. Groups: query (`ListNodes`, `GetNodeDetail`, `ListConnections`, `GetTypeSchema`), progressive context (`GetWorkflowSummary`, `GetComponentContext`, `ListComponentCommands`), state diff (`TakeSnapshot`, `GetChangesSinceSnapshot`, `MarkDirty`), mutation (`CreateNode`, `MoveNode`, `SetNodePosition`, `ResizeNode`, `DeleteNode`, `DeleteSlot`, `ConnectSlots`, `ConnectSlotsById`, `DisconnectSlots`, `ExecuteWork`, `BroadcastNode`, `Undo`, `Redo`, `PatchNodeProperties`, `PatchComponentById`), generic command execution (`ExecuteCommandOnNode`, `ExecuteCommandById`), slot collections (`ListSlotProperties`, `AddSlotToCollection`, `RemoveSlotFromCollection`, `SetEnumSlotCollection`, `GetEnumSlotByValue`, `SetEnumSlotChannel`, `ConnectEnumSlot`), graph traversal (`SearchForward`, `SearchReverse`, `SearchAllRelative`, `IsConnected`, `FindPath`), connection management (`DisconnectSlotsById`, `DisconnectAllFromSlot`, `DisconnectAllFromNode`, `ReplaceConnection`, `SetSlotChannel`, `GetLinkDetail`), bulk (`BatchExecute`, `ExecuteWorkOnNodes`, `BulkPatchNodes`, `CloneNodes`, `DeleteNodes`), layout (`AlignNodes`, `DistributeNodes`, `AutoLayout`, `ArrangeNodes`), analytics (`GetNodeStatistics`, `ListCreatableTypes`, `ValidateWorkflow`, `GetFullTopology`), composite (`ConnectByProperty`, `CreateAndConfigureNode`) and interaction (`RequestSelection`, `RequestConfirmation`, only when handlers configured and safety level > 0).
+`WorkflowAgentToolkit(WorkflowAgentScope)` — `CreateTools()` returns ~60 `AITool`s wrapped in call-tracking. Groups: query (`ListNodes`, `GetNodeDetail`, `ListConnections`, `GetTypeSchema`), progressive context (`GetWorkflowSummary`, `GetComponentContext`, `ListComponentCommands`), state diff (`TakeSnapshot`, `GetChangesSinceSnapshot`, `MarkDirty`), mutation (`CreateNode`, `MoveNode`, `SetNodePosition`, `ResizeNode`, `DeleteNode`, `DeleteSlot`, `ConnectSlots`, `ConnectSlotsById`, `DisconnectSlots`, `ExecuteNode`, `BroadcastNode`, `Undo`, `Redo`, `PatchNodeProperties`, `PatchComponentById`), generic command execution (`ExecuteCommandOnNode`, `ExecuteCommandById`), slot collections (`ListSlotProperties`, `AddSlotToCollection`, `RemoveSlotFromCollection`, `SetEnumSlotCollection`, `GetEnumSlotByValue`, `SetEnumSlotChannel`, `ConnectEnumSlot`), graph traversal (`SearchForward`, `SearchReverse`, `SearchAllRelative`, `IsConnected`, `FindPath`), connection management (`DisconnectSlotsById`, `DisconnectAllFromSlot`, `DisconnectAllFromNode`, `ReplaceConnection`, `SetSlotChannel`, `GetLinkDetail`), bulk (`BatchExecute`, `ExecuteNodes`, `BulkPatchNodes`, `CloneNodes`, `DeleteNodes`), layout (`AlignNodes`, `DistributeNodes`, `AutoLayout`, `ArrangeNodes`), analytics (`GetNodeStatistics`, `ListCreatableTypes`, `ValidateWorkflow`, `GetFullTopology`), composite (`ConnectByProperty`, `CreateAndConfigureNode`) and interaction (`RequestSelection`, `RequestConfirmation`, only when handlers configured and safety level > 0).
 
 *Source: `Src/Core/VeloxDev.Core.Extension/Agent/Workflow/Functions/WorkflowAgentToolkit.cs`, `CreateTools()` lines 34-139.*
 

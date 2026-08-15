@@ -64,7 +64,7 @@ public partial class NodeViewModel : ICompileTimePriority
 }
 ```
 
-`workSemaphore: 5` 是该节点 `WorkCommand` 的并发容量。Slot 和 Link 更简单：
+`workSemaphore: 5` 是该节点 `ReceiveCommand` 的并发容量。Slot 和 Link 更简单：
 
 > 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/SlotViewModel.cs`，第 6-13 行；`LinkViewModel.cs`，第 7-14 行
 

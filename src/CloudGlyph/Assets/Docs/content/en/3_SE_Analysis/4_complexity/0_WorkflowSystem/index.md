@@ -34,7 +34,7 @@ Cycle detection (`DfsFindCycle`) is a single DFS over the whole graph, also $O(V
 
 ## Sequential Execution
 
-`CompilationResult.ExecuteAsync` iterates the ordered items exactly once, awaiting each node's `WorkCommand.Exited`. With $N$ compiled items:
+`CompilationResult.ExecuteAsync` iterates the ordered items exactly once, awaiting each node's `ReceiveAsync` result. With $N$ compiled items:
 
 $$T_{\text{execute}} = \sum_{i=1}^{N} T_{\text{work}}(i) = O(N)$$
 

@@ -24,7 +24,7 @@ classDiagram
         +Anchor
         +Size
         +Slots
-        +WorkCommand
+        +ReceiveCommand
         +BroadcastCommand
     }
     class IWorkflowSlotViewModel {
@@ -49,8 +49,7 @@ classDiagram
     }
     class IWorkflowNodeViewModelHelper {
         <<interface>>
-        +WorkAsync()
-        +ReceiveAsync()
+        +ReceiveAsync(context, ct)
         +BroadcastAsync()
     }
     class TreeHelper~T~ {
@@ -59,7 +58,7 @@ classDiagram
         +SendConnection(slot)
     }
     class NodeHelper~T~ {
-        +WorkAsync(parameter, ct)
+        +ReceiveAsync(context, ct)
         +SetAnchor(anchor)
         +MarkDirty()
     }
@@ -96,7 +95,7 @@ classDiagram
 
 ### 1. 模板方法 —— Helper
 
-每个组件的 Helper 基类定义生命周期骨架（`Install` → 订阅集合、`Uninstall` → 取消订阅、`Closing/CloseAsync/Closed`）并暴露可覆写的钩子。`TreeHelper<T>` 调用 `base.Install` 后启用虚拟化；`HttpHelper<T>` 覆写 `Install` 订阅 `WorkCommand` 事件、`WorkAsync` 执行业务逻辑。
+每个组件的 Helper 基类定义生命周期骨架（`Install` → 订阅集合、`Uninstall` → 取消订阅、`Closing/CloseAsync/Closed`）并暴露可覆写的钩子。`TreeHelper<T>` 调用 `base.Install` 后启用虚拟化；`HttpHelper<T>` 覆写 `Install` 订阅 `ReceiveCommand` 事件、`ReceiveAsync` 执行业务逻辑。
 
 > 源码：`Src/Core/VeloxDev.Core/WorkflowSystem/Templates/Helpers/TreeHelper.cs`，第 109-124 行
 
@@ -139,15 +138,15 @@ public static void StandardCreateNode(this IWorkflowTreeViewModel component, IWo
 
 ### 3. 观察者模式 —— 集合与命令事件
 
-Helper 观察 `ObservableCollection` 变化和命令生命周期事件。`TreeHelper` 从 `CollectionChanged` 处理器中引发 `NodeAdded/NodeRemoved/LinkAdded/LinkRemoved`；`HttpHelper<T>` 订阅 `WorkCommand.Started/Exited/Enqueued/Dequeued` 更新运行时计数器：
+Helper 观察 `ObservableCollection` 变化和命令生命周期事件。`TreeHelper` 从 `CollectionChanged` 处理器中引发 `NodeAdded/NodeRemoved/LinkAdded/LinkRemoved`；`HttpHelper<T>` 订阅 `ReceiveCommand.Started/Exited/Enqueued/Dequeued` 更新运行时计数器：
 
 > 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/HttpHelper.cs`，第 42-82 行
 
 ```csharp
 _startedHandler = e => { Interlocked.Increment(ref _activeRuns); ... };
 _exitedHandler   = e => { ... if (Interlocked.Decrement(ref _activeRuns) <= 0) StopRuntimeTicker(); };
-_viewModel.WorkCommand.Started += _startedHandler;
-_viewModel.WorkCommand.Exited  += _exitedHandler;
+_viewModel.ReceiveCommand.Started += _startedHandler;
+_viewModel.ReceiveCommand.Exited  += _exitedHandler;
 ```
 
 ### 4. 策略模式 —— SlotEnumerator / 选择器 + `ICompileTimeRouter`

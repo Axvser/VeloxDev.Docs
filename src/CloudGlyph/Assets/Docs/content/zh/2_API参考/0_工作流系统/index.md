@@ -9,7 +9,7 @@
 | 属性 | 目标 | 泛型约束 | 说明 |
 |---|---|---|---|
 | `[WorkflowBuilder.Tree<T>]` | 类 | `T : IWorkflowTreeViewModelHelper, new()` | 可选构造参数 `virtualLinkType`、`virtualSlotType` |
-| `[WorkflowBuilder.Node<T>(workSemaphore = 1)]` | 类 | `T : IWorkflowNodeViewModelHelper, new()` | `workSemaphore` = `WorkCommand` 并发容量 |
+| `[WorkflowBuilder.Node<T>(workSemaphore = 1)]` | 类 | `T : IWorkflowNodeViewModelHelper, new()` | `workSemaphore` = `ReceiveCommand` 并发容量 |
 | `[WorkflowBuilder.Slot<T>]` | 类 | `T : IWorkflowSlotViewModelHelper, new()` | — |
 | `[WorkflowBuilder.Link<T>(slotType = null)]` | 类 | `T : IWorkflowLinkViewModelHelper, new()` | `slotType` = 初始槽位类型 |
 
@@ -54,11 +54,11 @@
 | `SetSizeCommand` | `IVeloxCommand` | 参数 `Size` |
 | `CreateSlotCommand` | `IVeloxCommand` | 参数 `IWorkflowSlotViewModel` |
 | `DeleteCommand` | `IVeloxCommand` | 参数 null；级联删除槽位与连接 |
-| `WorkCommand` | `IVeloxCommand` | 参数可空 |
+| `ReceiveCommand` | `IVeloxCommand` | 参数可空 |
 | `BroadcastCommand` | `IVeloxCommand` | 正向广播 |
 | `ReverseBroadcastCommand` | `IVeloxCommand` | 反向广播 |
 
-`IWorkflowNodeViewModelHelper : IWorkflowHelper` 增加 `SlotAdded/SlotRemoved`、`Install/Uninstall`、`CreateSlot`、`Move`、`SetAnchor`、`SetSize`、`WorkAsync(parameter, ct)`、`ReceiveAsync(parameter, sender, receiver, ct)`、`BroadcastAsync`、`ReverseBroadcastAsync`、`ValidateBroadcastAsync`、`Delete`。
+`IWorkflowNodeViewModelHelper : IWorkflowHelper` 增加 `SlotAdded/SlotRemoved`、`Install/Uninstall`、`CreateSlot`、`Move`、`SetAnchor`、`SetSize`、`ReceiveAsync(context, ct)` —— 唯一的执行入口（data/sender/receiver 均可空）、`BroadcastAsync`、`ReverseBroadcastAsync`、`ValidateBroadcastAsync`、`Delete`。
 
 *源码：`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowNodeViewModel.cs`。*
 
@@ -101,24 +101,24 @@
 | `Viewport(x, y, width, height)` | 矩形；`IsEmpty`、`Contains`、`IntersectsWith`、静态 `Union`、`Empty` |
 | `CanvasLayout` | `OriginSize`、`PositiveOffset`、`NegativeOffset`、`ActualSize`、`ActualOffset`、`ViewportOffset`；`AdaptTo(Size)`；`UpdateCommand` |
 | `CellKey(x, y)` | 网格单元坐标 |
-| `WorkContext(parameter, sender, receiver)` | 传给 `WorkCommand` 的载荷；`Deconstruct` |
+| `TaskContext(parameter, sender, receiver)` | 传给 `ReceiveCommand` 的载荷；`Deconstruct` |
 | `WorkflowActionPair(redo, undo)` | 实现 `IWorkflowActionPair` 的 `readonly struct` |
 | `SlotChannel` | `[Flags]`：`None`、`OneTarget`、`OneSource`、`OneBoth`、`MultipleTargets`、`MultipleSources`、`MultipleBoth` |
 | `SlotState` | `[Flags]`：`StandBy`、`PreviewSender`、`PreviewReceiver`、`Sender`、`Receiver` |
 | `IWorkflowIdentifiable` | `RuntimeId` 字符串，组件生命周期内稳定 |
 
-*源码：`Anchor.cs`、`Size.cs`、`Offset.cs`、`Viewport.cs`、`CanvasLayout.cs`、`CellKey.cs`、`WorkContext.cs`、`WorkflowActionPair.cs`、`Enums/Slot.cs`、`Interfaces/WorkflowSystem/IWorkflowIdentifiable.cs`。*
+*源码：`Anchor.cs`、`Size.cs`、`Offset.cs`、`Viewport.cs`、`CanvasLayout.cs`、`CellKey.cs`、`TaskContext.cs`、`WorkflowActionPair.cs`、`Enums/Slot.cs`、`Interfaces/WorkflowSystem/IWorkflowIdentifiable.cs`。*
 
 ### 默认 ViewModel 与 Helper
 
 | 默认 ViewModel | 默认 Helper | 用途 |
 |---|---|---|
 | `TreeDefaultViewModel` | `TreeHelper<T>` | 根容器；`CreateLink` 返回 `LinkDefaultViewModel` |
-| `NodeDefaultViewModel` | `NodeHelper<T>` | 提供 `Move/SetAnchor/SetSize/CreateSlot/Work/Broadcast/ReverseBroadcast/Delete` |
+| `NodeDefaultViewModel` | `NodeHelper<T>` | 提供 `Move/SetAnchor/SetSize/CreateSlot/Receive/Broadcast/ReverseBroadcast/Delete` |
 | `SlotDefaultViewModel` | `SlotHelper<T>` | 处理通道与状态 |
 | `LinkDefaultViewModel` | `LinkHelper<T>` | 提供 `Delete` |
 
-`TreeHelper(double cellSize)` 启用空间虚拟化；该类型标注 `[MonoBehaviour(channel: nameof(TreeHelper), fps: 10)]`，并在 `Install` 时调用 `tree.EnableMap(CellSize, VisibleItems)`。`NodeHelper.SetAnchor/SetSize/Move` 在变更后调用 `Parent.GetHelper().MarkDirty()`。`NodeDefaultViewModel.Work` 把 `WorkContext` 转发给 `ReceiveAsync`，否则回退到 `WorkAsync`（见 `NodeDefaultViewModel.cs` 第 67-78 行的 `Work` 命令）。
+`TreeHelper(double cellSize)` 启用空间虚拟化；该类型标注 `[MonoBehaviour(channel: nameof(TreeHelper), fps: 10)]`，并在 `Install` 时调用 `tree.EnableMap(CellSize, VisibleItems)`。`NodeHelper.SetAnchor/SetSize/Move` 在变更后调用 `Parent.GetHelper().MarkDirty()`。`NodeDefaultViewModel.ReceiveCommand` 把参数包装成 `TaskContext` 并调用 `ReceiveAsync(context, ct)` —— 单一接收路径，携带可空的 data/sender/receiver（见 `NodeDefaultViewModel.cs` 第 67-78 行）。
 
 *源码：`Templates/ViewModels/*.cs`、`Templates/Helpers/*.cs`。*
 
@@ -224,7 +224,7 @@
 
 ## 命名空间：`VeloxDev.AI.Workflow.Functions`
 
-`WorkflowAgentToolkit(WorkflowAgentScope)` —— `CreateTools()` 返回约 60 个带调用追踪的 `AITool`。分组：查询（`ListNodes`、`GetNodeDetail`、`ListConnections`、`GetTypeSchema`）、渐进式上下文（`GetWorkflowSummary`、`GetComponentContext`、`ListComponentCommands`）、状态差异（`TakeSnapshot`、`GetChangesSinceSnapshot`、`MarkDirty`）、变更（`CreateNode`、`MoveNode`、`SetNodePosition`、`ResizeNode`、`DeleteNode`、`DeleteSlot`、`ConnectSlots`、`ConnectSlotsById`、`DisconnectSlots`、`ExecuteWork`、`BroadcastNode`、`Undo`、`Redo`、`PatchNodeProperties`、`PatchComponentById`）、通用命令执行（`ExecuteCommandOnNode`、`ExecuteCommandById`）、槽位集合（`ListSlotProperties`、`AddSlotToCollection`、`RemoveSlotFromCollection`、`SetEnumSlotCollection`、`GetEnumSlotByValue`、`SetEnumSlotChannel`、`ConnectEnumSlot`）、图遍历（`SearchForward`、`SearchReverse`、`SearchAllRelative`、`IsConnected`、`FindPath`）、连接管理（`DisconnectSlotsById`、`DisconnectAllFromSlot`、`DisconnectAllFromNode`、`ReplaceConnection`、`SetSlotChannel`、`GetLinkDetail`）、批量（`BatchExecute`、`ExecuteWorkOnNodes`、`BulkPatchNodes`、`CloneNodes`、`DeleteNodes`）、布局（`AlignNodes`、`DistributeNodes`、`AutoLayout`、`ArrangeNodes`）、分析（`GetNodeStatistics`、`ListCreatableTypes`、`ValidateWorkflow`、`GetFullTopology`）、复合（`ConnectByProperty`、`CreateAndConfigureNode`）与交互（`RequestSelection`、`RequestConfirmation`，仅在配置了处理器且安全级别大于 0 时注册）。
+`WorkflowAgentToolkit(WorkflowAgentScope)` —— `CreateTools()` 返回约 60 个带调用追踪的 `AITool`。分组：查询（`ListNodes`、`GetNodeDetail`、`ListConnections`、`GetTypeSchema`）、渐进式上下文（`GetWorkflowSummary`、`GetComponentContext`、`ListComponentCommands`）、状态差异（`TakeSnapshot`、`GetChangesSinceSnapshot`、`MarkDirty`）、变更（`CreateNode`、`MoveNode`、`SetNodePosition`、`ResizeNode`、`DeleteNode`、`DeleteSlot`、`ConnectSlots`、`ConnectSlotsById`、`DisconnectSlots`、`ExecuteNode`、`BroadcastNode`、`Undo`、`Redo`、`PatchNodeProperties`、`PatchComponentById`）、通用命令执行（`ExecuteCommandOnNode`、`ExecuteCommandById`）、槽位集合（`ListSlotProperties`、`AddSlotToCollection`、`RemoveSlotFromCollection`、`SetEnumSlotCollection`、`GetEnumSlotByValue`、`SetEnumSlotChannel`、`ConnectEnumSlot`）、图遍历（`SearchForward`、`SearchReverse`、`SearchAllRelative`、`IsConnected`、`FindPath`）、连接管理（`DisconnectSlotsById`、`DisconnectAllFromSlot`、`DisconnectAllFromNode`、`ReplaceConnection`、`SetSlotChannel`、`GetLinkDetail`）、批量（`BatchExecute`、`ExecuteNodes`、`BulkPatchNodes`、`CloneNodes`、`DeleteNodes`）、布局（`AlignNodes`、`DistributeNodes`、`AutoLayout`、`ArrangeNodes`）、分析（`GetNodeStatistics`、`ListCreatableTypes`、`ValidateWorkflow`、`GetFullTopology`）、复合（`ConnectByProperty`、`CreateAndConfigureNode`）与交互（`RequestSelection`、`RequestConfirmation`，仅在配置了处理器且安全级别大于 0 时注册）。
 
 *源码：`Src/Core/VeloxDev.Core.Extension/Agent/Workflow/Functions/WorkflowAgentToolkit.cs`，`CreateTools()` 第 34-139 行。*
 

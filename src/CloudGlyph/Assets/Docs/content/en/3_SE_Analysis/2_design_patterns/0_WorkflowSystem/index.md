@@ -24,7 +24,7 @@ classDiagram
         +Anchor
         +Size
         +Slots
-        +WorkCommand
+        +ReceiveCommand
         +BroadcastCommand
     }
     class IWorkflowSlotViewModel {
@@ -49,8 +49,7 @@ classDiagram
     }
     class IWorkflowNodeViewModelHelper {
         <<interface>>
-        +WorkAsync()
-        +ReceiveAsync()
+        +ReceiveAsync(context, ct)
         +BroadcastAsync()
     }
     class TreeHelper~T~ {
@@ -59,7 +58,7 @@ classDiagram
         +SendConnection(slot)
     }
     class NodeHelper~T~ {
-        +WorkAsync(parameter, ct)
+        +ReceiveAsync(context, ct)
         +SetAnchor(anchor)
         +MarkDirty()
     }
@@ -96,7 +95,7 @@ classDiagram
 
 ### 1. Template Method — Helpers
 
-Each component's Helper base class defines the lifecycle skeleton (`Install` → subscribe collections, `Uninstall` → unsubscribe, `Closing/CloseAsync/Closed`) and exposes overridable hooks. `TreeHelper<T>` calls `base.Install` then enables virtualization; `HttpHelper<T>` overrides `Install` to subscribe `WorkCommand` events and `WorkAsync` to run business logic.
+Each component's Helper base class defines the lifecycle skeleton (`Install` → subscribe collections, `Uninstall` → unsubscribe, `Closing/CloseAsync/Closed`) and exposes overridable hooks. `TreeHelper<T>` calls `base.Install` then enables virtualization; `HttpHelper<T>` overrides `Install` to subscribe `ReceiveCommand` events and `ReceiveAsync` to run business logic.
 
 > Source: `Src/Core/VeloxDev.Core/WorkflowSystem/Templates/Helpers/TreeHelper.cs`, lines 109-124
 
@@ -139,15 +138,15 @@ public static void StandardCreateNode(this IWorkflowTreeViewModel component, IWo
 
 ### 3. Observer Pattern — Collections and Command Events
 
-Helpers observe `ObservableCollection` changes and command lifecycle events. `TreeHelper` raises `NodeAdded/NodeRemoved/LinkAdded/LinkRemoved` from `CollectionChanged` handlers; `HttpHelper<T>` subscribes `WorkCommand.Started/Exited/Enqueued/Dequeued` to update runtime counters:
+Helpers observe `ObservableCollection` changes and command lifecycle events. `TreeHelper` raises `NodeAdded/NodeRemoved/LinkAdded/LinkRemoved` from `CollectionChanged` handlers; `HttpHelper<T>` subscribes `ReceiveCommand.Started/Exited/Enqueued/Dequeued` to update runtime counters:
 
 > Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/HttpHelper.cs`, lines 42-82
 
 ```csharp
 _startedHandler = e => { Interlocked.Increment(ref _activeRuns); ... };
 _exitedHandler   = e => { ... if (Interlocked.Decrement(ref _activeRuns) <= 0) StopRuntimeTicker(); };
-_viewModel.WorkCommand.Started += _startedHandler;
-_viewModel.WorkCommand.Exited  += _exitedHandler;
+_viewModel.ReceiveCommand.Started += _startedHandler;
+_viewModel.ReceiveCommand.Exited  += _exitedHandler;
 ```
 
 ### 4. Strategy Pattern — SlotEnumerator / Selectors + `ICompileTimeRouter`
