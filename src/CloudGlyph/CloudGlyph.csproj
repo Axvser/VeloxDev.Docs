@@ -19,17 +19,60 @@
     <PackageReference Include="VeloxDev.Avalonia" />
   </ItemGroup>
 
+  <!--
+    Python interpreter for the doc-gen scripts (gen_lang_index.py / gen_tree.py).
+    Auto-resolved at build time by probing python3 → python → py (Windows only),
+    so the same csproj builds on Windows and Linux/macOS without hardcoding a name.
+    Override explicitly with: dotnet build /p:PythonCommand=python3
+  -->
+  <PropertyGroup>
+    <PythonCommand Condition="'$(PythonCommand)' == ''">_auto_</PythonCommand>
+  </PropertyGroup>
+
+  <Target Name="ResolvePythonCommand">
+    <!-- Probe candidates in order; keep the first whose version check exits 0. -->
+    <Exec Command="python3 --version"
+          ConsoleToMSBuild="true" IgnoreExitCode="true"
+          StandardOutputImportance="low" StandardErrorImportance="low"
+          Condition="'$(PythonCommand)' == '_auto_'">
+      <Output TaskParameter="ExitCode" PropertyName="_Py3OK" />
+    </Exec>
+    <PropertyGroup>
+      <PythonCommand Condition="'$(PythonCommand)' == '_auto_' and '$(_Py3OK)' == '0'">python3</PythonCommand>
+    </PropertyGroup>
+    <Exec Command="python --version"
+          ConsoleToMSBuild="true" IgnoreExitCode="true"
+          StandardOutputImportance="low" StandardErrorImportance="low"
+          Condition="'$(PythonCommand)' == '_auto_'">
+      <Output TaskParameter="ExitCode" PropertyName="_PyOK" />
+    </Exec>
+    <PropertyGroup>
+      <PythonCommand Condition="'$(PythonCommand)' == '_auto_' and '$(_PyOK)' == '0'">python</PythonCommand>
+    </PropertyGroup>
+    <Exec Command="py --version"
+          ConsoleToMSBuild="true" IgnoreExitCode="true"
+          StandardOutputImportance="low" StandardErrorImportance="low"
+          Condition="'$(PythonCommand)' == '_auto_' and $([MSBuild]::IsOSPlatform('Windows'))">
+      <Output TaskParameter="ExitCode" PropertyName="_PyLauncherOK" />
+    </Exec>
+    <PropertyGroup>
+      <PythonCommand Condition="'$(PythonCommand)' == '_auto_' and '$(_PyLauncherOK)' == '0'">py</PythonCommand>
+    </PropertyGroup>
+    <Error Condition="'$(PythonCommand)' == '_auto_'"
+           Text="Python interpreter not found (tried python3, python, py). Install Python, or override with /p:PythonCommand=python3." />
+  </Target>
+
   <!-- Auto-generate languages_index.json and embed as AvaloniaResource before build -->
-  <Target Name="GenerateLanguagesJson" BeforeTargets="BeforeBuild">
-    <Exec Command="python &quot;$(MSBuildProjectDirectory)/Assets/Docs/scripts/gen_lang_index.py&quot;" 
+  <Target Name="GenerateLanguagesJson" BeforeTargets="BeforeBuild" DependsOnTargets="ResolvePythonCommand">
+    <Exec Command="$(PythonCommand) &quot;$(MSBuildProjectDirectory)/Assets/Docs/scripts/gen_lang_index.py&quot;"
 		  ConsoleToMSBuild="true" 
 		  LogStandardErrorAsError="false" 
 		  StandardOutputImportance="normal" />
   </Target>
 
   <!-- Auto-generate tree.json index from directory structure before build -->
-  <Target Name="GenerateTreeJson" BeforeTargets="BeforeBuild">
-    <Exec Command="python &quot;$(MSBuildProjectDirectory)/Assets/Docs/scripts/gen_tree.py&quot;" 
+  <Target Name="GenerateTreeJson" BeforeTargets="BeforeBuild" DependsOnTargets="ResolvePythonCommand">
+    <Exec Command="$(PythonCommand) &quot;$(MSBuildProjectDirectory)/Assets/Docs/scripts/gen_tree.py&quot;"
 		  ConsoleToMSBuild="true" 
 		  LogStandardErrorAsError="false" 
 		  StandardOutputImportance="normal" />

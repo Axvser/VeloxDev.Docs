@@ -13,39 +13,39 @@ Produce rigorous software engineering analysis documentation. Use **PlantUML** f
 
 ## Page Plan
 
-The Architecture section is organized into the following pages. Each page after 3-2 uses **sub-pages grouped by functional module/feature** (discovered in the Module Discovery phase), so each feature gets its own dedicated analysis.
+The Architecture section is organized into the following pages. Each page after `01_functional-structure` uses **sub-pages grouped by feature** (from the Feature Inventory), so each feature gets its own dedicated analysis.
 
 | Page | Content | Rendering | Sub-page strategy |
 |---|---|---|---|
-| `0_file_structure/index.md` | Repository layout, directory tree, project-to-folder mapping | Mermaid flowchart + tree | Single overview page |
-| `1_functional_structure/index.md` | Module responsibility boundaries, feature-to-project mapping, entry point identification | Mermaid flowchart + tables | Single overview page |
-| `2_design_patterns/index.md` | **Design pattern analysis** — one sub-page per feature/module | Mermaid classDiagram + tables | `2_design_patterns/{Feature}/index.md`, may be further subdivided for complex features |
-| `3_data_flow/index.md` | **Data flow analysis** — sequence diagrams for each feature's API call chain | **PlantUML** sequence diagrams | `3_data_flow/{Feature}/index.md`, may be further subdivided for complex features |
-| `4_complexity/index.md` | **Complexity analysis** — time/space complexity for each feature's core operations | KaTeX + tables | `4_complexity/{Feature}/index.md`, may be further subdivided for complex features |
+| `00_file-structure/index.md` | Repository layout, directory tree, project-to-folder mapping | Mermaid flowchart + tree | Single overview page |
+| `01_functional-structure/index.md` | Module responsibility boundaries, feature-to-project mapping, entry point identification | Mermaid flowchart + tables | Single overview page |
+| `02_design-patterns/index.md` | **Design pattern analysis** — one sub-page per feature/module | Mermaid classDiagram + tables | `02_design-patterns/00_{Feature}/index.md`, may be further subdivided for complex features |
+| `03_data-flow/index.md` | **Data flow analysis** — sequence diagrams for each feature's API call chain | **PlantUML** sequence diagrams | `03_data-flow/00_{Feature}/index.md`, may be further subdivided for complex features |
+| `04_complexity/index.md` | **Complexity analysis** — time/space complexity for each feature's core operations | KaTeX + tables | `04_complexity/00_{Feature}/index.md`, may be further subdivided for complex features |
 
 ### Sub-page Depth Rules
 
-Under each `{Feature}/` directory, **further nesting is allowed and encouraged** when necessary to keep each page focused and readable.
+Under each `00_{Feature}/` directory, **further nesting is allowed and encouraged** when necessary to keep each page focused and readable.
 
-**Recommended subdivision dimensions:**
-- `2_design_patterns/{Feature}/` can split by: `0_{PatternName}/index.md` (e.g., `0_Singleton/index.md`, `1_Factory/index.md`)
-- `3_data_flow/{Feature}/` can split by: `0_{APIEndpoint}/index.md` or `0_{OperationName}/index.md` (e.g., `0_UserRegistration/index.md`, `1_OrderQuery/index.md`)
-- `4_complexity/{Feature}/` can split by: `0_{CoreOperation}/index.md` (e.g., `0_Search/index.md`, `1_Sort/index.md`)
+**Recommended subdivision dimensions (each level uses `NN_` two-digit prefixes):**
+- `02_design-patterns/00_{Feature}/` can split by: `00_{PatternName}/index.md` (e.g., `00_Singleton/index.md`, `01_Factory/index.md`)
+- `03_data-flow/00_{Feature}/` can split by: `00_{APIEndpoint}/index.md` or `00_{OperationName}/index.md` (e.g., `00_UserRegistration/index.md`, `01_OrderQuery/index.md`)
+- `04_complexity/00_{Feature}/` can split by: `00_{CoreOperation}/index.md` (e.g., `00_Search/index.md`, `01_Sort/index.md`)
 
-> Guiding principle: when a single page exceeds **500 lines** or covers **more than 3 distinct topics**, it should be split into sub-pages.
+> Guiding principle: when a single page exceeds **~300 lines** or covers **more than 3 distinct topics**, it should be split into sub-pages — splitting is the default for feature pages.
 > The parent directory's `index.md` serves as the feature overview/table of contents, linking to each sub-page.
 
 ### Page Detail
 
-**0_file_structure** — Repository layout showing all source directories, test directories, example directories, and their relationships. One static tree view.
+**00_file-structure** — Repository layout showing all source directories, test directories, example directories, and their relationships. One static tree view.
 
-**1_functional_structure** — Which features exist and which projects own them. Tables mapping feature → owning project → dependencies.
+**01_functional-structure** — Which features exist and which projects own them. Tables mapping feature → owning project → dependencies.
 
-**2_design_patterns/{Feature}/index.md** — For each feature module (e.g. MVVM, AOP, Workflow), analyze the design patterns employed. Mermaid class diagrams showing interfaces, base classes, and concrete implementations. Identify patterns such as: Command Pattern (VeloxCommand), Proxy Pattern (AOP), Observer Pattern (VeloxProperty), Strategy Pattern (Eases), Template Method (TransitionCore), etc.
+**02_design-patterns/00_{Feature}/index.md** — For each feature module (e.g. MVVM, AOP, Workflow), analyze the design patterns employed. Mermaid class diagrams showing interfaces, base classes, and concrete implementations. Identify patterns such as: Command Pattern (VeloxCommand), Proxy Pattern (AOP), Observer Pattern (VeloxProperty), Strategy Pattern (Eases), Template Method (TransitionCore), etc.
 
-**3_data_flow/{Feature}/index.md** — For each feature module, produce PlantUML sequence diagrams showing the complete call chain for core API operations. Cover: normal flow, error/exception paths, and async/event-driven scenarios where applicable.
+**03_data-flow/00_{Feature}/index.md** — For each feature module, produce PlantUML sequence diagrams showing the complete call chain for core API operations. Cover: normal flow, error/exception paths, and async/event-driven scenarios where applicable.
 
-**4_complexity/{Feature}/index.md** — For each feature module, analyze the time and space complexity of its core operations. Use KaTeX for formulas. Cover: construction, execution, look-up, serialization, and memory usage. Example: `O(n)` for linear operations, `O(log n)` for spatial hash lookups, `O(1)` for property access.
+**04_complexity/00_{Feature}/index.md** — For each feature module, analyze the time and space complexity of its core operations. Use KaTeX for formulas. Cover: construction, execution, look-up, serialization, and memory usage. Example: `O(n)` for linear operations, `O(log n)` for spatial hash lookups, `O(1)` for property access.
 
 ## API Call Sequence Diagrams (PlantUML)
 
@@ -228,16 +228,19 @@ flowchart TD
 
 ## Output Location
 
-Base page: `content/{lang}/{category}/architecture/index.md`
-Sub-pages: `content/{lang}/{category}/architecture/{page_group}/{Feature}/index.md`
+Base page: `Wiki_Root/3_SE_Analysis/00_{page_group}/index.md`
+Sub-pages: `Wiki_Root/3_SE_Analysis/00_{page_group}/00_{Feature}/index.md`
 
-For **Single project** tier: `content/{lang}/architecture/{page_group}/{Feature}/index.md`
-For **Multi project** tier: `content/{lang}/{project}/architecture/{page_group}/{Feature}/index.md`
-For **Framework/Monorepo** tier: `content/{lang}/{category}/architecture/{page_group}/{Feature}/index.md`
+Page groups: `00_file-structure` / `01_functional-structure` / `02_design-patterns` / `03_data-flow` / `04_complexity`.
+
+For **Multi project / Monorepo** wikis, insert the owning project as an extra `NN_` level: `Wiki_Root/3_SE_Analysis/00_{page_group}/00_{Project}/00_{Feature}/index.md`.
+
+> Feature directory names must match the Feature Inventory and be identical across the `1_QuickStart`, `2_API`, and `3_SE_Analysis` trees.
 
 ## Post-Write Action
 
 After writing SE Analysis content:
 
+- [ ] **Update the Feature Inventory** — set each analyzed feature's Coverage Status to `SE ✓`
 - [ ] **Regenerate navigation index** — Run the tree generator script (e.g. `python gen_tree.py`) to rebuild tree.json
 - [ ] **Build the project** — Run the project's build command to verify the new content embeds correctly

@@ -40,6 +40,8 @@ Strictly follow the workflow defined in this SKILL to produce Wiki documentation
 
 ⚙ Analysis artifact: a「Feature Inventory」listing per item: feature name / owning project / public API surface / evidence source (Demo / Test / inferred). It is the unified input for the subsequent Quick Start / API Reference / SE Analysis phases — the three phases work from the same inventory so every Wiki dimension stays consistent.
 
+⚙ The「Feature Inventory」also carries a per-feature **Coverage Status** field (`TODO / QS ✓ / API ✓ / SE ✓`). Steps 3–5 update it as they finish each feature; step 8 (Review) reconciles it into a Coverage Reconciliation Matrix. The feature set is **frozen after discovery** — later steps only mark status, they never add, remove, or rename features; any correction must flow back into the inventory and be re-reconciled.
+
 ⚙ Sub-items under the five fixed dimensions (see Structure Conventions) are always organized by feature.
 
 ## Structure Conventions
@@ -61,6 +63,70 @@ Ultimately, the directory will present the following structure. These are five f
 > Wiki_Root/3_SE_Analysis/.../
 
 > Wiki_Root/4_Copyright/.../
+
+## Directory Grammar
+
+⚙ Naming grammar by level:
+- **Top-level — the five fixed dimensions (single-digit prefix):** `0_Welcome` / `1_QuickStart` / `2_API` / `3_SE_Analysis` / `4_Copyright`.
+- **Every sub-level at any depth (two-digit prefix `NN_`, `00`–`99`):** lowercase kebab-case for English wikis, Chinese names for Chinese-language wikis, **no spaces**. E.g. `00_user-registration/`, `01_data-export/`.
+
+⚙ **Granularity rule:** one directory = one "independently describable, usable, verifiable capability unit". Each dimension gives each feature exactly one directory; never merge multiple features into one directory, and never split one feature across sibling directories — nest instead. Feature names always come from the「Feature Inventory」; never invent a name while writing.
+
+⚙ **Cross-dimension name consistency:** the SAME feature name must be used identically in the `1_QuickStart`, `2_API`, and `3_SE_Analysis` trees (within a language). A feature written `00_user-registration` in QuickStart must also be `00_user-registration` in API and in SE Analysis.
+
+⚙ Complex features may nest further sub-capabilities (e.g. `00_user-registration/00_email-verification/`), obeying the same two-digit + kebab-case rule at every level.
+
+⚙ **Page-focus limit (default-split):** a feature page is NOT a single monolithic document — splitting is the default, not the exception. Split a page when it would exceed **~300 lines** OR cover more than **3 distinct topics**, along capability/operation/endpoint boundaries (e.g. `00_{Feature}/00_{Operation}/index.md`). The parent `index.md` becomes a short overview that links its sub-pages. When in doubt, split earlier. Apply uniformly across QuickStart / API / SE Analysis.
+
+**Illustrative example only — not a fixed requirement.** Fictional project "Acme Console" with three features (`user-registration`, `data-export`, `theme`). Every directory contains an `index.md`.
+
+```
+Wiki_Root/
+├── 0_Welcome/
+│   └── index.md
+├── 1_QuickStart/
+│   ├── index.md
+│   ├── 00_user-registration/
+│   │   └── index.md
+│   ├── 01_data-export/
+│   │   └── index.md
+│   └── 02_theme/
+│       └── index.md
+├── 2_API/
+│   ├── index.md
+│   ├── 00_user-registration/
+│   │   ├── index.md
+│   │   └── 00_register-endpoint/
+│   │       └── index.md
+│   ├── 01_data-export/
+│   │   └── index.md
+│   └── 02_theme/
+│       └── index.md
+├── 3_SE_Analysis/
+│   ├── index.md
+│   ├── 00_file-structure/
+│   │   └── index.md
+│   ├── 01_functional-structure/
+│   │   └── index.md
+│   ├── 02_design-patterns/
+│   │   ├── index.md
+│   │   ├── 00_user-registration/
+│   │   │   └── index.md
+│   │   ├── 01_data-export/
+│   │   │   └── index.md
+│   │   └── 02_theme/
+│   │       └── index.md
+│   ├── 03_data-flow/
+│   │   ├── index.md
+│   │   └── 00_user-registration/
+│   │       └── index.md
+│   └── 04_complexity/
+│       ├── index.md
+│       └── 00_user-registration/
+│           └── index.md
+└── 4_Copyright/
+    └── index.md
+```
 
 ## Template Conventions
 

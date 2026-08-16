@@ -40,6 +40,8 @@ Strictly follow the workflow defined in this SKILL to produce Wiki documentation
 
 ⚙ Analysis artifact: a「Feature Inventory」listing per item: feature name / owning project / public API surface / evidence source (Demo / Test / inferred). It is the unified input for the subsequent Quick Start / API Reference / SE Analysis phases — the three phases work from the same inventory so every Wiki dimension stays consistent.
 
+⚙ The「Feature Inventory」also carries a per-feature **Coverage Status** field (`TODO / QS ✓ / API ✓ / SE ✓`). Steps 3–5 update it as they finish each feature; step 8 (Review) reconciles it into a Coverage Reconciliation Matrix. The feature set is **frozen after discovery** — later steps only mark status, they never add, remove, or rename features; any correction must flow back into the inventory and be re-reconciled.
+
 ⚙ Sub-items under the five fixed dimensions (see Structure Conventions) are always organized by feature.
 
 ## Structure Conventions
@@ -61,6 +63,70 @@ Ultimately, the directory will present the following structure. These are five f
 > Wiki_Root/3_SE_Analysis/.../
 
 > Wiki_Root/4_Copyright/.../
+
+## Directory Grammar
+
+⚙ Naming grammar by level:
+- **Top-level — the five fixed dimensions (single-digit prefix):** `0_Welcome` / `1_QuickStart` / `2_API` / `3_SE_Analysis` / `4_Copyright`.
+- **Every sub-level at any depth (two-digit prefix `NN_`, `00`–`99`):** lowercase kebab-case for English wikis, Chinese names for Chinese-language wikis, **no spaces**. E.g. `00_user-registration/`, `01_data-export/`.
+
+⚙ **Granularity rule:** one directory = one "independently describable, usable, verifiable capability unit". Each dimension gives each feature exactly one directory; never merge multiple features into one directory, and never split one feature across sibling directories — nest instead. Feature names always come from the「Feature Inventory」; never invent a name while writing.
+
+⚙ **Cross-dimension name consistency:** the SAME feature name must be used identically in the `1_QuickStart`, `2_API`, and `3_SE_Analysis` trees (within a language). A feature written `00_user-registration` in QuickStart must also be `00_user-registration` in API and in SE Analysis.
+
+⚙ Complex features may nest further sub-capabilities (e.g. `00_user-registration/00_email-verification/`), obeying the same two-digit + kebab-case rule at every level.
+
+⚙ **Page-focus limit (default-split):** a feature page is NOT a single monolithic document — splitting is the default, not the exception. Split a page when it would exceed **~300 lines** OR cover more than **3 distinct topics**, along capability/operation/endpoint boundaries (e.g. `00_{Feature}/00_{Operation}/index.md`). The parent `index.md` becomes a short overview that links its sub-pages. When in doubt, split earlier. Apply uniformly across QuickStart / API / SE Analysis.
+
+**Illustrative example only — not a fixed requirement.** Fictional project "Acme Console" with three features (`user-registration`, `data-export`, `theme`). Every directory contains an `index.md`.
+
+```
+Wiki_Root/
+├── 0_Welcome/
+│   └── index.md
+├── 1_QuickStart/
+│   ├── index.md
+│   ├── 00_user-registration/
+│   │   └── index.md
+│   ├── 01_data-export/
+│   │   └── index.md
+│   └── 02_theme/
+│       └── index.md
+├── 2_API/
+│   ├── index.md
+│   ├── 00_user-registration/
+│   │   ├── index.md
+│   │   └── 00_register-endpoint/
+│   │       └── index.md
+│   ├── 01_data-export/
+│   │   └── index.md
+│   └── 02_theme/
+│       └── index.md
+├── 3_SE_Analysis/
+│   ├── index.md
+│   ├── 00_file-structure/
+│   │   └── index.md
+│   ├── 01_functional-structure/
+│   │   └── index.md
+│   ├── 02_design-patterns/
+│   │   ├── index.md
+│   │   ├── 00_user-registration/
+│   │   │   └── index.md
+│   │   ├── 01_data-export/
+│   │   │   └── index.md
+│   │   └── 02_theme/
+│   │       └── index.md
+│   ├── 03_data-flow/
+│   │   ├── index.md
+│   │   └── 00_user-registration/
+│   │       └── index.md
+│   └── 04_complexity/
+│       ├── index.md
+│       └── 00_user-registration/
+│           └── index.md
+└── 4_Copyright/
+    └── index.md
+```
 
 ## Template Conventions
 
@@ -134,15 +200,30 @@ Read the dependency declarations from project definition files (build manifests,
 
 #### 3. Generate the Feature Inventory
 
-| Feature | Owning Project | Public API Surface | Dependencies | Evidence |
-|---|---|---|---|---|
-| User registration | auth service | register(credentials) | database driver | Demo |
-| Data export | report module | export(format) | template engine | Test |
+| Feature | Owning Project | Public API Surface | Dependencies | Evidence | Coverage Status |
+|---|---|---|---|---|---|
+| User registration | auth service | register(credentials) | database driver | Demo | QS ✓ / API ✓ / SE ✓ |
+| Data export | report module | export(format) | template engine | Test | QS ✓ / API — / SE — |
+| Theme customization | renderer | setTheme(palette) | — | *inferred* | TODO |
+
+#### 4. Coverage Status State Machine
+
+Each feature carries a Coverage Status field tracking how far the three writing dimensions have covered it.
+
+- `TODO` — discovered, not written yet.
+- `QS ✓` — QuickStart page written (step 3). `API ✓` — API Reference page written (step 4). `SE ✓` — SE Analysis page written (step 5).
+- Append a token each time a dimension completes; e.g. `QS ✓ / API ✓ / SE ✓`.
+
+Rules:
+
+- **Steps 3, 4, 5 MUST update this column immediately** after finishing a feature in their dimension. Do not leave it stale.
+- **The feature set is frozen after this step.** Steps 3–5 may only mark status; they may NOT add, remove, or rename features. Any correction must flow back into the inventory and be re-reconciled.
+- The inventory is a working artifact maintained **outside Wiki_Root** (e.g. `CloudGlyph_Child_Git/.workflow/feature-inventory.md`) and carried into step 8 Review for reconciliation. It is regenerated each run, so a future template sync removing it is expected.
 
 ### Output
 
-- 「Feature Inventory」table (feature / owning project / public API surface / dependencies / evidence source)
-- This inventory is the single feature input for the subsequent Quick Start / API Reference / SE Analysis phases — they must not introduce a different feature breakdown
+- 「Feature Inventory」table (feature / owning project / public API surface / dependencies / evidence source / coverage status)
+- The inventory is the single feature input for the subsequent Quick Start / API Reference / SE Analysis phases — they must not introduce a different feature breakdown, and they must keep the Coverage Status column up to date
 
 
 > 3.Write【QuickStart】
@@ -171,6 +252,33 @@ Use the module's highest-level API (attributes, extension methods, Fluent API, b
 
 Use the「Feature Inventory」produced by the 【Analysis Paradigm】 directly: each feature's evidence source (Demo / Test / inferred) is already recorded. Prioritize by evidence — fully read all Demo source files first, then tests; examples for features marked *inferred* must be noted as such in the page. Do not redo feature discovery.
 
+#### Reproducibility Contract
+
+Every Quick Start is a **contract that a human can reproduce end-to-end**. On top of the structure below, obey:
+
+- **Prerequisites are mandatory and derived from build metadata, not from Demos** — read the project's declared `TargetFrameworks` / `TargetFramework` and dependency minimums (csproj/project files, package manifests) to state the actual supported targets, SDK/runtime and package versions. A Demo or test only proves one *tested* configuration — it is never the minimum supported version. State required services with how to obtain/start them.
+- **Every numbered step states an observable "Expected result"** — what the reader sees/hears/verifies after completing it, not only at the end.
+- **Complete Code is a single minimal runnable block** — no `...` / ellipses; symbol self-consistency: every identifier used is defined in the sample, in a prior step, or traced to a real file (with path).
+- **Run Declaration is mandatory** — the page must end by honestly declaring whether the writer actually built and ran it (✅, with recorded output) or only statically verified it (⚠️).
+
+#### Sub-pages (default-split)
+
+A feature's Quick Start is normally **split into sub-pages** rather than one long page. Split when the page would exceed **~300 lines** or cover more than **3 distinct topics** — group by step or by operation:
+
+```
+00_{Feature}/                        ← overview + table of contents
+├── index.md
+├── 00_prerequisites/
+├── 01_setup/
+├── 02_{operation-a}/
+├── 03_{operation-b}/
+└── 09_verification/                 ← Verification + Complete Code + Run Declaration
+```
+
+- Each sub-page keeps its own **Expected result** assertions.
+- The parent `index.md` is a short overview that links the sub-pages; do not duplicate their body there.
+- The **Run Declaration** footer stays at the end of the last content page (the one holding the Complete Code).
+
 #### Structure
 
 ```
@@ -178,43 +286,65 @@ Use the「Feature Inventory」produced by the 【Analysis Paradigm】 directly: 
 
 ### Quick Start
 
-#### 1. Install / Add Dependency
+#### 1. Prerequisites
+
+- **Supported target(s) from the project's declared `TargetFrameworks`** (e.g. `netstandard2.0;net6.0`) — the Demo's runtime is only a *tested* configuration, never the requirement
+- {SDK/runtime}: version required by the supported target (e.g. .NET SDK 6.0+ for `net6.0`)
+- {Package manager}: version
+- {Required services}: (e.g. a running database, API key) — and how to obtain/start them
+- If any prerequisite cannot be verified locally, the Run Declaration below MUST be ⚠️.
+
+#### 2. Install / Add Dependency
 
 How to install / add dependencies (using the package manager appropriate to the project's tech stack)
 
-#### 2. Basic Setup / Registration
+**Expected result:** {observable outcome, e.g. package appears in the manifest / command exits 0}
+
+#### 3. Basic Setup / Registration
 
 Register services, create instances, configure settings, etc.
 
-#### 3. Core Usage (Step by Step)
+**Expected result:** {e.g. object constructs, service starts, config loads}
+
+#### 4. Core Usage (Step by Step)
 
 Combine top-level APIs step by step, from simple to complete, each with runnable code
 
-#### 4. Verification
+**Expected result:** {e.g. output value, UI state, HTTP status}
+
+#### 5. Verification
 
 How to run and verify the feature works (expected output, UI effect, etc.)
 
-#### 5. Complete Code
+#### 6. Complete Code
 
-Provide the final complete code files for reference
+A single minimal complete runnable block. NO `...` / ellipses. Symbol self-consistency: every identifier used is defined in this sample, in a prior step, or traced to a real file (with path).
+
+#### 7. Run Declaration
+
+- ✅ Actually built and ran on {date}; recorded output: {paste actual output}
+- OR ⚠️ Not actually run — statically verified only. Keep this declaration honest; it is the reproducibility contract.
 ```
 
 #### Output Location
 
 ```
-content/{lang}/{category}/0_QuickStart/
+Wiki_Root/1_QuickStart/
 ├── index.md                    ← Overview
-├── 0_{FeatureA}/
+├── 00_{feature-a}/
 │   └── index.md
-├── 1_{FeatureB}/
+├── 01_{feature-b}/
 │   └── index.md
 └── ...
 ```
+
+> Directory names must come from the Feature Inventory and be identical across the `1_QuickStart`, `2_API`, and `3_SE_Analysis` trees (cross-dimension consistency).
 
 ### Post-Write Action
 
 After writing Quick Start content:
 
+- [ ] **Update the Feature Inventory** — set this feature's Coverage Status to `QS ✓` (see module-discovery)
 - [ ] **Regenerate navigation index** — Run the tree generator script (e.g. `python gen_tree.py`) to rebuild tree.json
 - [ ] **Build the project** — Run the project's build command to verify the new content embeds correctly
 
@@ -237,9 +367,13 @@ API Reference is not about depth or multiple styles — it's about **uncompromis
 - For each type, list all public members (methods, properties, events, fields)
 - Include full signature, parameter descriptions, return value descriptions, and exception declarations
 
+**Coverage is a hard gate.** Every feature in the Feature Inventory must have an API page. For features with Demo/Test evidence, the public surface must be **fully enumerated** — every public type and member, no truncation. For *inferred* features, mark the page as such; partial coverage is allowed only there. After finishing, re-scan the module's public surface and diff it against what is documented; any missed API becomes an explicit residual.
+
 #### API Source
 
 Use the「Feature Inventory」produced by the 【Analysis Paradigm】 as the source of truth: for features with Demo / Test evidence, extract the API surface from those Demos/tests; for features marked *inferred*, compile signatures from source and mark them accordingly.
+
+**Update the inventory** — after finishing a feature, set its Coverage Status to `API ✓`.
 
 #### Entry Template
 
@@ -267,6 +401,8 @@ Record each public member using the following structure:
 // Source: [Demo/Test/Inferred]
 result = instance.method(value);
 ```
+
+Prefer a concrete call with **real input values and the resulting output**. If the sample needs environment setup (dependencies, service registration), reference the feature's Quick Start page instead of duplicating it.
 
 **Notes:**
 - {additional notes}
@@ -299,14 +435,18 @@ Group by type, and within each type sort by member kind (properties first, then 
 #### Output Location
 
 ```
-content/{lang}/{category}/1_API_Reference/{Feature}/
+Wiki_Root/2_API/00_{feature}/
 ├── index.md                    ← Overview
-├── 0_{Namespace/Package A}/
+├── 00_{namespace-package-a}/
 │   └── index.md
-├── 1_{Namespace/Package B}/
+├── 01_{namespace-package-b}/
 │   └── index.md
 └── ...
 ```
+
+> Feature directory names must match the Feature Inventory and be identical across the `1_QuickStart`, `2_API`, and `3_SE_Analysis` trees.
+
+> When a namespace or feature API page would exceed ~300 lines, split further by type: `2_API/00_{feature}/00_{namespace}/00_{Type}/index.md` (or directly `2_API/00_{feature}/00_{Type}/index.md` when the feature has few namespaces).
 
 ### Post-Write Action
 
@@ -333,39 +473,39 @@ Produce rigorous software engineering analysis documentation. Use **PlantUML** f
 
 ### Page Plan
 
-The Architecture section is organized into the following pages. Each page after 3-2 uses **sub-pages grouped by functional module/feature** (discovered in the Module Discovery phase), so each feature gets its own dedicated analysis.
+The Architecture section is organized into the following pages. Each page after `01_functional-structure` uses **sub-pages grouped by feature** (from the Feature Inventory), so each feature gets its own dedicated analysis.
 
 | Page | Content | Rendering | Sub-page strategy |
 |---|---|---|---|
-| `0_file_structure/index.md` | Repository layout, directory tree, project-to-folder mapping | Mermaid flowchart + tree | Single overview page |
-| `1_functional_structure/index.md` | Module responsibility boundaries, feature-to-project mapping, entry point identification | Mermaid flowchart + tables | Single overview page |
-| `2_design_patterns/index.md` | **Design pattern analysis** — one sub-page per feature/module | Mermaid classDiagram + tables | `2_design_patterns/{Feature}/index.md`, may be further subdivided for complex features |
-| `3_data_flow/index.md` | **Data flow analysis** — sequence diagrams for each feature's API call chain | **PlantUML** sequence diagrams | `3_data_flow/{Feature}/index.md`, may be further subdivided for complex features |
-| `4_complexity/index.md` | **Complexity analysis** — time/space complexity for each feature's core operations | KaTeX + tables | `4_complexity/{Feature}/index.md`, may be further subdivided for complex features |
+| `00_file-structure/index.md` | Repository layout, directory tree, project-to-folder mapping | Mermaid flowchart + tree | Single overview page |
+| `01_functional-structure/index.md` | Module responsibility boundaries, feature-to-project mapping, entry point identification | Mermaid flowchart + tables | Single overview page |
+| `02_design-patterns/index.md` | **Design pattern analysis** — one sub-page per feature/module | Mermaid classDiagram + tables | `02_design-patterns/00_{Feature}/index.md`, may be further subdivided for complex features |
+| `03_data-flow/index.md` | **Data flow analysis** — sequence diagrams for each feature's API call chain | **PlantUML** sequence diagrams | `03_data-flow/00_{Feature}/index.md`, may be further subdivided for complex features |
+| `04_complexity/index.md` | **Complexity analysis** — time/space complexity for each feature's core operations | KaTeX + tables | `04_complexity/00_{Feature}/index.md`, may be further subdivided for complex features |
 
 #### Sub-page Depth Rules
 
-Under each `{Feature}/` directory, **further nesting is allowed and encouraged** when necessary to keep each page focused and readable.
+Under each `00_{Feature}/` directory, **further nesting is allowed and encouraged** when necessary to keep each page focused and readable.
 
-**Recommended subdivision dimensions:**
-- `2_design_patterns/{Feature}/` can split by: `0_{PatternName}/index.md` (e.g., `0_Singleton/index.md`, `1_Factory/index.md`)
-- `3_data_flow/{Feature}/` can split by: `0_{APIEndpoint}/index.md` or `0_{OperationName}/index.md` (e.g., `0_UserRegistration/index.md`, `1_OrderQuery/index.md`)
-- `4_complexity/{Feature}/` can split by: `0_{CoreOperation}/index.md` (e.g., `0_Search/index.md`, `1_Sort/index.md`)
+**Recommended subdivision dimensions (each level uses `NN_` two-digit prefixes):**
+- `02_design-patterns/00_{Feature}/` can split by: `00_{PatternName}/index.md` (e.g., `00_Singleton/index.md`, `01_Factory/index.md`)
+- `03_data-flow/00_{Feature}/` can split by: `00_{APIEndpoint}/index.md` or `00_{OperationName}/index.md` (e.g., `00_UserRegistration/index.md`, `01_OrderQuery/index.md`)
+- `04_complexity/00_{Feature}/` can split by: `00_{CoreOperation}/index.md` (e.g., `00_Search/index.md`, `01_Sort/index.md`)
 
-> Guiding principle: when a single page exceeds **500 lines** or covers **more than 3 distinct topics**, it should be split into sub-pages.
+> Guiding principle: when a single page exceeds **~300 lines** or covers **more than 3 distinct topics**, it should be split into sub-pages — splitting is the default for feature pages.
 > The parent directory's `index.md` serves as the feature overview/table of contents, linking to each sub-page.
 
 #### Page Detail
 
-**0_file_structure** — Repository layout showing all source directories, test directories, example directories, and their relationships. One static tree view.
+**00_file-structure** — Repository layout showing all source directories, test directories, example directories, and their relationships. One static tree view.
 
-**1_functional_structure** — Which features exist and which projects own them. Tables mapping feature → owning project → dependencies.
+**01_functional-structure** — Which features exist and which projects own them. Tables mapping feature → owning project → dependencies.
 
-**2_design_patterns/{Feature}/index.md** — For each feature module (e.g. MVVM, AOP, Workflow), analyze the design patterns employed. Mermaid class diagrams showing interfaces, base classes, and concrete implementations. Identify patterns such as: Command Pattern (VeloxCommand), Proxy Pattern (AOP), Observer Pattern (VeloxProperty), Strategy Pattern (Eases), Template Method (TransitionCore), etc.
+**02_design-patterns/00_{Feature}/index.md** — For each feature module (e.g. MVVM, AOP, Workflow), analyze the design patterns employed. Mermaid class diagrams showing interfaces, base classes, and concrete implementations. Identify patterns such as: Command Pattern (VeloxCommand), Proxy Pattern (AOP), Observer Pattern (VeloxProperty), Strategy Pattern (Eases), Template Method (TransitionCore), etc.
 
-**3_data_flow/{Feature}/index.md** — For each feature module, produce PlantUML sequence diagrams showing the complete call chain for core API operations. Cover: normal flow, error/exception paths, and async/event-driven scenarios where applicable.
+**03_data-flow/00_{Feature}/index.md** — For each feature module, produce PlantUML sequence diagrams showing the complete call chain for core API operations. Cover: normal flow, error/exception paths, and async/event-driven scenarios where applicable.
 
-**4_complexity/{Feature}/index.md** — For each feature module, analyze the time and space complexity of its core operations. Use KaTeX for formulas. Cover: construction, execution, look-up, serialization, and memory usage. Example: `O(n)` for linear operations, `O(log n)` for spatial hash lookups, `O(1)` for property access.
+**04_complexity/00_{Feature}/index.md** — For each feature module, analyze the time and space complexity of its core operations. Use KaTeX for formulas. Cover: construction, execution, look-up, serialization, and memory usage. Example: `O(n)` for linear operations, `O(log n)` for spatial hash lookups, `O(1)` for property access.
 
 ### API Call Sequence Diagrams (PlantUML)
 
@@ -548,17 +688,20 @@ flowchart TD
 
 ### Output Location
 
-Base page: `content/{lang}/{category}/architecture/index.md`
-Sub-pages: `content/{lang}/{category}/architecture/{page_group}/{Feature}/index.md`
+Base page: `Wiki_Root/3_SE_Analysis/00_{page_group}/index.md`
+Sub-pages: `Wiki_Root/3_SE_Analysis/00_{page_group}/00_{Feature}/index.md`
 
-For **Single project** tier: `content/{lang}/architecture/{page_group}/{Feature}/index.md`
-For **Multi project** tier: `content/{lang}/{project}/architecture/{page_group}/{Feature}/index.md`
-For **Framework/Monorepo** tier: `content/{lang}/{category}/architecture/{page_group}/{Feature}/index.md`
+Page groups: `00_file-structure` / `01_functional-structure` / `02_design-patterns` / `03_data-flow` / `04_complexity`.
+
+For **Multi project / Monorepo** wikis, insert the owning project as an extra `NN_` level: `Wiki_Root/3_SE_Analysis/00_{page_group}/00_{Project}/00_{Feature}/index.md`.
+
+> Feature directory names must match the Feature Inventory and be identical across the `1_QuickStart`, `2_API`, and `3_SE_Analysis` trees.
 
 ### Post-Write Action
 
 After writing SE Analysis content:
 
+- [ ] **Update the Feature Inventory** — set each analyzed feature's Coverage Status to `SE ✓`
 - [ ] **Regenerate navigation index** — Run the tree generator script (e.g. `python gen_tree.py`) to rebuild tree.json
 - [ ] **Build the project** — Run the project's build command to verify the new content embeds correctly
 
@@ -624,7 +767,7 @@ Organize categories in the following order by {type}:
 
 ### Output Location
 
-Wiki_Root/content/{language}/4_Copyright/{type}/index.md
+Wiki_Root/4_Copyright/00_{type}/index.md
 
 
 > 7.Write【Welcome】
@@ -647,7 +790,7 @@ Create a welcome page from a template that fits the current project
 
 ### Output Location
 
-Wiki_Root/content/{language}/0_Welcome/index.md
+Wiki_Root/0_Welcome/index.md
 
 ### Template Selection
 
@@ -670,10 +813,22 @@ Review and correct each deliverable one by one
 
 ### Checklist
 
-#### Feature Inventory Coverage Audit
+#### Coverage Reconciliation Matrix (HARD GATE)
 
-- [ ] Cross-reference the「Feature Inventory」produced by the Analysis Paradigm, verifying every feature is documented across Quick Start / API Reference / SE Analysis
-- [ ] Immediately fill any missing features
+Build the matrix from the Feature Inventory's Coverage Status column. The matrix MUST be written into the Review output — it is a deliverable, not a thought exercise.
+
+| Feature | Evidence | QuickStart | API | SE Analysis | Status |
+|---|---|---|---|---|---|
+| User registration | Demo | ✅ | ✅ | ✅ | PASS |
+| Data export | Test | ✅ | ✅ | ❌ missing data-flow sub-page | FAIL |
+| Theme customization | *inferred* | ✅ | ⚠️ partial: `setTheme` only | ✅ | PASS (residual) |
+
+Rules:
+
+- **Features with Demo/Test evidence MUST be ✅ across all three dimensions (QuickStart / API / SE Analysis). Any ❌ ⇒ the entire Review FAILS.** Fix immediately and re-run before continuing.
+- **Only *inferred* features may carry residual ⚠️ items**, and each residual MUST state a one-line reason (e.g. "API surface not fully covered by evidence").
+- After reconciliation, write the final status back into the Feature Inventory (`PASS` / `FAIL` / `RESIDUAL`).
+- If the inventory carries `TODO` or a stale status that a completed page contradicts → FAIL; the status machine was not respected.
 
 ---
 
@@ -710,11 +865,26 @@ For **every page** in the Wiki, extract all code blocks containing API reference
 
 ---
 
-#### Diagram Syntax Validation
+#### Reproducibility Spot-check
 
-- [ ] **Mermaid** — direction/type valid, participants declared, brackets balanced, arrows correct
-- [ ] **KaTeX** — all `$...$` and `$$...$$` inline/block pairs are balanced, no mismatched delimiters
-- [ ] **PlantUML** — `@startuml` / `@enduml` paired, participants declared before use, `activate`/`deactivate` paired, `alt`/`else`/`end` structure correct
+- [ ] Every QuickStart has a mandatory **Prerequisites** block (SDK/runtime/package-manager versions, target framework, required services)
+- [ ] Prerequisites are derived from the project's declared `TargetFrameworks`/dependency minimums — **not** from a Demo's runtime (a Demo proves one tested config, never the minimum)
+- [ ] Every numbered step states an observable **Expected result**
+- [ ] The complete-code block contains **no `...` / ellipses**; every identifier is defined in the sample, a prior step, or traced to a real file
+- [ ] The page ends with a **Run Declaration** footer: `✅ actually built/ran` (recorded output) or `⚠️ not actually run` (static verification only, marked)
+- [ ] For any `✅` declaration, the recorded output matches the step's stated expected results
+
+---
+
+#### Diagram & Formula Validation (real-engine render + fallback pre-check)
+
+Diagrams and math are validated by the **actual rendering engines** — ground truth, not by eye or heuristics. **One-time setup** in `<CloudGlyph_Child_Git>/src/CloudGlyph/Assets/Docs/scripts/`: run `npm install` (provides mermaid/katex/jsdom) and place `plantuml.jar` next to the script (or pass `--jar <path>`). Then run:
+
+- [ ] **PlantUML (real engine)** — `python validate-plantuml.py <Wiki_Root> --engine java`; the actual `plantuml.jar -checkonly` must report no errors
+- [ ] **Mermaid (real parser)** — `node validate-mermaid.js <Wiki_Root>`; the real `mermaid.parse` must not throw
+- [ ] **KaTeX (real renderer)** — `node validate-katex.js <Wiki_Root>`; the real `katex.renderToString` must not throw on any `$...$` / `$$...$$`
+- [ ] Fix every reported **ERROR** — a real-engine error means the diagram/math will not render, it is authoritative
+- [ ] **If the engines are unavailable** (no node/java on the machine), fall back to the dependency-free structural pre-checks `validate-plantuml.py` / `validate-mermaid.py` / `validate-katex.py` (heuristic) and explicitly note that real-render validation was not run
 
 ---
 
@@ -724,6 +894,7 @@ For **every page** in the Wiki, extract all code blocks containing API reference
 - [ ] `index.md` exists in **every** page directory (root and sub-pages)
 - [ ] Code block indentation uses real spaces, not tab characters, matching the Code Style Conventions
 - [ ] No local Markdown links (`[text](local/path/)`) — use relative navigation via the tree instead
+- [ ] Pages exceeding **~300 lines / 3 topics** are split into sub-pages, with the parent `index.md` acting as an overview/table of contents
 - [ ] **Prune untracked entries** — Any document page or directory **not produced by the current workflow** must be deleted. If removing all affected files empties a parent directory and that does not break the current output structure, the empty directory must also be removed.
 
 ---
@@ -747,10 +918,12 @@ For **every page** in the Wiki, extract all code blocks containing API reference
 
 1. Walk through the checklist item by item; **fix issues immediately** before moving to the next item
 2. Code authenticity issues → search source to confirm signatures, then fix docs
-3. Diagram syntax issues → fix and re-validate
-4. Run `python gen_tree.py`, confirm no pages are missing
-5. Run the project's build command, confirm compilation succeeds
-6. Only after all items are ✅, mark the quality gate as passed
+3. Diagram/KaTeX issues → run the real-engine validators (`validate-plantuml.py --engine java`, `validate-mermaid.js`, `validate-katex.js`), fix every ERROR, re-run until clean
+4. Reconcile the **Coverage Reconciliation Matrix**: if any Demo/Test feature has a ❌, or the matrix was not written, the quality gate FAILS
+5. Run the **Reproducibility Spot-check** against the QuickStart pages
+6. Run `python gen_tree.py`, confirm no pages are missing
+7. Run the project's build command, confirm compilation succeeds
+8. Only after all items are ✅, mark the quality gate as passed
 
 ## Template Index
 

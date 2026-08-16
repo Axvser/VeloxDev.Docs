@@ -14,9 +14,13 @@ API Reference is not about depth or multiple styles — it's about **uncompromis
 - For each type, list all public members (methods, properties, events, fields)
 - Include full signature, parameter descriptions, return value descriptions, and exception declarations
 
+**Coverage is a hard gate.** Every feature in the Feature Inventory must have an API page. For features with Demo/Test evidence, the public surface must be **fully enumerated** — every public type and member, no truncation. For *inferred* features, mark the page as such; partial coverage is allowed only there. After finishing, re-scan the module's public surface and diff it against what is documented; any missed API becomes an explicit residual.
+
 ### API Source
 
 Use the「Feature Inventory」produced by the 【Analysis Paradigm】 as the source of truth: for features with Demo / Test evidence, extract the API surface from those Demos/tests; for features marked *inferred*, compile signatures from source and mark them accordingly.
+
+**Update the inventory** — after finishing a feature, set its Coverage Status to `API ✓`.
 
 ### Entry Template
 
@@ -44,6 +48,8 @@ Record each public member using the following structure:
 // Source: [Demo/Test/Inferred]
 result = instance.method(value);
 ```
+
+Prefer a concrete call with **real input values and the resulting output**. If the sample needs environment setup (dependencies, service registration), reference the feature's Quick Start page instead of duplicating it.
 
 **Notes:**
 - {additional notes}
@@ -76,14 +82,18 @@ Group by type, and within each type sort by member kind (properties first, then 
 ### Output Location
 
 ```
-content/{lang}/{category}/1_API_Reference/{Feature}/
+Wiki_Root/2_API/00_{feature}/
 ├── index.md                    ← Overview
-├── 0_{Namespace/Package A}/
+├── 00_{namespace-package-a}/
 │   └── index.md
-├── 1_{Namespace/Package B}/
+├── 01_{namespace-package-b}/
 │   └── index.md
 └── ...
 ```
+
+> Feature directory names must match the Feature Inventory and be identical across the `1_QuickStart`, `2_API`, and `3_SE_Analysis` trees.
+
+> When a namespace or feature API page would exceed ~300 lines, split further by type: `2_API/00_{feature}/00_{namespace}/00_{Type}/index.md` (or directly `2_API/00_{feature}/00_{Type}/index.md` when the feature has few namespaces).
 
 ## Post-Write Action
 

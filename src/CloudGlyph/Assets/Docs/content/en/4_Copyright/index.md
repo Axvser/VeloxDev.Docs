@@ -1,11 +1,7 @@
 # Copyright
 
-This section records the license, copyright and attribution information of VeloxDev.
+License, attribution, and legal notices for the VeloxDev project.
 
-| Category | Status |
+| Category | Document |
 |---|---|
-| License Information | ✅ [MIT License](0_LicenseInformation/index.md) |
-| Copyright Notice | — |
-| Contributors | — |
-| Patent Grant | — |
-| Third-party Notices | — |
+| [License Information](00_license-information) | MIT License · Copyright (c) 2025 Axvser |

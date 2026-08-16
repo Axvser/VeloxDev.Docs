@@ -16,7 +16,7 @@ Create a welcome page from a template that fits the current project
 
 ## Output Location
 
-Wiki_Root/content/{language}/0_Welcome/index.md
+Wiki_Root/0_Welcome/index.md
 
 ## Template Selection
 

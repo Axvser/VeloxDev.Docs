@@ -1,0 +1,141 @@
+# 平台适配器 — `NodeView.xaml / NodeView.xaml.cs`
+
+Source file from the complete scaffold.
+
+```xml
+
+<!-- ====================== NodeView.xaml ====================== -->
+
+<UserControl x:Class="Demo.Views.Workflow.NodeView"
+
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+
+             xmlns:local="clr-namespace:Demo.Views.Workflow"
+
+             xmlns:behaviors="clr-namespace:VeloxDev.WorkflowSystem.AttachedBehaviors;assembly=VeloxDev.WPF"
+
+             behaviors:WorkflowSlotLayoutBehavior.IsEnabled="True"
+
+             behaviors:WorkflowSlotLayoutBehavior.SlotNames="PART_InputSlot"
+
+             behaviors:WorkflowSlotLayoutBehavior.SlotEnumeratorNames="PART_OutputSlots"
+
+             behaviors:WorkflowSlotLayoutBehavior.CoordinateHostName="PART_Canvas"
+
+             ClipToBounds="False"
+
+             Foreground="#DD1E1E1E">
+
+    <Grid ClipToBounds="False">
+
+        <Grid.RowDefinitions>
+
+            <RowDefinition Height="36" />
+
+            <RowDefinition Height="*" />
+
+        </Grid.RowDefinitions>
+
+        <Border Grid.RowSpan="2"
+
+                Background="#DDFFFFFF"
+
+                BorderBrush="#331E1E1E"
+
+                BorderThickness="1"
+
+                CornerRadius="6" />
+
+        <Grid Grid.Row="0" Background="Transparent"
+
+              behaviors:WorkflowNodeDragBehavior.CoordinateHostName="PART_Canvas"
+
+              behaviors:WorkflowNodeDragBehavior.IsEnabled="True">
+
+            <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+
+                       VerticalAlignment="Center" Margin="12,0" />
+
+        </Grid>
+
+        <Grid Grid.Row="1" Panel.ZIndex="6" ClipToBounds="False">
+
+            <local:SlotView x:Name="PART_InputSlot" DataContext="{Binding InputSlot}"
+
+                            SlotState="{Binding State}" Width="18" Height="18"
+
+                            Margin="2,0,0,0" HorizontalAlignment="Left"
+
+                            VerticalAlignment="Center" />
+
+        </Grid>
+
+        <ItemsControl x:Name="PART_OutputSlots" ItemsSource="{Binding OutputSlots.Items}"
+
+                      Grid.Row="1" Margin="12,6" VerticalAlignment="Center">
+
+            <ItemsControl.ItemTemplate>
+
+                <DataTemplate>
+
+                    <Grid Margin="0,3" ClipToBounds="False">
+
+                        <Grid.ColumnDefinitions>
+
+                            <ColumnDefinition Width="*" />
+
+                            <ColumnDefinition Width="Auto" />
+
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="{Binding Name}" Margin="0,0,10,0"
+
+                                   HorizontalAlignment="Right" VerticalAlignment="Center" />
+
+                        <local:SlotView Grid.Column="1" DataContext="{Binding Slot}"
+
+                                        SlotState="{Binding Slot.State}" Width="14" Height="14" Margin="0" />
+
+                    </Grid>
+
+                </DataTemplate>
+
+            </ItemsControl.ItemTemplate>
+
+        </ItemsControl>
+
+    </Grid>
+
+</UserControl>
+
+```
+
+```csharp
+
+// ====================== NodeView.xaml.cs ======================
+
+using System.Windows.Controls;
+
+
+
+namespace Demo.Views.Workflow;
+
+
+
+public partial class NodeView : UserControl
+
+{
+
+    public NodeView()
+
+    {
+
+        InitializeComponent();
+
+    }
+
+}
+
+```

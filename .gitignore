@@ -287,6 +287,9 @@ FakesAssemblies/
 .ntvs_analysis.dat
 node_modules/
 
+# Doc validators local artifacts (real-engine validation; downloaded at setup)
+src/CloudGlyph/Assets/Docs/scripts/plantuml.jar
+
 # Visual Studio 6 build log
 *.plg
 

@@ -57,4 +57,4 @@ Organize categories in the following order by {type}:
 
 ## Output Location
 
-Wiki_Root/content/{language}/4_Copyright/{type}/index.md
+Wiki_Root/4_Copyright/00_{type}/index.md

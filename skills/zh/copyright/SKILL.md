@@ -57,4 +57,4 @@
 
 ## 输出位置
 
-Wiki_Root/content/{language}/4_版权/{type}/index.md
+Wiki_Root/4_版权/00_{type}/index.md

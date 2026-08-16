@@ -1,0 +1,15 @@
+{
+  "name": "cloudglyph-doc-validators",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Real-engine validators for Mermaid/KaTeX/PlantUML in CloudGlyph wiki content",
+  "scripts": {
+    "validate:mermaid": "node validate-mermaid.js",
+    "validate:katex": "node validate-katex.js"
+  },
+  "dependencies": {
+    "jsdom": "^30.0.1",
+    "katex": "^0.16.21",
+    "mermaid": "^11.4.1"
+  }
+}
