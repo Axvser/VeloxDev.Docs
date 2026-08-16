@@ -18,29 +18,25 @@ $$k = \left\lceil \frac{W}{s} \right\rceil \cdot \left\lceil \frac{H}{s} \right\
 
 *源码：`Src/Core/VeloxDev.Core/WorkflowSystem/SpatialGridHashMap.cs`，`GetCells`/`CellEnumerator` 第 190-256 行。*
 
-## 编译（BFS / DFS）
+## 编译（CompilerViewModel）
 
-编译器先从槽位 targets/sources 构建一次邻接表，再遍历。设 $V$ 个节点、$E$ 条边（连接）：
-
-$$T_{\text{adjacency}} = O(V + E)$$
-
-BFS 与 DFS 各自只访问每个节点一次（由 `globalVisited` 守卫）：
+`CompilerViewModel.CompileAsync` 从起点做一次有记忆的分解：`CompileState.Visited` 保证每个节点只处理一次；对每个节点枚举其输出槽的 `Targets`（边）。设 $V$ 个节点、$E$ 条边（连接）：
 
 $$T_{\text{compile}} = O(V + E)$$
 
-环路检测（`DfsFindCycle`）是对整个图的一次 DFS，也是 $O(V + E)$，无论有多少个 `Omni` 入口都只做一次。按 `CompilePriority` 排序同深度邻居会为每个节点增加 $O(\deg \log \deg)$ 的因子。空间为 $O(V + E)$（邻接表与访问集）。
+分解是线性的（单出单入节点并入当前链）加路由点展开（`ICompileTimeRouter` 的每个 key 递归编译一个子图），每个节点仅访问一次，因此整体仍是 $O(V + E)$。静态模式下被剪枝分支会从起点沿拓扑走一遍发放「重置信号」（`Order = -1`），同样受 `Visited` 守卫，最多一次。空间为 $O(V + E)$（编译图条目 + 访问集）。
 
-*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/Compilation/Compiler.cs`，`BuildForwardAdjacency` 第 153-174 行、`TraverseBfsFrom` 第 252-296 行、`TraverseDfsFrom` 第 300-336 行、`DetectCycle` 第 353-389 行。*
+*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/CompilerViewModel.cs`，`CompileGraphAsync` 第 36-157 行、`FlushChain` 第 160-169 行、`MarkStoppedBranch` 第 186-200 行。*
 
 ## 顺序执行
 
-`CompilationResult.ExecuteAsync` 恰好遍历一次有序项目，逐个等待节点 `ReceiveAsync` 的返回值。设编译项目数为 $N$：
+`CompilerEngine.RunAsync` 恰好遍历一张图的条目，`ExecuteEntry` 逐个等待节点 `ReceiveAsync` 的返回值并写入 `RuntimeContext.Data` 链式传递。设图中节点数为 $N$：
 
 $$T_{\text{execute}} = \sum_{i=1}^{N} T_{\text{work}}(i) = O(N)$$
 
-在节点数量上（墙钟时间由节点工作负载主导，例如演示中的 `Task.Delay(DelayMilliseconds)`）。执行器通过 `HashSet<int>` 记录跳过的项目 ID，从而跳过未选中的路由器分支，循环不会重复执行节点。
+在节点数量上（墙钟时间由节点工作负载主导，例如演示中的 `Task.Delay(DelayMilliseconds)`）。未选中的静态分支不会被驱动（`BranchEntry` 按 `CompileKey` 选择、`Order < 回退目标` 的节点被跳过）。`ParallelEntry` 扇出是顺序执行的（共享 `RuntimeContext` 黑板非线程安全，不做真并行）。跨链回退会带目标 Order 重跑整张图，最多 50 次（`MaxRedirects`），因此最坏情况 $T_{\text{redirect}} = O(50 \cdot N)$。
 
-*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/Compilation/Models/CompilationResult.cs`，`ExecuteCoreAsync` 第 157-260 行。*
+*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/CompilerEngine.cs`，`RunGraphAsync` 第 63-89 行、`RunExecuteAsync` 第 96-148 行、`RunParallelAsync` 第 189-196 行。*
 
 ## 撤销 / 重做栈
 
@@ -68,7 +64,7 @@ $$T_{\text{TrySelect}} = O(1) \text{ 期望}$$
 |---|---|---|---|
 | `SpatialGridHashMap.Insert` | $O(1)$ 期望 | 总计 $O(n)$ | 每个项目单元有界 |
 | `SpatialGridHashMap.Query` | $O(k + m)$ | 临时 $O(1)$ | $k$ = 视口内单元数 |
-| 编译（BFS/DFS） | $O(V+E)$ | $O(V+E)$ | 单次遍历 + 邻接表 |
-| 执行链 | $O(N)$ | $O(N)$ | 单遍项目 |
+| 编译（CompilerViewModel） | $O(V+E)$ | $O(V+E)$ | 有记忆分解 + 访问集 |
+| 执行链（CompilerEngine） | $O(N)$ | $O(N)$ | 单遍条目；回退最坏 $O(50N)$ |
 | 撤销 / 重做 | 每个操作 $O(1)$ | $O(n)$ | 并发栈 |
 | `SlotEnumerator.TrySelect` | $O(1)$ 期望 | $O(\text{成员数})$ | 字典查找 |

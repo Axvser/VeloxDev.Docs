@@ -52,7 +52,7 @@ public partial class TreeViewModel
 [WorkflowBuilder.Node
     <HttpHelper<NodeViewModel>>
     (workSemaphore: 5)]
-public partial class NodeViewModel : ICompileTimePriority
+public partial class NodeViewModel : ICompileTimeAware, IRuntimeAware
 {
     public NodeViewModel() => InitializeWorkflow();
 
@@ -104,7 +104,6 @@ NodeViewModel CreateNode(string title, int delayMilliseconds, double left, doubl
         DelayMilliseconds = delayMilliseconds,
         Size = nodeSize,
         Anchor = new Anchor(left, top, 0),
-        CompilePriority = priority,
     };
 
 var loadSeed = CreateNode("Load Seed", 900, 340, 120, priority: 1);
@@ -151,40 +150,52 @@ Every mutating operation on the tree is submitted as a `WorkflowActionPair(redo,
 
 ### 5. Compile & Execute
 
-The `WorkflowCompiler` turns the graph into an ordered execution plan. The demo controller compiles from itself with the four dimension settings and then runs the chain:
+`CompilerViewModel.CompileAsync(start)` decomposes the subgraph reachable from the start node into acyclic compiled graphs; `CompilerEngine.RunAsync(graph, context, ct)` drives the graph. The demo controller compiles from itself first, then runs (requires `using VeloxDev.Core.WorkflowSystem.CompilerEx;`):
 
-> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/ControllerViewModel.cs`, lines 61-85
+> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/ControllerViewModel.cs`, lines 29-58
 
 ```csharp
+using VeloxDev.Core.WorkflowSystem.CompilerEx;
+
+public CompilerViewModel Compiler { get; } = new();
+
 [VeloxCommand]
-private async Task OpenWorkflow(object? parameters, CancellationToken ct)
+private async Task Compile(object? parameters, CancellationToken ct)
 {
-    var tree = Parent as TreeViewModel;
-    tree?.BeginWorkflowRun();
+    await Compiler.CompileAsync(this);          // decompose compiled graphs from this node
+    OnPropertyChanged(nameof(HasCompiledGraphs));
+}
+
+[VeloxCommand]
+private async Task Run(object? parameters, CancellationToken ct)
+{
+    var graph = Compiler.Graphs.FirstOrDefault();
+    if (graph is null) return;
+
+    var context = new RuntimeContext { IsRunning = true };  // runtime session (logs / shared vars / progress)
+    RuntimeContext = context;
+    OnPropertyChanged(nameof(RuntimeContext));
+
+    _runCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
     try
     {
-        var compiler = new WorkflowCompiler();
-        var context = NetworkFlowContext.Create(SeedPayload);
-        var results = compiler.Compile(this, CompileMode, CompileDirection, CompileScope, CycleHandling);
-        if (results.Count == 0) return;
-        var result = results[0];
-        await result.ExecuteAsync(context, ct);
+        await new CompilerEngine().RunAsync(graph, context, _runCts.Token);
     }
-    catch
+    finally
     {
-        tree?.EndWorkflowRun();
-        throw;
+        _runCts.Dispose();
+        _runCts = null;
     }
 }
 ```
 
-`Compile(startNode, mode, direction, scope, cycleHandling)` returns `IReadOnlyList<CompilationResult>`; each result's `ExecuteAsync(parameter, ct)` runs its items in deterministic order and chains the parameter. Branching nodes implement `ICompileTimeRouter`:
+`CompileAsync` returns `IReadOnlyList<CompiledGraph>`; linear segments compile to `ExecuteEntry`, branch nodes to `BranchEntry` (`ICompileTimeRouter`), fan-outs to `ParallelEntry`. `RunAsync` drives entries one by one, injecting `RuntimeContext` into each `IRuntimeAware` node and chaining return values through `ReceiveAsync`. Branching nodes implement `ICompileTimeRouter` (static / dynamic modes):
 
-> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/BoolSelectorNodeViewModel.cs`, lines 19-36, 67-91
+> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/BoolSelectorNodeViewModel.cs`, lines 92-118
 
 ```csharp
 [WorkflowBuilder.Node<BoolSelectorHelper>(workSemaphore: 1)]
-public partial class BoolSelectorNodeViewModel : ICompileTimeRouter
+public partial class BoolSelectorNodeViewModel : ICompileTimeRouter, ICompileTimeAware
 {
     public BoolSelectorNodeViewModel()
     {
@@ -196,25 +207,31 @@ public partial class BoolSelectorNodeViewModel : ICompileTimeRouter
     [SlotSelectors(typeof(bool))]
     public partial SlotEnumerator<SlotViewModel> OutputSlots { get; set; }
 
-    public object? GetCurrentRouteKey() => Condition ? (object)true : (object)false;
-
-    public IReadOnlyDictionary<object, IWorkflowNodeViewModel> GetRouteTable()
+    // Static → returns the current selection (decidable at compile time); Dynamic → compile-time(null) returns null (IsDynamic), re-resolved at runtime
+    public Task<object?> ResolveRouteKey(object? payload)
     {
-        var dict = new Dictionary<object, IWorkflowNodeViewModel>();
-        if (TrueSlot is not null)
-            foreach (var target in TrueSlot.Targets)
-                if (target.Parent is not null)
-                    dict[true] = target.Parent;
-        if (FalseSlot is not null)
-            foreach (var target in FalseSlot.Targets)
-                if (target.Parent is not null)
-                    dict[false] = target.Parent;
-        return dict;
+        if (CompileMode == RouterCompileMode.Dynamic && payload is null)
+            return Task.FromResult<object?>(null);
+        return Task.FromResult<object?>(Condition);
+    }
+
+    public Task<IReadOnlyDictionary<object, IReadOnlyList<IWorkflowNodeViewModel>>> GetRouteTable()
+    {
+        var dict = new Dictionary<object, List<IWorkflowNodeViewModel>>();
+        if (CompileMode == RouterCompileMode.Static)
+            AddBranch(dict, Condition, Condition ? TrueSlot : FalseSlot);
+        else
+        {
+            AddBranch(dict, true, TrueSlot);
+            AddBranch(dict, false, FalseSlot);
+        }
+        return Task.FromResult<IReadOnlyDictionary<object, IReadOnlyList<IWorkflowNodeViewModel>>>(
+            dict.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<IWorkflowNodeViewModel>)kv.Value.AsReadOnly()));
     }
 }
 ```
 
-`SetSelector(typeof(bool))` builds two conditional output slots (`true` / `false`); the compiler pre-collects the route table and the executor skips branch-exclusive items of the unchosen branch.
+`SetSelector(typeof(bool))` builds two conditional output slots (`true` / `false`); `GetRouteTable` registers each branch's downstreams (a branch with no downstream is registered as terminal), `ResolveRouteKey` returns the key of the branch to take — static mode locks the key at compile time and prunes the unchosen branch; dynamic mode re-resolves at runtime. A node calling `RuntimeContext.Error()/Warn()` or throwing during `ReceiveAsync` requests a redirect: implementing `IRedirectable` re-runs the whole graph from the returned Order (possibly cross-chain), otherwise the flow ends with status `-1`.
 
 ### 6. Serialization
 
@@ -297,7 +314,7 @@ Note the property is `Package`, not `NpmPackage` — for `Dotnet` mode it is the
 ### 8. Verification
 
 - Run the WPF demo (`Examples/Workflow/WPF/Demo`): it opens a ready-made 15-node graph, supports Undo/Redo/Save/Load, a 1000-node performance test, and an Agent chat pane (`WorkflowView.xaml.cs`, `InitializeNetworkDemo`).
-- The `WorkflowSystem` test project covers value types (`AnchorTests`, `SizeTests`, `ViewportTests`, `OffsetTests`, `CellKeyTests`, `CanvasLayoutTests`), spatial index (`SpatialGridHashMapTests`), selector (`SlotEnumeratorTests`), action pairs (`WorkflowActionPairTests`, `WorkflowHistoryTests`) and the compiler (`WorkflowCompilerTests`, `WorkflowTreeExTests`) — see `Src/Core/VeloxDev.Core.Test/WorkflowSystem`.
+- The `WorkflowSystem` test project covers value types (`AnchorTests`, `SizeTests`, `ViewportTests`, `OffsetTests`, `CellKeyTests`, `CanvasLayoutTests`), spatial index (`SpatialGridHashMapTests`), selector (`SlotEnumeratorTests`), action pairs (`WorkflowActionPairTests`, `WorkflowHistoryTests`) and tree operations (`WorkflowTreeExTests`) — see `Src/Core/VeloxDev.Core.Test/WorkflowSystem`; compiler semantics (`CompilerExTests`, `ParallelFanOutTests`, `RedirectTests`, `TerminalBranchTests`) live in `Src/Core/VeloxDev.Core.Extension.Test/Agent/Workflow/Functions`.
 
 ### 9. Complete Code
 
@@ -305,9 +322,9 @@ A minimal end-to-end sample combining the pieces above:
 
 ```csharp
 using VeloxDev.AI;
+using VeloxDev.Core.WorkflowSystem.CompilerEx;
 using VeloxDev.MVVM.Serialization;
 using VeloxDev.WorkflowSystem;
-using VeloxDev.WorkflowSystem.Compilation;
 
 [WorkflowBuilder.Tree<TreeHelper>]
 public partial class MyTree
@@ -349,9 +366,12 @@ public static class Program
         helper.SendConnection(a.Output);
         helper.ReceiveConnection(b.Input);
 
-        var results = new WorkflowCompiler().Compile(a, CompileMode.BFS,
-            CompileDirection.Forward, CompileScope.FromNode, CycleHandling.Throw);
-        await results[0].ExecuteAsync("seed", CancellationToken.None);
+        var compiler = new CompilerViewModel();
+        await compiler.CompileAsync(a);                       // decompose compiled graphs from node a
+        var graph = compiler.Graphs.FirstOrDefault();
+        if (graph is not null)
+            await new CompilerEngine().RunAsync(graph,
+                new RuntimeContext { Data = "seed" }, CancellationToken.None);
 
         var json = tree.Serialize();
         var copy = json.Deserialize<MyTree>();

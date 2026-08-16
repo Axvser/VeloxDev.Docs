@@ -14,7 +14,7 @@ flowchart TB
         B["WorkflowBuilder attributes"]
         I["I*ViewModel + helpers"]
         S["SpatialGridHashMap / WorkflowSpatialManager"]
-        C["WorkflowCompiler + CompilationResult"]
+        C["CompilerViewModel + CompilerEngine"]
         SL["SlotEnumerator / selector"]
         UR["WorkflowActionPair undo/redo"]
     end
@@ -45,7 +45,7 @@ flowchart TB
 | Undo / redo | `VeloxDev.WorkflowSystem.StandardEx` | Core | `WorkflowActionPair` |
 | Spatial index | `VeloxDev.WorkflowSystem` | Core | `ISpatialMap<T>`, `ISpatialBoundsProvider` |
 | Selector | `VeloxDev.WorkflowSystem` | Core | `ISlotProvider`, `[SlotSelectors]` |
-| Compiler | `VeloxDev.WorkflowSystem.Compilation` | Core | `ICompileTimeRouter`, `ICompileTimePriority`, `ICompileTimeSink` |
+| Compiler | `VeloxDev.Core.WorkflowSystem.CompilerEx` | Core | `ICompileTimeRouter`, `IRedirectable`, `ICompileTimeAware` |
 | Agent scope + toolkit | `VeloxDev.AI.Workflow` / `.Functions` | Core.Extension | Core + `Microsoft.Extensions.AI` |
 | MCP | `VeloxDev.AI.MCP` | Core.Extension | `ModelContextProtocol.Client`, `CliWrap` |
 | Serialization | `VeloxDev.MVVM.Serialization` | Core.Extension | Newtonsoft.Json |
@@ -59,9 +59,9 @@ flowchart TB
 | Define a Node | `[WorkflowBuilder.Node<THelper>(workSemaphore: n)]` |
 | Build a graph | `tree.GetHelper().CreateNode(node)` → `SendConnection` / `ReceiveConnection` |
 | Undo / redo | `tree.UndoCommand` / `tree.RedoCommand` |
-| Compile & execute | `new WorkflowCompiler().Compile(start, ...)` → `CompilationResult.ExecuteAsync(parameter, ct)` |
+| Compile & execute | `new CompilerViewModel().CompileAsync(start)` → `new CompilerEngine().RunAsync(graph, context, ct)` |
 | Virtualize | `TreeHelper(cellSize)` → `tree.EnableMap(cellSize, VisibleItems)` → `Virtualize(viewport)` |
-| Route branches | `ICompileTimeRouter.GetRouteTable()` / `SlotEnumerator.SetSelector(type)` |
+| Route branches | `ICompileTimeRouter.GetRouteTable()` / `ResolveRouteKey(payload)` / `SlotEnumerator.SetSelector(type)` |
 | Let AI drive it | `tree.AsAgentScope().With...().ProvideProgressiveContextPrompt()` + `ProvideTools()` |
 | Persist | `tree.Serialize()` / `json.Deserialize<T>()` |
 
@@ -75,7 +75,7 @@ flowchart TB
 | Defaults | `WorkflowSystem/Templates/ViewModels/*.cs`, `Templates/Helpers/*.cs` |
 | Spatial | `WorkflowSystem/SpatialGridHashMap.cs`, `WorkflowSpatialManager.cs`, `NodeBoundsProvider.cs`, `NodePairBoundsProvider.cs` |
 | Selector | `WorkflowSystem/SelectorEx/SlotEnumerator.cs`, `ConditionalSlot.cs`, `SlotDefinition.cs` |
-| Compiler | `WorkflowSystem/Compilation/Compiler.cs`, `Models/CompilationResult.cs`, `Models/CompiledItem.cs`, `Enums/*.cs` |
+| Compiler | `WorkflowSystem/CompilerEx/CompilerViewModel.cs`, `CompilerEngine.cs`, `CompiledGraph.cs`, `ActionEntry/*.cs`, `IRedirectable.cs`, `ICompileTimeRouter.cs` |
 | Agent | `VeloxDev.Core.Extension/Agent/Workflow/WorkflowAgentScope.cs`, `WorkflowStateTracker.cs`, `Functions/WorkflowAgentToolkit.cs` |
 | MCP | `VeloxDev.Core.Extension/Agent/MCP/McpScope.cs`, `McpServerConfiguration.cs`, `McpServerRunMode.cs` |
 | Serialization | `VeloxDev.Core.Extension/ComponentModelEx.cs` |

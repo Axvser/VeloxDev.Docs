@@ -160,25 +160,33 @@
 
 *源码：`Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/`。*
 
-## 命名空间：`VeloxDev.WorkflowSystem.Compilation`
+## 命名空间：`VeloxDev.Core.WorkflowSystem.CompilerEx`
+
+V7 编译管道：编译期把起点可达子图分解成若干无环的编译图（多图语义），运行期由执行引擎按图驱动。旧的 `WorkflowCompiler`/`CompilationResult`/`CompiledItem` 及其 `CompileMode`/`CycleHandling` 四维度配置已移除。
 
 | 类型 | 签名 / 成员 |
 |---|---|
-| `WorkflowCompiler` | `Compile(IWorkflowNodeViewModel startNode, CompileMode mode, CompileDirection direction = Forward, CompileScope scope = FromNode, CycleHandling cycleHandling = Throw) → IReadOnlyList<CompilationResult>`；构造函数 `WorkflowCompiler(IDiagnosticLogger?)` |
-| `CompilationResult` | `Items`（`IReadOnlyList<CompiledItem>`）、`Mode`、`Direction`、`Scope`、`HasCycle`、`CycleHandling`；`ExecuteAsync(object? parameter = null, CancellationToken ct = default)` 及带 `TextWriter` 或调试文件路径的重载 |
-| `CompiledItem` | `Id`、`Node`、`Order`、`Depth`、`ErrorRedirectId`、`MaxRetries`、`Result`、`IsLoopEntry`、`LoopTailId`、`RouteTable`、`BranchExclusiveItems`、`SubscribeError()`、`UnsubscribeError()` |
-| `ICompileTimePriority` | `int CompilePriority` —— 同深度排序（越小越前） |
-| `ICompileTimeRouter` | `GetRouteTable()`、`GetCurrentRouteKey()` —— 编译期槽位路由 |
-| `ICompileTimeSink` | `OnExecutionEvent(ExecutionContext)` —— 执行生命周期钩子 |
-| `IDiagnosticLogger` / `DebugDiagnosticLogger` / `SynchronousFileLogger` | 编译 / 执行诊断 |
-| `CompileMode` | `BFS`、`DFS`（前序） |
-| `CompileDirection` | `Forward`（沿 targets）、`Reverse`（沿 sources） |
-| `CompileScope` | `FromNode`、`Omni`（自动发现入口/出口） |
-| `CycleHandling` | `Throw`、`Trim`、`Allow` |
-| `ExecutionEvent` | `BeforeExecute`、`AfterExecute`、`OnError`、`OnCompleted` |
-| `ExecutionContext` / `DiagnosticContext` / `ErrorContext` | 执行阶段数据对象 |
+| `CompilerViewModel` | `CompileAsync<T>(T component) → IReadOnlyList<CompiledGraph>`（`T : IWorkflowViewModel`，起点须为 `IWorkflowNodeViewModel`）；`Graphs`（`ObservableCollection<CompiledGraph>`）。分解：线性段 → `ExecuteEntry`；实现 `ICompileTimeRouter` 的节点 → `BranchEntry`（静态按当前 key 剪枝、动态全保留）；路由 key 指向多个下游 → `ParallelEntry`（扇出/汇聚）；无下游 → 终端分支（`IsTerminal`）；分支后所有出口共同指向的节点为汇合点，作为父图下一段链的起点（序号带偏移，不归零）。编译完给每个实现 `ICompileTimeAware` 的节点注入 `CompileContext`。 |
+| `CompiledGraph` | `Entries`（`ObservableCollection<ActionEntry>`）—— 一张编译图 |
+| `ActionEntry` | 抽象基类；具体条目：`ExecuteEntry`、`BranchEntry`、`ParallelEntry` |
+| `ExecuteEntry` | `Nodes`（线性段节点集合） |
+| `BranchEntry` | `Router`（`IWorkflowNodeViewModel?`）、`Options`（`ObservableCollection<BranchOption>`）、`IsDynamic`、`CompileKey`（静态锁定 key） |
+| `BranchOption` | `Key`、`Label`、`Graph`（`CompiledGraph?`）、`IsSkipped`、`IsTerminal` |
+| `ParallelEntry` | `Branches`（`ObservableCollection<CompiledGraph>`）—— 扇出组，顺序执行各分支（顺序即"等待所有上游"的汇聚语义） |
+| `CompilerEngine` | `RunAsync(CompiledGraph graph, RuntimeContext context, CancellationToken ct)` —— 驱动一张图的所有条目；带目标 Order 重跑整张图（跨链回退） |
+| `ICompileTimeRouter` | `Task<IReadOnlyDictionary<object, IReadOnlyList<IWorkflowNodeViewModel>>> GetRouteTable()`、`Task<object?> ResolveRouteKey(object? payload)` —— 编译期/运行期槽位路由 |
+| `IRedirectable` | `Task<int?> ResolveRedirectAsync(RuntimeContext context, CancellationToken ct)` —— 节点报错时返回回退目标编译状态 Order |
+| `ICompileTimeAware` | `AttachCompileTimeContext(CompileContext)`、`CompileContext` —— 编译期身份注入 |
+| `IRuntimeAware` | `AttachRuntimeContext(RuntimeContext)` —— 每次驱动前注入运行会话 |
+| `ICompileContext` | `Order`、`ChainIndex`、`Offset` —— 编译身份（`Order = -1` 表示绝对停止） |
+| `IRuntimeContext` | `ITaskContext` + `Uid`、`Sequence`、`Logs`、`CurrentEntry`、`NodeIndex`、`BranchKey`、`Attempt`、`IsRunning`、`Status`、`CurrentOrder`；`Log()/Error()/Warn()/Set()/TryGet()` |
+| `RuntimeContext` | `IRuntimeContext` 的默认实现（`VeloxProperty` 属性 + 共享变量字典）；`RedirectRequested`、`EndedWithError`、`PendingRedirectTarget` |
+| `CompileContext` | `ICompileContext` 的默认实现 |
+| `RouterCompileMode` | `Static`（编译期锁定 key，静态剪枝）、`Dynamic`（运行期重解析） |
 
-*源码：`WorkflowSystem/Compilation/Compiler.cs`、`Models/*.cs`、`Enums/*.cs`、`Interfaces/*.cs`。*
+执行语义（`CompilerEngine`）：`ExecuteEntry` 逐个驱动节点 —— 跨链回退时跳过 `Order < 目标` 的节点；节点在 `ReceiveAsync` 中调用 `RuntimeContext.Error()/Warn()` 或抛异常即视为请求重定向 —— 若实现 `IRedirectable`，按其返回的 Order **重跑整张图**（跳过目标之前的节点，可跨链；目标是 Router 时只重新路由、不重新计算），否则整个流程结束、状态标记为 `-1`。`BranchEntry` 静态模式以编译期锁定的 `CompileKey` 为准，动态模式运行期 `ResolveRouteKey` 重解析；终端分支（`IsTerminal`）选中即结束。`ParallelEntry` 顺序执行所有分支子图。重定向超过 50 次放弃。
+
+*源码：`WorkflowSystem/CompilerEx/CompilerViewModel.cs`、`CompilerEngine.cs`、`CompiledGraph.cs`、`CompileContext.cs`、`RuntimeContext.cs`、`IRedirectable.cs`、`ActionEntry/*.cs`、`Interfaces/*.cs`。*
 
 ## 命名空间：`VeloxDev.AI`
 

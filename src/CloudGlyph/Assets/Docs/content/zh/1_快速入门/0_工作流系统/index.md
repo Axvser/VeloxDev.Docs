@@ -52,7 +52,7 @@ public partial class TreeViewModel
 [WorkflowBuilder.Node
     <HttpHelper<NodeViewModel>>
     (workSemaphore: 5)]
-public partial class NodeViewModel : ICompileTimePriority
+public partial class NodeViewModel : ICompileTimeAware, IRuntimeAware
 {
     public NodeViewModel() => InitializeWorkflow();
 
@@ -104,7 +104,6 @@ NodeViewModel CreateNode(string title, int delayMilliseconds, double left, doubl
         DelayMilliseconds = delayMilliseconds,
         Size = nodeSize,
         Anchor = new Anchor(left, top, 0),
-        CompilePriority = priority,
     };
 
 var loadSeed = CreateNode("Load Seed", 900, 340, 120, priority: 1);
@@ -151,40 +150,52 @@ private static void Connect(IWorkflowTreeViewModel tree, IWorkflowSlotViewModel 
 
 ### 5. 编译与执行
 
-`WorkflowCompiler` 把图变成有序的执行计划。演示控制器以自身为起点、按四维度配置编译后顺序执行：
+`CompilerViewModel.CompileAsync(起点)` 把从起点可达的子图分解成若干无环编译图；`CompilerEngine.RunAsync(graph, context, ct)` 驱动图执行。演示控制器以自身为起点，先编译、再运行（需要 `using VeloxDev.Core.WorkflowSystem.CompilerEx;`）：
 
-> 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/ControllerViewModel.cs`，第 61-85 行
+> 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/ControllerViewModel.cs`，第 29-58 行
 
 ```csharp
+using VeloxDev.Core.WorkflowSystem.CompilerEx;
+
+public CompilerViewModel Compiler { get; } = new();
+
 [VeloxCommand]
-private async Task OpenWorkflow(object? parameters, CancellationToken ct)
+private async Task Compile(object? parameters, CancellationToken ct)
 {
-    var tree = Parent as TreeViewModel;
-    tree?.BeginWorkflowRun();
+    await Compiler.CompileAsync(this);          // 以自身为起点分解编译图
+    OnPropertyChanged(nameof(HasCompiledGraphs));
+}
+
+[VeloxCommand]
+private async Task Run(object? parameters, CancellationToken ct)
+{
+    var graph = Compiler.Graphs.FirstOrDefault();
+    if (graph is null) return;
+
+    var context = new RuntimeContext { IsRunning = true };  // 运行会话（日志/共享变量/进度）
+    RuntimeContext = context;
+    OnPropertyChanged(nameof(RuntimeContext));
+
+    _runCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
     try
     {
-        var compiler = new WorkflowCompiler();
-        var context = NetworkFlowContext.Create(SeedPayload);
-        var results = compiler.Compile(this, CompileMode, CompileDirection, CompileScope, CycleHandling);
-        if (results.Count == 0) return;
-        var result = results[0];
-        await result.ExecuteAsync(context, ct);
+        await new CompilerEngine().RunAsync(graph, context, _runCts.Token);
     }
-    catch
+    finally
     {
-        tree?.EndWorkflowRun();
-        throw;
+        _runCts.Dispose();
+        _runCts = null;
     }
 }
 ```
 
-`Compile(startNode, mode, direction, scope, cycleHandling)` 返回 `IReadOnlyList<CompilationResult>`；每个结果的 `ExecuteAsync(parameter, ct)` 按确定顺序执行项目并链式传递参数。分支节点实现 `ICompileTimeRouter`：
+`CompileAsync` 返回 `IReadOnlyList<CompiledGraph>`；线性段编译为 `ExecuteEntry`，分支节点编译为 `BranchEntry`（`ICompileTimeRouter`），扇出为 `ParallelEntry`。`RunAsync` 逐个驱动条目，把 `RuntimeContext` 注入每个 `IRuntimeAware` 节点、经 `ReceiveAsync` 执行并链式传递返回值。分支节点实现 `ICompileTimeRouter`（静态/动态两种模式）：
 
-> 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/BoolSelectorNodeViewModel.cs`，第 19-36、67-91 行
+> 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/BoolSelectorNodeViewModel.cs`，第 92-118 行
 
 ```csharp
 [WorkflowBuilder.Node<BoolSelectorHelper>(workSemaphore: 1)]
-public partial class BoolSelectorNodeViewModel : ICompileTimeRouter
+public partial class BoolSelectorNodeViewModel : ICompileTimeRouter, ICompileTimeAware
 {
     public BoolSelectorNodeViewModel()
     {
@@ -196,25 +207,31 @@ public partial class BoolSelectorNodeViewModel : ICompileTimeRouter
     [SlotSelectors(typeof(bool))]
     public partial SlotEnumerator<SlotViewModel> OutputSlots { get; set; }
 
-    public object? GetCurrentRouteKey() => Condition ? (object)true : (object)false;
-
-    public IReadOnlyDictionary<object, IWorkflowNodeViewModel> GetRouteTable()
+    // Static → 返回当前选中值（编译期可定）；Dynamic → 编译期(null)返回 null（IsDynamic），运行期再解析
+    public Task<object?> ResolveRouteKey(object? payload)
     {
-        var dict = new Dictionary<object, IWorkflowNodeViewModel>();
-        if (TrueSlot is not null)
-            foreach (var target in TrueSlot.Targets)
-                if (target.Parent is not null)
-                    dict[true] = target.Parent;
-        if (FalseSlot is not null)
-            foreach (var target in FalseSlot.Targets)
-                if (target.Parent is not null)
-                    dict[false] = target.Parent;
-        return dict;
+        if (CompileMode == RouterCompileMode.Dynamic && payload is null)
+            return Task.FromResult<object?>(null);
+        return Task.FromResult<object?>(Condition);
+    }
+
+    public Task<IReadOnlyDictionary<object, IReadOnlyList<IWorkflowNodeViewModel>>> GetRouteTable()
+    {
+        var dict = new Dictionary<object, List<IWorkflowNodeViewModel>>();
+        if (CompileMode == RouterCompileMode.Static)
+            AddBranch(dict, Condition, Condition ? TrueSlot : FalseSlot);
+        else
+        {
+            AddBranch(dict, true, TrueSlot);
+            AddBranch(dict, false, FalseSlot);
+        }
+        return Task.FromResult<IReadOnlyDictionary<object, IReadOnlyList<IWorkflowNodeViewModel>>>(
+            dict.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<IWorkflowNodeViewModel>)kv.Value.AsReadOnly()));
     }
 }
 ```
 
-`SetSelector(typeof(bool))` 构建两个条件输出槽（`true` / `false`）；编译器预先收集路由表，执行器跳过未选中分支的独占项目。
+`SetSelector(typeof(bool))` 构建两个条件输出槽（`true` / `false`）；`GetRouteTable` 登记各分支的下游（无下游的分支登记为终端分支），`ResolveRouteKey` 返回当前应走的分支 key —— 静态模式编译期锁定、剪枝未选中分支；动态模式运行期重解析。节点在 `ReceiveAsync` 中调用 `RuntimeContext.Error()/Warn()` 或抛异常即请求重定向：实现 `IRedirectable` 则按返回的 Order 重跑整张图（可跨链），否则流程结束、状态 `-1`。
 
 ### 6. 序列化
 
@@ -297,7 +314,7 @@ var mcpTools = await mcp.LoadAsync([
 ### 8. 验证
 
 - 运行 WPF 演示（`Examples/Workflow/WPF/Demo`）：它打开一个 15 节点的成品图，支持撤销/重做/保存/加载、1000 节点性能测试以及 Agent 对话面板（`WorkflowView.xaml.cs`，`InitializeNetworkDemo`）。
-- `WorkflowSystem` 测试项目覆盖值类型（`AnchorTests`、`SizeTests`、`ViewportTests`、`OffsetTests`、`CellKeyTests`、`CanvasLayoutTests`）、空间索引（`SpatialGridHashMapTests`）、选择器（`SlotEnumeratorTests`）、操作对（`WorkflowActionPairTests`、`WorkflowHistoryTests`）与编译器（`WorkflowCompilerTests`、`WorkflowTreeExTests`）——见 `Src/Core/VeloxDev.Core.Test/WorkflowSystem`。
+- `WorkflowSystem` 测试项目覆盖值类型（`AnchorTests`、`SizeTests`、`ViewportTests`、`OffsetTests`、`CellKeyTests`、`CanvasLayoutTests`）、空间索引（`SpatialGridHashMapTests`）、选择器（`SlotEnumeratorTests`）、操作对（`WorkflowActionPairTests`、`WorkflowHistoryTests`）与树操作（`WorkflowTreeExTests`）——见 `Src/Core/VeloxDev.Core.Test/WorkflowSystem`；编译器语义（`CompilerExTests`、`ParallelFanOutTests`、`RedirectTests`、`TerminalBranchTests`）在 `Src/Core/VeloxDev.Core.Extension.Test/Agent/Workflow/Functions`。
 
 ### 9. 完整代码
 
@@ -305,9 +322,9 @@ var mcpTools = await mcp.LoadAsync([
 
 ```csharp
 using VeloxDev.AI;
+using VeloxDev.Core.WorkflowSystem.CompilerEx;
 using VeloxDev.MVVM.Serialization;
 using VeloxDev.WorkflowSystem;
-using VeloxDev.WorkflowSystem.Compilation;
 
 [WorkflowBuilder.Tree<TreeHelper>]
 public partial class MyTree
@@ -349,9 +366,12 @@ public static class Program
         helper.SendConnection(a.Output);
         helper.ReceiveConnection(b.Input);
 
-        var results = new WorkflowCompiler().Compile(a, CompileMode.BFS,
-            CompileDirection.Forward, CompileScope.FromNode, CycleHandling.Throw);
-        await results[0].ExecuteAsync("seed", CancellationToken.None);
+        var compiler = new CompilerViewModel();
+        await compiler.CompileAsync(a);                       // 以节点 a 为起点分解编译图
+        var graph = compiler.Graphs.FirstOrDefault();
+        if (graph is not null)
+            await new CompilerEngine().RunAsync(graph,
+                new RuntimeContext { Data = "seed" }, CancellationToken.None);
 
         var json = tree.Serialize();
         var copy = json.Deserialize<MyTree>();

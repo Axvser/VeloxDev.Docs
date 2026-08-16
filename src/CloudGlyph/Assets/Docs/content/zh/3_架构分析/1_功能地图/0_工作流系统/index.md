@@ -14,7 +14,7 @@ flowchart TB
         B["WorkflowBuilder attributes"]
         I["I*ViewModel + helpers"]
         S["SpatialGridHashMap / WorkflowSpatialManager"]
-        C["WorkflowCompiler + CompilationResult"]
+        C["CompilerViewModel + CompilerEngine"]
         SL["SlotEnumerator / selector"]
         UR["WorkflowActionPair undo/redo"]
     end
@@ -45,7 +45,7 @@ flowchart TB
 | 撤销 / 重做 | `VeloxDev.WorkflowSystem.StandardEx` | Core | `WorkflowActionPair` |
 | 空间索引 | `VeloxDev.WorkflowSystem` | Core | `ISpatialMap<T>`、`ISpatialBoundsProvider` |
 | 选择器 | `VeloxDev.WorkflowSystem` | Core | `ISlotProvider`、`[SlotSelectors]` |
-| 编译器 | `VeloxDev.WorkflowSystem.Compilation` | Core | `ICompileTimeRouter`、`ICompileTimePriority`、`ICompileTimeSink` |
+| 编译器 | `VeloxDev.Core.WorkflowSystem.CompilerEx` | Core | `ICompileTimeRouter`、`IRedirectable`、`ICompileTimeAware` |
 | Agent 作用域 + 工具集 | `VeloxDev.AI.Workflow` / `.Functions` | Core.Extension | Core + `Microsoft.Extensions.AI` |
 | MCP | `VeloxDev.AI.MCP` | Core.Extension | `ModelContextProtocol.Client`、`CliWrap` |
 | 序列化 | `VeloxDev.MVVM.Serialization` | Core.Extension | Newtonsoft.Json |
@@ -59,9 +59,9 @@ flowchart TB
 | 定义 Node | `[WorkflowBuilder.Node<THelper>(workSemaphore: n)]` |
 | 构建图 | `tree.GetHelper().CreateNode(node)` → `SendConnection` / `ReceiveConnection` |
 | 撤销 / 重做 | `tree.UndoCommand` / `tree.RedoCommand` |
-| 编译与执行 | `new WorkflowCompiler().Compile(start, ...)` → `CompilationResult.ExecuteAsync(parameter, ct)` |
+| 编译与执行 | `new CompilerViewModel().CompileAsync(start)` → `new CompilerEngine().RunAsync(graph, context, ct)` |
 | 虚拟化 | `TreeHelper(cellSize)` → `tree.EnableMap(cellSize, VisibleItems)` → `Virtualize(viewport)` |
-| 分支路由 | `ICompileTimeRouter.GetRouteTable()` / `SlotEnumerator.SetSelector(type)` |
+| 分支路由 | `ICompileTimeRouter.GetRouteTable()` / `ResolveRouteKey(payload)` / `SlotEnumerator.SetSelector(type)` |
 | 让 AI 驱动 | `tree.AsAgentScope().With...().ProvideProgressiveContextPrompt()` + `ProvideTools()` |
 | 持久化 | `tree.Serialize()` / `json.Deserialize<T>()` |
 
@@ -75,7 +75,7 @@ flowchart TB
 | 默认实现 | `WorkflowSystem/Templates/ViewModels/*.cs`、`Templates/Helpers/*.cs` |
 | 空间 | `WorkflowSystem/SpatialGridHashMap.cs`、`WorkflowSpatialManager.cs`、`NodeBoundsProvider.cs`、`NodePairBoundsProvider.cs` |
 | 选择器 | `WorkflowSystem/SelectorEx/SlotEnumerator.cs`、`ConditionalSlot.cs`、`SlotDefinition.cs` |
-| 编译 | `WorkflowSystem/Compilation/Compiler.cs`、`Models/CompilationResult.cs`、`Models/CompiledItem.cs`、`Enums/*.cs` |
+| 编译 | `WorkflowSystem/CompilerEx/CompilerViewModel.cs`、`CompilerEngine.cs`、`CompiledGraph.cs`、`ActionEntry/*.cs`、`IRedirectable.cs`、`ICompileTimeRouter.cs` |
 | Agent | `VeloxDev.Core.Extension/Agent/Workflow/WorkflowAgentScope.cs`、`WorkflowStateTracker.cs`、`Functions/WorkflowAgentToolkit.cs` |
 | MCP | `VeloxDev.Core.Extension/Agent/MCP/McpScope.cs`、`McpServerConfiguration.cs`、`McpServerRunMode.cs` |
 | 序列化 | `VeloxDev.Core.Extension/ComponentModelEx.cs` |

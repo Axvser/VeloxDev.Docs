@@ -18,29 +18,25 @@ Expected case with cell size $s = 200$ and typical node sizes, a viewport covers
 
 *Source: `Src/Core/VeloxDev.Core/WorkflowSystem/SpatialGridHashMap.cs`, `GetCells`/`CellEnumerator` lines 190-256.*
 
-## Compilation (BFS / DFS)
+## Compilation (CompilerViewModel)
 
-The compiler builds adjacency lists from slot targets/sources once, then traverses. With $V$ nodes and $E$ edges (connections):
-
-$$T_{\text{adjacency}} = O(V + E)$$
-
-Each of BFS and DFS visits every node once (guarded by `globalVisited`):
+`CompilerViewModel.CompileAsync` does a single remembered decomposition from the start node: `CompileState.Visited` guarantees each node is processed once; each node enumerates its output slots' `Targets` (edges). With $V$ nodes and $E$ edges (connections):
 
 $$T_{\text{compile}} = O(V + E)$$
 
-Cycle detection (`DfsFindCycle`) is a single DFS over the whole graph, also $O(V + E)$, performed once regardless of the number of `Omni` entry points. Sorting same-depth neighbors by `CompilePriority` adds a factor of $O(\deg \log \deg)$ per node. Space is $O(V + E)$ for the adjacency lists and visited sets.
+The decomposition is linear (single-in/single-out nodes fold into the current chain) plus router expansion (each key of an `ICompileTimeRouter` recursively compiles one subgraph); every node is visited once, so the total stays $O(V + E)$. In static mode, pruned branches walk the topology from their start to emit the reset signal (`Order = -1`), also guarded by `Visited` and run at most once. Space is $O(V + E)$ for the compiled-graph entries and visited set.
 
-*Source: `Src/Core/VeloxDev.Core/WorkflowSystem/Compilation/Compiler.cs`, `BuildForwardAdjacency` lines 153-174, `TraverseBfsFrom` lines 252-296, `TraverseDfsFrom` lines 300-336, `DetectCycle` lines 353-389.*
+*Source: `Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/CompilerViewModel.cs`, `CompileGraphAsync` lines 36-157, `FlushChain` lines 160-169, `MarkStoppedBranch` lines 186-200.*
 
 ## Sequential Execution
 
-`CompilationResult.ExecuteAsync` iterates the ordered items exactly once, awaiting each node's `ReceiveAsync` result. With $N$ compiled items:
+`CompilerEngine.RunAsync` iterates a graph's entries exactly once; `ExecuteEntry` awaits each node's `ReceiveAsync` result and writes it back to `RuntimeContext.Data` to chain downstream. With $N$ nodes in the graph:
 
 $$T_{\text{execute}} = \sum_{i=1}^{N} T_{\text{work}}(i) = O(N)$$
 
-in the number of nodes (wall-clock time is dominated by the node workloads, e.g. `Task.Delay(DelayMilliseconds)` in the demo). The executor skips unchosen router branches via a `HashSet<int>` of skipped item IDs, so the loop never re-executes a node.
+in the number of nodes (wall-clock time is dominated by the node workloads, e.g. `Task.Delay(DelayMilliseconds)` in the demo). Unchosen static branches are not driven (`BranchEntry` picks by `CompileKey`; nodes with `Order < redirect target` are skipped). `ParallelEntry` fan-outs run in order (the shared `RuntimeContext` blackboard is not thread-safe, so no true parallelism). Cross-chain rollback re-runs the whole graph from a target Order, at most 50 times (`MaxRedirects`), so worst case $T_{\text{redirect}} = O(50 \cdot N)$.
 
-*Source: `Src/Core/VeloxDev.Core/WorkflowSystem/Compilation/Models/CompilationResult.cs`, `ExecuteCoreAsync` lines 157-260.*
+*Source: `Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/CompilerEngine.cs`, `RunGraphAsync` lines 63-89, `RunExecuteAsync` lines 96-148, `RunParallelAsync` lines 189-196.*
 
 ## Undo / Redo Stack
 
@@ -68,7 +64,7 @@ $$T_{\text{TrySelect}} = O(1) \text{ expected}$$
 |---|---|---|---|
 | `SpatialGridHashMap.Insert` | $O(1)$ expected | $O(n)$ total | bounded cells per item |
 | `SpatialGridHashMap.Query` | $O(k + m)$ | $O(1)$ scratch | $k$ = cells in viewport |
-| Compile (BFS/DFS) | $O(V+E)$ | $O(V+E)$ | single traversal + adjacency |
-| Execute chain | $O(N)$ | $O(N)$ | one pass over items |
+| Compile (CompilerViewModel) | $O(V+E)$ | $O(V+E)$ | remembered decomposition + visited set |
+| Execute chain (CompilerEngine) | $O(N)$ | $O(N)$ | one pass over entries; rollback worst $O(50N)$ |
 | Undo / Redo | $O(1)$ per action | $O(n)$ | concurrent stacks |
 | `SlotEnumerator.TrySelect` | $O(1)$ expected | $O(\text{members})$ | dictionary lookup |

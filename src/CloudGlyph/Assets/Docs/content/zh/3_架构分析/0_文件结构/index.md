@@ -7,7 +7,7 @@ VeloxDev/
 ├── Src/
 │   ├── Core/
 │   │   ├── VeloxDev.Core/                 ← 核心引擎（多目标框架）
-│   │   │   ├── WorkflowSystem/            ← 工作流编辑器：Templates、StandardEx、Compilation、SelectorEx
+│   │   │   ├── WorkflowSystem/            ← 工作流编辑器：Templates、StandardEx、CompilerEx、SelectorEx
 │   │   │   ├── TransitionSystem/          ← 动画引擎 + NativeInterpolators/
 │   │   │   ├── DynamicTheme/              ← 主题切换（ThemeManager、ThemeCache）
 │   │   │   ├── MVVM/                      ← VeloxProperty/VeloxCommand 运行时 + IVeloxCommand
@@ -28,7 +28,7 @@ VeloxDev/
 │   │   └── VeloxDev.Razor/                ← Razor / Blazor
 │   ├── Generators/
 │   │   └── VeloxDev.Core.Generator/       ← Roslyn 源生成器（WorkflowBuilder、MVVM、Command、AOP、Theme、MonoBehaviour）
-│   └── Templates/                         ← dotnet new 项模板（WPF/Avalonia/MAUI/WinUI）
+│   └── Templates/                         ← dotnet new 项模板（WPF/Avalonia/WinUI/MAUI/WinForms/Razor）
 ├── Examples/                              ← 示例（主要证据）
 │   ├── Workflow/   WPF · Avalonia · WinUI · MAUI · WinForms · Blazor + Common/Lib
 │   ├── Transition/ WPF · Avalonia · WinUI · WinForms · MAUI · Blazor

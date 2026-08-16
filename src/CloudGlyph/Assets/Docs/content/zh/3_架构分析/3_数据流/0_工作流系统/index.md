@@ -114,60 +114,60 @@
 
 *源码：`Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowTreeEx.cs`，第 92-177、363-416 行。*
 
-## 3. Compile + ExecuteAsync 与 ReceiveCommand 生命周期
+## 3. Compile + RunAsync 与 ReceiveCommand 生命周期
 
-`WorkflowCompiler.Compile` 遍历图（BFS 或 DFS）并生成带 `Order`/`Depth` 的 `CompilationResult` 项目。`ExecuteAsync` 逐个项目驱动节点的 `ReceiveCommand → ReceiveAsync(context, ct)`，并用其返回值把数据链式传给下一个项目。路由器分支通过 `BranchExclusiveItems` 跳过。
+`CompilerViewModel.CompileAsync(start)` 把起点可达子图分解成若干 `CompiledGraph`（线性段 → `ExecuteEntry`、分支 → `BranchEntry`、扇出 → `ParallelEntry`）。`CompilerEngine.RunAsync(graph, context, ct)` 逐个条目驱动节点的 `ReceiveCommand → ReceiveAsync(context, ct)`，并用其返回值写回 `RuntimeContext.Data` 链式传给下游。分支由 `BranchEntry` 按编译期 `CompileKey`（静态）或运行期 `ResolveRouteKey`（动态）选择；终端分支选中即结束。
 
 ```plantuml
 @startuml
     participant Caller
-    participant Compiler as WorkflowCompiler
+    participant Compiler as CompilerViewModel
     participant Tree as IWorkflowTreeViewModel
-    participant Result as CompilationResult
-    participant Item as CompiledItem
+    participant Engine as CompilerEngine
+    participant Graph as CompiledGraph
+    participant Entry as ExecuteEntry
     participant Cmd as ReceiveCommand
     participant Helper as NodeHelper
 
-    Caller -> Compiler: Compile(start, mode, dir, scope, cycle)
+    Caller -> Compiler: CompileAsync(start)
     activate Compiler
     Compiler -> Tree: read Nodes / Slots / Targets
-    Compiler -> Compiler: build adjacency, detect cycle, traverse
-    alt CycleHandling.Throw and cycle found
-        Compiler --> Caller: throw InvalidOperationException
-    else ok
-        Compiler --> Caller: IReadOnlyList<CompilationResult>
-    end
+    Compiler -> Compiler: decompose linear/branch/fan-out entries
+    Compiler --> Caller: IReadOnlyList<CompiledGraph>
     deactivate Compiler
 
-    Caller -> Result: ExecuteAsync(parameter, ct)
-    activate Result
-    loop each item in Items
-        Result -> Item: item.SubscribeError()
-        Result -> Cmd: ReceiveCommand.ExecuteAsync(context)
-        activate Cmd
-        Cmd -> Helper: ReceiveAsync(context, ct)
-        activate Helper
-        Helper --> Helper: mutate context in place (e.g. NetworkFlowContext)
-        Helper --> Cmd: return result
-        deactivate Helper
-        Cmd --> Result: returns result
-        deactivate Cmd
-        alt FailureException != null and ErrorRedirectId set
-            Result -> Item: execute ErrorRedirect target with TaskContext(errorCtx)
-        else success and ICompileTimeRouter
-            Result -> Item: skip BranchExclusiveItems of unchosen key
+    Caller -> Engine: RunAsync(graph, context, ct)
+    activate Engine
+    loop each entry in graph.Entries
+        Engine -> Entry: drive (linear chain)
+        activate Entry
+        loop each node in Entry.Nodes
+            Engine -> Cmd: ReceiveCommand.ExecuteAsync(context)
+            activate Cmd
+            Cmd -> Helper: ReceiveAsync(context, ct)
+            activate Helper
+            Helper --> Helper: mutate RuntimeContext in place (Data / logs / shared vars)
+            Helper --> Cmd: return result
+            deactivate Helper
+            Cmd --> Engine: returns result
+            deactivate Cmd
+            Engine -> Engine: context.Data = result  (chain to next node)
         end
-        Result -> Result: currentParam = item.Result ?? currentParam
-        Result -> Item: item.UnsubscribeError()
+        deactivate Entry
+        alt node reported error (Error/Warn/throw) and IRedirectable
+            Engine -> Engine: re-run whole graph from redirect target Order (skip earlier nodes, may cross chains)
+        else unchosen static branch / terminal branch
+            Engine -> Engine: skip or end the run
+        end
     end
-    Result --> Caller: return last result / parameter
-    deactivate Result
+    Engine --> Caller: status Completed / Stopped
+    deactivate Engine
 @enduml
 ```
 
-取消路径：循环顶部 `ct.ThrowIfCancellationRequested()` 会中止整条链；节点抛出的 `OperationCanceledException` 立即重抛。
+取消路径：`ct.ThrowIfCancellationRequested()` 会中止整条链；节点抛出的 `OperationCanceledException` 立即重抛（取消不是重定向）。`IRuntimeAware` 节点在驱动前收到 `RuntimeContext`；`RuntimeContext.Error()/Warn()` 会把 `RedirectRequested` 置位 —— 实现 `IRedirectable` 则由其返回回退目标 Order，引擎带目标重跑整张图；未实现则流程结束、状态 `-1`。
 
-*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/Compilation/Compiler.cs`，第 54-149 行；`Models/CompilationResult.cs`，第 157-260 行；`Models/CompiledItem.cs`，第 104-121 行。*
+*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/CompilerViewModel.cs`、`CompilerEngine.cs`、`CompiledGraph.cs`、`ActionEntry/*.cs`。*
 
 ## 4. Agent 工具调用流
 

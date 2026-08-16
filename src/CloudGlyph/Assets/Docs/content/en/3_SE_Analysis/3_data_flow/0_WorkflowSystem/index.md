@@ -114,60 +114,60 @@ Error path: any failed validation (capacity, custom `ValidateConnection`, same-n
 
 *Source: `Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowTreeEx.cs`, lines 92-177, 363-416.*
 
-## 3. Compile + ExecuteAsync with ReceiveCommand lifecycle
+## 3. Compile + RunAsync with ReceiveCommand lifecycle
 
-`WorkflowCompiler.Compile` traverses the graph (BFS or DFS) and produces `CompilationResult` items with `Order`/`Depth`. `ExecuteAsync` runs each item by driving the node's `ReceiveCommand → ReceiveAsync(context, ct)` and uses its return value to chain data to the next item. Router branches are skipped via `BranchExclusiveItems`.
+`CompilerViewModel.CompileAsync(start)` decomposes the subgraph reachable from the start node into `CompiledGraph`s (linear segments → `ExecuteEntry`, branches → `BranchEntry`, fan-outs → `ParallelEntry`). `CompilerEngine.RunAsync(graph, context, ct)` drives entries one by one, invoking each node's `ReceiveCommand → ReceiveAsync(context, ct)` and writing the return value back to `RuntimeContext.Data` to chain to the next node. Branches are chosen by `BranchEntry` via the compile-time `CompileKey` (static) or runtime `ResolveRouteKey` (dynamic); selecting a terminal branch ends the run.
 
 ```plantuml
 @startuml
     participant Caller
-    participant Compiler as WorkflowCompiler
+    participant Compiler as CompilerViewModel
     participant Tree as IWorkflowTreeViewModel
-    participant Result as CompilationResult
-    participant Item as CompiledItem
+    participant Engine as CompilerEngine
+    participant Graph as CompiledGraph
+    participant Entry as ExecuteEntry
     participant Cmd as ReceiveCommand
     participant Helper as NodeHelper
 
-    Caller -> Compiler: Compile(start, mode, dir, scope, cycle)
+    Caller -> Compiler: CompileAsync(start)
     activate Compiler
     Compiler -> Tree: read Nodes / Slots / Targets
-    Compiler -> Compiler: build adjacency, detect cycle, traverse
-    alt CycleHandling.Throw and cycle found
-        Compiler --> Caller: throw InvalidOperationException
-    else ok
-        Compiler --> Caller: IReadOnlyList<CompilationResult>
-    end
+    Compiler -> Compiler: decompose linear/branch/fan-out entries
+    Compiler --> Caller: IReadOnlyList<CompiledGraph>
     deactivate Compiler
 
-    Caller -> Result: ExecuteAsync(parameter, ct)
-    activate Result
-    loop each item in Items
-        Result -> Item: item.SubscribeError()
-        Result -> Cmd: ReceiveCommand.ExecuteAsync(context)
-        activate Cmd
-        Cmd -> Helper: ReceiveAsync(context, ct)
-        activate Helper
-        Helper --> Helper: mutate context in place (e.g. NetworkFlowContext)
-        Helper --> Cmd: return result
-        deactivate Helper
-        Cmd --> Result: returns result
-        deactivate Cmd
-        alt FailureException != null and ErrorRedirectId set
-            Result -> Item: execute ErrorRedirect target with TaskContext(errorCtx)
-        else success and ICompileTimeRouter
-            Result -> Item: skip BranchExclusiveItems of unchosen key
+    Caller -> Engine: RunAsync(graph, context, ct)
+    activate Engine
+    loop each entry in graph.Entries
+        Engine -> Entry: drive (linear chain)
+        activate Entry
+        loop each node in Entry.Nodes
+            Engine -> Cmd: ReceiveCommand.ExecuteAsync(context)
+            activate Cmd
+            Cmd -> Helper: ReceiveAsync(context, ct)
+            activate Helper
+            Helper --> Helper: mutate RuntimeContext in place (Data / logs / shared vars)
+            Helper --> Cmd: return result
+            deactivate Helper
+            Cmd --> Engine: returns result
+            deactivate Cmd
+            Engine -> Engine: context.Data = result  (chain to next node)
         end
-        Result -> Result: currentParam = item.Result ?? currentParam
-        Result -> Item: item.UnsubscribeError()
+        deactivate Entry
+        alt node reported error (Error/Warn/throw) and IRedirectable
+            Engine -> Engine: re-run whole graph from redirect target Order (skip earlier nodes, may cross chains)
+        else unchosen static branch / terminal branch
+            Engine -> Engine: skip or end the run
+        end
     end
-    Result --> Caller: return last result / parameter
-    deactivate Result
+    Engine --> Caller: status Completed / Stopped
+    deactivate Engine
 @enduml
 ```
 
-Cancellation path: `ct.ThrowIfCancellationRequested()` at the top of each loop iteration aborts the whole chain; an `OperationCanceledException` from a node rethrows immediately.
+Cancellation path: `ct.ThrowIfCancellationRequested()` aborts the whole chain; an `OperationCanceledException` from a node rethrows immediately (cancellation is not a redirect). Each `IRuntimeAware` node receives the `RuntimeContext` before being driven; `RuntimeContext.Error()/Warn()` sets `RedirectRequested` — if the node implements `IRedirectable`, its returned Order becomes the target and the engine re-runs the whole graph from there; otherwise the flow ends with status `-1`.
 
-*Source: `Src/Core/VeloxDev.Core/WorkflowSystem/Compilation/Compiler.cs`, lines 54-149; `Models/CompilationResult.cs`, lines 157-260; `Models/CompiledItem.cs`, lines 104-121.*
+*Source: `Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/CompilerViewModel.cs`, `CompilerEngine.cs`, `CompiledGraph.cs`, `ActionEntry/*.cs`.*
 
 ## 4. Agent tool call flow
 

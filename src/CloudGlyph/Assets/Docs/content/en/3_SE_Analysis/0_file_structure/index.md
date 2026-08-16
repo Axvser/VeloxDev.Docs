@@ -7,7 +7,7 @@ VeloxDev/
 ├── Src/
 │   ├── Core/
 │   │   ├── VeloxDev.Core/                 ← Core engine (multi-target)
-│   │   │   ├── WorkflowSystem/            ← Workflow editor: Templates, StandardEx, Compilation, SelectorEx
+│   │   │   ├── WorkflowSystem/            ← Workflow editor: Templates, StandardEx, CompilerEx, SelectorEx
 │   │   │   ├── TransitionSystem/          ← Animation engine + NativeInterpolators/
 │   │   │   ├── DynamicTheme/              ← Theme switching (ThemeManager, ThemeCache)
 │   │   │   ├── MVVM/                      ← VeloxProperty/VeloxCommand runtime + IVeloxCommand
@@ -28,7 +28,7 @@ VeloxDev/
 │   │   └── VeloxDev.Razor/                ← Razor / Blazor
 │   ├── Generators/
 │   │   └── VeloxDev.Core.Generator/       ← Roslyn source generators (WorkflowBuilder, MVVM, Command, AOP, Theme, MonoBehaviour)
-│   └── Templates/                         ← dotnet new item templates (WPF/Avalonia/MAUI/WinUI)
+│   └── Templates/                         ← dotnet new item templates (WPF/Avalonia/WinUI/MAUI/WinForms/Razor)
 ├── Examples/                              ← Demos (primary evidence)
 │   ├── Workflow/   WPF · Avalonia · WinUI · MAUI · WinForms · Blazor + Common/Lib
 │   ├── Transition/ WPF · Avalonia · WinUI · WinForms · MAUI · Blazor

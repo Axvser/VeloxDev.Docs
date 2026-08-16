@@ -70,12 +70,27 @@ classDiagram
         +Redo : Action
         +Undo : Action
     }
-    class WorkflowCompiler {
-        +Compile(start, mode, dir, scope, cycle) : IReadOnlyList~CompilationResult~
+    class CompilerViewModel {
+        +CompileAsync(start) : IReadOnlyList~CompiledGraph~
     }
-    class CompilationResult {
-        +Items
-        +ExecuteAsync(parameter, ct)
+    class CompiledGraph {
+        +Entries
+    }
+    class CompilerEngine {
+        +RunAsync(graph, context, ct)
+    }
+    class ActionEntry {
+        <<abstract>>
+    }
+    class ExecuteEntry {
+        +Nodes
+    }
+    class BranchEntry {
+        +Router
+        +Options
+    }
+    class ParallelEntry {
+        +Branches
     }
 
     IWorkflowViewModel <|-- IWorkflowTreeViewModel
@@ -87,7 +102,12 @@ classDiagram
     IWorkflowSlotViewModelHelper <|-- SlotHelper~T~
     IWorkflowTreeViewModel "1" *-- "many" IWorkflowNodeViewModel
     IWorkflowNodeViewModel "1" *-- "many" IWorkflowSlotViewModel
-    WorkflowCompiler ..> CompilationResult
+    CompilerViewModel ..> CompiledGraph
+    CompiledGraph "1" *-- "many" ActionEntry
+    ActionEntry <|-- ExecuteEntry
+    ActionEntry <|-- BranchEntry
+    ActionEntry <|-- ParallelEntry
+    CompilerEngine ..> CompiledGraph
     WorkflowActionPair ..> IWorkflowTreeViewModelHelper : Submit/Undo/Redo
 ```
 
@@ -151,36 +171,42 @@ _viewModel.ReceiveCommand.Exited  += _exitedHandler;
 
 ### 4. 策略模式 —— SlotEnumerator / 选择器 + `ICompileTimeRouter`
 
-`SlotEnumerator<TSlot>` 通过 `SetSelector(type)` 交换输出槽策略。`BoolSelectorNodeViewModel` 与 `EnumSelectorNodeViewModel` 实现 `ICompileTimeRouter`，让编译器预先收集路由表（`GetRouteTable`），执行器跳过未选中分支（`GetCurrentRouteKey`）：
+`SlotEnumerator<TSlot>` 通过 `SetSelector(type)` 交换输出槽策略。`BoolSelectorNodeViewModel` 与 `EnumSelectorNodeViewModel` 实现 `ICompileTimeRouter`，让编译器预先收集路由表（`GetRouteTable`），`ResolveRouteKey` 决定当前走哪个分支 —— 静态模式编译期锁定、剪枝未选中分支；动态模式运行期重解析：
 
-> 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/BoolSelectorNodeViewModel.cs`，第 70-91 行
+> 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/BoolSelectorNodeViewModel.cs`，第 92-118 行
 
 ```csharp
-public object? GetCurrentRouteKey() => Condition ? (object)true : (object)false;
-
-public IReadOnlyDictionary<object, IWorkflowNodeViewModel> GetRouteTable()
+public Task<object?> ResolveRouteKey(object? payload)
 {
-    var dict = new Dictionary<object, IWorkflowNodeViewModel>();
-    if (TrueSlot is not null)
-        foreach (var target in TrueSlot.Targets)
-            if (target.Parent is not null)
-                dict[true] = target.Parent;
-    // ... false 分支同理
-    return dict;
+    if (CompileMode == RouterCompileMode.Dynamic && payload is null)
+        return Task.FromResult<object?>(null);
+    return Task.FromResult<object?>(Condition);
+}
+
+public Task<IReadOnlyDictionary<object, IReadOnlyList<IWorkflowNodeViewModel>>> GetRouteTable()
+{
+    var dict = new Dictionary<object, List<IWorkflowNodeViewModel>>();
+    if (CompileMode == RouterCompileMode.Static)
+        AddBranch(dict, Condition, Condition ? TrueSlot : FalseSlot);
+    else
+    {
+        AddBranch(dict, true, TrueSlot);
+        AddBranch(dict, false, FalseSlot);
+    }
+    // ... 无下游的分支登记为终端分支（空列表）
+    return Task.FromResult<IReadOnlyDictionary<object, IReadOnlyList<IWorkflowNodeViewModel>>>(
+        dict.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<IWorkflowNodeViewModel>)kv.Value.AsReadOnly()));
 }
 ```
 
 ### 5. 代理 / 装饰器 —— 源生成的 partial ViewModel
 
-`[WorkflowBuilder.Node<THelper>]` 等把用户的 `partial` 类作为被装饰的表面；生成器产生属性/命令成员，而 Helper（通过 `SetHelper` 注入的独立对象）拥有行为。演示 `ControllerViewModel` 在生成命令之外暴露了额外的实例属性作为 ComboBox 数据源：
+`[WorkflowBuilder.Node<THelper>]` 等把用户的 `partial` 类作为被装饰的表面；生成器产生属性/命令成员，而 Helper（通过 `SetHelper` 注入的独立对象）拥有行为。演示 `BoolSelectorNodeViewModel` / `EnumSelectorNodeViewModel` 在生成命令之外暴露了额外的实例属性作为 ComboBox 数据源（路由模式）：
 
-> 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/ControllerViewModel.cs`，第 47-57 行
+> 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/BoolSelectorNodeViewModel.cs`，第 86 行
 
 ```csharp
-public CompileMode[] CompileModeOptions => [CompileMode.BFS, CompileMode.DFS];
-public CompileDirection[] CompileDirectionOptions => [CompileDirection.Forward, CompileDirection.Reverse];
-public CompileScope[] CompileScopeOptions => [CompileScope.FromNode, CompileScope.Omni];
-public CycleHandling[] CycleHandlingOptions => [CycleHandling.Throw, CycleHandling.Trim, CycleHandling.Allow];
+public RouterCompileMode[] CompileModeOptions => [RouterCompileMode.Static, RouterCompileMode.Dynamic];
 ```
 
 ### 6. 门面 —— `WorkflowBuilder`

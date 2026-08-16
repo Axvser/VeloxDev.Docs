@@ -70,12 +70,27 @@ classDiagram
         +Redo : Action
         +Undo : Action
     }
-    class WorkflowCompiler {
-        +Compile(start, mode, dir, scope, cycle) : IReadOnlyList~CompilationResult~
+    class CompilerViewModel {
+        +CompileAsync(start) : IReadOnlyList~CompiledGraph~
     }
-    class CompilationResult {
-        +Items
-        +ExecuteAsync(parameter, ct)
+    class CompiledGraph {
+        +Entries
+    }
+    class CompilerEngine {
+        +RunAsync(graph, context, ct)
+    }
+    class ActionEntry {
+        <<abstract>>
+    }
+    class ExecuteEntry {
+        +Nodes
+    }
+    class BranchEntry {
+        +Router
+        +Options
+    }
+    class ParallelEntry {
+        +Branches
     }
 
     IWorkflowViewModel <|-- IWorkflowTreeViewModel
@@ -87,7 +102,12 @@ classDiagram
     IWorkflowSlotViewModelHelper <|-- SlotHelper~T~
     IWorkflowTreeViewModel "1" *-- "many" IWorkflowNodeViewModel
     IWorkflowNodeViewModel "1" *-- "many" IWorkflowSlotViewModel
-    WorkflowCompiler ..> CompilationResult
+    CompilerViewModel ..> CompiledGraph
+    CompiledGraph "1" *-- "many" ActionEntry
+    ActionEntry <|-- ExecuteEntry
+    ActionEntry <|-- BranchEntry
+    ActionEntry <|-- ParallelEntry
+    CompilerEngine ..> CompiledGraph
     WorkflowActionPair ..> IWorkflowTreeViewModelHelper : Submit/Undo/Redo
 ```
 
@@ -151,36 +171,42 @@ _viewModel.ReceiveCommand.Exited  += _exitedHandler;
 
 ### 4. Strategy Pattern — SlotEnumerator / Selectors + `ICompileTimeRouter`
 
-A `SlotEnumerator<TSlot>` swaps its output-slot strategy via `SetSelector(type)`. `BoolSelectorNodeViewModel` and `EnumSelectorNodeViewModel` implement `ICompileTimeRouter`, letting the compiler pre-collect the routing table (`GetRouteTable`) and the executor skip unchosen branches (`GetCurrentRouteKey`):
+A `SlotEnumerator<TSlot>` swaps its output-slot strategy via `SetSelector(type)`. `BoolSelectorNodeViewModel` and `EnumSelectorNodeViewModel` implement `ICompileTimeRouter`, letting the compiler pre-collect the routing table (`GetRouteTable`) while `ResolveRouteKey` decides which branch to take — static mode locks the key at compile time and prunes unchosen branches; dynamic mode re-resolves at runtime:
 
-> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/BoolSelectorNodeViewModel.cs`, lines 70-91
+> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/BoolSelectorNodeViewModel.cs`, lines 92-118
 
 ```csharp
-public object? GetCurrentRouteKey() => Condition ? (object)true : (object)false;
-
-public IReadOnlyDictionary<object, IWorkflowNodeViewModel> GetRouteTable()
+public Task<object?> ResolveRouteKey(object? payload)
 {
-    var dict = new Dictionary<object, IWorkflowNodeViewModel>();
-    if (TrueSlot is not null)
-        foreach (var target in TrueSlot.Targets)
-            if (target.Parent is not null)
-                dict[true] = target.Parent;
-    // ... false branch likewise
-    return dict;
+    if (CompileMode == RouterCompileMode.Dynamic && payload is null)
+        return Task.FromResult<object?>(null);
+    return Task.FromResult<object?>(Condition);
+}
+
+public Task<IReadOnlyDictionary<object, IReadOnlyList<IWorkflowNodeViewModel>>> GetRouteTable()
+{
+    var dict = new Dictionary<object, List<IWorkflowNodeViewModel>>();
+    if (CompileMode == RouterCompileMode.Static)
+        AddBranch(dict, Condition, Condition ? TrueSlot : FalseSlot);
+    else
+    {
+        AddBranch(dict, true, TrueSlot);
+        AddBranch(dict, false, FalseSlot);
+    }
+    // ... a branch with no downstream is registered as terminal (empty list)
+    return Task.FromResult<IReadOnlyDictionary<object, IReadOnlyList<IWorkflowNodeViewModel>>>(
+        dict.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<IWorkflowNodeViewModel>)kv.Value.AsReadOnly()));
 }
 ```
 
 ### 5. Proxy / Decorator — Source-Generated Partial ViewModels
 
-`[WorkflowBuilder.Node<THelper>]` etc. make the user's `partial` class the decorated surface; the generator emits property/command members while the Helper (a separate object injected via `SetHelper`) owns behavior. The demo `ControllerViewModel` exposes extra instance properties for ComboBox sources alongside generated commands:
+`[WorkflowBuilder.Node<THelper>]` etc. make the user's `partial` class the decorated surface; the generator emits property/command members while the Helper (a separate object injected via `SetHelper`) owns behavior. The demo `BoolSelectorNodeViewModel` / `EnumSelectorNodeViewModel` expose extra instance properties for ComboBox sources alongside generated commands (routing mode):
 
-> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/ControllerViewModel.cs`, lines 47-57
+> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/BoolSelectorNodeViewModel.cs`, line 86
 
 ```csharp
-public CompileMode[] CompileModeOptions => [CompileMode.BFS, CompileMode.DFS];
-public CompileDirection[] CompileDirectionOptions => [CompileDirection.Forward, CompileDirection.Reverse];
-public CompileScope[] CompileScopeOptions => [CompileScope.FromNode, CompileScope.Omni];
-public CycleHandling[] CycleHandlingOptions => [CycleHandling.Throw, CycleHandling.Trim, CycleHandling.Allow];
+public RouterCompileMode[] CompileModeOptions => [RouterCompileMode.Static, RouterCompileMode.Dynamic];
 ```
 
 ### 6. Facade — `WorkflowBuilder`

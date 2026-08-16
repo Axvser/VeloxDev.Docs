@@ -160,25 +160,33 @@ Static extension classes that implement the standard behavior invoked by generat
 
 *Source: `Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/`.*
 
-## Namespace: `VeloxDev.WorkflowSystem.Compilation`
+## Namespace: `VeloxDev.Core.WorkflowSystem.CompilerEx`
+
+V7 compilation pipeline: compile time decomposes the reachable subgraph from a start node into acyclic compiled graphs (multi-graph semantics); the execution engine drives the graph at runtime. The old `WorkflowCompiler`/`CompilationResult`/`CompiledItem` and their four-dimension settings (`CompileMode`/`CycleHandling`/…) are removed.
 
 | Type | Signature / members |
 |---|---|
-| `WorkflowCompiler` | `Compile(IWorkflowNodeViewModel startNode, CompileMode mode, CompileDirection direction = Forward, CompileScope scope = FromNode, CycleHandling cycleHandling = Throw) → IReadOnlyList<CompilationResult>`; ctor `WorkflowCompiler(IDiagnosticLogger?)` |
-| `CompilationResult` | `Items` (`IReadOnlyList<CompiledItem>`), `Mode`, `Direction`, `Scope`, `HasCycle`, `CycleHandling`; `ExecuteAsync(object? parameter = null, CancellationToken ct = default)` and overloads with `TextWriter` or debug file path |
-| `CompiledItem` | `Id`, `Node`, `Order`, `Depth`, `ErrorRedirectId`, `MaxRetries`, `Result`, `IsLoopEntry`, `LoopTailId`, `RouteTable`, `BranchExclusiveItems`, `SubscribeError()`, `UnsubscribeError()` |
-| `ICompileTimePriority` | `int CompilePriority` — same-depth ordering (lower first) |
-| `ICompileTimeRouter` | `GetRouteTable()`, `GetCurrentRouteKey()` — compile-time slot routing |
-| `ICompileTimeSink` | `OnExecutionEvent(ExecutionContext)` — execution lifecycle hook |
-| `IDiagnosticLogger` / `DebugDiagnosticLogger` / `SynchronousFileLogger` | Compilation / execution diagnostics |
-| `CompileMode` | `BFS`, `DFS` (pre-order) |
-| `CompileDirection` | `Forward` (follow targets), `Reverse` (follow sources) |
-| `CompileScope` | `FromNode`, `Omni` (auto entry/exit discovery) |
-| `CycleHandling` | `Throw`, `Trim`, `Allow` |
-| `ExecutionEvent` | `BeforeExecute`, `AfterExecute`, `OnError`, `OnCompleted` |
-| `ExecutionContext` / `DiagnosticContext` / `ErrorContext` | Execution-phase data objects |
+| `CompilerViewModel` | `CompileAsync<T>(T component) → IReadOnlyList<CompiledGraph>` (`T : IWorkflowViewModel`, start must be an `IWorkflowNodeViewModel`); `Graphs` (`ObservableCollection<CompiledGraph>`). Decomposition: linear segments → `ExecuteEntry`; nodes implementing `ICompileTimeRouter` → `BranchEntry` (static prunes to the current key, dynamic keeps all); a route key pointing to multiple downstreams → `ParallelEntry` (fan-out/join); no downstream → terminal branch (`IsTerminal`); the node all branch exits share is the merge point, continued as the next chain of the parent graph (order offset, not reset). After compiling, every `ICompileTimeAware` node receives its `CompileContext`. |
+| `CompiledGraph` | `Entries` (`ObservableCollection<ActionEntry>`) — one compiled graph |
+| `ActionEntry` | Abstract base; concrete entries: `ExecuteEntry`, `BranchEntry`, `ParallelEntry` |
+| `ExecuteEntry` | `Nodes` (linear-segment node collection) |
+| `BranchEntry` | `Router` (`IWorkflowNodeViewModel?`), `Options` (`ObservableCollection<BranchOption>`), `IsDynamic`, `CompileKey` (statically locked key) |
+| `BranchOption` | `Key`, `Label`, `Graph` (`CompiledGraph?`), `IsSkipped`, `IsTerminal` |
+| `ParallelEntry` | `Branches` (`ObservableCollection<CompiledGraph>`) — fan-out group, branches run in order (the order IS the "wait for all upstreams" join semantics) |
+| `CompilerEngine` | `RunAsync(CompiledGraph graph, RuntimeContext context, CancellationToken ct)` — drives all entries of a graph; re-runs the whole graph with a target Order (cross-chain rollback) |
+| `ICompileTimeRouter` | `Task<IReadOnlyDictionary<object, IReadOnlyList<IWorkflowNodeViewModel>>> GetRouteTable()`, `Task<object?> ResolveRouteKey(object? payload)` — compile-time / runtime slot routing |
+| `IRedirectable` | `Task<int?> ResolveRedirectAsync(RuntimeContext context, CancellationToken ct)` — returns the compile-state Order to roll back to when the node reports an error |
+| `ICompileTimeAware` | `AttachCompileTimeContext(CompileContext)`, `CompileContext` — compile-time identity injection |
+| `IRuntimeAware` | `AttachRuntimeContext(RuntimeContext)` — runtime session injected before each drive |
+| `ICompileContext` | `Order`, `ChainIndex`, `Offset` — compile identity (`Order = -1` means absolute stop) |
+| `IRuntimeContext` | `ITaskContext` + `Uid`, `Sequence`, `Logs`, `CurrentEntry`, `NodeIndex`, `BranchKey`, `Attempt`, `IsRunning`, `Status`, `CurrentOrder`; `Log()/Error()/Warn()/Set()/TryGet()` |
+| `RuntimeContext` | Default `IRuntimeContext` implementation (`VeloxProperty` members + shared-variable dictionary); `RedirectRequested`, `EndedWithError`, `PendingRedirectTarget` |
+| `CompileContext` | Default `ICompileContext` implementation |
+| `RouterCompileMode` | `Static` (key locked at compile time, static pruning), `Dynamic` (runtime re-resolution) |
 
-*Sources: `WorkflowSystem/Compilation/Compiler.cs`, `Models/*.cs`, `Enums/*.cs`, `Interfaces/*.cs`.*
+Execution semantics (`CompilerEngine`): `ExecuteEntry` drives nodes one by one — on cross-chain rollback it skips nodes with `Order < target`; a node calling `RuntimeContext.Error()/Warn()` or throwing during `ReceiveAsync` requests a redirect — if it implements `IRedirectable`, the engine **re-runs the whole graph** from the returned Order (skipping earlier nodes, possibly cross-chain; if the target is a Router it re-routes only, without recomputing), otherwise the flow ends with status `-1`. `BranchEntry` uses the statically locked `CompileKey` in static mode and re-resolves via `ResolveRouteKey` in dynamic mode; selecting a terminal branch (`IsTerminal`) ends the run. `ParallelEntry` runs all branch graphs in order. Redirects are abandoned after 50 attempts.
+
+*Sources: `WorkflowSystem/CompilerEx/CompilerViewModel.cs`, `CompilerEngine.cs`, `CompiledGraph.cs`, `CompileContext.cs`, `RuntimeContext.cs`, `IRedirectable.cs`, `ActionEntry/*.cs`, `Interfaces/*.cs`.*
 
 ## Namespace: `VeloxDev.AI`
 
