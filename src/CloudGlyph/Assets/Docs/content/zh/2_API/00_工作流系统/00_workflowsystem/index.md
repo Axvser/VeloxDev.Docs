@@ -105,7 +105,7 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 | `ReceiveAsync` | `Task<object?> ReceiveAsync(ITaskContext context, CancellationToken ct)` | **唯一执行入口**（可空 data/sender/receiver）；返回非空值让编译器链式传递结果 |
 | `BroadcastAsync` | `Task BroadcastAsync(object? parameter, CancellationToken ct)` | 驱动所有下游 `ReceiveCommand` |
 | `ReverseBroadcastAsync` | `Task ReverseBroadcastAsync(object? parameter, CancellationToken ct)` | 驱动所有上游 `ReceiveCommand` |
-| `ValidateBroadcastAsync` | `Task<bool> ValidateBroadcastAsync(IWorkflowSlotViewModel sender, IWorkflowSlotViewModel receiver, object? parameter, CancellationToken ct)` | 逐连接广播门；默认 `true` |
+| `AccessAsync` | `Task<bool> AccessAsync(IAccessContext context, CancellationToken ct)` | 数据流访问门（边 Sender→Receiver + 阶段 + 负载）；编译期 = 静态检测（Data 为 null），运行期 = 实时检测（Data = 负载）；默认 `true` |
 | `Delete` | `void Delete()` | → `StandardDelete`（原子、可撤销） |
 
 *源码：`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowNodeViewModel.cs`。*
@@ -147,8 +147,9 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 |---|---|
 | `IWorkflowActionPair` | `Action Redo { get; }`、`Action Undo { get; }` |
 | `IWorkflowIdentifiable` | `string RuntimeId { get; }` —— 组件生命周期内唯一 |
-| `IContext` | 空标记 —— 上下文体系根契约（`ITaskContext`、`IRuntimeContext`、`ICompileContext`） |
-| `ITaskContext : IContext` | `object? Data`、`IWorkflowSlotViewModel? Sender`、`IWorkflowSlotViewModel? Receiver` —— 传给 `ReceiveCommand → ReceiveAsync` 的可空载荷 |
+| `IContext` | 根契约，统一携带负载 `object? Data { get; }` —— 运行期为真实数据、编译身份为 null；是 `IAccessContext` 的基（`ITaskContext`、`IRuntimeContext`、`ICompileContext`） |
+| `IAccessContext : IContext` | `bool IsCompilePhase`（true = 编译期静态检测 / 无数据，false = 运行期实时检测）、`IWorkflowSlotViewModel? Sender`、`IWorkflowSlotViewModel? Receiver` —— 一次数据流访问（边 + 阶段）；`AccessAsync` 的入参 |
+| `ITaskContext : IAccessContext` | 继承 `Data`/`Sender`/`Receiver`/`IsCompilePhase` —— 传给 `ReceiveCommand → ReceiveAsync` 的可空载荷 |
 | `ISlotProvider` | `IEnumerable<SlotDefinition> GetSlots()` —— 以实例列表驱动 `SlotEnumerator` |
 | `ISpatialMap<T>` | `T : class, ISpatialBoundsProvider`；`Insert(T)`、`Remove(T)`、`Query(Viewport)`、`Clear()`、`Bounds` |
 | `ISpatialBoundsProvider` | `Viewport Bounds { get; }` + `INotifyPropertyChanged`；变更时引发 `PropertyChanged("Bounds")` |

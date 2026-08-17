@@ -105,7 +105,7 @@ Events: `SlotAdded` / `SlotRemoved` (`EventHandler<IWorkflowSlotViewModel>`).
 | `ReceiveAsync` | `Task<object?> ReceiveAsync(ITaskContext context, CancellationToken ct)` | **The single execution entry** (nullable data/sender/receiver); returning a non-null value lets the Compiler chain results |
 | `BroadcastAsync` | `Task BroadcastAsync(object? parameter, CancellationToken ct)` | Drive all connected downstream `ReceiveCommand`s |
 | `ReverseBroadcastAsync` | `Task ReverseBroadcastAsync(object? parameter, CancellationToken ct)` | Drive all connected upstream `ReceiveCommand`s |
-| `ValidateBroadcastAsync` | `Task<bool> ValidateBroadcastAsync(IWorkflowSlotViewModel sender, IWorkflowSlotViewModel receiver, object? parameter, CancellationToken ct)` | Per-connection broadcast gate; default `true` |
+| `AccessAsync` | `Task<bool> AccessAsync(IAccessContext context, CancellationToken ct)` | Dataflow access gate for an edge (Sender→Receiver) + phase + payload; compile phase = static check (Data null), runtime phase = real-time check (Data = payload); default `true` |
 | `Delete` | `void Delete()` | → `StandardDelete` (atomic, undoable) |
 
 *Source: `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowNodeViewModel.cs`.*
@@ -147,8 +147,9 @@ Events: `SlotAdded` / `SlotRemoved` (`EventHandler<IWorkflowSlotViewModel>`).
 |---|---|
 | `IWorkflowActionPair` | `Action Redo { get; }`, `Action Undo { get; }` |
 | `IWorkflowIdentifiable` | `string RuntimeId { get; }` — unique for the component lifetime |
-| `IContext` | Empty marker — root of the context hierarchy (`ITaskContext`, `IRuntimeContext`, `ICompileContext`) |
-| `ITaskContext : IContext` | `object? Data`, `IWorkflowSlotViewModel? Sender`, `IWorkflowSlotViewModel? Receiver` — nullable payload passed to `ReceiveCommand → ReceiveAsync` |
+| `IContext` | Root contract carrying the universal payload `object? Data { get; }` — real at runtime, null at compile identity; base of `IAccessContext` (`ITaskContext`, `IRuntimeContext`, `ICompileContext`) |
+| `IAccessContext : IContext` | `bool IsCompilePhase` (true = compile-time static check / no data, false = runtime real-time check), `IWorkflowSlotViewModel? Sender`, `IWorkflowSlotViewModel? Receiver` — a dataflow access (edge + phase); the parameter of `AccessAsync` |
+| `ITaskContext : IAccessContext` | Inherits `Data`/`Sender`/`Receiver`/`IsCompilePhase` — nullable payload passed to `ReceiveCommand → ReceiveAsync` |
 | `ISlotProvider` | `IEnumerable<SlotDefinition> GetSlots()` — drives a `SlotEnumerator` with an instance-based slot list |
 | `ISpatialMap<T>` | `T : class, ISpatialBoundsProvider`; `Insert(T)`, `Remove(T)`, `Query(Viewport)`, `Clear()`, `Bounds` |
 | `ISpatialBoundsProvider` | `Viewport Bounds { get; }` + `INotifyPropertyChanged`; raise `PropertyChanged("Bounds")` on change |

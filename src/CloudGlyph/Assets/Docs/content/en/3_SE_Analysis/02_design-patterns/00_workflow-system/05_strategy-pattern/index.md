@@ -10,7 +10,7 @@ public Task<object?> ResolveRouteKey(object? payload)
     if (CompileMode == RouterCompileMode.Dynamic && payload is null)
         return Task.FromResult<object?>(null);
 
-    if (payload is RuntimeContext ctx && ctx.TryGet("selector.bool", out var v) && v is string s)
+    if (payload is IRuntimeContext ctx && ctx.TryGet("selector.bool", out var v) && v is string s)
         return Task.FromResult<object?>(bool.TryParse(s, out var b) ? b : Condition);
 
     return Task.FromResult<object?>(Condition);

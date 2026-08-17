@@ -38,7 +38,7 @@
 | `ProvideProgressiveContextPrompt` | `string ProvideProgressiveContextPrompt()` / `(AgentLanguages)` | 精简的渐进式系统提示词。 |
 | `ProvideFrameworkContext` | `string ProvideFrameworkContext(AgentLanguages = English)` | 内置框架枚举/接口/组件的上下文。 |
 | `ProvideCustomerContext` | `string ProvideCustomerContext(AgentLanguages = English)` | 已注册客户枚举/接口/组件的上下文。 |
-| `ProvideFrameworkDataContext` | `string ProvideFrameworkDataContext(AgentLanguages = English)` | 框架值类型的数据上下文（`Anchor`、`Offset`、`Size`、`ITaskContext`、`TaskContext`、`ICompileContext`、`IRuntimeContext`）。 |
+| `ProvideFrameworkDataContext` | `string ProvideFrameworkDataContext(AgentLanguages = English)` | 框架值类型的数据上下文（`Anchor`、`Offset`、`Size`、`IAccessContext`、`ITaskContext`、`TaskContext`、`ICompileContext`、`IRuntimeContext`）。 |
 | `ProvideCustomerDataContext` | `string ProvideCustomerDataContext(AgentLanguages = English)` | 已注册客户数据类型的数据上下文。 |
 | `CreateToolkit` | `WorkflowAgentToolkit CreateToolkit()` | 基于此作用域构建 `WorkflowAgentToolkit`。 |
 | `ProvideTools` | `IList<AITool> ProvideTools()` | `CreateToolkit().CreateTools()` —— 全部工具。 |

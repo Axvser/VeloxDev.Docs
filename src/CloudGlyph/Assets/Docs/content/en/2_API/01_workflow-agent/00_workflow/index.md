@@ -38,7 +38,7 @@ Fluent builder obtained via `tree.AsAgentScope()`. Implements `IAgentToolCallNot
 | `ProvideProgressiveContextPrompt` | `string ProvideProgressiveContextPrompt()` / `(AgentLanguages)` | Compact progressive system prompt. |
 | `ProvideFrameworkContext` | `string ProvideFrameworkContext(AgentLanguages = English)` | Context for built-in framework enums/interfaces/components. |
 | `ProvideCustomerContext` | `string ProvideCustomerContext(AgentLanguages = English)` | Context for registered customer enums/interfaces/components. |
-| `ProvideFrameworkDataContext` | `string ProvideFrameworkDataContext(AgentLanguages = English)` | Data context for framework value types (`Anchor`, `Offset`, `Size`, `ITaskContext`, `TaskContext`, `ICompileContext`, `IRuntimeContext`). |
+| `ProvideFrameworkDataContext` | `string ProvideFrameworkDataContext(AgentLanguages = English)` | Data context for framework value types (`Anchor`, `Offset`, `Size`, `IAccessContext`, `ITaskContext`, `TaskContext`, `ICompileContext`, `IRuntimeContext`). |
 | `ProvideCustomerDataContext` | `string ProvideCustomerDataContext(AgentLanguages = English)` | Data context for registered customer data types. |
 | `CreateToolkit` | `WorkflowAgentToolkit CreateToolkit()` | Builds a `WorkflowAgentToolkit` over this scope. |
 | `ProvideTools` | `IList<AITool> ProvideTools()` | `CreateToolkit().CreateTools()` — all tools. |
