@@ -2,6 +2,8 @@
 
 V7 编译流水线：编译期把从起点可达的子图分解成无环编译图（多图语义）；执行引擎在运行期驱动图。
 
+> 想了解 Compiler 路径与非Compiler（无状态广播）路径的差异——入口、参数、时序——见 [执行机制](../05_执行机制)。
+
 | 类型 | 签名 / 成员 |
 |---|---|
 | `CompilerViewModel` | `Task<IReadOnlyList<CompiledGraph>> CompileAsync<T>(T component, CancellationToken ct = default)`（`T : IWorkflowViewModel`，起点必须是 `IWorkflowNodeViewModel`）；`ObservableCollection<CompiledGraph> Graphs`。分解：线性段 → `ExecuteEntry`；`ICompileTimeRouter` 节点 → `BranchEntry`（静态按当前 key 剪枝，动态全保留）；路由 key 指向多个下游 → `ParallelEntry`（扇出/汇聚）；无下游 → 终端分支（`IsTerminal`）；所有分支出口共同指向的节点为汇合点，作为父图下一段链的起点（序号带偏移，不归零）。编译完给每个 `ICompileTimeAware` 节点注入 `CompileContext`；线性链续接时逐条输出边经 `AccessAsync`（编译期，`IsCompilePhase = true`）做静态检测，非法边按未连接跳过。 |

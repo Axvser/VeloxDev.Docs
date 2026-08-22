@@ -110,6 +110,8 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 
 *源码：`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowNodeViewModel.cs`。*
 
+> `ReceiveAsync` 是 Compiler（引擎驱动）与非Compiler（节点驱动广播）两条路径共享的单一执行入口——每条路径以不同的 context 到达。入口、参数、时序见 [执行机制](../05_执行机制)。
+
 #### `IWorkflowSlotViewModel : IWorkflowViewModel`
 
 | 成员 | 类型 | 说明 |

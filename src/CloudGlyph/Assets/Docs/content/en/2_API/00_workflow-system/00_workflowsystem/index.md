@@ -110,6 +110,8 @@ Events: `SlotAdded` / `SlotRemoved` (`EventHandler<IWorkflowSlotViewModel>`).
 
 *Source: `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowNodeViewModel.cs`.*
 
+> `ReceiveAsync` is the single execution entry shared by the Compiler (engine-driven) and the non-Compiler (node-driven broadcast) paths — each path reaches it with a different context. Entry points, parameters, and timing: see [Execution Mechanism](../05_execution-mechanism).
+
 #### `IWorkflowSlotViewModel : IWorkflowViewModel`
 
 | Member | Type | Description |

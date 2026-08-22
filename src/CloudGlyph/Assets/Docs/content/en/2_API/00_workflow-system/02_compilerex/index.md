@@ -2,6 +2,8 @@
 
 V7 compilation pipeline: compile time decomposes the subgraph reachable from a start node into acyclic compiled graphs (multi-graph semantics); the execution engine drives the graph at runtime.
 
+> For how the Compiler path differs from the non-Compiler (stateless broadcast) path — entry points, parameters, and timing — see [Execution Mechanism](../05_execution-mechanism).
+
 | Type | Signature / members |
 |---|---|
 | `CompilerViewModel` | `Task<IReadOnlyList<CompiledGraph>> CompileAsync<T>(T component, CancellationToken ct = default)` (`T : IWorkflowViewModel`, start must be an `IWorkflowNodeViewModel`); `ObservableCollection<CompiledGraph> Graphs`. Decomposition: linear segments → `ExecuteEntry`; `ICompileTimeRouter` nodes → `BranchEntry` (static prunes to the current key, dynamic keeps all); a route key pointing to multiple downstreams → `ParallelEntry` (fan-out/join); no downstream → terminal branch (`IsTerminal`); the node all branch exits share is the merge point, continued as the next chain of the parent graph (Order offset, not reset). After compiling, every `ICompileTimeAware` node receives its `CompileContext`; linear chain-continuation validates each output edge via `AccessAsync` (compile phase, `IsCompilePhase = true`) — edges that fail are skipped as if unconnected. |
