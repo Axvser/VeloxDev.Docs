@@ -9,7 +9,7 @@
 | 命名空间 | 内容 |
 |---|---|
 | `VeloxDev.DynamicTheme` | `ThemeManager`、`ThemeCache`（+ 嵌套 `InstanceCache`）、`ThemeConfigAttribute<TConverter, TTheme...>`、`StartModel`、`Dark`、`Light`、`ITheme`、`IThemeObject`、`IThemeValueConverter` |
-| `VeloxDev.TransitionSystem`（支撑引擎） | `InterpolatorCore`（声明于 `VeloxDev.TransitionSystem.Abstractions`）、`ITransitionEffectCore`、`IEaseCalculator`、`Eases` |
+| `VeloxDev.TransitionSystem`（支撑引擎） | `InterpolatorCore`/`SamplerSet`（声明于 `VeloxDev.TransitionSystem.Abstractions`）、`ISampler`/`ISampleable`、`ITransitionEffectCore`、`IEaseCalculator`、`Eases` |
 | 平台适配器（`VeloxDev.WPF` / `VeloxDev.Avalonia`） | `Interpolator`、`TransitionEffect`、`TransitionEffects`、值转换器（`DoubleConverter`、`PointConverter`、`ThicknessConverter`、`CornerRadiusConverter`、`ColorConverter`、`BrushConverter`、`ObjectConverter`） |
 
 ## 页面
@@ -19,7 +19,7 @@
 | `00 ThemeManager` | `ThemeManager`（全部静态成员）、枚举 `StartModel`、类 `Dark` / `Light` |
 | `01 ThemeCache` | `ThemeCache`（全部静态成员）、嵌套类 `InstanceCache` |
 | `02 ThemeConfigAttribute` | `ThemeConfigAttribute<TConverter, TTheme...>`（6 种元数）、接口 `ITheme`、`IThemeObject`、`IThemeValueConverter` |
-| `03 TransitionSystem` | 支撑引擎：`InterpolatorCore` 静态成员、`ITransitionEffectCore`、`IEaseCalculator`、`Eases` |
+| `03 TransitionSystem` | 支撑引擎：`InterpolatorCore`/`SamplerSet`、`ISampler`/`ISampleable`、`ITransitionEffectCore`、`IEaseCalculator`、`Eases` |
 | `04 PlatformAdapters` | `Interpolator`、`TransitionEffect`、`TransitionEffects` 及值转换器 |
 
 ## 关键类型速览
@@ -29,5 +29,5 @@
 - **`ThemeConfigAttribute<TConverter, TTheme1..TTheme7>`** — 6 种元数，将一个属性映射为每个主题下的一个值。
 - **`StartModel`** — `[Flags]` 枚举（`Reflect = 1`、`Cache = 2`），选择动画起始值的来源。
 - **`ITheme` / `IThemeObject` / `IThemeValueConverter`** — 标记接口、生成的主题对象契约、值转换策略。
-- **支撑引擎** — `InterpolatorCore.NativeInterpolators` 注册表、`ITransitionEffectCore`、`IEaseCalculator`、`Eases`。
+- **支撑引擎** — `InterpolatorCore.NativeInterpolators` 注册表（`ConcurrentDictionary<Type, ISampleable>`）、`SamplerSet`、`ISampler`/`ISampleable`、`ITransitionEffectCore`、`IEaseCalculator`、`Eases`。
 - **平台适配器** — `Interpolator`、`TransitionEffect`（`Priority = DispatcherPriority.Render`）、`TransitionEffects`（`Empty` / `Theme` / `Hover`）及值转换器。

@@ -13,7 +13,7 @@
 - **支持目标**（来自 `VeloxDev.Core.csproj`）：`netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0` —— 可用于 .NET Framework 4.6.1+、.NET Core 3.0+ 与 .NET 5+。
 - **SDK / 运行时：** 带 Roslyn 4.x（5.0+）的 .NET SDK；示例面向 `net9.0` / `net10.0` —— *被验证过*的配置。
 - **包管理器：** NuGet（`dotnet` CLI 或 Visual Studio）。
-- **所需服务：** 用于 UI 线程动画与平台插值器的 UI 框架适配器（WPF / Avalonia / WinUI / MAUI / WinForms / Razor）。**纯数学插值**（在普通 POCO 上）**无需任何适配器** —— `Eases`、`InterpolatorCore` / `IValueInterpolator` 可在纯控制台应用中运行。
+- **所需服务：** 用于 UI 线程动画与平台插值器的 UI 框架适配器（WPF / Avalonia / WinUI / MAUI / WinForms / Razor）。**纯数学插值**（在普通 POCO 上）**无需任何适配器** —— `Eases`、`InterpolatorCore` / `ISampler` 可在纯控制台应用中运行。
 
 
 #### 2. 安装 / 添加依赖
@@ -180,7 +180,7 @@ public static class Program
 </Project>
 ```
 
-> **提示：** Razor 适配器额外提供 `string?` 的 `Property` 重载，可动画 CSS 颜色字符串（`"#ff7043"`、`rgb(...)`、命名颜色）。WinForms 动画 `IInterpolable`、`Padding` 及常用数值类型；MAUI 动画 MAUI 类型（`Brush`、`Shadow`、`PointF`、`RectF`...）。
+> **提示：** Razor 适配器额外提供 `string?` 的 `Property` 重载，可动画 CSS 颜色字符串（`"#ff7043"`、`rgb(...)`、命名颜色）。WinForms 动画 `Padding` 及常用数值类型；MAUI 动画 MAUI 类型（`Brush`、`Shadow`、`PointF`、`RectF`...）。
 
 #### 7. 运行声明
 

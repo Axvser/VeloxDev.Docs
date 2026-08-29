@@ -1,29 +1,28 @@
 # Transition — Namespace: `VeloxDev.TransitionSystem`
 
-### Interface: `IInterpolable`
+### Interface: `ISampler`
 
 ```csharp
-public interface IInterpolable
+public interface ISampler
 {
-    List<object?> Interpolate(object? start, object? end, int steps, object? options = null);
+    void Update(object target, ITransitionProperty property, object? start, object? end, object? options, double t);
 }
 ```
 
-**Returns:** `List<object?>` — the intermediate values for `steps` frames.
-**Notes:** Implement this on a value type to make it animatable without registering an interpolator. The engine checks it as a fallback on the current value, then on the new value.
-**Verified by:** `NativeInterpolatorsExtendedTests` (a test `TestStringInterpolator` implements `IValueInterpolator`); adapter `Property(Expression<Func<T, IInterpolable?>>, ...)` overloads accept it.
+**Notes:** Stateless, thread-safe, shared-singleton sampling processor (无状态采样处理器) that **directly updates the property** at normalized time `t ∈ [0, 1]` — it no longer returns a value. Semantics: `t <= 0` writes the exact `start`; `t >= 1` writes the exact `end`; `0 < t < 1` computes-and-assigns for value types and **MUTATES the existing `start` instance in place** for reference types (no new instance). Replaces `IValueInterpolator`/`IInterpolable`. The interpreter applies easing and clamps `t` before invoking. `options` still carries `RotationDirection` for angular samplers.
+**Verified by:** `NativeSamplersTests`, `NativeSamplersExtendedTests`.
 
-### Interface: `IValueInterpolator`
+### Interface: `ISampleable`
 
 ```csharp
-public interface IValueInterpolator
+public interface ISampleable
 {
-    List<object?> Interpolate(object? start, object? end, int steps, object? options = null);
+    ISampler Normalize(object? start, object? end, object? options);
 }
 ```
 
-**Notes:** Implement this to register support for a custom type via `InterpolatorCore.RegisterInterpolator`. `options` carries `RotationDirection` for angular interpolators.
-**Verified by:** `InterpolatorCoreTests` (`RegisterInterpolator_And_TryGet_Succeeds`, `RegisterInterpolator_ForCustomType_Succeeds`), `NativeInterpolatorsTests`.
+**Notes:** 可采样定义 (sampleable definition) at the **type level**. User-defined types implement it to be directly animatable without registering a sampler. `Normalize` normalizes start/end **once** (called by the interpreter when it is created with the FrameState, per animated property) and returns the stateless `ISampler`. The former `IInPlaceSampler.CreateUpdater` / in-place `FrameUpdater` classes are now the per-type `ISampler.Update`: reference-type samplers mutate `start` in place inside `Update`; value types compute-and-assign.
+**Verified by:** `NativeSamplersTests`, `NativeSamplersExtendedTests`.
 
 ### Interface: `IEaseCalculator`
 
@@ -58,17 +57,17 @@ A bag of three `ConcurrentDictionary`s keyed by `ITransitionProperty`:
 | Member | Type |
 |---|---|
 | `Values` | `ConcurrentDictionary<ITransitionProperty, object?>` |
-| `Interpolators` | `ConcurrentDictionary<ITransitionProperty, IValueInterpolator>` |
+| `Interpolators` | `ConcurrentDictionary<ITransitionProperty, ISampleable>` |
 | `Options` | `ConcurrentDictionary<ITransitionProperty, object?>` |
 
-Plus typed/strongly-named accessors: `SetValue`, `TryGetValue`, `SetInterpolator`, `TryGetInterpolator`, `SetOptions`, `TryGetOptions` — each with three overload families (expression lambda / `ITransitionProperty` / `PropertyInfo`), and `IFrameState Clone()`.
+Plus typed/strongly-named accessors: `SetValue`, `TryGetValue`, `SetInterpolator`, `TryGetInterpolator`, `SetOptions`, `TryGetOptions` — each with three overload families (expression lambda / `ITransitionProperty` / `PropertyInfo`), and `IFrameState Clone()`. The `SetInterpolator`/`TryGetInterpolator` overloads take/return `ISampleable`.
 **Verified by:** `StateCoreTests` (`SetValue_Expression_CanRetrieve`, `Clone_ReturnsIndependentCopy`).
 
 ### Interface: `ITransitionEffectCore`
 
 | Member | Type / Signature |
 |---|---|
-| `FPS` | `int FPS { get; set; }` (default 60) |
+| `FPS` | `int FPS { get; set; }` (default 60) — **maximum sample-rate cap** (yield interval = `1000 / FPS` ms); timing is Stopwatch-driven continuous sampling — FPS bounds how often the loop samples, not a frame grid |
 | `Duration` | `TimeSpan Duration { get; set; }` |
 | `IsAutoReverse` | `bool IsAutoReverse { get; set; }` |
 | `LoopTime` | `int LoopTime { get; set; }` (`int.MaxValue` = infinite) |
@@ -88,7 +87,7 @@ Adds `TPriorityCore Priority { get; set; }` and `new ITransitionEffect<TPriority
 ```csharp
 public interface ITransitionSchedulerCore
 {
-    Task Execute(IFrameInterpolatorCore interpolator, IFrameState state, ITransitionEffectCore effect, CancellationTokenSource? externCts = default);
+    Task Execute(InterpolatorCore producer, IFrameState state, ITransitionEffectCore effect, CancellationTokenSource? externCts = default);
     void Exit();
 }
 ```
@@ -101,7 +100,7 @@ public interface ITransitionSchedulerCore
 public interface ITransitionInterpreterCore : IDisposable
 {
     TransitionEventArgs Args { get; set; }
-    Task Execute(object target, IFrameSequenceCore frameSequence, ITransitionEffectCore effect, CancellationTokenSource cts);
+    Task Execute(object target, SamplerSet samplerSet, ITransitionEffectCore effect, CancellationTokenSource cts);
     void Exit();
 }
 ```
@@ -114,20 +113,15 @@ public interface ITransitionInterpreterCore : IDisposable
 | `IsUIThread` | `bool IsUIThread()` |
 | `ProtectedInvoke` | `abstract void ProtectedInvoke(object target, Action action, object? priority = default)` |
 | `ProtectedGetValue` | `object? ProtectedGetValue(object target, ITransitionProperty property)` |
-| `ProtectedInterpolate` | `abstract List<object?> ProtectedInterpolate(object target, Func<List<object?>> interpolate)` |
 
 **Notes:** Typed variants `IUIThreadInspector` and `IUIThreadInspector<TPriorityCore>` add `ProtectedInvoke(object, Action)` / `ProtectedInvoke(object, Action, TPriorityCore)`.
 
-### Interface family (frame pump)
+### Interface family (sampler)
 
 | Interface | Key member |
 |---|---|
-| `IFrameInterpolatorCore` | `IFrameSequenceCore Interpolate(object target, IFrameState state, ITransitionEffectCore effect, IUIThreadInspectorCore inspector)` |
-| `IFrameInterpolator : IFrameInterpolatorCore` | `IFrameSequence Interpolate(..., ITransitionEffectCore, IUIThreadInspector)` |
-| `IFrameInterpolator<TPriorityCore> : IFrameInterpolatorCore` | `IFrameSequence<TPriorityCore> Interpolate(..., ITransitionEffect<TPriorityCore>, IUIThreadInspector<TPriorityCore>)` |
-| `IFrameSequenceCore` | `int Count`; `SetValues(target, frameIndex)`; `Update(target, frameIndex, object? priority = default)`; `AddPropertyInterpolations(property, objects)`; `SetCount(count)` |
-| `IFrameSequence : IFrameSequenceCore` | `Update(target, frameIndex)` |
-| `IFrameSequence<TPriorityCore> : IFrameSequenceCore` | `Update(target, frameIndex, TPriorityCore priority)` |
+| `ISampler` | `void Update(object target, ITransitionProperty property, object? start, object? end, object? options, double t)` |
+| `ISampleable` | `ISampler Normalize(object? start, object? end, object? options)` |
 
 ### Enum: `RotationDirection`
 
@@ -142,7 +136,7 @@ public enum RotationDirection
 }
 ```
 
-**Notes:** Passed as the `interpolationOptions` of `.Property(lambda, value, options)` to steer angular interpolation. `DoubleInterpolator` and `QuaternionInterpolator` honor it (`QuaternionInterpolator` negates `q2` to force direction).
+**Notes:** Passed as the `interpolationOptions` of `.Property(lambda, value, options)` to steer angular interpolation. `DoubleSampler` and `QuaternionSampler` honor it (`QuaternionSampler` negates `q2` to force direction).
 **Verified by:** WPF demo `Animation1` passes `RotationDirection.CounterClockWise`.
 
 ### Static Class: `Eases`

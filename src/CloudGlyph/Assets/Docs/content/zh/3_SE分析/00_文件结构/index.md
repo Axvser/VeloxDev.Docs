@@ -8,7 +8,7 @@ VeloxDev/
 │   ├── Core/
 │   │   ├── VeloxDev.Core/                 ← 核心引擎（多目标框架）
 │   │   │   ├── WorkflowSystem/            ← 工作流编辑器：Templates、StandardEx、CompilerEx、SelectorEx
-│   │   │   ├── TransitionSystem/          ← 动画引擎 + NativeInterpolators/
+│   │   │   ├── TransitionSystem/          ← 动画引擎 + NativeSamplers/
 │   │   │   ├── DynamicTheme/              ← 主题切换（ThemeManager、ThemeCache）
 │   │   │   ├── MVVM/                      ← VeloxProperty/VeloxCommand 运行时 + IVeloxCommand
 │   │   │   ├── AspectOriented/            ← AOP 代理（#if NET）
@@ -72,8 +72,8 @@ VeloxDev.Avalonia/
 │   ├── WorkflowMinimapOverlay.cs
 │   └── IWorkflowGridDecorator.cs / IWorkflowMinimapOverlay.cs
 ├── PlatformAdapters/                ← 过渡/主题平台接线
-│   ├── Interpolator.cs / InterpolatorOutput.cs
-│   ├── Interpolators/               ← 按类型插值器（IBrush、ITransform、BoxShadows、...）
+│   ├── Interpolator.cs
+│   ├── Samplers/                    ← 按类型采样器（+ FrameUpdaters/ 供 WPF/Jalium 原地修改）
 │   ├── Transition.cs / TransitionScheduler.cs / TransitionInterpreter.cs
 │   ├── TransitionEffect.cs / TransitionEffects.cs / State.cs
 │   ├── ThemeValueConverters.cs

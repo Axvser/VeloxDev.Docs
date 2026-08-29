@@ -37,7 +37,7 @@ deactivate TO
 
 ## Animated Theme Switch (`Transition<T>`)
 
-`ThemeManager.Transition` validates the target theme, cancels any running transition, prunes dead `WeakReference`s, pre-computes all interpolation frames, then applies them frame by frame on a timer.
+`ThemeManager.Transition` validates the target theme, cancels any running transition, prunes dead `WeakReference`s, prepares per-property samplers, then samples them in a Stopwatch-driven loop over the effect's duration.
 
 ```plantuml
 @startuml
@@ -54,8 +54,8 @@ User -> TM: Transition<Light>(TransitionEffects.Theme)
 activate TM
 
 note right of TM
-  steps = Duration / (1000 / FPS)
-  deltaTime = Duration / steps
+  durationMs = effect.Duration.TotalMilliseconds
+  sampling loop: rawT = stopwatch.Elapsed / durationMs
 end note
 
 TM -> TM: CancleTransition()
@@ -67,32 +67,44 @@ TO --> TM: (fires OnThemeChanging)
 deactivate TO
 
 loop each registered object, each themed property
-    TM -> IK: TryGetInterpolator(propertyType, out interp)
+    TM -> IK: TryGetInterpolator(propertyType, out sampleable)
     activate IK
-    IK --> TM: interp or null
+    IK --> TM: ISampleable? or null
     deactivate IK
 
-    alt interpolator found
+    alt sampleable found (registered native / self-ISampleable)
         TM -> TC: TryGetDefaultValue(type, prop, Dark, out start)\nor active cache value
         activate TC
         TC --> TM: start value (Cache) / live value (Reflect)
         deactivate TC
-        TM -> IK: Interpolate(start, end, steps)
-        activate IK
-        IK --> TM: frames[] (eased by EaseCalculator)
-        deactivate IK
-    else no interpolator
+        TM -> TM: sampler = sampleable.Normalize(current, targetValue, options)
+    else no sampleable
         note right of TM
-          simple two-frame switch: current -> target
+          simple switch: hold current value, jump to target at the end
         end note
     end
+    TM -> TM: TransitionEntry(target, property, sampler, current, targetValue)
 end
 
-loop every frame (delay deltaTime)
-    TM -> PI: SetValue(target, frame[i])
-    activate PI
-    PI --> TM: property updated
-    deactivate PI
+TM -> TM: stopwatch = Stopwatch.StartNew()
+
+loop until rawT >= 1 (Stopwatch-driven, 1ms coarse yield)
+    TM -> TM: rawT = elapsed / durationMs  (clamped to [0,1])
+    TM -> TM: easedT = clamp(Ease(rawT), 0, 1)
+    loop each TransitionEntry
+        alt rawT >= 1 (end)
+            TM -> PI: SetValue(target, targetValue)
+        else sampler == null
+            note right of TM
+              hold current value (no write)
+            end note
+        else
+            TM -> TM: sampler.Update(target, property, current, targetValue, null, easedT)
+        end
+        activate PI
+        PI --> TM: property updated (written inside Update)
+        deactivate PI
+    end
 end
 
 TM -> TM: Current = typeof(Light)
@@ -106,11 +118,11 @@ deactivate TM
 @enduml
 ```
 
-> Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` — `Transition` (lines 83–106), `CalculateFrames` (153–407), `ExecuteTransition` (414–452). Interpolation via `InterpolatorCore.TryGetInterpolator` and `IValueInterpolator.Interpolate`.
+> Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` — `Transition`, `PrepareSamplers`, `ExecuteTransition`. Sampler resolution via `InterpolatorCore.TryGetInterpolator`; `Normalize` in `PrepareSamplers`; per-sample writes via `ISampler.Update`.
 
 ## Instant Theme Switch (`Jump<T>`)
 
-`Jump` reuses the same frame pipeline with `steps = 1` and `deltaTime = 0`, so every property is set directly to the target value.
+`Jump` runs the same sampler pipeline with a zero duration (`durationMs = 0`), so the first sample has `rawT = 1` and every property is set directly to the target value.
 
 ```plantuml
 @startuml
@@ -128,8 +140,8 @@ activate TO
 TO --> TM: (fires OnThemeChanging)
 deactivate TO
 
-TM -> TM: CalculateFrames(steps = 1, Eases.Default)
-TM -> TM: set each property to target theme value (no interpolation)
+TM -> TM: PrepareSamplers(actives, themeType)
+TM -> TM: ExecuteTransition(entries, Eases.Default, 0d, themeType)\n(rawT = 1 immediately → each property set directly to target value)
 TM -> TM: Current = typeof(Light)
 
 TM -> TO: ExecuteThemeChanged(old=Dark, new=Light)
@@ -142,7 +154,7 @@ deactivate TM
 @enduml
 ```
 
-> Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` — `Jump(Type)` (lines 121–143).
+> Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` — `Jump(Type)`.
 
 ## Error / Edge Paths
 
@@ -173,9 +185,9 @@ deactivate TM
 User -> TM: Transition<Light>(TransitionEffects.Empty)
 activate TM
 note right of TM
-  steps = 0 → clamped to 1
+  durationMs = 0 → rawT = 1 on the first sample
 end note
-TM -> TM: apply final values, Current = typeof(Light)
+TM -> TM: apply final values (end-value writes), Current = typeof(Light)
 TM --> User: return
 deactivate TM
 @enduml
@@ -185,11 +197,11 @@ deactivate TM
 
 | Scenario | Behavior |
 |---|---|
-| Normal animated switch | Interpolate each registered object's themed properties over `Duration`, then set `Current` and fire `OnThemeChanged`. |
+| Normal animated switch | Prepare per-property samplers (`Normalize`), then drive each registered object's themed properties over `Duration` (Stopwatch-driven, eased + clamped) via `ISampler.Update`, then set `Current` and fire `OnThemeChanged`. |
 | `themeType == Current` | Aborted early — debug message "Invalid theme type, jumping to current theme." |
 | `themeType` not assignable to `ITheme` | Aborted early with the same debug message. |
-| Property without an interpolator | Falls back to a simple two-frame switch (`current` for every frame but the last, `target` for the last); `Jump`/`SetThemeValue` still set the final value. |
-| Target theme has no configured value for a property | `CalculateFrames` logs "No target value found" and skips that property for the transition. |
-| `steps <= 0` (zero-duration effect) | Clamped to `steps = 1`, so the theme still applies. |
+| Property without a sampleable | Falls back to a simple switch (the current value is held for the whole pass, the target value is written on the final sample); `Jump`/`SetThemeValue` still set the final value. |
+| Target theme has no configured value for a property | `PrepareSamplers` logs "No target value found" and skips that property for the transition. |
+| Zero-duration effect (`durationMs = 0`) | `rawT = 1` on the first sample, so every property is written directly to its target value; the theme still applies. |
 
-> Source references: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` (lines 83–106 `Transition`, 121–143 `Jump`, 153–407 `CalculateFrames`, 414–452 `ExecuteTransition`), `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`.
+> Source references: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` (`Transition`, `Jump`, `PrepareSamplers`, `ExecuteTransition`), `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`.

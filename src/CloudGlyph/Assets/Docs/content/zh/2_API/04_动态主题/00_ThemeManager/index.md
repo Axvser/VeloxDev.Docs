@@ -117,8 +117,8 @@ ThemeManager.Transition<Light>(TransitionEffects.Theme);
 
 **说明：**
 - 取消正在运行的过渡，清理失效的 `WeakReference`，然后对每个已注册对象调用 `ExecuteThemeChanging(old, new)`。
-- 预先计算所有插值帧（`CalculateFrames`），并逐帧应用（`ExecuteTransition`），持续整个效果的时长。
-- 最后一帧后，设置 `Current = themeType`，并对每个已注册对象调用 `ExecuteThemeChanged(old, new)`。
+- 准备每属性采样器（`PrepareSamplers`），并驱动 Stopwatch 采样循环（`ExecuteTransition`），持续整个效果的时长。
+- 最后一次采样后，设置 `Current = themeType`，并对每个已注册对象调用 `ExecuteThemeChanged(old, new)`。
 
 #### ThemeManager.Jump<T>
 
@@ -150,7 +150,7 @@ ThemeManager.Jump<Dark>();
 **异常：** 未声明 —— 无效的 `themeType` 会像 `Transition` 一样被忽略并输出调试信息。
 
 **说明：**
-- 使用单帧（steps = 1，deltaTime = 0），因此所有属性都直接设置为目标主题的值，无插值。切换前触发 `ExecuteThemeChanging`，切换后触发 `ExecuteThemeChanged`。
+- 运行零时长程（`durationMs = 0`），因此首次采样即 `rawT = 1`，所有属性都直接设置为目标主题的值，无插值。切换前触发 `ExecuteThemeChanging`，切换后触发 `ExecuteThemeChanged`。
 
 ---
 

@@ -117,8 +117,8 @@ ThemeManager.Transition<Light>(TransitionEffects.Theme);
 
 **Notes:**
 - Cancels any running transition, prunes dead `WeakReference`s, then calls `ExecuteThemeChanging(old, new)` on every registered object.
-- Pre-computes all interpolation frames (`CalculateFrames`) and applies them frame by frame (`ExecuteTransition`) over the effect's duration.
-- After the last frame, sets `Current = themeType` and calls `ExecuteThemeChanged(old, new)` on every registered object.
+- Prepares per-property samplers (`PrepareSamplers`) and drives a Stopwatch-based sampling loop (`ExecuteTransition`) over the effect's duration.
+- After the final sample, sets `Current = themeType` and calls `ExecuteThemeChanged(old, new)` on every registered object.
 
 #### ThemeManager.Jump<T>
 
@@ -150,7 +150,7 @@ ThemeManager.Jump<Dark>();
 **Exceptions:** none declared — an invalid `themeType` is ignored with the same debug message as `Transition`.
 
 **Notes:**
-- Uses a single frame (steps = 1, deltaTime = 0), so all properties are set directly to the target theme value without interpolation. Raises `ExecuteThemeChanging` before and `ExecuteThemeChanged` after.
+- Runs a zero-duration pass (`durationMs = 0`), so the first sample has `rawT = 1` and all properties are set directly to the target theme value without interpolation. Raises `ExecuteThemeChanging` before and `ExecuteThemeChanged` after.
 
 ---
 

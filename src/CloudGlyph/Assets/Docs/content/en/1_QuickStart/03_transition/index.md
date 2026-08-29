@@ -13,7 +13,7 @@ This guide gets you animating UI properties with the **Transition** feature — 
 - **Supported targets** (from `VeloxDev.Core.csproj`): `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0` — usable from .NET Framework 4.6.1+, .NET Core 3.0+ and .NET 5+.
 - **SDK / runtime:** a .NET SDK with Roslyn 4.x (5.0+); the demos target `net9.0` / `net10.0` — *tested* configurations.
 - **Package manager:** NuGet (dotnet CLI or Visual Studio).
-- **Required services:** a UI framework adapter (WPF / Avalonia / WinUI / MAUI / WinForms / Razor) for UI-thread animation and platform interpolators. **None required** for pure math interpolation on a POCO — `Eases`, `InterpolatorCore` / `IValueInterpolator` run in a plain console app.
+- **Required services:** a UI framework adapter (WPF / Avalonia / WinUI / MAUI / WinForms / Razor) for UI-thread animation and platform interpolators. **None required** for pure math interpolation on a POCO — `Eases`, `InterpolatorCore` / `ISampler` run in a plain console app.
 
 
 #### 2. Install / Add Dependency
@@ -180,7 +180,7 @@ The matching `.csproj` (from `dotnet new`):
 </Project>
 ```
 
-> **Note:** the Razor adapter adds a `string?` `Property` overload for animating CSS color strings (`"#ff7043"`, `rgb(...)`, named colors). WinForms animates `IInterpolable` + `Padding` + common numerics; MAUI animates MAUI types (`Brush`, `Shadow`, `PointF`, `RectF`, ...).
+> **Note:** the Razor adapter adds a `string?` `Property` overload for animating CSS color strings (`"#ff7043"`, `rgb(...)`, named colors). WinForms animates `Padding` + common numerics; MAUI animates MAUI types (`Brush`, `Shadow`, `PointF`, `RectF`, ...).
 
 #### 7. Run Declaration
 

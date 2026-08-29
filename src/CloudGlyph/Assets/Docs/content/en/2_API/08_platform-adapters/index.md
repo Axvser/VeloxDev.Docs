@@ -133,7 +133,7 @@ Each adapter provides `Interpolator`, `TransitionEffect`, `TransitionEffects`, `
 
 ### Class: `Interpolator`
 
-`Interpolator : InterpolatorCore<InterpolatorOutput[, TPriorityCore]>`. The static constructor registers platform types:
+`Interpolator : InterpolatorCore`. The static constructor registers platform types:
 
 | Adapter | Registered types (static ctor) |
 |---|---|
@@ -142,9 +142,9 @@ Each adapter provides `Interpolator`, `TransitionEffect`, `TransitionEffects`, `
 | WinUI | `Brush`, `Color`, `CornerRadius`, `GridLength`, `Point`, `Projection`, `Rect`, `Size`, `Thickness`, `Transform` |
 | MAUI | `Brush`, `Color`, `CornerRadius`, `Point`, `PointF`, `Rect`, `RectF`, `Shadow`, `Size`, `SizeF`, `Thickness`, `Transform` |
 | WinForms | `Padding` |
-| Razor | `string` → `StringInterpolator` |
+| Razor | `string` → `StringSampler` |
 
-The `Interpolators/*` folder holds one class per type (e.g. `BrushInterpolator`, `ThicknessInterpolator`, `TransformInterpolator`, `CornerRadiusInterpolator`, `PointInterpolator`, `ColorInterpolator`, `DropShadowEffectInterpolator`, `Point3DInterpolator`, `Vector3DInterpolator`, `SizeInterpolator`, `RectInterpolator`, `VectorInterpolator` for WPF). Interpolator classes for non-WPF platforms are source-verified to exist; the exact registration list is `*inferred*` from the type names plus the old wiki for Avalonia.
+The `Samplers/*` folder holds one `ISampleable, ISampler` class per type (e.g. `BrushSampler`, `ThicknessSampler`, `TransformSampler`, `CornerRadiusSampler`, `PointSampler`, `ColorSampler`, `DropShadowEffectSampler`, `Point3DSampler`, `Vector3DSampler`, `SizeSampler`, `RectSampler`, `VectorSampler` for WPF). Sampler classes for non-WPF platforms are source-verified to exist; the exact registration list is `*inferred*` from the type names plus the old wiki for Avalonia.
 
 ### Class: `TransitionEffect`
 
@@ -184,12 +184,12 @@ Each overload is `StateSnapshot Property(Expression<Func<T, X>>, X newValue, obj
 
 | Adapter | Extra overloads (beyond numerics + `System.Drawing.*` + `System.Numerics.*`) |
 |---|---|
-| WPF | `IInterpolable?`, `Brush?`, `Transform?`, `Point`, `CornerRadius`, `Thickness`, `Size`, `Rect`, `Vector`, `Color`, `DropShadowEffect?`, `Point3D`, `Vector3D` |
-| Avalonia | `IInterpolable?`, `ITransform?`, `IBrush?`, `Thickness`, `Point`, `CornerRadius`, `Size`, `PixelPoint`, `PixelSize`, `PixelRect`, `RelativePoint`, `RelativeRect`, `Color`, `BoxShadows` |
-| WinUI | `IInterpolable?`, `Brush?`, `Transform?`, `Point`, `CornerRadius`, `Thickness`, `Projection?`, `Size`, `Rect`, `GridLength`, `Color` |
-| MAUI | `IInterpolable?`, `Brush?`, `Transform?`, `Point`, `PointF`, `CornerRadius`, `Thickness`, `Color?`, `Size`, `SizeF`, `Rect`, `RectF`, `Shadow?` |
-| WinForms | `IInterpolable?`, `Padding` |
-| Razor | `string?` (no `IInterpolable?`) |
+| WPF | `Brush?`, `Transform?`, `Point`, `CornerRadius`, `Thickness`, `Size`, `Rect`, `Vector`, `Color`, `DropShadowEffect?`, `Point3D`, `Vector3D` |
+| Avalonia | `ITransform?`, `IBrush?`, `Thickness`, `Point`, `CornerRadius`, `Size`, `PixelPoint`, `PixelSize`, `PixelRect`, `RelativePoint`, `RelativeRect`, `Color`, `BoxShadows` |
+| WinUI | `Brush?`, `Transform?`, `Point`, `CornerRadius`, `Thickness`, `Projection?`, `Size`, `Rect`, `GridLength`, `Color` |
+| MAUI | `Brush?`, `Transform?`, `Point`, `PointF`, `CornerRadius`, `Thickness`, `Color?`, `Size`, `SizeF`, `Rect`, `RectF`, `Shadow?` |
+| WinForms | `Padding` |
+| Razor | `string?` |
 
 ## Namespace: `VeloxDev.DynamicTheme` (per-platform)
 

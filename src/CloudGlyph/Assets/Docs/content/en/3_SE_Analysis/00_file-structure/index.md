@@ -72,8 +72,8 @@ VeloxDev.Avalonia/
 │   ├── WorkflowMinimapOverlay.cs
 │   └── IWorkflowGridDecorator.cs / IWorkflowMinimapOverlay.cs
 ├── PlatformAdapters/                ← Transition/Theme platform wiring
-│   ├── Interpolator.cs / InterpolatorOutput.cs
-│   ├── Interpolators/               ← per-type interpolators (IBrush, ITransform, BoxShadows, ...)
+│   ├── Interpolator.cs
+│   ├── Samplers/                    ← per-type samplers (+ FrameUpdaters/ for in-place WPF/Jalium)
 │   ├── Transition.cs / TransitionScheduler.cs / TransitionInterpreter.cs
 │   ├── TransitionEffect.cs / TransitionEffects.cs / State.cs
 │   ├── ThemeValueConverters.cs

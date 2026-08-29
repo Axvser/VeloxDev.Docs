@@ -60,11 +60,11 @@ classDiagram
         <<abstract>>
         +NativeInterpolators dict
         +TryGetInterpolator(type, out) bool
-        +RegisterInterpolator(type, interp) bool
+        +RegisterInterpolator(type, sampleable) bool
     }
     class ITransitionEffectCore {
         <<interface>>
-        +FPS int
+        +FPS int (最大采样率上限)
         +Duration TimeSpan
         +Ease IEaseCalculator
     }
@@ -73,7 +73,7 @@ classDiagram
     ITheme <|.. Light
     ThemeManager --> IThemeObject : Register / 通知
     ThemeManager --> ThemeCache : 读取值
-    ThemeManager --> InterpolatorCore : 插值帧
+    ThemeManager --> InterpolatorCore : 解析采样器
     ThemeManager --> ITransitionEffectCore : 驱动动画
     IThemeValueConverter <|.. BrushConverter
     IThemeValueConverter <|.. ObjectConverter
@@ -90,7 +90,7 @@ classDiagram
 | 观察者（Observer） | `IThemeObject`（生成） | `ThemeManager.Transition(Type, effect)` 遍历已注册的 `IThemeObject`，动画前调用 `ExecuteThemeChanging(old, new)`，动画后调用 `ExecuteThemeChanged(old, new)`。生成实现转发给用户的 `partial void OnThemeChanging` / `partial void OnThemeChanged`。 |
 | 模板方法（Template Method） | 源生成的 `IThemeObject` | `InitializeTheme()` 是固定算法（在 `ThemeCache` 注册类型 → `ThemeManager.Register(this)` → 应用当前主题值）；用户仅通过 `[ThemeConfig]` 提供各属性值。生成器产生 `virtual`/`partial` 钩子（`OnThemeChanging`、`OnThemeChanged`），使基类可扩展。 |
 | 策略（Strategy） | `StartModel` | `ThemeManager.StartModel`（`Reflect` 或 `Cache`）选择解析每个属性动画**起始值**的方式 —— 反射读取实时属性值，或使用当前主题的缓存值。 |
-| 策略 / 转换器（Strategy / Converter） | `IThemeValueConverter` | `Convert(Type, string, object?[])` 把原始字符串/数值参数适配为平台类型（`Brush`、`Thickness`...）。`Eases.*` 返回 `IEaseCalculator` 策略（`Sine`、`Quad`、`Bounce`...），用于 `CalculateFrames` 塑造插值曲线。 |
+| 策略 / 转换器（Strategy / Converter） | `IThemeValueConverter` | `Convert(Type, string, object?[])` 把原始字符串/数值参数适配为平台类型（`Brush`、`Thickness`...）。`Eases.*` 返回 `IEaseCalculator` 策略（`Sine`、`Quad`、`Bounce`...）；`ThemeManager.PrepareSamplers` 解析 `ISampleable` 并 `Normalize` 得到 `ISampler`，由 `ExecuteTransition` 在每个采样点调用 `sampler.Update(...)` 并先缓动归一化时间。 |
 | 注册表（弱引用） | `ThemeManager` + `ThemeCache` | `ThemeManager` 以 `ConditionalWeakTable` + `List<WeakReference<IThemeObject>>` 维护活跃实例（每次过渡时清理失效项）；`ThemeCache` 用 `ConditionalWeakTable<IThemeObject, InstanceCache>` 保存按实例覆盖 —— 无强引用，注册永不泄漏。 |
 | 适配器（Adapter） | 平台适配器 | `Interpolator`、`TransitionEffect` 与值转换器是核心契约（`InterpolatorCore`、`ITransitionEffectCore`、`IThemeValueConverter`）的适配器实现，使核心引擎保持 GUI 无关。 |
 | 缓存（Cache） | `ThemeCache` | 以声明类型为键的单一全局存储，消除了按类生成的静态字典；查找时沿继承链收集。 |
@@ -103,7 +103,7 @@ classDiagram
 // Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs (Transition)
 foreach (var themeObject in actives)
     themeObject?.ExecuteThemeChanging(current, themeType);
-await ExecuteTransition(CalculateFrames(actives, steps, effect.Ease, themeType), deltaTime, themeType);
+await ExecuteTransition(PrepareSamplers(actives, themeType), effect.Ease, effect.Duration.TotalMilliseconds, themeType);
 foreach (var themeObject in actives)
     themeObject?.ExecuteThemeChanged(current, themeType);
 ```
@@ -123,7 +123,7 @@ var actives = activeThemes.Select(x => x.TryGetTarget(out var obj) ? obj : null)
 ### 策略（StartModel 起始值）
 
 ```csharp
-// Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs (CalculateFrames)
+// Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs (PrepareSamplers)
 switch (StartModel)
 {
     case StartModel.Reflect:

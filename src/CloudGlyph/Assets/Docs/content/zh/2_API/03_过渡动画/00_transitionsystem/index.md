@@ -1,29 +1,28 @@
 # Transition — 命名空间：`VeloxDev.TransitionSystem`
 
-### 接口：`IInterpolable`
+### 接口：`ISampler`
 
 ```csharp
-public interface IInterpolable
+public interface ISampler
 {
-    List<object?> Interpolate(object? start, object? end, int steps, object? options = null);
+    void Update(object target, ITransitionProperty property, object? start, object? end, object? options, double t);
 }
 ```
 
-**返回：** `List<object?>` — `steps` 帧的中间值。
-**说明：** 在值类型上实现此接口即可使其可动画，而无需注册插值器。引擎会作为回退先检查当前值上的实现，再检查新值上的实现。
-**验证依据：** `NativeInterpolatorsExtendedTests`（测试用 `TestStringInterpolator` 实现 `IValueInterpolator`）；适配器的 `Property(Expression<Func<T, IInterpolable?>>, ...)` 重载接受它。
+**说明：** 无状态、线程安全的共享单例采样处理器：不返回值，直接更新属性。语义：`t <= 0` 写精确 `start`；`t >= 1` 写精确 `end`；`0 < t < 1` 时值类型算好即赋、引用类型**原地修改** `start` 现有实例（不 new）。取代 `IValueInterpolator`/`IInterpolable`/`IInPlaceSampler`/`IFrameUpdater`。`options` 仍携带 `RotationDirection` 供角度采样器使用。
+**验证依据：** `InterpolatorCoreTests`（`RegisterInterpolator_And_TryGet_Succeeds`、`RegisterInterpolator_ForCustomType_Succeeds`）、`NativeSamplersTests`、`NativeSamplersExtendedTests`。
 
-### 接口：`IValueInterpolator`
+### 接口：`ISampleable`
 
 ```csharp
-public interface IValueInterpolator
+public interface ISampleable
 {
-    List<object?> Interpolate(object? start, object? end, int steps, object? options = null);
+    ISampler Normalize(object? start, object? end, object? options);
 }
 ```
 
-**说明：** 实现此接口可通过 `InterpolatorCore.RegisterInterpolator` 注册自定义类型支持。`options` 携带 `RotationDirection` 供角度插值器使用。
-**验证依据：** `InterpolatorCoreTests`（`RegisterInterpolator_And_TryGet_Succeeds`、`RegisterInterpolator_ForCustomType_Succeeds`）、`NativeInterpolatorsTests`。
+**说明：** 可采样定义（类型级）：用户自定义类型实现它即可直接用于动画，无需注册采样器。`Normalize` 归一化 start/end/options——解释器创建并知晓 `FrameState` 时对每个动画属性调用一次，返回该类型的无状态 `ISampler`；`start` 为 target 上的现值（引用类型即现有实例，供原地修改），`end` 为目标值。取代 `IInPlaceSampler`/`IFrameUpdater`/`IFrameUpdaterProducer`（引用类型的原地修改逻辑现在在各自 `ISampler.Update` 内）。
+**验证依据：** `InterpolatorCoreTests`、`SamplingLoopTests`。
 
 ### 接口：`IEaseCalculator`
 
@@ -58,17 +57,17 @@ public interface IEaseCalculator
 | 成员 | 类型 |
 |---|---|
 | `Values` | `ConcurrentDictionary<ITransitionProperty, object?>` |
-| `Interpolators` | `ConcurrentDictionary<ITransitionProperty, IValueInterpolator>` |
+| `Interpolators` | `ConcurrentDictionary<ITransitionProperty, ISampleable>` |
 | `Options` | `ConcurrentDictionary<ITransitionProperty, object?>` |
 
-另有强类型访问器：`SetValue`、`TryGetValue`、`SetInterpolator`、`TryGetInterpolator`、`SetOptions`、`TryGetOptions` —— 每种都有三种重载族（表达式 lambda / `ITransitionProperty` / `PropertyInfo`），以及 `IFrameState Clone()`。
+另有强类型访问器：`SetValue`、`TryGetValue`、`SetInterpolator`、`TryGetInterpolator`、`SetOptions`、`TryGetOptions` —— 每种都有三种重载族（表达式 lambda / `ITransitionProperty` / `PropertyInfo`），以及 `IFrameState Clone()`。`SetInterpolator`/`TryGetInterpolator` 重载接受/返回 `ISampleable`。
 **验证依据：** `StateCoreTests`（`SetValue_Expression_CanRetrieve`、`Clone_ReturnsIndependentCopy`）。
 
 ### 接口：`ITransitionEffectCore`
 
 | 成员 | 类型 / 签名 |
 |---|---|
-| `FPS` | `int FPS { get; set; }`（默认 60） |
+| `FPS` | `int FPS { get; set; }`（默认 60）——最大采样率上限（yield 间隔 = `1000 / FPS` ms）；计时为 Stopwatch 连续采样——FPS 只限制采样频率，不是帧网格 |
 | `Duration` | `TimeSpan Duration { get; set; }` |
 | `IsAutoReverse` | `bool IsAutoReverse { get; set; }` |
 | `LoopTime` | `int LoopTime { get; set; }`（`int.MaxValue` = 无限） |
@@ -88,7 +87,7 @@ public interface IEaseCalculator
 ```csharp
 public interface ITransitionSchedulerCore
 {
-    Task Execute(IFrameInterpolatorCore interpolator, IFrameState state, ITransitionEffectCore effect, CancellationTokenSource? externCts = default);
+    Task Execute(InterpolatorCore producer, IFrameState state, ITransitionEffectCore effect, CancellationTokenSource? externCts = default);
     void Exit();
 }
 ```
@@ -101,7 +100,7 @@ public interface ITransitionSchedulerCore
 public interface ITransitionInterpreterCore : IDisposable
 {
     TransitionEventArgs Args { get; set; }
-    Task Execute(object target, IFrameSequenceCore frameSequence, ITransitionEffectCore effect, CancellationTokenSource cts);
+    Task Execute(object target, SamplerSet samplerSet, ITransitionEffectCore effect, CancellationTokenSource cts);
     void Exit();
 }
 ```
@@ -114,20 +113,15 @@ public interface ITransitionInterpreterCore : IDisposable
 | `IsUIThread` | `bool IsUIThread()` |
 | `ProtectedInvoke` | `abstract void ProtectedInvoke(object target, Action action, object? priority = default)` |
 | `ProtectedGetValue` | `object? ProtectedGetValue(object target, ITransitionProperty property)` |
-| `ProtectedInterpolate` | `abstract List<object?> ProtectedInterpolate(object target, Func<List<object?>> interpolate)` |
 
 **说明：** 类型化变体 `IUIThreadInspector` 与 `IUIThreadInspector<TPriorityCore>` 增加 `ProtectedInvoke(object, Action)` / `ProtectedInvoke(object, Action, TPriorityCore)`。
 
-### 接口家族（帧泵）
+### 接口家族（采样器）
 
 | 接口 | 关键成员 |
 |---|---|
-| `IFrameInterpolatorCore` | `IFrameSequenceCore Interpolate(object target, IFrameState state, ITransitionEffectCore effect, IUIThreadInspectorCore inspector)` |
-| `IFrameInterpolator : IFrameInterpolatorCore` | `IFrameSequence Interpolate(..., ITransitionEffectCore, IUIThreadInspector)` |
-| `IFrameInterpolator<TPriorityCore> : IFrameInterpolatorCore` | `IFrameSequence<TPriorityCore> Interpolate(..., ITransitionEffect<TPriorityCore>, IUIThreadInspector<TPriorityCore>)` |
-| `IFrameSequenceCore` | `int Count`；`SetValues(target, frameIndex)`；`Update(target, frameIndex, object? priority = default)`；`AddPropertyInterpolations(property, objects)`；`SetCount(count)` |
-| `IFrameSequence : IFrameSequenceCore` | `Update(target, frameIndex)` |
-| `IFrameSequence<TPriorityCore> : IFrameSequenceCore` | `Update(target, frameIndex, TPriorityCore priority)` |
+| `ISampler` | `void Update(object target, ITransitionProperty property, object? start, object? end, object? options, double t)` |
+| `ISampleable` | `ISampler Normalize(object? start, object? end, object? options)` |
 
 ### 枚举：`RotationDirection`
 
@@ -142,7 +136,7 @@ public enum RotationDirection
 }
 ```
 
-**说明：** 作为 `.Property(lambda, value, options)` 的 `interpolationOptions` 传入，用于引导角度插值方向。`DoubleInterpolator` 与 `QuaternionInterpolator` 都会遵循它（`QuaternionInterpolator` 通过取反 `q2` 强制方向）。
+**说明：** 作为 `.Property(lambda, value, options)` 的 `interpolationOptions` 传入，用于引导角度采样方向。`DoubleSampler` 与 `QuaternionSampler` 都会遵循它（`QuaternionSampler` 通过取反 `q2` 强制方向）。
 **验证依据：** WPF 示例 `Animation1` 传入 `RotationDirection.CounterClockWise`。
 
 ### 静态类：`Eases`

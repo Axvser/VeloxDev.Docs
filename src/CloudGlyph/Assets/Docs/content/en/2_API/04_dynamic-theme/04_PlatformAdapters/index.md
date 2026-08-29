@@ -8,10 +8,10 @@ The platform adapters (`VeloxDev.WPF` / `VeloxDev.Avalonia`) provide the concret
 
 ### Class: `Interpolator` (adapter)
 
-WPF: `public class Interpolator : InterpolatorCore<InterpolatorOutput, DispatcherPriority>`
-Avalonia: `public class Interpolator : InterpolatorCore<InterpolatorOutput, DispatcherPriority>`
+WPF: `public class Interpolator : InterpolatorCore`
+Avalonia: `public class Interpolator : InterpolatorCore`
 
-The static constructor registers platform value interpolators:
+The adapter `Interpolator` extends the non-generic `InterpolatorCore` (the generic `InterpolatorCore<InterpolatorOutput, DispatcherPriority>` tiers were removed with the frame-sequence model). The static constructor registers platform samplers:
 
 | Adapter | Registered property types |
 |---|---|
@@ -19,6 +19,7 @@ The static constructor registers platform value interpolators:
 | Avalonia (`VeloxDev.Avalonia`) | `IBrush`, `ITransform`, `Thickness`, `Point`, `CornerRadius`, `Size`, `PixelPoint`, `PixelSize`, `PixelRect`, `RelativePoint`, `RelativeRect`, `Color`, `BoxShadows`, `GridLength` |
 
 **Notes:**
+- Each registered type maps to an `ISampleable, ISampler` implementation (e.g. `BrushSampler`, `ThicknessSampler`) in `NativeInterpolators` (`ConcurrentDictionary<Type, ISampleable>`).
 - This is the instance passed to `ThemeManager.SetPlatformInterpolator<T>(T)`.
 
 ### Class: `TransitionEffect`

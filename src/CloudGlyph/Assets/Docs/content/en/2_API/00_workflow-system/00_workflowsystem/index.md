@@ -162,9 +162,9 @@ Events: `SlotAdded` / `SlotRemoved` (`EventHandler<IWorkflowSlotViewModel>`).
 
 | Type | Description |
 |---|---|
-| `Anchor(left, top, layer)` | Position; `ICloneable`, `IEquatable<Anchor>`, `IInterpolable`; `==`/`!=`/`+`/`-` operators |
-| `Size(width, height)` | Dimensions; `ICloneable`, `IEquatable<Size>`, `IInterpolable` |
-| `Offset(left, top)` | Delta vector; `ICloneable`, `IEquatable<Offset>`, `IInterpolable` |
+| `Anchor(left, top, layer)` | Position; `ICloneable`, `IEquatable<Anchor>`, `ISampleable`, `ISampler` (`Update` mutates the live `start` instance in place); `==`/`!=`/`+`/`-` operators |
+| `Size(width, height)` | Dimensions; `ICloneable`, `IEquatable<Size>`, `ISampleable`, `ISampler` (`Update` mutates the live `start` instance in place) |
+| `Offset(left, top)` | Delta vector; `ICloneable`, `IEquatable<Offset>`, `ISampleable`, `ISampler` (`Update` mutates the live `start` instance in place) |
 | `Viewport(left, top, width, height)` | `readonly struct`; `Empty`, `Right`, `Bottom`, `IsEmpty`, `Contains`, `IntersectsWith`, `Union`, `==`/`!=` |
 | `CanvasLayout` | `OriginSize`, `PositiveOffset`, `NegativeOffset`, `ActualSize`, `ActualOffset`, `ViewportOffset`; `AdaptTo(Size)`; `UpdateCommand` |
 | `CellKey(x, y)` | `readonly struct` grid cell coordinate; `==`/`!=` |

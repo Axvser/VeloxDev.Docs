@@ -1,6 +1,6 @@
 # Complexity Analysis — Dynamic Theme
 
-Let $N$ = number of registered theme-aware objects, $P$ = number of themed properties per object, $S$ = number of interpolation frames for a transition, $T$ = number of registered types, and $K$ = number of themes.
+Let $N$ = number of registered theme-aware objects, $P$ = number of themed properties per object, $T$ = number of registered types, and $K$ = number of themes. (Sampling is continuous/Stopwatch-driven, so there is no pre-computed frame count $S$.)
 
 ## Core Operations
 
@@ -26,25 +26,19 @@ $$O(1) \quad \text{per call}$$
 
 ### Animated switch (`Transition<T>`)
 
-$$O(N \cdot P \cdot S)$$
+$$O(N \cdot P) \text{ preparation} \quad + \quad O(N \cdot P) \text{ per sample}$$
 
-For each of the $N$ objects, for each of its $P$ properties, `CalculateFrames` produces $S$ frames:
+For each of the $N$ objects, for each of its $P$ properties, `PrepareSamplers` resolves an `ISampleable` (`InterpolatorCore.TryGetInterpolator` → self-`ISampleable` → null), calls `Normalize`, and captures current/target values — $O(1)$ per property, **no frame list is built**. `ExecuteTransition` then runs a Stopwatch-driven sampling loop:
 
-$$S = \max\left(1,\; \left\lfloor \frac{\text{Duration} \times FPS}{1000} \right\rfloor\right)$$
-
-- Frame pre-computation per property: $O(S)$ (one interpolate + one eased evaluation per frame).
-- Frame application: $S$ sequential `Task.Delay(deltaTime)` steps, each invoking one queued action that applies `PropertyInfo.SetValue` once per property — **wall-clock** $O(S \cdot \Delta t)$, i.e. bounded by `Duration`.
-- Temporary memory for the pre-computed frame queue and per-property frame arrays: $O(N \cdot P \cdot S)$.
-
-Example with `TransitionEffects.Theme` ($FPS = 60$, $Duration = 0.46s$):
-
-$$S = \left\lfloor \frac{460 \times 60}{1000} \right\rfloor = 27 \quad \text{frames per property}$$
+- Per-sample work: $O(N \cdot P)$ — one `ISampler.Update` (or a held current value) per property.
+- The sample count is **not** `FPS`-derived: it is `elapsed / duration`, throttled by a coarse yield interval capped at `1000 / FPS` ms (a yield, not a timing source), so a pass issues at most ~`FPS` samples per second — **wall-clock** bounded by `Duration`. `FPS` is the maximum sample-rate cap.
+- Temporary memory for the prepared entries: $O(N \cdot P)$ (each holds target / property / sampler / current / targetValue).
 
 ### Instant switch (`Jump<T>`)
 
 $$O(N \cdot P)$$
 
-No interpolation; `steps = 1`, `deltaTime = 0`. Each property is set directly to its target value.
+No sampling beyond the endpoint; `ExecuteTransition` runs with `durationMs = 0`, so the first sample has `rawT = 1` and each property is written directly to its target value.
 
 ### Runtime override (`SetThemeValue<T>`)
 
@@ -59,14 +53,14 @@ Writes one override entry into the instance's active cache (`InstanceCache.Overr
 | Static theme cache (per registered type) | $O(T \cdot P \cdot K)$ | `ThemeCache._staticCache`, keyed by declaring type; holds one value per property per theme. |
 | Active instance overrides | $O(N \cdot P)$ | `ConditionalWeakTable<IThemeObject, InstanceCache>` — weak-keyed, no leaks. |
 | `ThemeManager` live-instance list | $O(N)$ | `List<WeakReference<IThemeObject>>`; dead entries pruned on each transition ($O(N)$). |
-| Transition frame buffers | $O(N \cdot P \cdot S)$ | Temporary during a transition; freed after `ExecuteTransition` completes. |
+| Prepared sampler entries | $O(N \cdot P)$ | Temporary during a transition; freed after `ExecuteTransition` completes. |
 | Converter registry | $O(C)$ | `Dictionary<string, IThemeValueConverter>`, $C$ = registered converters. |
 
 ## Lookup Cost of Supporting Structures
 
 | Operation | Complexity |
 |---|---|
-| Interpolator registry lookup (`InterpolatorCore.NativeInterpolators`) | $O(1)$ — `ConcurrentDictionary<Type, IValueInterpolator>` |
+| Interpolator registry lookup (`InterpolatorCore.NativeInterpolators`) | $O(1)$ — `ConcurrentDictionary<Type, ISampleable>` |
 | Converter lookup by key (`ThemeCache.GetConverter`) | $O(1)$ — `Dictionary<string, IThemeValueConverter>` |
 | `StartModel.Cache` start-value read | $O(1)$ — active cache then static dictionary |
 | `StartModel.Reflect` start-value read | $O(1)$ per property via `PropertyInfo.GetValue` — $O(P)$ per object per transition |
@@ -76,4 +70,4 @@ Writes one override entry into the instance's active cache (`InstanceCache.Overr
 - `StartModel.Cache` avoids reflection during animation start; `StartModel.Reflect` reads the live property value via `PropertyInfo.GetValue` — negligible per property, but $O(P)$ per object per transition.
 - The weak-reference design means a registered object that is otherwise unreachable is collected (and pruned at the next transition), so long-running editors do not accumulate theme registrations.
 
-> Source references: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` (lines 83–106 `Transition`, 121–143 `Jump`, 153–407 `CalculateFrames`, 414–452 `ExecuteTransition`), `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`.
+> Source references: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` (`Transition`, `Jump`, `PrepareSamplers`, `ExecuteTransition`), `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`.

@@ -34,18 +34,20 @@ classDiagram
         <<abstract>>
         +NativeInterpolators dict
         +TryGetInterpolator(type, out) bool
-        +RegisterInterpolator(type, i) bool
-        +Interpolate(target, state, effect, inspector) IFrameSequenceCore
+        +RegisterInterpolator(type, sampleable) bool
+        +Prepare(target, state, effect, inspector) SamplerSet
     }
-    class IValueInterpolator {
+    class ISampleable {
         <<interface>>
-        +Interpolate(start, end, steps, options) List
+        +Normalize(start, end, options) ISampler
     }
-    class IFrameSequenceCore {
+    class ISampler {
         <<interface>>
-        +Count int
-        +Update(target, frameIndex, priority) void
-        +SetValues(target, frameIndex) void
+        +Update(target, property, start, end, options, t) void
+    }
+    class SamplerSet {
+        +Apply(target, t, priority) void
+        +CanSetValue() bool
     }
     class TransitionEffectCore {
         +FPS int
@@ -66,20 +68,17 @@ classDiagram
         +MutualSchedulers ConditionalWeakTable
         +NoMutualSchedulers ConditionalWeakTable
         +FindOrCreate(source, CanMutualTask) IScheduler
+        +Execute(producer, state, effect, cts) Task
         +Exit() void
     }
     class TransitionInterpreterCore {
         <<abstract>>
-        +Execute(target, frames, effect, cts) Task
+        +Execute(target, samplerSet, effect, cts) Task
         +Exit() void
-    }
-    class InterpolatorOutputBase {
-        +Frames dict
-        +Update(target, index, priority) void
-        +SetValues(target, index) void
     }
     class UIThreadInspectorCore {
         <<abstract>>
+        +IsAppAlive() bool
         +IsUIThread() bool
         +ProtectedInvoke(target, action, priority) void
         +ProtectedGetValue(target, property) object
@@ -89,14 +88,13 @@ classDiagram
     StateSnapshotCore~T,State,Effect,Interpolator,Inspector,Interpreter~ --> StateCore
     StateCore --> TransitionProperty
     TransitionSchedulerCore --> TransitionInterpreterCore
-    TransitionInterpreterCore --> InterpolatorOutputBase
+    TransitionInterpreterCore --> SamplerSet
     TransitionInterpreterCore --> TransitionEffectCore
     TransitionEffectCore --> Eases
-    InterpolatorCore ..> IFrameSequenceCore : produces
-    InterpolatorOutputBase ..|> IFrameSequenceCore : implements
-    InterpolatorOutputBase --> IValueInterpolator
-    InterpolatorOutputBase --> UIThreadInspectorCore
-    InterpolatorCore --> IValueInterpolator
+    InterpolatorCore ..> ISampleable : registry
+    ISampleable --> ISampler : Normalize
+    SamplerSet --> ISampler : drives
+    SamplerSet --> UIThreadInspectorCore
 ```
 
 ## Patterns Identified
@@ -122,15 +120,15 @@ private static readonly Transition<Rectangle>.StateSnapshot Animation0 =
 
 ### 2. Registry Pattern (`InterpolatorCore`)
 
-A global `ConcurrentDictionary<Type, IValueInterpolator>` (`NativeInterpolators`) plus `RegisterInterpolator`/`TryGetInterpolator`/`UnregisterInterpolator`. Resolution order in `Interpolate`: per-property custom interpolator → registry → `IInterpolable` on the current/new value. `RegisterInterpolator` uses atomic `AddOrUpdate` (last-writer-wins, no lost updates).
+A global `ConcurrentDictionary<Type, ISampleable>` (`NativeInterpolators`) plus `RegisterInterpolator`/`TryGetInterpolator`/`UnregisterInterpolator`. Resolution order in `Prepare`: per-property custom sampler (`state.Interpolators`) → registry → the value IS `ISampleable`. `RegisterInterpolator` uses atomic `AddOrUpdate` (last-writer-wins, no lost updates).
 
-### 3. Strategy Pattern (easing + interpolators)
+### 3. Strategy Pattern (easing + samplers)
 
-`IEaseCalculator.Ease(double t)` strategies come from `Eases.*` (`Sine`, `Quad`, `Bounce`, ...). `IValueInterpolator.Interpolate(...)` strategies map a value type to a frame list (e.g. `ColorInterpolator`, `QuaternionInterpolator`). Easing is applied by **re-indexing** the pre-computed frame array (`GetEaseIndex` maps eased `t` → frame index), not re-evaluating values per frame.
+`IEaseCalculator.Ease(double t)` strategies come from `Eases.*` (`Sine`, `Quad`, `Bounce`, ...). `ISampler.Update(target, property, start, end, options, t)` strategies write the property at a normalized time (e.g. `DoubleSampler`, `ColorSampler`, `QuaternionSampler`). Easing is applied by the interpreter **before** sampling: it eases and clamps the normalized time to `easedT ∈ [0,1]` and then asks the sampler to update the property — there is no pre-computed frame array to re-index.
 
 ### 4. Template Method Pattern (core engine)
 
-The core classes (`StateSnapshotCore` 6/7-generic arities, `InterpolatorCore<TOutputCore[, TPriorityCore]>`, `TransitionSchedulerCore<TUIThreadInspector, TTransitionInterpreter[, TPriorityCore]>`, `TransitionInterpreterCore<TOutputCore, TEffectCore[, TPriorityCore]>`, `InterpolatorOutputCore<TUIThreadInspector[, TPriorityCore]>`, `UIThreadInspectorCore<TPriorityCore>`) define the algorithm skeleton; each **adapter** provides concrete subclasses for its platform (`TransitionEffect` priority, `Interpolator` registrations, `UIThreadInspector` marshalling).
+The core classes (`StateSnapshotCore` 6/7-generic arities, the non-generic `InterpolatorCore`, `TransitionSchedulerCore<TUIThreadInspector, TTransitionInterpreter[, TPriorityCore]>`, `TransitionInterpreterCore<TEffectCore[, TPriorityCore]>`, `UIThreadInspectorCore<TPriorityCore>`) define the algorithm skeleton; each **adapter** provides concrete subclasses for its platform (`TransitionEffect` priority, `Interpolator` sampler registrations, `UIThreadInspector` marshalling).
 
 ### 5. Proxy / Adapter Pattern (platform adapters)
 
@@ -146,15 +144,15 @@ The core classes (`StateSnapshotCore` 6/7-generic arities, `InterpolatorCore<TOu
 
 ### 8. Observer Pattern (effect lifecycle events)
 
-`TransitionEffectCore` exposes `Awaked/Start/Update/LateUpdate/Canceled/Completed/Finally` events backed by `WeakDelegate` (leak-free); `TransitionInterpreterCore` invokes them around each frame and at completion/cancellation.
+`TransitionEffectCore` exposes `Awaked/Start/Update/LateUpdate/Canceled/Completed/Finally` events backed by `WeakDelegate` (leak-free); `TransitionInterpreterCore` invokes them around each sample and at completion/cancellation.
 
 ## Pattern Summary
 
 | Pattern | Where it appears | Role |
 |---|---|---|
 | Fluent Builder | `StateSnapshotCore` chain | Describe a target state + timing without mutable config objects |
-| Registry | `InterpolatorCore.NativeInterpolators` | Map a type to an `IValueInterpolator` at runtime |
-| Strategy | `IEaseCalculator`/`Eases`, `IValueInterpolator` | Swap easing curves and value interpolation without changing the engine |
+| Registry | `InterpolatorCore.NativeInterpolators` | Map a type to an `ISampleable` at runtime |
+| Strategy | `IEaseCalculator`/`Eases`, `ISampler` | Swap easing curves and value interpolation without changing the engine |
 | Template Method | `InterpolatorCore`, `TransitionSchedulerCore`, `TransitionInterpreterCore`, `UIThreadInspectorCore` | Fix the algorithm skeleton; let adapters fill in platform specifics |
 | Adapter / Proxy | `UIThreadInspector` per platform | Hide dispatcher differences behind one interface |
 | Scheduler + CWT cache | `TransitionSchedulerCore` mutual/non-mutual tables | One serialized animation per target; no leaks |

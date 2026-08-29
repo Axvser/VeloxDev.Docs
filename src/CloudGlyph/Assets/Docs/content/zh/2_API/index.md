@@ -7,7 +7,7 @@
 | [00 工作流系统](00_工作流系统) | `VeloxDev.WorkflowSystem`、`.StandardEx`、`VeloxDev.Core.WorkflowSystem.CompilerEx`、`VeloxDev.MVVM.Serialization` |
 | [01 工作流代理](01_工作流代理) | `VeloxDev.AI`、`VeloxDev.AI.Workflow`、`VeloxDev.AI.Workflow.Functions`、`VeloxDev.AI.MCP` |
 | [02 MVVM](02_MVVM) | `VeloxDev.MVVM`、`VeloxDev.Generators` |
-| [03 过渡动画](03_过渡动画) | `VeloxDev.TransitionSystem`、`.Abstractions`、`.NativeInterpolators`、`VeloxDev.TimeLine` |
+| [03 过渡动画](03_过渡动画) | `VeloxDev.TransitionSystem`、`.Abstractions`、`.NativeSamplers`、`VeloxDev.TimeLine` |
 | [04 动态主题](04_动态主题) | `VeloxDev.DynamicTheme`、`VeloxDev.TransitionSystem` |
 | [05 AOP](05_AOP) | `VeloxDev.AspectOriented` |
 | [06 MonoBehaviour](06_MonoBehaviour) | `VeloxDev.TimeLine`、`VeloxDev.MonoBehaviour` |

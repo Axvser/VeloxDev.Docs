@@ -60,11 +60,19 @@ classDiagram
         <<abstract>>
         +NativeInterpolators dict
         +TryGetInterpolator(type, out) bool
-        +RegisterInterpolator(type, interp) bool
+        +RegisterInterpolator(type, sampleable) bool
+    }
+    class ISampleable {
+        <<interface>>
+        +Normalize(start, end, options) ISampler
+    }
+    class ISampler {
+        <<interface>>
+        +Update(target, property, start, end, options, t) void
     }
     class ITransitionEffectCore {
         <<interface>>
-        +FPS int
+        +FPS int (max sample-rate cap)
         +Duration TimeSpan
         +Ease IEaseCalculator
     }
@@ -73,7 +81,9 @@ classDiagram
     ITheme <|.. Light
     ThemeManager --> IThemeObject : Register / notify
     ThemeManager --> ThemeCache : read values
-    ThemeManager --> InterpolatorCore : interpolate frames
+    ThemeManager --> InterpolatorCore : resolve ISampleable
+    ThemeManager --> ISampleable : Normalize
+    ThemeManager --> ISampler : Update per sample
     ThemeManager --> ITransitionEffectCore : drive animation
     IThemeValueConverter <|.. BrushConverter
     IThemeValueConverter <|.. ObjectConverter
@@ -90,7 +100,7 @@ classDiagram
 | Observer | `IThemeObject` (generated) | `ThemeManager.Transition(Type, effect)` iterates registered `IThemeObject`s, calling `ExecuteThemeChanging(old, new)` before the animation and `ExecuteThemeChanged(old, new)` after. The generated implementation forwards to the user's `partial void OnThemeChanging` / `partial void OnThemeChanged`. |
 | Template Method | source-generated `IThemeObject` | `InitializeTheme()` is a fixed algorithm (register type in `ThemeCache` → `ThemeManager.Register(this)` → apply current theme values); the user plugs in only per-property values via `[ThemeConfig]`. The generator emits `virtual`/`partial` hooks (`OnThemeChanging`, `OnThemeChanged`) so base classes can extend it. |
 | Strategy | `StartModel` | `ThemeManager.StartModel` (`Reflect` vs `Cache`) selects how each property's animation **start value** is resolved — reflection over the live property vs. the cached value for the current theme. |
-| Strategy / Converter | `IThemeValueConverter` | `Convert(Type, string, object?[])` adapts raw string/numeric parameters to platform types (`Brush`, `Thickness`, ...). `Eases.*` returns `IEaseCalculator` strategies (`Sine`, `Quad`, `Bounce`, ...) used by `CalculateFrames` to shape interpolation. |
+| Strategy / Converter | `IThemeValueConverter` | `Convert(Type, string, object?[])` adapts raw string/numeric parameters to platform types (`Brush`, `Thickness`, ...). Samplers follow the `ISampleable` / `ISampler` strategy: `PrepareSamplers` resolves each property's `ISampleable` and calls `Normalize` once; `ExecuteTransition` drives `ISampler.Update` per sample. `Eases.*` returns `IEaseCalculator` strategies used to ease the normalized time during sampling. |
 | Registry (weak) | `ThemeManager` + `ThemeCache` | `ThemeManager` keeps live instances in `ConditionalWeakTable` + a `List<WeakReference<IThemeObject>>` (pruned on each transition); `ThemeCache` uses a `ConditionalWeakTable<IThemeObject, InstanceCache>` for per-instance overrides — no strong refs, so registration never leaks. |
 | Adapter | platform adapters | `Interpolator`, `TransitionEffect`, and the value converters implement core contracts (`InterpolatorCore`, `ITransitionEffectCore`, `IThemeValueConverter`), keeping the core engine GUI-agnostic. |
 | Cache | `ThemeCache` | Single global store keyed by declaring type eliminates per-class generated static dictionaries; inheritance chains are walked on lookup. |
@@ -103,7 +113,7 @@ classDiagram
 // Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs (Transition)
 foreach (var themeObject in actives)
     themeObject?.ExecuteThemeChanging(current, themeType);
-await ExecuteTransition(CalculateFrames(actives, steps, effect.Ease, themeType), deltaTime, themeType);
+await ExecuteTransition(PrepareSamplers(actives, themeType), effect.Ease, effect.Duration.TotalMilliseconds, themeType);
 foreach (var themeObject in actives)
     themeObject?.ExecuteThemeChanged(current, themeType);
 ```
@@ -123,7 +133,7 @@ var actives = activeThemes.Select(x => x.TryGetTarget(out var obj) ? obj : null)
 ### Strategy (StartModel start value)
 
 ```csharp
-// Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs (CalculateFrames)
+// Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs (PrepareSamplers)
 switch (StartModel)
 {
     case StartModel.Reflect:
@@ -137,5 +147,7 @@ switch (StartModel)
         break;
 }
 ```
+
+After resolving the `ISampleable`, `PrepareSamplers` calls `Normalize(current, targetValue, options)` once per property to obtain the stateless `ISampler`; `ExecuteTransition` then calls `sampler.Update(target, property, current, targetValue, options, easedT)` on each Stopwatch-driven sample.
 
 > Source references: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`, `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`, `Src/Core/VeloxDev.Core/Interfaces/DynamicTheme/*`, `Src/Adapters/VeloxDev.WPF/PlatformAdapters/ThemeValueConverters.cs`, `Examples/Theme/WPF/Demo/MainWindow.xaml.cs`.

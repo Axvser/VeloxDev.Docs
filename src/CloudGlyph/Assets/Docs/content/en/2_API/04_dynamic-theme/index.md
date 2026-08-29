@@ -9,7 +9,7 @@ The Dynamic Theme feature provides runtime theme switching with animated transit
 | Namespace | Contents |
 |---|---|
 | `VeloxDev.DynamicTheme` | `ThemeManager`, `ThemeCache` (+ nested `InstanceCache`), `ThemeConfigAttribute<TConverter, TTheme...>`, `StartModel`, `Dark`, `Light`, `ITheme`, `IThemeObject`, `IThemeValueConverter` |
-| `VeloxDev.TransitionSystem` (backing engine) | `InterpolatorCore` (declared in `VeloxDev.TransitionSystem.Abstractions`), `ITransitionEffectCore`, `IEaseCalculator`, `Eases` |
+| `VeloxDev.TransitionSystem` (backing engine) | `InterpolatorCore` (declared in `VeloxDev.TransitionSystem.Abstractions`), `ISampler`, `ISampleable`, `ITransitionEffectCore`, `IEaseCalculator`, `Eases` |
 | Platform adapters (`VeloxDev.WPF` / `VeloxDev.Avalonia`) | `Interpolator`, `TransitionEffect`, `TransitionEffects`, value converters (`DoubleConverter`, `PointConverter`, `ThicknessConverter`, `CornerRadiusConverter`, `ColorConverter`, `BrushConverter`, `ObjectConverter`) |
 
 ## Pages
@@ -19,7 +19,7 @@ The Dynamic Theme feature provides runtime theme switching with animated transit
 | `00 ThemeManager` | `ThemeManager` (all static members), enum `StartModel`, classes `Dark` / `Light` |
 | `01 ThemeCache` | `ThemeCache` (all static members), nested class `InstanceCache` |
 | `02 ThemeConfigAttribute` | `ThemeConfigAttribute<TConverter, TTheme...>` (6 arities), interfaces `ITheme`, `IThemeObject`, `IThemeValueConverter` |
-| `03 TransitionSystem` | Backing engine: `InterpolatorCore` static members, `ITransitionEffectCore`, `IEaseCalculator`, `Eases` |
+| `03 TransitionSystem` | Backing engine: `InterpolatorCore` static members, `ISampler`, `ISampleable`, `ITransitionEffectCore`, `IEaseCalculator`, `Eases` |
 | `04 PlatformAdapters` | `Interpolator`, `TransitionEffect`, `TransitionEffects`, and the value converters |
 
 ## Key Types at a Glance
@@ -29,5 +29,5 @@ The Dynamic Theme feature provides runtime theme switching with animated transit
 - **`ThemeConfigAttribute<TConverter, TTheme1..TTheme7>`** — 6 arities mapping one property to one value per theme.
 - **`StartModel`** — `[Flags]` enum (`Reflect = 1`, `Cache = 2`) selecting the animation start value source.
 - **`ITheme` / `IThemeObject` / `IThemeValueConverter`** — marker interface, generated theme-object contract, and the value-conversion strategy.
-- **Backing engine** — `InterpolatorCore.NativeInterpolators` registry, `ITransitionEffectCore`, `IEaseCalculator`, `Eases`.
+- **Backing engine** — `InterpolatorCore.NativeInterpolators` registry (`ConcurrentDictionary<Type, ISampleable>`), `ISampler`/`ISampleable`, `ITransitionEffectCore`, `IEaseCalculator`, `Eases`.
 - **Platform adapters** — `Interpolator`, `TransitionEffect` (`Priority = DispatcherPriority.Render`), `TransitionEffects` (`Empty` / `Theme` / `Hover`), and the value converters.

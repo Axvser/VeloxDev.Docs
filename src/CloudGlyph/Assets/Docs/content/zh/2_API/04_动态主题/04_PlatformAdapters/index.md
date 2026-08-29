@@ -8,10 +8,10 @@
 
 ### 类：`Interpolator`（适配器）
 
-WPF：`public class Interpolator : InterpolatorCore<InterpolatorOutput, DispatcherPriority>`
-Avalonia：`public class Interpolator : InterpolatorCore<InterpolatorOutput, DispatcherPriority>`
+WPF：`public class Interpolator : InterpolatorCore`
+Avalonia：`public class Interpolator : InterpolatorCore`
 
-静态构造函数注册平台值插值器：
+适配器 `Interpolator` 继承自非泛型 `InterpolatorCore`（泛型 `InterpolatorCore<InterpolatorOutput, DispatcherPriority>` 层级随帧序列模型一并移除）。静态构造函数注册平台采样器（均实现 `ISampleable, ISampler`，`Normalize => this` + `Update`）：
 
 | 适配器 | 注册的属性类型 |
 |---|---|
@@ -19,6 +19,7 @@ Avalonia：`public class Interpolator : InterpolatorCore<InterpolatorOutput, Dis
 | Avalonia（`VeloxDev.Avalonia`） | `IBrush`、`ITransform`、`Thickness`、`Point`、`CornerRadius`、`Size`、`PixelPoint`、`PixelSize`、`PixelRect`、`RelativePoint`、`RelativeRect`、`Color`、`BoxShadows`、`GridLength` |
 
 **说明：**
+- 每个注册的类型映射到一个采样器（如 `BrushSampler`、`ThicknessSampler`），存入 `NativeInterpolators`（`ConcurrentDictionary<Type, ISampleable>`）。
 - 这是传给 `ThemeManager.SetPlatformInterpolator<T>(T)` 的实例。
 
 ### 类：`TransitionEffect`

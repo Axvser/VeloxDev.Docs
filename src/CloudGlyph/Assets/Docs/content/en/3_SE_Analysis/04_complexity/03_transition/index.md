@@ -2,9 +2,7 @@
 
 ## Core Operations
 
-Let $P$ = number of properties recorded in a snapshot, and $S$ = number of frames for the active effect:
-
-$$S = \max\left(1,\; \left\lfloor \frac{\text{Duration} \times FPS}{1000} \right\rfloor\right)$$
+Let $P$ = number of properties recorded in a snapshot. Sampling is continuous (Stopwatch-driven), so there is no pre-computed frame count: `ITransitionEffectCore.FPS` caps the maximum sample rate (yield interval = `1000 / FPS` ms), and no $S$-element per-property frame list is ever materialized.
 
 ### Building a snapshot (`.Property(...)` calls)
 
@@ -12,43 +10,45 @@ $$O(P)$$
 
 Each `.Property(lambda, value)` parses the expression into a `TransitionProperty` (constant-time per call; `TryCreate` walks the lambda body once) and inserts into the state's `ConcurrentDictionary` ($O(1)$ amortized). The compiled getter/setter delegate is built lazily on first read/write and then reused.
 
-### Interpolator resolution
+### Sampler resolution
 
 $$O(1)$$
 
-`InterpolatorCore.TryGetInterpolator(Type, out _)` is a `ConcurrentDictionary` lookup. Per-property custom interpolators and `IInterpolable` fallback add a constant check. `RegisterInterpolator` is an atomic `AddOrUpdate`, also $O(1)$.
+`InterpolatorCore.TryGetInterpolator(Type, out _)` is a `ConcurrentDictionary` lookup over `NativeInterpolators` (`ConcurrentDictionary<Type, ISampleable>`). Per-property custom samplers (`state.Interpolators`) and the `ISampleable` self-fallback on the current/new value add a constant check. `RegisterInterpolator` is an atomic `AddOrUpdate`, also $O(1)$.
 
-### Frame computation (`InterpolatorCore.Interpolate`)
+### Updater preparation (`InterpolatorCore.Prepare`)
 
-$$O(P \cdot S)$$
+$$O(P)$$
 
-For each of the $P$ properties, the interpolator produces a $S$-element frame list:
+`Prepare` runs once per animation. For each of the $P$ properties it: reads the current value via the compiled getter (`ProtectedGetValue`, $O(1)$), resolves a sampler ($O(1)$), calls `Normalize` once, and stores a per-property `(property, sampler, start, end, options)` entry. **No per-property frame list is built** — the per-sample value is computed lazily at sampling time.
 
-| Interpolator | Cost per property | Notes |
+### Sampling loop (`TransitionInterpreterCore.Execute`)
+
+$$O(P) \text{ per sample}$$
+
+Each sample iteration evaluates one eased/clamped time `t ∈ [0,1]` and applies it through `SamplerSet.Apply`, which walks the $P$ prepared sampler entries. Per property the work is $O(1)$:
+
+| Sampler | Cost per sample | Notes |
 |---|---|---|
-| Numeric (`Double`/`Float`/`Int`/`Long`) | $O(S)$ | linear walk, constant ops per frame |
-| `ColorInterpolator` (ARGB channels) | $O(4S) = O(S)$ | 4 channel lerps per frame |
-| `Point`/`PointF`/`Size`/`SizeF`/`Rectangle`/`RectangleF`/`Vector2/3/4` | $O(S)$ | component-wise lerp |
-| `QuaternionInterpolator` (`Slerp`) | $O(S)$ | constant per-frame trig (dot + possibly negate + `Slerp`) |
-| `DoubleInterpolator` with `RotationDirection` | $O(S)$ | one mod-360 delta precomputed, then linear walk |
+| Numeric (`Double`/`Float`/`Int`/`Long`) | $O(1)$ | one lerp |
+| `ColorSampler` (ARGB channels) | $O(1)$ | 4 channel lerps |
+| `Point`/`PointF`/`Size`/`SizeF`/`Rectangle`/`RectangleF`/`Vector2/3/4` | $O(1)$ | component-wise lerp |
+| `QuaternionSampler` (`Slerp`) | $O(1)$ | constant trig (dot + possibly negate + `Slerp`) |
+| `DoubleSampler` with `RotationDirection` | $O(1)$ | one mod-360 delta per call, then a single lerp |
 
-**Critical note:** the frame **lists** are materialized up-front (eager). Easing does not re-run the interpolator — the interpreter re-indexes the same array, so easing adds $O(1)$ per frame.
+**Endpoints are $O(1)$ replacements:** `t <= 0` writes the exact start value, `t >= 1` the exact end value (no sampling). Reference types are mutated **in place** inside `ISampler.Update` (the live `start` instance), so middle samples allocate nothing; value types compute-and-assign.
+
+The number of samples is **not** dictated by `FPS` — it is the Stopwatch-derived `elapsed / duration`, throttled only by a coarse 1 ms `Task.Delay` yield (not a timing source). A pass therefore issues roughly `Duration / 1ms` samples at most, each $O(P)$. Auto-reverse doubles the pass count; `LoopTime` multiplies it. The wall-clock time is bounded by:
+
+$$T_{\text{wall}} = \text{Duration} \times \text{LoopTime} \quad (\text{or forever when } \text{LoopTime} = \text{int.MaxValue})$$
+
+No eased-index list is precomputed ($O(1)$ extra space), and there is no per-frame `Task.Delay` calibration.
 
 ### Scheduler lookup (`FindOrCreate`)
 
 $$O(1)$$
 
 `TransitionSchedulerCore.FindOrCreate(target, CanMutualTask)` performs a `ConditionalWeakTable` lookup (`MutualSchedulers`) or allocates a fresh non-mutual scheduler. A `SemaphoreSlim.WaitAsync()` gate serializes executions on a mutual scheduler.
-
-### Frame pump (`TransitionInterpreterCore.Execute`)
-
-$$O(S) \text{ passes over } P \text{ properties} \quad \Rightarrow \quad O(P \cdot S) \text{ total work}$$
-
-Each of the $S$ iterations applies $P$ `SetValue` writes through `InterpolatorOutputBase.SetValues` (compiled delegates, no per-frame reflection). UI-thread marshalling (when started off-thread) adds $O(1)$ dispatch per frame. Auto-reverse doubles the frame walk ($2S$); `LoopTime` multiplies it. The wall-clock time is bounded by:
-
-$$T_{\text{wall}} = \text{Duration} \times \text{LoopTime} \quad (\text{or forever when } \text{LoopTime} = \text{int.MaxValue})$$
-
-The interpreter precomputes the eased index list once: $O(S)$ space and time. `WaitForFrameAsync` is $O(1)$ per frame.
 
 ### State capture (`TransitionSnapshotHelper`)
 
@@ -63,7 +63,7 @@ where $V$ = number of reachable public instance properties (read/write, non-inde
 | Structure | Complexity |
 |---|---|
 | State (`IFrameState`) | $O(P)$ dictionaries (values + interpolators + options) |
-| Frame sequence (`InterpolatorOutputBase.Frames`) | $O(P \cdot S)$ intermediate values, freed after the transition |
+| Prepared sampler set (`SamplerSet`) | $O(P)$ — one `(property, sampler, start, end, options)` entry per property; no frame list |
 | Mutual scheduler table | $O(N)$ targets via `ConditionalWeakTable` (collected with targets, no leaks) |
 | NoMutual scheduler table | $O(N \cdot M)$ per target, where $M$ = concurrent non-mutual animations |
 | Effect events (`WeakDelegate`) | $O(H)$ handlers, $H$ = live handler targets |
@@ -74,19 +74,20 @@ where $V$ = number of reachable public instance properties (read/write, non-inde
 |---|---|
 | `TryGetInterpolator` / `RegisterInterpolator` / `UnregisterInterpolator` | $O(1)$ |
 | `.Property(...)` (expression parse + dict insert) | $O(1)$ per property |
-| Interpolate one property | $O(S)$ |
-| Interpolate all properties | $O(P \cdot S)$ |
-| Eased index list precompute | $O(S)$ |
-| Frame write (per frame) | $O(P)$ |
-| Easing index lookup | $O(1)$ per frame |
+| `Prepare` one property (read current + resolve sampler + create updater) | $O(1)$ |
+| `Prepare` all properties (`InterpolatorCore.Prepare`) | $O(P)$ |
+| Sample one property (`ISampler.Update` / in-place mutation) | $O(1)$ |
+| Apply one sample to all properties (`SamplerSet.Apply`) | $O(P)$ |
+| Easing + clamping one sample | $O(1)$ |
+| Endpoint write (t <= 0 / t >= 1) | $O(1)$ replacement, no sampling |
 | Scheduler `FindOrCreate` (CWT lookup) | $O(1)$ |
 | `SnapshotAll` discovery (`DiscoverAnimatableProperties`) | $O(V \cdot d)$ DFS over the object graph |
 
 ## Notes
 
-- Frames are **pre-computed once** and **re-indexed** for easing — the expensive per-property work happens once, before the first frame, not per frame.
-- Long-running loops (`LoopTime = int.MaxValue`) hold $O(P \cdot S)$ memory for the frame sequence but constant extra memory per iteration.
-- A property whose path is invalid for the current target returns the `UnreadablePath` sentinel in $O(1)$ (compiled getter), and the interpolator skips it rather than interpolating from a bogus `null`.
-- `TransitionProperty` getter/setter delegates are compiled lazily once per property and shared across frames, so the frame pump avoids reflection entirely.
+- Updaters are **prepared once** in `O(P)`; each sample re-evaluates only the eased time against the captured start/end/options — there is no frame list to build, store, or re-index, and no eager `count` boxed objects.
+- Reference types are mutated **in place** inside `ISampler.Update`, so middle samples allocate nothing per sample (constant extra memory per iteration even for `LoopTime = int.MaxValue`).
+- A property whose path is invalid for the current target returns the `UnreadablePath` sentinel in $O(1)$ (compiled getter), and `Prepare` skips it rather than sampling from a bogus `null`.
+- `TransitionProperty` getter/setter delegates are compiled lazily once per property and shared across samples, so the sampling loop avoids reflection entirely.
 
-> Source references: `Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`, `TransitionInterpreter.cs`, `TransitionSnapshotHelper.cs`, `InterpolatorOutputCore.cs`, `TransitionScheduler.cs`, `TransitionProperty.cs`.
+> Source references: `Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`, `TransitionInterpreter.cs`, `TransitionSnapshotHelper.cs`, `SamplerSet.cs`, `TransitionScheduler.cs`, `TransitionProperty.cs`.

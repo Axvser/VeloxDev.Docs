@@ -162,9 +162,9 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 
 | 类型 | 说明 |
 |---|---|
-| `Anchor(left, top, layer)` | 位置；`ICloneable`、`IEquatable<Anchor>`、`IInterpolable`；`==`/`!=`/`+`/`-` 运算符 |
-| `Size(width, height)` | 尺寸；`ICloneable`、`IEquatable<Size>`、`IInterpolable` |
-| `Offset(left, top)` | 增量向量；`ICloneable`、`IEquatable<Offset>`、`IInterpolable` |
+| `Anchor(left, top, layer)` | 位置；`ICloneable`、`IEquatable<Anchor>`、`ISampleable`/`ISampler`（`Update` 原地修改 `start` 现有实例，不 new）；`==`/`!=`/`+`/`-` 运算符 |
+| `Size(width, height)` | 尺寸；`ICloneable`、`IEquatable<Size>`、`ISampleable`/`ISampler` |
+| `Offset(left, top)` | 增量向量；`ICloneable`、`IEquatable<Offset>`、`ISampleable`/`ISampler` |
 | `Viewport(left, top, width, height)` | `readonly struct`；`Empty`、`Right`、`Bottom`、`IsEmpty`、`Contains`、`IntersectsWith`、`Union`、`==`/`!=` |
 | `CanvasLayout` | `OriginSize`、`PositiveOffset`、`NegativeOffset`、`ActualSize`、`ActualOffset`、`ViewportOffset`；`AdaptTo(Size)`；`UpdateCommand` |
 | `CellKey(x, y)` | `readonly struct` 网格单元坐标；`==`/`!=` |

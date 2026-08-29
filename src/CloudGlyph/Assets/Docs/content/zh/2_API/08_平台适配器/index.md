@@ -129,11 +129,11 @@ public interface IWorkflowMinimapOverlay
 
 ## 命名空间：`VeloxDev.TransitionSystem`（各平台接线）
 
-每个适配器都提供 `Interpolator`、`TransitionEffect`、`TransitionEffects`、`UIThreadInspector`、`State` 与 `Interpolators/*` 集合。基础引擎见 [过渡系统](1_TransitionSystem) API 页。
+每个适配器都提供 `Interpolator`、`TransitionEffect`、`TransitionEffects`、`UIThreadInspector`、`State` 与 `Samplers/*` 集合。基础引擎见 [过渡系统](1_TransitionSystem) API 页。
 
 ### 类：`Interpolator`
 
-`Interpolator : InterpolatorCore<InterpolatorOutput[, TPriorityCore]>`。静态构造函数注册平台类型：
+`Interpolator : InterpolatorCore`。静态构造函数注册平台类型：
 
 | 适配器 | 注册类型（静态构造） |
 |---|---|
@@ -142,9 +142,9 @@ public interface IWorkflowMinimapOverlay
 | WinUI | `Brush`、`Color`、`CornerRadius`、`GridLength`、`Point`、`Projection`、`Rect`、`Size`、`Thickness`、`Transform` |
 | MAUI | `Brush`、`Color`、`CornerRadius`、`Point`、`PointF`、`Rect`、`RectF`、`Shadow`、`Size`、`SizeF`、`Thickness`、`Transform` |
 | WinForms | `Padding` |
-| Razor | `string` → `StringInterpolator` |
+| Razor | `string` → `StringSampler` |
 
-`Interpolators/*` 目录为每种类型一个类（例如 WPF 的 `BrushInterpolator`、`ThicknessInterpolator`、`TransformInterpolator`、`CornerRadiusInterpolator`、`PointInterpolator`、`ColorInterpolator`、`DropShadowEffectInterpolator`、`Point3DInterpolator`、`Vector3DInterpolator`、`SizeInterpolator`、`RectInterpolator`、`VectorInterpolator`）。非 WPF 平台的插值器类经源码验证存在；确切的注册清单按类型名加旧 wiki（Avalonia）为 `*推断所得*`。
+`Samplers/*` 目录为每种类型一个类（例如 WPF 的 `BrushSampler`、`ThicknessSampler`、`TransformSampler`、`CornerRadiusSampler`、`PointSampler`、`ColorSampler`、`DropShadowEffectSampler`、`Point3DSampler`、`Vector3DSampler`、`SizeSampler`、`RectSampler`、`VectorSampler`）。非 WPF 平台的采样器类经源码验证存在；确切的注册清单按类型名加旧 wiki（Avalonia）为 `*推断所得*`。
 
 ### 类：`TransitionEffect`
 
@@ -184,12 +184,12 @@ public interface IWorkflowMinimapOverlay
 
 | 适配器 | 额外重载（除数值 + `System.Drawing.*` + `System.Numerics.*` 之外） |
 |---|---|
-| WPF | `IInterpolable?`、`Brush?`、`Transform?`、`Point`、`CornerRadius`、`Thickness`、`Size`、`Rect`、`Vector`、`Color`、`DropShadowEffect?`、`Point3D`、`Vector3D` |
-| Avalonia | `IInterpolable?`、`ITransform?`、`IBrush?`、`Thickness`、`Point`、`CornerRadius`、`Size`、`PixelPoint`、`PixelSize`、`PixelRect`、`RelativePoint`、`RelativeRect`、`Color`、`BoxShadows` |
-| WinUI | `IInterpolable?`、`Brush?`、`Transform?`、`Point`、`CornerRadius`、`Thickness`、`Projection?`、`Size`、`Rect`、`GridLength`、`Color` |
-| MAUI | `IInterpolable?`、`Brush?`、`Transform?`、`Point`、`PointF`、`CornerRadius`、`Thickness`、`Color?`、`Size`、`SizeF`、`Rect`、`RectF`、`Shadow?` |
-| WinForms | `IInterpolable?`、`Padding` |
-| Razor | `string?`（无 `IInterpolable?`） |
+| WPF | `Brush?`、`Transform?`、`Point`、`CornerRadius`、`Thickness`、`Size`、`Rect`、`Vector`、`Color`、`DropShadowEffect?`、`Point3D`、`Vector3D` |
+| Avalonia | `ITransform?`、`IBrush?`、`Thickness`、`Point`、`CornerRadius`、`Size`、`PixelPoint`、`PixelSize`、`PixelRect`、`RelativePoint`、`RelativeRect`、`Color`、`BoxShadows` |
+| WinUI | `Brush?`、`Transform?`、`Point`、`CornerRadius`、`Thickness`、`Projection?`、`Size`、`Rect`、`GridLength`、`Color` |
+| MAUI | `Brush?`、`Transform?`、`Point`、`PointF`、`CornerRadius`、`Thickness`、`Color?`、`Size`、`SizeF`、`Rect`、`RectF`、`Shadow?` |
+| WinForms | `Padding` |
+| Razor | `string?` |
 
 ## 命名空间：`VeloxDev.DynamicTheme`（各平台）
 

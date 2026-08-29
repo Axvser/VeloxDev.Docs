@@ -31,10 +31,10 @@ public class TransitionCore<TTarget, TStateSnapshotCore> : TransitionCore where 
 | `Await` | `StateSnapshot Await(TimeSpan)` | Wait before this segment. |
 | `Then` | `StateSnapshot Then()` | Start the next segment. |
 | `AwaitThen` | `StateSnapshot AwaitThen(TimeSpan)` | Wait, then start the next segment. |
-| `Interpolator` | `StateSnapshot Interpolator<T>(Expression, IValueInterpolator)` | Per-property interpolator override. |
+| `Interpolator` | `StateSnapshot Interpolator<T>(Expression, ISampleable)` | Per-property sampler override. |
 | `Execute` | `void Execute(object target, bool CanMutualTask = true)` / `void Execute(bool CanMutualTask = true)` | Run the snapshot. |
 
-**Notes:** `GetState()` returns the underlying `IFrameState`. Segments are linked via `next`; `CoreExecute` drains interpolators, delays, effects, and states segment-by-segment through the scheduler.
+**Notes:** `GetState()` returns the underlying `IFrameState`. Segments are linked via `next`; `CoreExecute` drains samplers, delays, effects, and states segment-by-segment through the scheduler.
 
 ### Class: `StateCore : IFrameState`
 
@@ -43,19 +43,21 @@ Concrete implementation of `IFrameState`; `Values`/`Interpolators`/`Options` are
 
 ### Abstract Class: `InterpolatorCore`
 
+Now a single non-generic tier (was three generic tiers; it no longer implements an interface). The registry is keyed by `Type` and holds `ISampleable` definitions:
+
 | Member | Signature |
 |---|---|
-| `NativeInterpolators` | `public static ConcurrentDictionary<Type, IValueInterpolator> NativeInterpolators { get; protected set; }` |
-| `TryGetInterpolator` | `public static bool TryGetInterpolator(Type type, out IValueInterpolator? interpolator)` |
-| `RegisterInterpolator` | `public static bool RegisterInterpolator(Type type, IValueInterpolator interpolator)` |
-| `UnregisterInterpolator` | `public static bool UnregisterInterpolator(Type type, out IValueInterpolator? interpolator)` |
+| `NativeInterpolators` | `public static ConcurrentDictionary<Type, ISampleable> NativeInterpolators { get; protected set; }` |
+| `TryGetInterpolator` | `public static bool TryGetInterpolator(Type type, out ISampleable? sampleable)` |
+| `RegisterInterpolator` | `public static bool RegisterInterpolator(Type type, ISampleable sampleable)` |
+| `UnregisterInterpolator` | `public static bool UnregisterInterpolator(Type type, out ISampleable? sampleable)` |
 
-**Notes:** Static ctor seeds numeric + `System.Drawing` + (non-netstandard2.0) `System.Numerics` interpolators. `Interpolate` resolves per-property custom interpolator → registry → `IInterpolable` fallback. `TransitionProperty.UnreadablePath` results are skipped. Adapters derive `Interpolator : InterpolatorCore<InterpolatorOutput[, TPriorityCore]>` and register platform types in their static ctor.
-**Verified by:** `InterpolatorCoreTests`, `NativeInterpolatorsTests`.
+**Notes:** Static ctor seeds numeric + `System.Drawing` + (non-netstandard2.0) `System.Numerics` samplers. `Prepare` resolves the per-property `ISampleable` (custom from state → registered by property type → the value IS `ISampleable`), calls `Normalize` once to obtain the stateless `ISampler`, and stores each `(ITransitionProperty, ISampler, start, end, options)` entry in a `SamplerSet`. `TransitionProperty.UnreadablePath` results are skipped. Adapters derive `Interpolator : InterpolatorCore` and register platform types in their static ctor.
+**Verified by:** `InterpolatorCoreTests`, `NativeSamplersTests`.
 
 ### Class: `TransitionEffectCore` / `TransitionEffectCore<TPriorityCore> : ITransitionEffectCore`
 
-Defaults: `FPS = 60`, `Duration = 0ms`, `IsAutoReverse = false`, `LoopTime = 0`, `Ease = Eases.Default`. Events are backed by `WeakDelegate` (leak-free). The `TPriorityCore` variant adds `Priority`. Adapter `TransitionEffect : TransitionEffectCore<DispatcherPriority>` sets `DispatcherPriority.Render` (WPF/Avalonia), `TransitionEffect : TransitionEffectCore<DispatcherQueuePriority>` sets `DispatcherQueuePriority.Normal` (WinUI).
+Defaults: `FPS = 60` (maximum sample-rate cap — yield interval = `1000 / FPS` ms; timing is Stopwatch-driven continuous sampling), `Duration = 0ms`, `IsAutoReverse = false`, `LoopTime = 0`, `Ease = Eases.Default`. Events are backed by `WeakDelegate` (leak-free). The `TPriorityCore` variant adds `Priority`. Adapter `TransitionEffect : TransitionEffectCore<DispatcherPriority>` sets `DispatcherPriority.Render` (WPF/Avalonia), `TransitionEffect : TransitionEffectCore<DispatcherQueuePriority>` sets `DispatcherQueuePriority.Normal` (WinUI).
 **Verified by:** `TransitionEffectCoreTests`.
 
 ### Abstract Class: `TransitionSchedulerCore`
@@ -70,7 +72,7 @@ public abstract class TransitionSchedulerCore : ITransitionSchedulerCore
     public static bool TryGetNoMutualScheduler(object source, out ITransitionSchedulerCore[] schedulers);
     public static bool RemoveNoMutualScheduler(object source);
     public virtual WeakReference<object>? TargetRef { get; protected set; }
-    public abstract Task Execute(IFrameInterpolatorCore interpolator, IFrameState state, ITransitionEffectCore effect, CancellationTokenSource? externCts = default);
+    public abstract Task Execute(InterpolatorCore producer, IFrameState state, ITransitionEffectCore effect, CancellationTokenSource? externCts = default);
     public abstract void Exit();
 }
 ```
@@ -80,12 +82,13 @@ public abstract class TransitionSchedulerCore : ITransitionSchedulerCore
 
 ### Abstract Class: `TransitionInterpreterCore : ITransitionInterpreterCore, IDisposable`
 
-The frame pump: computes an eased index list via `GetEaseIndex` (re-indexing the pre-computed frame array), invokes `effect.InvokeStart/Update/LateUpdate`, applies each frame through `frameSequence.Update(target, index)`, honors `IsAutoReverse` (backward walk) and `LoopTime`, then `InvokeCompleted` / `InvokeCancled` / `InvokeFinally`. `TransitionEventArgs.Handled` or a cancelled `cts` throws `OperationCanceledException` → `InvokeCancled`. Frame pacing uses a `Stopwatch`-calibrated delay (`WaitForFrameAsync`) that compensates for `Task.Delay` jitter.
-**Verified by:** WPF demo animations (auto-reverse + loop), `TransitionEffectCoreTests` event order.
+A Stopwatch-driven sampling loop (not a frame pump): computes `t = elapsed / Duration` from a `Stopwatch`, applies easing (clamped to `[0, 1]`), invokes `effect.InvokeStart/Update/LateUpdate`, and drives the prepared `SamplerSet` via `samplerSet.Apply(target, t, priority)`. Honors `IsAutoReverse` (forward pass samples the end, reverse pass samples the start) and `LoopTime` (`int.MaxValue` = infinite), then `InvokeCompleted` / `InvokeCancled` / `InvokeFinally`. The pass-final frame is the exact endpoint. `TransitionEventArgs.Handled` or a cancelled `cts` throws `OperationCanceledException` → `InvokeCancled`. There is no FPS-based frame stepping and no `Task.Delay` frame calibration.
+**Verified by:** `SamplingLoopTests`, WPF demo animations (auto-reverse + loop), `TransitionEffectCoreTests` event order.
 
-### Abstract Class: `InterpolatorOutputBase : IFrameSequenceCore`
+### Class: `SamplerSet`
 
-`Frames` (`Dictionary<ITransitionProperty, List<object?>>`) + `Count`. `SetValues(target, frameIndex)` writes every property's frame value onto the target, skipping the write if the cancellation token is already requested (prevents stale queued frames overwriting a reset). `InterpolatorOutputCore<TUIThreadInspectorCore[, TPriorityCore]>` caches a reusable frame-write delegate and marshals via the inspector.
+The prepared per-property sampler container (renamed from `FrameUpdaterSet`; replaces `IFrameSequence` + `InterpolatorOutputBase`). Non-generic: holds the per-property `(ITransitionProperty, ISampler, start, end, options)` entries produced by `InterpolatorCore.Prepare` and carries the animation's cancellation token. `Apply(object target, double t, object? priority = default)` marshals to the UI thread, calls each `sampler.Update(target, property, start, end, options, t)`, and returns immediately when the animation is cancelled or the app is no longer alive, so stale queued frames never overwrite a reset result.
+**Verified by:** `SamplerSetTests`.
 
 ### Class: `TransitionProperty : ITransitionProperty, IEquatable<TransitionProperty>`
 
@@ -97,7 +100,7 @@ public IReadOnlyList<PropertyInfo> Segments { get; }
 public static readonly object UnreadablePath;   // sentinel for invalid intermediate type
 ```
 
-**Notes:** Getter/setter are **compiled into a single delegate** on first use (no per-frame reflection). An intermediate type mismatch returns `UnreadablePath` from `GetValue` (skipped by the interpolator) instead of throwing `TargetException`.
+**Notes:** Getter/setter are **compiled into a single delegate** on first use (no per-frame reflection). An intermediate type mismatch returns `UnreadablePath` from `GetValue` (skipped by the sampler/updater) instead of throwing `TargetException`.
 **Verified by:** `TransitionPropertyTests`.
 
 ### Static Class: `TransitionSnapshotHelper`

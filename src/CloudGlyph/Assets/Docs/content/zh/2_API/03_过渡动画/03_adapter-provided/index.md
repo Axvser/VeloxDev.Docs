@@ -24,17 +24,19 @@ public static class TransitionEx
 
 | 适配器 | 优先级类型 | 额外重载 | 缺失 |
 |---|---|---|---|
-| WPF | `DispatcherPriority` | `IInterpolable?`、`Brush?`、`Transform?`（集合）、`Point`、`CornerRadius`、`Thickness`、`Size`、`Rect`、`Vector`、`Color`、`DropShadowEffect?`、`Point3D`、`Vector3D` | — |
-| Avalonia | `DispatcherPriority` | `IInterpolable?`、`ITransform?`、`IBrush?`、`Thickness`、`Point`、`CornerRadius`、`Size`、`PixelPoint`、`PixelSize`、`PixelRect`、`RelativePoint`、`RelativeRect`、`Color`、`BoxShadows` | — |
-| WinUI | `DispatcherQueuePriority` | `IInterpolable?`、`Brush?`、`Transform?`、`Point`、`CornerRadius`、`Thickness`、`Projection?`、`Size`、`Rect`、`GridLength`、`Color` | — |
-| MAUI | 无 | `IInterpolable?`、`Brush?`、`Transform?`、`Point`、`PointF`、`CornerRadius`、`Thickness`、`Color?`、`Size`、`SizeF`、`Rect`、`RectF`、`Shadow?` | `Transform?` 无 `interpolationOptions` |
-| WinForms | 无 | `IInterpolable?`、`Padding` | — |
-| Razor | 无 | `string?` | 无 `IInterpolable?`；有 `string?` |
+| WPF | `DispatcherPriority` | `Brush?`、`Transform?`（集合）、`Point`、`CornerRadius`、`Thickness`、`Size`、`Rect`、`Vector`、`Color`、`DropShadowEffect?`、`Point3D`、`Vector3D` | — |
+| Avalonia | `DispatcherPriority` | `ITransform?`、`IBrush?`、`Thickness`、`Point`、`CornerRadius`、`Size`、`PixelPoint`、`PixelSize`、`PixelRect`、`RelativePoint`、`RelativeRect`、`Color`、`BoxShadows` | — |
+| WinUI | `DispatcherQueuePriority` | `Brush?`、`Transform?`、`Point`、`CornerRadius`、`Thickness`、`Projection?`、`Size`、`Rect`、`GridLength`、`Color` | — |
+| MAUI | 无 | `Brush?`、`Transform?`、`Point`、`PointF`、`CornerRadius`、`Thickness`、`Color?`、`Size`、`SizeF`、`Rect`、`RectF`、`Shadow?` | `Transform?` 无 `interpolationOptions` |
+| WinForms | 无 | `Padding` | — |
+| Razor | 无 | `string?` | — |
+
+**说明：** 旧的 `IInterpolable?` 重载已被泛型 `Property<TValue>(Expression<Func<T, TValue>>, TValue newValue, object? interpolationOptions = null)` 取代——它接受任何可动画类型（包括实现 `ISampleable` 的自定义类型）。适配器采样器实现 `ISampleable, ISampler`（`Normalize => this` + `Update`）；WPF/Jalium 引用类型目标（`SolidColorBrush`、`Transform`、`DropShadowEffect`）在 `Update` 内**原地修改** `start` 现有实例（不 new），否则走计算路径。
 
 所有适配器共有重载：`int`、`double`、`float`、`decimal`、`System.Drawing.*`、以及（非 netstandard2.0）`System.Numerics.*`。
 
 ### 平台特定类型
 
 - **`UIThreadInspector`** — WPF：目标优先的 `DispatcherObject.Dispatcher` 再 `Application.Current.Dispatcher`，优先级 `DispatcherPriority`；Avalonia：`Dispatcher.UIThread`；WinUI：`DependencyObject.DispatcherQueue` 自动编组 + 可选 `CaptureUIThread()`；MAUI：`Application.Current.Dispatcher.Dispatch`；WinForms/Razor：`Control`/`SynchronizationContext` + 可选 `CaptureUIThread()`。
-- **`Interpolator`** 静态构造函数注册平台类型（WPF：`Brush`、`Thickness`、`Point`、`CornerRadius`、`Transform`、`Size`、`Rect`、`Vector`、`Color`、`DropShadowEffect`、`Point3D`、`Vector3D`；Avalonia：`IBrush`、`ITransform`、`BoxShadows`、`GridLength`...；WinUI：`Projection`、`GridLength`...；MAUI：`Shadow`、`RectF`...；WinForms：`Padding`；Razor：`string` → `StringInterpolator`）。
+- **`Interpolator`** 静态构造函数注册平台采样器（WPF：`Brush`、`Thickness`、`Point`、`CornerRadius`、`Transform`、`Size`、`Rect`、`Vector`、`Color`、`DropShadowEffect`、`Point3D`、`Vector3D`；Avalonia：`IBrush`、`ITransform`、`BoxShadows`、`GridLength`...；WinUI：`Projection`、`GridLength`...；MAUI：`Shadow`、`RectF`...；WinForms：`Padding`；Razor：`string` → `StringSampler`）。
 - **`TransitionEffects`** — 静态预设：`Empty`（0 秒）、`Theme`（0.46 秒）、`Hover`（0.32 秒）。**注意：** WinUI 的 `TransitionEffects` 是**非静态**类。

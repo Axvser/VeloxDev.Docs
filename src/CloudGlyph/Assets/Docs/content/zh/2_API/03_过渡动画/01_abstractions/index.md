@@ -31,31 +31,31 @@ public class TransitionCore<TTarget, TStateSnapshotCore> : TransitionCore where 
 | `Await` | `StateSnapshot Await(TimeSpan)` | 本段开始前等待。 |
 | `Then` | `StateSnapshot Then()` | 开始下一段。 |
 | `AwaitThen` | `StateSnapshot AwaitThen(TimeSpan)` | 等待后开始下一段。 |
-| `Interpolator` | `StateSnapshot Interpolator<T>(Expression, IValueInterpolator)` | 按属性插值器覆盖。 |
+| `Interpolator` | `StateSnapshot Interpolator<T>(Expression, ISampleable)` | 按属性采样器覆盖。 |
 | `Execute` | `void Execute(object target, bool CanMutualTask = true)` / `void Execute(bool CanMutualTask = true)` | 运行快照。 |
 
-**说明：** `GetState()` 返回底层 `IFrameState`。分段通过 `next` 链接；`CoreExecute` 逐段把插值器、延迟、效果与状态交给调度器执行。
+**说明：** `GetState()` 返回底层 `IFrameState`。分段通过 `next` 链接；`CoreExecute` 逐段把采样器、延迟、效果与状态交给调度器执行。
 
 ### 类：`StateCore : IFrameState`
 
-`IFrameState` 的具体实现；`Values`/`Interpolators`/`Options` 为 `public virtual` + `protected set`。适配器的 `State` 由其派生。
+`IFrameState` 的具体实现；`Values`/`Interpolators`/`Options` 为 `public virtual` + `protected set`，其中 `Interpolators` 现为 `ConcurrentDictionary<ITransitionProperty, ISampleable>`。适配器的 `State` 由其派生。
 **验证依据：** `StateCoreTests`。
 
 ### 抽象类：`InterpolatorCore`
 
 | 成员 | 签名 |
 |---|---|
-| `NativeInterpolators` | `public static ConcurrentDictionary<Type, IValueInterpolator> NativeInterpolators { get; protected set; }` |
-| `TryGetInterpolator` | `public static bool TryGetInterpolator(Type type, out IValueInterpolator? interpolator)` |
-| `RegisterInterpolator` | `public static bool RegisterInterpolator(Type type, IValueInterpolator interpolator)` |
-| `UnregisterInterpolator` | `public static bool UnregisterInterpolator(Type type, out IValueInterpolator? interpolator)` |
+| `NativeInterpolators` | `public static ConcurrentDictionary<Type, ISampleable> NativeInterpolators { get; protected set; }` |
+| `TryGetInterpolator` | `public static bool TryGetInterpolator(Type type, out ISampleable? sampleable)` |
+| `RegisterInterpolator` | `public static bool RegisterInterpolator(Type type, ISampleable sampleable)` |
+| `UnregisterInterpolator` | `public static bool UnregisterInterpolator(Type type, out ISampleable? sampleable)` |
 
-**说明：** 静态构造函数内置数值 + `System.Drawing` +（非 netstandard2.0）`System.Numerics` 插值器。`Interpolate` 按「按属性自定义插值器 → 注册表 → `IInterpolable` 回退」解析；返回 `TransitionProperty.UnreadablePath` 的属性会被跳过。适配器派生 `Interpolator : InterpolatorCore<InterpolatorOutput[, TPriorityCore]>` 并在静态构造函数中注册平台类型。
-**验证依据：** `InterpolatorCoreTests`、`NativeInterpolatorsTests`。
+**说明：** 现为普通非泛型 `abstract class`（不再实现任何接口，原三层泛型与 `IFrameUpdaterProducer` 已移除）。静态构造函数内置数值 + `System.Drawing` +（非 netstandard2.0）`System.Numerics` 采样器。`Prepare` 按「按属性自定义 `ISampleable` → 注册表 → 值本身是 `ISampleable`」解析，调用 `Normalize(start, end, options)` 得到无状态 `ISampler` 并逐属性存入 `SamplerSet`；返回 `TransitionProperty.UnreadablePath` 的属性会被跳过。适配器派生 `Interpolator : InterpolatorCore` 并在静态构造函数中注册平台采样器。
+**验证依据：** `InterpolatorCoreTests`、`NativeSamplersTests`。
 
 ### 类：`TransitionEffectCore` / `TransitionEffectCore<TPriorityCore> : ITransitionEffectCore`
 
-默认：`FPS = 60`、`Duration = 0ms`、`IsAutoReverse = false`、`LoopTime = 0`、`Ease = Eases.Default`。事件由 `WeakDelegate`（无泄漏）支撑。`TPriorityCore` 变体增加 `Priority`。适配器 `TransitionEffect : TransitionEffectCore<DispatcherPriority>` 设置 `DispatcherPriority.Render`（WPF/Avalonia），`TransitionEffect : TransitionEffectCore<DispatcherQueuePriority>` 设置 `DispatcherQueuePriority.Normal`（WinUI）。
+默认：`FPS = 60`（仅元数据——计时为 Stopwatch 连续采样）、`Duration = 0ms`、`IsAutoReverse = false`、`LoopTime = 0`、`Ease = Eases.Default`。事件由 `WeakDelegate`（无泄漏）支撑。`TPriorityCore` 变体增加 `Priority`。适配器 `TransitionEffect : TransitionEffectCore<DispatcherPriority>` 设置 `DispatcherPriority.Render`（WPF/Avalonia），`TransitionEffect : TransitionEffectCore<DispatcherQueuePriority>` 设置 `DispatcherQueuePriority.Normal`（WinUI）。
 **验证依据：** `TransitionEffectCoreTests`。
 
 ### 抽象类：`TransitionSchedulerCore`
@@ -70,7 +70,7 @@ public abstract class TransitionSchedulerCore : ITransitionSchedulerCore
     public static bool TryGetNoMutualScheduler(object source, out ITransitionSchedulerCore[] schedulers);
     public static bool RemoveNoMutualScheduler(object source);
     public virtual WeakReference<object>? TargetRef { get; protected set; }
-    public abstract Task Execute(IFrameInterpolatorCore interpolator, IFrameState state, ITransitionEffectCore effect, CancellationTokenSource? externCts = default);
+    public abstract Task Execute(InterpolatorCore producer, IFrameState state, ITransitionEffectCore effect, CancellationTokenSource? externCts = default);
     public abstract void Exit();
 }
 ```
@@ -80,12 +80,13 @@ public abstract class TransitionSchedulerCore : ITransitionSchedulerCore
 
 ### 抽象类：`TransitionInterpreterCore : ITransitionInterpreterCore, IDisposable`
 
-帧泵：通过 `GetEaseIndex` 计算缓动索引列表（重新索引预计算帧数组）、调用 `effect.InvokeStart/Update/LateUpdate`、通过 `frameSequence.Update(target, index)` 应用每帧、尊重 `IsAutoReverse`（反向遍历）与 `LoopTime`，然后 `InvokeCompleted` / `InvokeCancled` / `InvokeFinally`。`TransitionEventArgs.Handled` 或已取消的 `cts` 抛出 `OperationCanceledException` → `InvokeCancled`。帧间隔用 `Stopwatch` 校准（`WaitForFrameAsync`），补偿 `Task.Delay` 的抖动。
-**验证依据：** WPF 示例动画（往返 + 循环）、`TransitionEffectCoreTests` 的事件顺序。
+Stopwatch 驱动的连续采样循环（非帧泵）：`ExecuteSamplingLoopAsync` 每次迭代由墙钟经过时间推导归一化时间 `t = elapsed / Duration`，因此粗粒度 `Task.Delay(TimeSpan)` 节流不作为计时来源——其不精确不影响正确性。每程在 `[0,1]` 内采样缓动时间（Back/Elastic 越界钳制到 `[0,1]`）并经 `samplerSet.Apply(target, easedT, priority)` 应用；`samplerSet` 把写入编组到 UI 线程。每程末帧精确为端点（正向 = end、反向 = start）。调用 `effect.InvokeStart/Update/LateUpdate`；尊重 `IsAutoReverse`（反向遍历）与 `LoopTime`（`int.MaxValue` = 无限），然后 `InvokeCompleted` / `InvokeCancled` / `InvokeFinally`。`TransitionEventArgs.Handled` 或已取消的 `cts` 抛出 `OperationCanceledException` → `InvokeCancled`。
+**验证依据：** WPF 示例动画（往返 + 循环）、`TransitionEffectCoreTests` 的事件顺序、`SamplingLoopTests`。
 
-### 抽象类：`InterpolatorOutputBase : IFrameSequenceCore`
+### 类：`SamplerSet`
 
-`Frames`（`Dictionary<ITransitionProperty, List<object?>>`）+ `Count`。`SetValues(target, frameIndex)` 把每个属性的帧值写到目标上；若取消令牌已被请求则跳过写入（防止已入队的旧帧覆盖重置结果）。`InterpolatorOutputCore<TUIThreadInspectorCore[, TPriorityCore]>` 缓存可复用的帧写入委托，并经 inspector 编组。
+准备好的逐属性采样容器（取代 `IFrameSequence` + `InterpolatorOutputBase` + `FrameUpdaterSet`）。每个属性持有 `(ITransitionProperty, ISampler, start, end, options)`，并携带动画的取消令牌。`Apply(object target, double t, object? priority = default)` 经 UI 线程 marshal 后逐个调用 `sampler.Update(target, property, start, end, options, t)`；动画取消或应用不再存活时立即返回，因此已入队的过期帧永远不会覆盖重置结果（`ICancellableFrameSequence` 等价物）。
+**验证依据：** `SamplerSetTests`。
 
 ### 类：`TransitionProperty : ITransitionProperty, IEquatable<TransitionProperty>`
 
@@ -97,7 +98,7 @@ public IReadOnlyList<PropertyInfo> Segments { get; }
 public static readonly object UnreadablePath;   // 中间类型无效时的哨兵
 ```
 
-**说明：** getter/setter 在首次使用时**编译为单个委托**（无每帧反射）。中间类型不匹配时 `GetValue` 返回 `UnreadablePath`（插值器会跳过该属性）而不是抛 `TargetException`。
+**说明：** getter/setter 在首次使用时**编译为单个委托**（无每帧反射）。中间类型不匹配时 `GetValue` 返回 `UnreadablePath`（采样器/updater 会跳过该属性）而不是抛 `TargetException`。
 **验证依据：** `TransitionPropertyTests`。
 
 ### 静态类：`TransitionSnapshotHelper`
