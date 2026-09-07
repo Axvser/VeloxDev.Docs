@@ -22,7 +22,7 @@ $$O(P) + O\!\left(\sum m_j\right)$$
 
 ## 采样循环（`TransitionInterpreterCore.Execute`）
 
-$$每次采样 O(P)$$
+$$	ext{每次采样} \; O(P)$$
 
 每次采样迭代求出一个缓动/钳制后的时间并通过 `SamplerSet.Apply` 应用，它遍历 $P$ 个已准备条目（每属性 $O(1)$）：
 
