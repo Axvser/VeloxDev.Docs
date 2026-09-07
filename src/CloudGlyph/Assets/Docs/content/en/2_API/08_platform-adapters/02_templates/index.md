@@ -4,7 +4,7 @@ Each adapter ships a `dotnet new` item-template suite (`VeloxDev.{Platform}.Temp
 
 ## Template suite per adapter
 
-All suites contain the same seven kinds: node view, slot view, link view, tree view, template selector, grid decorator, minimap overlay. Short names are `{prefix}-v-{kind}`; the grid decorator is `{prefix}-v-decorator` on every platform **except Jalium**, where it is `jalium-v-grid`.
+All suites contain the same seven kinds: node view, slot view, link view, tree view, template selector, grid decorator, minimap overlay. Short names are `{prefix}-v-{kind}` on every platform (grid decorator = `{prefix}-v-decorator`).
 
 | Package | Node | Slot | Link | Tree | Selector | Decorator | Minimap |
 |---|---|---|---|---|---|---|---|
@@ -14,7 +14,7 @@ All suites contain the same seven kinds: node view, slot view, link view, tree v
 | `VeloxDev.MAUI.Templates` | `maui-v-node` | `maui-v-slot` | `maui-v-link` | `maui-v-tree` | `maui-v-selector` | `maui-v-decorator` | `maui-v-minimap` |
 | `VeloxDev.WinForms.Templates` | `winforms-v-node` | `winforms-v-slot` | `winforms-v-link` | `winforms-v-tree` | `winforms-v-selector` | `winforms-v-decorator` | `winforms-v-minimap` |
 | `VeloxDev.Razor.Templates` | `razor-v-node` | `razor-v-slot` | `razor-v-link` | `razor-v-tree` | `razor-v-selector` | `razor-v-decorator` | `razor-v-minimap` |
-| `VeloxDev.Jalium.Templates` | `jalium-v-node` | `jalium-v-slot` | `jalium-v-link` | `jalium-v-tree` | `jalium-v-selector` | `jalium-v-grid` | `jalium-v-minimap` |
+| `VeloxDev.Jalium.Templates` | `jalium-v-node` | `jalium-v-slot` | `jalium-v-link` | `jalium-v-tree` | `jalium-v-selector` | `jalium-v-decorator` | `jalium-v-minimap` |
 
 ## Default names & generated files
 

@@ -15,7 +15,7 @@ dotnet pack Src/Templates/VeloxDev.WPF.Templates
 dotnet new install Src/Templates/VeloxDev.WPF.Templates/bin/Debug/VeloxDev.WPF.Templates.8.0.0.nupkg
 ```
 
-The template pack for your framework is the sibling of the adapter package: `VeloxDev.{Platform}.Templates`, whose item templates are all named `{prefix}-v-*` (`wpf-v-*`, `winforms-v-*`, `ava-v-*`, `winui-v-*`, `maui-v-*`, `razor-v-*`, `jalium-v-*`). Jalium's grid-decorator item is `jalium-v-grid`; every other platform calls it `-v-decorator`.
+The template pack for your framework is the sibling of the adapter package: `VeloxDev.{Platform}.Templates`, whose item templates are all named `{prefix}-v-*` (`wpf-v-*`, `winforms-v-*`, `ava-v-*`, `winui-v-*`, `maui-v-*`, `razor-v-*`, `jalium-v-*`). The grid decorator item is `{prefix}-v-decorator` on every platform.
 
 **Expected result:** `dotnet new list wpf-v` lists the seven `wpf-v-*` item templates (they are also visible under `dotnet new list` with the `VeloxDev.WPF.Workflow*` identities).
 

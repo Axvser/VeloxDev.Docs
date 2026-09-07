@@ -15,7 +15,7 @@ dotnet pack Src/Templates/VeloxDev.WPF.Templates
 dotnet new install Src/Templates/VeloxDev.WPF.Templates/bin/Debug/VeloxDev.WPF.Templates.8.0.0.nupkg
 ```
 
-目标框架的模板包是适配器包的同级：`VeloxDev.{Platform}.Templates`，其项模板统一命名成 `{前缀}-v-*`（`wpf-v-*`、`winforms-v-*`、`ava-v-*`、`winui-v-*`、`maui-v-*`、`razor-v-*`、`jalium-v-*`）。Jalium 的网格装饰层项叫 `jalium-v-grid`；其余平台都叫 `-v-decorator`。
+目标框架的模板包是适配器包的同级：`VeloxDev.{Platform}.Templates`，其项模板统一命名成 `{前缀}-v-*`（`wpf-v-*`、`winforms-v-*`、`ava-v-*`、`winui-v-*`、`maui-v-*`、`razor-v-*`、`jalium-v-*`）。网格装饰层项在所有平台都叫 `{前缀}-v-decorator`。
 
 **预期结果：** `dotnet new list wpf-v` 会列出七个 `wpf-v-*` 项模板（在 `dotnet new list` 里也以 `VeloxDev.WPF.Workflow*` 身份出现）。
 
