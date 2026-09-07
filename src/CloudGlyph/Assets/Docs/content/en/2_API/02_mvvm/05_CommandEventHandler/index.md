@@ -1,9 +1,15 @@
 # MVVM — `CommandEventHandler`
 
-**Signature** (`VeloxCommand.cs`, line 380):
+`VeloxDev.MVVM.CommandEventHandler` (`Src/Core/VeloxDev.Core/MVVM/VeloxCommand.cs`) is the delegate type for the command lifecycle events.
+
+**Signature**
 
 ```csharp
 public delegate void CommandEventHandler(CommandEventArgs e);
 ```
 
-- **Notes:** The payload is a single `CommandEventArgs`, not an `(object sender, CommandEventArgs)` pair — unlike the standard .NET event pattern.
+**Notes:**
+
+- The payload is a single `CommandEventArgs`, not the standard .NET `(object? sender, CommandEventArgs e)` pair.
+- `IVeloxCommand` exposes one event of this type per lifecycle state (`Created`, `Enqueued`, `Dequeued`, `Started`, `Completed`, `Failed`, `Canceled`, `Exited`) — see [02_IVeloxCommand](../02_IVeloxCommand/index.md).
+- Subscriber exceptions are swallowed by `VeloxCommand` (`RaiseCommandEvent`), so one faulty handler does not break the command pipeline.

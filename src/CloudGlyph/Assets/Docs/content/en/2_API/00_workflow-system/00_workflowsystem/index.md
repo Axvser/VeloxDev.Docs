@@ -11,9 +11,9 @@ Partial classes decorated with these attributes receive generated properties, co
 | `[WorkflowBuilder.Slot<T>]` | class | `T : IWorkflowSlotViewModelHelper, new()` | — |
 | `[WorkflowBuilder.Link<T>(slotType = null)]` | class | `T : IWorkflowLinkViewModelHelper, new()` | `slotType` = initial slot type |
 
-**Example** — demo node decoration: `Examples/Workflow/Common/Lib/ViewModels/Workflow/NodeViewModel.cs`, line 11-14 (`[WorkflowBuilder.Node<HttpHelper<NodeViewModel>>(workSemaphore: 5)]`).
+**Examples** (shared demo lib, `Examples/Workflow/Common/Lib/ViewModels/Workflow/`) — `[WorkflowBuilder.Tree<AgentHelper>]` on `TreeViewModel.cs` (line 14); `[WorkflowBuilder.Node<NodeHelper>]` on `ControllerViewModel.cs` (line 10); `[WorkflowBuilder.Node<EnumSelectorHelper>(workSemaphore: 1)]` on `EnumSelectorNodeViewModel.cs` (line 12).
 
-*Source: `Src/Core/VeloxDev.Core/WorkflowSystem/Templates/WorkflowBuilder.cs`, lines 3-50.*
+*Source: `Src/Core/VeloxDev.Core/WorkflowSystem/Templates/WorkflowBuilder.cs`.*
 
 ### Core Interfaces
 
@@ -188,7 +188,7 @@ Notes:
 
 - `TreeHelper()` disables virtualization; `TreeHelper(double cellSize)` enables it. The type is annotated `[MonoBehaviour(channel: nameof(TreeHelper), fps: 10)]` and calls `tree.EnableMap(CellSize, VisibleItems)` on `Install`. `CellSize` defaults to `200`.
 - `NodeHelper.SetAnchor/SetSize/Move` call `Component.Parent.GetHelper().MarkDirty()` after mutating.
-- `NodeDefaultViewModel.ReceiveCommand` wraps the parameter into `TaskContext` and calls `Helper.ReceiveAsync(ctx, ct)` — a single receive path carrying nullable data/sender/receiver (`NodeDefaultViewModel.cs` lines 67-72).
+- `NodeDefaultViewModel`'s generated `Receive` handler (the body behind `ReceiveCommand`, lines 115-120) passes the parameter through when it is already an `ITaskContext`, else wraps it as `new TaskContext(parameter)`, and calls `Helper.ReceiveAsync(ctx, ct)` — a single receive path carrying nullable data/sender/receiver.
 - All four default ViewModels implement `IWorkflowIdentifiable` (`RuntimeId = Guid.NewGuid().ToString("N")`).
 
 *Sources: `Templates/ViewModels/*.cs`, `Templates/Helpers/*.cs`.*

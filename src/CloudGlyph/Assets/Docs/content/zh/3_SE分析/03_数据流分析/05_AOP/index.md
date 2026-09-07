@@ -1,90 +1,103 @@
 # 数据流分析 — AOP
 
-## 1. 代理创建 + 钩子注册（`Aop()` → `SetProxy`）
+AOP 运行期流程分三个阶段：**代理获取**、**钩子注册**、**拦截调用**。下面的示例使用 WPF 示例（`Examples/AOP/WPF/Demo`），其中 `Demo.TeamViewModel` 是目标，`TeamViewModel_Demo_Aop` 是其生成的代理接口。
+
+## 1. 代理获取与钩子注册
+
+生成的 `Aop()` 扩展（`AopWriter.cs`，`Src/Generators/VeloxDev.Core.Generator/Writers/AopWriter.cs`）是唯一入口。其工厂只在每个目标的首次调用时运行；后续调用命中每对类型 `ConditionalWeakTable` 的缓存：
 
 ```plantuml
 @startuml
 !theme plain
 
-actor Caller as C
-participant "生成的 Aop() 扩展" as E
+actor "Caller (UI)" as C
+participant "Aop() 扩展" as E
 participant "AopCache" as AC
 participant "ProxyEx" as PX
 participant "DispatchProxy" as DP
 participant "ProxyInstance" as PI
-participant "Aop（注册表）" as AO
+participant "Aop" as AO
 
-C -> E: counter.Aop()
+C -> E: team.Aop()
 activate E
-E -> AC: AopCache.Resolve(counter, factory)
+
+E -> AC: AopCache.Resolve<TeamViewModel, TeamViewModel_Demo_Aop>(team, factory)
 activate AC
-AC -> AC: 每对类型的 CWT.GetValue(counter, factory)
-note right of AC: 泛型对 Counter, Counter_AopDemo_Aop
-alt 已缓存代理
-    AC --> E: 缓存的代理
+
+alt 该目标已缓存代理
+    AC --> E: 缓存的代理（每对类型 CWT 命中）
 else 首次调用
-    AC -> AC: factory(counter)  （生成的 Aop() 匿名函数）
-    AC -> PX: ProxyEx.CreateProxy(counter)
+    AC -> AC: Entry<TeamViewModel, TeamViewModel_Demo_Aop>.Instances.GetValue(team, factory)
+    AC -> PX: factory -> ProxyEx.CreateProxy<TeamViewModel_Demo_Aop>(team)
     activate PX
-    PX -> DP: DispatchProxy.Create(proxyType, ProxyInstance)
+    PX -> DP: DispatchProxy.Create<TeamViewModel_Demo_Aop, ProxyInstance>()
     activate DP
-    DP --> PX: 代理（Invoke 由 ProxyInstance 处理）
+    DP --> PX: 代理（ProxyInstance 子类；构造函数登记 ProxyInstances[localid]）
     deactivate DP
-    PX -> PI: _target = counter; _targetType = proxyType
+    PX -> PI: _target = team; _targetType = 接口类型
     PX -> PI: ProxyIDs.Add(proxy, proxy._localid)
     PX --> AC: 代理
     deactivate PX
-    AC -> AO: Aop.Map(proxy, counter)  （在匿名函数内）
-    AC --> E: 代理（已缓存进每对类型的 CWT）
+    AC -> AO: Aop.Map(proxy, team)  （逆向查找表）
+    AC --> E: 代理（已缓存进每对类型 CWT）
 end
-deactivate AC
-E --> C: 代理
-deactivate E
 
-C -> PX: proxy.SetProxy(ProxyMembers.Method, "Add", start, coverage, end)
-activate PX
-PX -> PI: ProxyIDs.TryGetValue(proxy, out id)
-PX -> PI: ProxyInstances.TryGetValue(id, out instance)
-PX -> PI: instance.MethodActions["Add"] = (start, coverage, end)
-deactivate PX
+deactivate AC
+E --> C: TeamViewModel_Demo_Aop 代理
+deactivate E
 
 @enduml
 ```
 
-说明：`Aop()` 在首次调用之后，对同一目标每次都命中缓存；`SetProxy` 通过 `ProxyIDs` → `ProxyInstances` 解析出 `ProxyInstance`，当成员键已存在时会覆盖整个 `(start, coverage, end)` 三元组（`ProxyEx.cs` 第 26-41 行，`SetMethod` 第 83-101 行）。
+随后 `SetProxy` 用 `ProxyMembers` 对成员分类，并通过 `ProxyIDs` → `ProxyInstances`（均为 `ProxyEx.cs` 中的静态字典）解析出存活的 `ProxyInstance`。当键已存在时，整个 `(start, coverage, end)` 三元组会被覆盖：
 
-## 2. 被拦截的调用（`proxy.Method()`）
+| 成员种类（`ProxyMembers`） | 写入的字典 | 访问器键 |
+|---|---|---|
+| `Getter` | `ProxyInstance.GetterActions` | `"get_" + memberName` |
+| `Setter` | `ProxyInstance.SetterActions` | `"set_" + memberName` |
+| `Method` | `ProxyInstance.MethodActions` | `memberName`（原样） |
+
+例如 `p.SetProxy(ProxyMembers.Setter, nameof(TeamViewModel.Name), null, null, endHook)` 会把三元组按键 `"set_Name"` 存入 `SetterActions`（`ProxyEx.cs` 的 `SetPropertySetter`，第 63-82 行）。这些字典、`ProxyInstance` 登记与钩子都属于**同一个代理实例**，因此 `SetProxy` 必须作用于 `Aop()` 返回的对象，而非原始目标。
+
+## 2. 拦截调用
+
+代理上的每一次成员调用都会汇入 `ProxyInstance.Invoke`（`ProxyInstance.cs`，第 23-53 行）。成员名选择字典：`get_*` → `GetterActions`、`set_*` → `SetterActions`、其余 → `MethodActions`。钩子顺序始终是 `start` →（`coverage`，或对真实目标的反射回退）→ `end`：
 
 ```plantuml
 @startuml
 !theme plain
 
-actor Caller as C
-participant "X_Ns_Aop 代理" as P
+actor "Caller (UI)" as C
+participant "TeamViewModel_Demo_Aop 代理" as P
 participant "ProxyInstance" as PI
-participant "钩子处理器" as H
-participant "真实目标（反射）" as T
+participant "ProxyHandler 钩子" as H
+participant "TeamViewModel (目标)" as T
 
-C -> P: proxy.Add(2, 3)
+C -> P: p.Reset() / p.Name 读取 / p.Name = value
 activate P
-P -> PI: Invoke(targetMethod = "Add", args)   （由 DispatchProxy 进入）
+P -> PI: DispatchProxy 路由 Invoke(name, args)
 activate PI
-PI -> PI: MethodActions.TryGetValue("Add", out actions)
-alt start != null
+
+PI -> PI: 按成员名查找 GetterActions/SetterActions/MethodActions
+
+alt 已注册 start
     PI -> H: start.Invoke(args, null)
     H --> PI: R0
 end
-alt coverage != null
-    PI -> H: coverage.Invoke(args, R0)   // 替换原逻辑
+
+alt 已注册 coverage
+    PI -> H: coverage.Invoke(args, R0)   （替换原始方法体）
     H --> PI: R1
-else coverage == null   // 反射回退
-    PI -> T: _targetType.GetMethod("Add").Invoke(_target, args)
-    T --> PI: R1
+else coverage == null
+    PI -> T: 反射：_targetType.GetMethod(name).Invoke(_target, args)
+    T --> PI: R1（真实方法体执行）
 end
-alt end != null
+
+alt 已注册 end
     PI -> H: end.Invoke(args, R1)
-    H --> PI: null
+    H --> PI: -
 end
+
 PI --> P: 返回 R1
 deactivate PI
 P --> C: 结果
@@ -93,83 +106,46 @@ deactivate P
 @enduml
 ```
 
-属性访问器形状相同：名字以 `get_` 开头的路由到 `GetterActions`，`set_*` 路由到 `SetterActions`，其余路由到 `MethodActions`（`ProxyInstance.cs` 第 23-53 行）。钩子顺序始终是 `start` →（`coverage`，或反射）→ `end`。
+对照示例中注册的钩子（`MainWindow.xaml.cs`，第 45-95 行）：
 
-## 3. 错误路径
+- 读取 `p.Name`：只注册了 `start` 钩子，于是读取操作记录访问，值本身来自反射回退。
+- 写入 `p.Name = "..."`：只注册了 `end` 钩子；反射回退完成写入，随后 `end` 钩子观察到 `args[0]`（新值）。
+- 调用 `p.Reset()`：只注册了 `coverage` 钩子，因此内置的 reset 方法体**不会执行**——钩子返回值 `R1 = null` 取代了它。
 
-### 3a. 钩子抛出异常 → 传播
+### 事件驱动扩展（集合变更 → 自我 `Aop()`）
 
-`ProxyInstance.Invoke` 内部没有 try/catch，因此任何处理器抛出的异常都会直接传播给调用方，并跳过其余阶段与任何反射调用：
+示例还展示了经事件而非直接代理调用触发的切面行为。`TeamViewModel` 构造函数把自己的私有处理器订阅到真实的 `Members` 集合（`TeamViewModel.cs`，第 10-14 行）：
 
-```plantuml
-@startuml
-!theme plain
-
-actor Caller as C
-participant "X_Ns_Aop 代理" as P
-participant "ProxyInstance" as PI
-participant "start 处理器" as H
-
-C -> P: proxy.Reset()
-activate P
-P -> PI: Invoke(targetMethod = "Reset", args)
-activate PI
-PI -> H: start.Invoke(args, null)
-activate H
-H --> PI: throw InvalidOperationException
-deactivate H
-note over PI: Invoke 内部没有 try/catch<br/>coverage / end / 反射全部跳过
-PI --> P: 异常传播
-deactivate PI
-P --> C: 异常到达调用方
-deactivate P
-
-@enduml
+```csharp
+// Examples/AOP/WPF/Demo/TeamViewModel.cs（第 35-38 行）
+private void OnMemberAdded(object? sender, NotifyCollectionChangedEventArgs e)
+{
+    this.Aop().AOP_OnMemberAdded(sender, e);
+}
 ```
 
-### 3b. `coverage == null` 的反射回退
+通过代理添加成员（`p.Members.Add(...)`）会反射到目标的真实集合，其 `CollectionChanged` 触发 `OnMemberAdded`。该处理器经**同一个已缓存的代理**——`this.Aop()`——回调带 `[AspectOriented]` 的 `AOP_OnMemberAdded`，其 `end` 钩子逐个报告新增成员。被拦截的方法自身仍通过反射回退执行，于是切面叠加在原逻辑之上。
 
-当 `coverage` 为 `null` 时，代理对真实目标做反射。若接口类型上解析不到该成员，`GetMethod` 返回 `null`，`?.` 短路，于是调用在不执行原方法体的情况下静默返回 `null`：
+## 3. 错误与边界路径
 
-```plantuml
-@startuml
-!theme plain
+`ProxyInstance.Invoke` 内部**没有 try/catch**——钩子各阶段均不受保护：
 
-actor Caller as C
-participant "X_Ns_Aop 代理" as P
-participant "ProxyInstance" as PI
-participant "真实目标" as T
-participant "end 处理器" as H
-
-C -> P: proxy.SomeMember()
-activate P
-P -> PI: Invoke(targetMethod = name, args)
-activate PI
-PI -> PI: MethodActions.TryGetValue(name, out actions)   // coverage = null
-PI -> T: _targetType.GetMethod(name)
-T --> PI: null   // 生成的接口类型上找不到该成员
-note over PI: R1 = null（?. 短路）—— 原方法体不执行
-PI -> H: end.Invoke(args, null)
-H --> PI: null
-PI --> P: 返回 null
-deactivate PI
-P --> C: null
-deactivate P
-
-@enduml
-```
-
-若 `GetMethod` 找到了成员但反射 `Invoke` 抛异常（例如目标抛错或实参不匹配），该异常会被 `MethodInfo.Invoke` 包装成 `TargetInvocationException` 并传播给调用方；任何 `end` 钩子都会被跳过。
+- `start` / `coverage` / `end` 处理器抛出的异常直接传播给调用方；其余阶段与任何反射调用都被跳过。
+- 当 `coverage == null` 且反射 `MethodInfo.Invoke` 抛异常（真实方法抛错或实参不匹配）时，反射会把它包装为 `TargetInvocationException` 并传播出去；`end` 钩子被跳过。
+- 当 `coverage == null` 且 `_targetType.GetMethod(name)` 返回 `null`（在代理接口上解析不到该成员）时，`?.` 短路：`Invoke` 返回 `null`，真实方法体**不执行**。
+- 未注册钩子的成员没有特殊处理——`actions == null` 时仍走反射回退，因此未挂钩子的成员会透明地抵达真实目标。
+- 对非已登记代理的对象调用 `SetProxy`（例如把原始目标当作 `Aop()` 结果）会静默无效：`ProxyEx.cs` 的 `ProxyIDs` 查找失败，辅助方法原样返回。
 
 ## 流程汇总
 
 | 路径 | 触发条件 | 结果 |
 |---|---|---|
-| 创建代理 | 首次调用 `instance.Aop()` | 创建 `DispatchProxy`，设置 `_target`/`_targetType`，登记到 `ProxyIDs`，经 `Aop.Map` 映射，缓存进每对类型的 CWT |
-| 注册钩子 | `proxy.SetProxy(memberType, name, s, c, e)` | 把 `(s, c, e)` 写入 `GetterActions` / `SetterActions` / `MethodActions` |
+| 代理获取 | 首次 `instance.Aop()` | 创建 `DispatchProxy`，设置 `_target`/`_targetType`，登记进 `ProxyIDs`，经 `Aop.Map` 映射，缓存进每对类型 CWT |
+| 钩子注册 | `proxy.SetProxy(kind, name, s, c, e)` | 把 `(s, c, e)` 写入 `GetterActions`/`SetterActions`/`MethodActions`，键为 `get_*`/`set_*`/原样 |
 | 正常调用 | `proxy.Member(...)` | `start` → `coverage`（或反射回退）→ `end` → 返回 `R1` |
-| 钩子抛异常 | 任意非空钩子 | 异常传播给调用方；其余阶段跳过 |
-| 反射回退 | `coverage == null` | `_targetType.GetMethod(Name)?.Invoke(_target, args)`；找不到则返回 `null` |
-| 反射抛异常 | `coverage == null` 且找到成员 | `TargetInvocationException` 传播给调用方；`end` 跳过 |
+| 钩子抛异常 | 任意非空钩子 | 异常传播给调用方；其余阶段与反射跳过 |
+| 反射抛异常 | `coverage == null` 且找到成员 | `TargetInvocationException` 传播；`end` 跳过 |
+| 反射未命中 | `coverage == null` 且找不到成员 | `GetMethod(...)?` 返回 `null`；调用返回 `null`，真实方法体不执行 |
+| 事件扩展 | 目标集合 `CollectionChanged` | 私有处理器经已缓存代理调用 `this.Aop().AOP_OnMemberAdded(...)` |
 
-> 出处汇总：`Src/Core/VeloxDev.Core/AspectOriented/ProxyInstance.cs`、`ProxyEx.cs`、`AopCache.cs`、`Aop.cs`、`Src/Generators/VeloxDev.Core.Generator/Writers/AopWriter.cs`。
+> 出处汇总：`Src/Core/VeloxDev.Core/AspectOriented/{ProxyInstance,ProxyEx,AopCache,Aop}.cs`、`Src/Generators/VeloxDev.Core.Generator/Writers/AopWriter.cs`、`Examples/AOP/WPF/Demo/{TeamViewModel.cs,MainWindow.xaml.cs}`。

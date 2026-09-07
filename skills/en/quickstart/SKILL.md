@@ -46,8 +46,9 @@ A feature's Quick Start is normally **split into sub-pages** rather than one lon
 ```
 
 - Each sub-page keeps its own **Expected result** assertions.
-- The parent `index.md` is a short overview that links the sub-pages; do not duplicate their body there.
+- The parent `index.md` is a short overview that links the sub-pages using the cross-page link syntax in 【Links & Navigation】; do not duplicate their body there.
 - The **Run Declaration** footer stays at the end of the last content page (the one holding the Complete Code).
+- **Outline-first:** BEFORE writing any body, create the sub-page skeleton above (each directory plus an empty `index.md`, with every ancestor `index.md` in place) and run `gen_tree.py` so the sub-pages appear in the navigation; then fill each leaf within its budget. Do not write one page and split it afterwards.
 
 ### Structure
 

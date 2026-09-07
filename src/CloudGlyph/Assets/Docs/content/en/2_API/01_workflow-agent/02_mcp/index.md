@@ -1,79 +1,81 @@
 # Workflow Agent — Namespace: `VeloxDev.AI.MCP`
 
-### `McpScope`
+Local/remote MCP hosting: `McpScope` installs server packages (npm/pip), launches processes over stdio, or reaches remote servers over Streamable HTTP (SSE fallback), returning each server's tools as `AITool`; `McpAgentToolkit` turns server management into Agent-callable tools. All types below live in `VeloxDev.AI.MCP` (implemented in `Src/Core/VeloxDev.Core.Extension/Agent/MCP/`). Security model: server configuration is fixed once at load time; the Agent can only load/unload/inspect, never reconfigure.
 
-Local MCP environment: installs server packages and connects over stdio (or remote HTTP), returning tools as `AITool[]`.
+**Evidence:** **Test** (`Src/Core/VeloxDev.Core.Extension.Test/Agent/MCP/*`) + **Demo** (`AgentHelper` `Mcp`/`McpServers` + `McpAgentToolkit` registration).
 
-#### `WithMcpRoot`
+## McpScope
 
-**Signature:** `public McpScope WithMcpRoot(string relativePath)`
-**Returns:** the same scope.
-**Notes:** root is relative to `AppContext.BaseDirectory`; default `".evn/mcp"`. Runtime subdirectories: `{root}/node/` (npm/npx), `{root}/py/` (pip/uvx), `{root}/dotnet/`, `{root}/exe/`.
+`public class McpScope`. Manages the MCP installation root and the connect lifecycle. `McpScope.McpRootRelative` defaults to `".evn/mcp"` (relative to `AppContext.BaseDirectory`); runtimes live in `{root}/node/` (npm/npx), `{root}/py/` (pip/uvx), `{root}/dotnet/`, `{root}/exe/`.
 
-#### `LoadAsync`
-
-**Signature:** `public async Task<AITool[]> LoadAsync(IEnumerable<McpServerConfiguration> servers, CancellationToken ct = default)`
-**Returns:** all loaded server tools as `AITool[]`.
-**Exceptions:** none thrown for per-server failures — the `ServerError` event is raised and that server contributes zero tools. `OperationCanceledException` propagates on cancellation.
-**Example:** `Src/Core/VeloxDev.Core.Extension/Agent/MCP/McpScope.cs`, lines 163–187; demo `AgentHelper.LoadMcpServersAsync`.
-**Notes:** local modes (`Npm`/`Pip`) install first (idempotent, process-wide `s_installed` set + `SemaphoreSlim`), then connect via stdio; `Npx`/`Uvx`/`Dotnet`/`Exe` connect directly; `Http` connects over Streamable HTTP (SSE fallback). Status is driven on `Status` (`McpStatusViewModel`), marshalled to the UI thread when a synchronization context is registered.
-
-#### `ServerError`
-
-**Signature:** `public event Action<McpServerConfiguration, Exception>? ServerError`
-**Notes:** raised when a server fails to load; the error is not rethrown. Per-server status becomes `McpServerStatus.Error`.
-
-#### Other members
-
-| Member | Signature | Effect |
+| Member | Signature | Notes |
 |---|---|---|
-| `McpRootRelative` | `string { get; }` | Current MCP root (relative). |
-| `Status` | `McpStatusViewModel { get; }` | Global bindable per-server status + aggregates. |
-| `LoadedTools` | `IReadOnlyList<AITool> { get; }` | All connected servers' tools, aggregated; changes mid-session. |
-| `GetServerTools` | `IReadOnlyList<AITool> GetServerTools(string name)` | Tools of one connected server (empty if not connected). |
-| `UnloadServer` | `bool UnloadServer(string name)` | Removes a server's tools and resets its status to `NotStarted`. |
-| `WithConnectionTimeout` | `McpScope WithConnectionTimeout(TimeSpan?)` | Global connection timeout (Http mode). |
-| `WithSynchronizationContext` | `McpScope WithSynchronizationContext(SynchronizationContext?)` | Marshal status updates to the UI thread. |
-| `WithOAuthAuthorizationRedirect` | `McpScope WithOAuthAuthorizationRedirect(Func<Uri, Uri, CancellationToken, Task<string>>)` | OAuth authorization-redirect handler for remote servers. |
+| `ServerError` | `event Action<McpServerConfiguration, Exception>?` | Raised when a server fails to load; the error is **not** rethrown and that server contributes zero tools. |
+| `McpRootRelative` | `string { get; private set; }` | Current MCP root (relative). |
+| `Status` | `McpStatusViewModel { get; }` | Globally bindable per-server status + aggregates, driven live during `LoadAsync`. |
+| `LoadedTools` | `IReadOnlyList<AITool> { get; }` | All connected servers' tools, aggregated; changes mid-session (unload → tools disappear). |
+| `WithMcpRoot` | `McpScope WithMcpRoot(string relativePath)` | Sets the install root. |
+| `WithConnectionTimeout` | `McpScope WithConnectionTimeout(TimeSpan?)` | Global connection/initialization timeout (Http mode); per-server override via `Options.connectionTimeout`. |
+| `WithSynchronizationContext` | `McpScope WithSynchronizationContext(SynchronizationContext?)` | Marshals all status updates onto the given UI context. |
+| `WithOAuthAuthorizationRedirect` | `McpScope WithOAuthAuthorizationRedirect(Func<Uri, Uri, CancellationToken, Task<string?>>)` | OAuth authorization-redirect handler for remote servers (opens `authorizationUri`, returns the final redirect URL carrying the code). When unset, the MCP SDK's default console-input handler is used. |
+| `LoadAsync` | `Task<AITool[]> LoadAsync(IEnumerable<McpServerConfiguration> servers, CancellationToken ct = default)` | Loads servers in order. |
+| `GetServerTools` | `IReadOnlyList<AITool> GetServerTools(string name)` | Tools of one connected server (empty when not connected). |
+| `UnloadServer` | `bool UnloadServer(string name)` | Removes a server's tool set and resets its status to `NotStarted`. Returns whether tools were loaded. |
 
-### `McpServerConfiguration`
+**`LoadAsync` behavior.** `Npm`/`Pip` install first (idempotent, process-wide install cache + `SemaphoreSlim`), then connect over stdio; `Npx`/`Uvx`/`Dotnet`/`Exe` connect directly; `Http` connects over Streamable HTTP with SSE fallback. Per-server failure is caught — status becomes `McpServerStatus.Error`, `ServerError` fires, that server contributes zero tools; caller cancellation propagates. A remote connection respects `WithConnectionTimeout` with a host-side hard fallback.
 
-**Signature:** `public partial class McpServerConfiguration` (MVVM source-generated properties)
+## McpServerConfiguration
+
+`public partial class McpServerConfiguration` — MVVM source-generated (`[VeloxProperty]`) properties.
 
 | Property | Type | Description |
 |---|---|---|
 | `Name` | `string` | Server name (status/tool key). |
 | `Description` | `string` | Human-readable description. |
 | `RunMode` | `McpServerRunMode` | How the server is launched / reached. |
-| `Package` | `string` | Npm/PyPI package name, DLL path under `dotnet/`, or exe path under `exe/`. Note: property name is **`Package`**, not `NpmPackage`. |
-| `Version` | `string?` | Version tag (Npm/Pip); `null` = `"latest"`. |
+| `Package` | `string` | Npm/Npx/Uvx/Pip package name; Dotnet: DLL path under `dotnet/` (e.g. `"sharp-email-mcp/SharpEmailMcp.dll"`); Exe: executable path under `exe/`. |
+| `Version` | `string?` | Version tag for `Npm`/`Pip`; `null` = `"latest"`. |
 | `Arguments` | `string[]` | Extra args passed to the server process. |
 | `Endpoint` | `string?` | Remote URL for `Http` mode. |
-| `Options` | `object?` | Anonymous-object blob; known keys `headers`, `oauth`, `connectionTimeout`, `transportMode`, `ownsSession`, `env`, `workingDirectory`; unknown keys are rejected. |
+| `Options` | `object?` | Anonymous-object blob (see below); unknown keys are rejected by `McpScope`. |
 
-### `McpServerRunMode`
+**`Options` keys.** Http: `headers` (extra headers), `oauth` (`clientId`, `clientSecret`, `redirectUri`, `scopes` — Authorization Code + PKCE), `connectionTimeout` (seconds or TimeSpan string; overrides the scope-wide value), `transportMode` (`AutoDetect`/`StreamableHttp`/`Sse`), `ownsSession`. Stdio: `env`, `workingDirectory`.
 
-`Npm` (npm install + node), `Npx` (npx -y), `Uvx` (uvx), `Dotnet` (dotnet {dll}), `Pip` (venv + pip install + python -m), `Exe` (direct executable), `Http` (remote Streamable HTTP/SSE). The previous doc revision listed six modes; `Http` is the current seventh.
+## McpServerRunMode
 
-### `McpServerStatus`
+`enum McpServerRunMode` — how the server is reached:
 
-`NotStarted`, `Installing`, `Connecting`, `Connected`, `Error`.
+| Mode | Command model |
+|---|---|
+| `Npm` | `npm install` into `{root}/node/{package}/`, then `node {entry} {args}`. |
+| `Npx` | `npx -y {package} {args}` (temporary download, no install). |
+| `Uvx` | `uvx {package} {args}` (uv provides its own isolation). |
+| `Dotnet` | `dotnet {dll} {args}`; the user pre-publishes under `{root}/dotnet/{package}`. |
+| `Pip` | Creates a venv at `{root}/py/venvs/{package}/`, `pip install`, then `python -m {module} {args}`. |
+| `Exe` | Executes `{root}/exe/{package}` directly (tech-agnostic). |
+| `Http` | Connects to a remote server at `Endpoint` (Streamable HTTP, SSE fallback); no local process. |
 
-### `McpStatusViewModel` / `McpServerStatusViewModel`
+## McpServerStatus
 
-Bindable per-server status (`Name`, `Description`, `RunMode`, `State`, `ToolCount`, `Error`, `Endpoint`, derived `IsConnected`/`IsInstalling`/`IsConnecting`/`IsError`/`StateText`) and the aggregate VM (`Servers`, `IsLoading`, `ConnectedCount`, `ErrorCount`, `WorkingCount`, `IsAllReady`, `HasError`; `Track`, `SetLoading`, `Reset`).
+`enum McpServerStatus` — connection lifecycle: `NotStarted`, `Installing` (local npm/pip only; Http skips it), `Connecting`, `Connected`, `Error`.
 
-### `McpAgentToolkit`
+## Status view-models
 
-Agent-callable MCP management tools, registered via `WorkflowAgentScope.WithTools(...)`.
+`McpServerStatusViewModel` (per server): `Name`, `Description`, `RunMode`, `State`, `ToolCount`, `Error`, `Endpoint` plus derived `IsConnected`/`IsInstalling`/`IsConnecting`/`IsError` and Chinese `StateText` (`已连接`/`安装中`/`连接中`/`错误`/`未启动`).
 
-**Signature:** `public sealed class McpAgentToolkit(McpScope scope, IReadOnlyList<McpServerConfiguration> servers)` — `CreateTools()` returns four tools:
+`McpStatusViewModel` (aggregate, exposed by `McpScope.Status`): `Servers`, `IsLoading`, `ConnectedCount`, `ErrorCount`, `WorkingCount`, `IsAllReady`, `HasError`; methods `Track(McpServerStatusViewModel)`, `SetLoading(bool)`, `Reset()`.
+
+## McpAgentToolkit
+
+`public sealed class McpAgentToolkit(McpScope scope, IReadOnlyList<McpServerConfiguration> servers)` — MCP management tools callable by the Agent; register via `WorkflowAgentScope.WithTools(...)` (demo `AgentHelper.ProvideAgent`). Constructor throws `ArgumentNullException` when `scope` is null.
+
+| Member | Signature | Notes |
+|---|---|---|
+| `CreateTools` | `IList<AITool> CreateTools()` | Four tools: `ListMcpServers`, `LoadMcpServers`, `UnloadMcpServer`, `DescribeMcpServer`. |
 
 | Tool | Purpose |
 |---|---|
-| `ListMcpServers` | Lists configured servers and status (state, tool count, error) + aggregate counts. |
-| `LoadMcpServers` | Loads (installs if needed, connects) host pre-registered servers, optional name subset. |
-| `UnloadMcpServer` | Unloads a connected server mid-session. |
-| `DescribeMcpServer` | Exports a connected server's tool capabilities as prompts without invoking them. |
-
-Security model: server configuration is fixed at load time; the Agent can only load/unload/inspect, never reconfigure.
+| `ListMcpServers` | Lists configured servers and status (`runMode`, `state`, `stateText`, `toolCount`, `error`) + aggregate counts. Pure query. |
+| `LoadMcpServers` | Loads (installs if needed, connects) host pre-registered servers; optional JSON array of server names to load a subset. |
+| `UnloadMcpServer` | Unloads a connected server mid-session (tools disappear from the next conversation; status resets to `NotStarted`). |
+| `DescribeMcpServer` | Exports a connected server's tool capabilities (name + description) as prompts WITHOUT invoking them. |

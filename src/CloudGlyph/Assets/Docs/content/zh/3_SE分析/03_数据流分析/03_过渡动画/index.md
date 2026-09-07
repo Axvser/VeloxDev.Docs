@@ -1,213 +1,218 @@
 # 数据流 — 过渡动画
 
-## (a) 正常执行流
+引擎在每个平台适配器上都通过相同的核心管道执行。一次运行在每个分段内是**两阶段**的：调度器先*准备*出一个归一化的 `SamplerSet`（读取当前值、解析采样器、固定端点），随后解释器驱动一个基于 Stopwatch 的*连续*采样循环，把每一帧写入编组到 UI 线程。本页展示运行生命周期、效果调度循环、UI 线程跳转，以及调度器的扇出/抢占规则。
 
-从 `snapshot.Execute(target)` 到 Stopwatch 驱动采样循环的完整调用链。此流程在全部六个平台适配器上一致运行。
+## (a) 分段运行生命周期
+
+`Execute(target)` 沿流式 `StateSnapshot` 链（`root`…`next`）行走，为每段排队 `(state, effect-clone, interpolator, delay)`，然后在每目标一个的调度器上一次播放一段。取消由一次运行共享的一个 `CancellationTokenSource` 承载，贯穿该运行的所有分段。
 
 ```plantuml
 @startuml
 !theme plain
 
-actor User as User
+actor "Caller" as Caller
 participant "StateSnapshot" as SS
-participant "TransitionCore" as TC
 participant "TransitionScheduler" as Sch
-participant "InterpolatorCore" as IC
 participant "UIThreadInspector" as UI
-participant "SamplerSet" as FUS
+participant "InterpolatorCore" as IC
+participant "SamplerSet" as SET
 participant "TransitionInterpreter" as TI
 participant "Effect" as EF
-participant "Target (UI element)" as T
+participant "Target" as TGT
 
-User -> SS: Execute(Rec0, CanMutualTask)
+Caller -> SS: Execute(target, CanMutualTask)
 activate SS
 
-SS -> TC: (static) Execute(target, snapshot, CanMutualTask)
-activate TC
+SS -> SS: Walk root -> next chain;\nqueue (interpolator, delay, effect-clone, state) per segment
 
-TC -> Sch: FindOrCreate(target, CanMutualTask)
+SS -> Sch: FindOrCreate(target, CanMutualTask)
 activate Sch
 alt CanMutualTask == true
-    Sch -> Sch: return shared mutual scheduler (ConditionalWeakTable)
+    Sch --> SS: shared scheduler cached in MutualSchedulers (ConditionalWeakTable)
 else CanMutualTask == false
-    Sch -> Sch: return one-off non-mutual scheduler
+    Sch --> SS: fresh scheduler; registered in NoMutualSchedulers
 end
-Sch --> TC: scheduler
+opt CanMutualTask == true
+    SS -> Sch: Exit()  (cancel the scheduler's active cts, if any -> new run preempts old)
+end
 deactivate Sch
 
-TC -> Sch: Execute(producer, state, effect, cts)
-activate Sch
+loop one iteration per chained segment
+    SS -> SS: await Task.Delay(segment.delay, cts)  (skip on OperationCanceledException)
+    SS -> Sch: Execute(interpolator, state, effect, cts)
+    activate Sch
+    Sch -> Sch: _gate.WaitAsync()  (serialize executions on this scheduler)
+    Sch -> UI: ProtectedInvoke(target, () => effect.InvokeAwake(target, args))
+    activate UI
+    UI -> EF: Awaked event (raised on the UI thread)
+    UI --> Sch
+    deactivate UI
 
-Sch -> IC: Prepare(target, state, effect, inspector)
-activate IC
-
-loop every recorded property
-    IC -> UI: ProtectedGetValue(target, property)  (marshalled if needed)
-    UI --> IC: currentValue (start)
-    alt custom sampleable (state.Interpolators)
-        IC -> IC: sampleable = state.Interpolators[property]
-    else registry TryGetInterpolator(propertyType)
-        IC -> IC: sampleable = NativeInterpolators[type]
-    else current/new value is ISampleable
-        IC -> IC: sampleable = value
+    Sch -> IC: Prepare(target, state, effect, inspector)
+    activate IC
+    loop every recorded property
+        IC -> UI: ProtectedGetValue(target, property)  (marshal the read if off-thread)
+        UI --> IC: current value (start)
+        IC -> IC: resolve sampler: state override -> registry -> value-type ISampleable (StructAssembler)
+        IC -> IC: normStart = NormalizeStart(cur, new, opt);\nnormEnd = NormalizeEnd(cur, new, opt)
+        IC -> SET: Add(property, sampler, normStart, normEnd, options)
     end
-    IC -> IC: sampler = sampleable.Normalize(current, new, options)
-    IC -> FUS: Add(property, sampler, current, new, options)
+    IC --> Sch: SamplerSet (one entry per property)
+    deactivate IC
+
+    alt cts cancelled or Args.Handled set by Awake
+        Sch --> SS: run skipped (no sampling)
+    else
+        Sch -> TI: Execute(target, samplerSet, effect, cts)
+        activate TI
+        TI -> TI: Start/Update/Apply/LateUpdate ... Completed\n(b: sampling loop)
+        TI --> Sch: completed
+        deactivate TI
+    end
+    Sch -> Sch: finally: release _gate; clear cts
+    Sch --> SS
+    deactivate Sch
 end
 
-IC --> Sch: SamplerSet (one prepared sampler per property)
-deactivate IC
-
-Sch -> TI: Execute(target, samplerSet, effect, cts)
-activate TI
-
-TI -> EF: InvokeStart(sender, args)
-EF --> TI: Start event fired
-
-loop each pass (forward; backward when IsAutoReverse)
-    loop sample until rawT >= 1 (Stopwatch-driven)
-        TI -> TI: rawT = elapsed / durationMs  (clamped to [0,1])
-        TI -> TI: easedT = Ease(rawT), clamped to [0,1]
-        TI -> EF: InvokeUpdate(sender, args)
-        TI -> FUS: Apply(target, easedT, priority)
-        activate FUS
-        FUS -> UI: ProtectedInvoke(target, applyCore, priority)\n(skipped if cancelled / app dead)
-        UI -> FUS: applyCore: per entry → sampler.Update(target, property, start, end, options, easedT)
-        FUS -> T: t<=0 → exact start / t>=1 → exact end /\nmiddle → SetValue (value) or in-place mutation (reference)
-        deactivate FUS
-        TI -> EF: InvokeLateUpdate(sender, args)
-        TI -> TI: await Task.Delay(1)  (coarse yield only; Stopwatch is the timing source)
-    end
-end
-
-TI -> EF: InvokeCompleted(sender, args)
-EF --> TI: Completed event fired
-deactivate TI
-Sch --> TC: completed
-deactivate Sch
-TC --> SS
-deactivate TC
-SS --> User: return
+SS --> Caller: return
 deactivate SS
 @enduml
 ```
 
-## (b) 自动往返 / 循环流
+来源：`TransitionSystem/StateSnapshot.cs`（`CoreExecute`，分段排队与播放循环）、`TransitionScheduler.cs`（`FindOrCreate`、`Execute`、`_gate`、弱目标引用）、`Interpolator.cs`（`Prepare`，采样器解析）、`SamplerSet.cs`。
 
-当设置了 `IsAutoReverse` 或 `LoopTime` 时，解释器会把采样程包起来。`LoopTime = int.MaxValue` 表示无限循环。
+## (b) 效果调度与采样循环
+
+每段的解释器运行一个连续循环。`Duration`/`FPS` 取自该段的 `Effect`；`FPS` 是**最大采样率上限**——让出间隔为 `1000 / FPS` ms，而 Stopwatch 是唯一计时来源（因此 `Task.Delay` 的误差永远不会让动画失真）。`LoopTime = int.MaxValue` 表示无限循环。
 
 ```plantuml
 @startuml
 !theme plain
 
 participant "TransitionInterpreter" as TI
-participant "SamplerSet" as FUS
 participant "Effect" as EF
 
-TI -> TI: durationMs = effect.Duration.TotalMilliseconds
-TI -> TI: stopwatch = Stopwatch.StartNew()
 TI -> EF: InvokeStart(sender, args)
+EF --> TI: Start fired
+TI -> TI: frameSet.SetCancellation(cts);\ndurationMs = effect.Duration.TotalMilliseconds
+TI -> TI: sampleIntervalMs = 1000 / max(1, effect.FPS)\nforeverloop = (effect.LoopTime == int.MaxValue)
+TI -> TI: stopwatch = Stopwatch.StartNew(); cycle = 0
 
-loop loop in 0 .. effect.LoopTime (forever when int.MaxValue)
-    loop forward pass (sample until rawT >= 1)
-        TI -> TI: cts/Args.Handled check
-        TI -> TI: rawT = stopwatch.Elapsed / durationMs
-        TI -> TI: easedT = clamp(Ease(rawT), 0, 1)
-        TI -> EF: InvokeUpdate
-        TI -> FUS: Apply(target, easedT, priority)
-        TI -> EF: InvokeLateUpdate
-        TI -> TI: await Task.Delay(1)  (coarse yield)
+loop while (foreverloop || cycle <= effect.LoopTime)
+    loop forward pass until rawT >= 1
+        TI -> TI: throw OperationCanceledException if cts cancelled or Args.Handled
+        TI -> TI: rawT = (stopwatch.Elapsed - passStartMs) / durationMs
+        TI -> TI: easedT = rawT >= 1 ? 1 : clamp(effect.Ease.Ease(rawT), 0, 1)
+        TI -> EF: InvokeUpdate(sender, args)
+        TI -> TI: apply(easedT) -> SamplerSet.Apply (UI-thread hop, see (c))
+        TI -> EF: InvokeLateUpdate(sender, args)
+        TI -> TI: await Task.Delay(sampleIntervalMs, cts)\n(Stopwatch is the timing authority)
     end
-    alt effect.IsAutoReverse
-        loop backward pass (sample until rawT >= 1)
-            TI -> TI: cts/Args.Handled check
-            TI -> TI: easedT = clamp(Ease(1 - rawT), 0, 1); endpoint easedT = 0
-            TI -> EF: InvokeUpdate
-            TI -> FUS: Apply(target, easedT, priority)
-            TI -> EF: InvokeLateUpdate
-            TI -> TI: await Task.Delay(1)  (coarse yield)
+    opt effect.IsAutoReverse
+        loop backward pass until rawT >= 1
+            TI -> TI: throw OperationCanceledException if cts cancelled or Args.Handled
+            TI -> TI: easedT = rawT >= 1 ? 0 : clamp(effect.Ease.Ease(1 - rawT), 0, 1)
+            TI -> EF: InvokeUpdate / apply(easedT) / InvokeLateUpdate
         end
     end
 end
-
 TI -> EF: InvokeCompleted(sender, args)
-EF --> TI: Completed event fired
+EF --> TI: Completed fired
+TI -> EF: InvokeFinally(sender, args)
+EF --> TI: Finally fired
 @enduml
 ```
 
-## (c) 取消 / `TransitionEventArgs.Handled = true` 短路
+每程最后一次采样写入**精确端点**（正向 `easedT = 1`，反向 `easedT = 0`），而非依赖 `Ease(1)`；每个采样器把 `t <= 0`/`t >= 1` 映射为归一化后的精确起点/终点值。
 
-被取消的 `cts`（来自 `Transition.Exit` 或新的互斥动画）或处理器把 `Handled` 设为 `true` 都会抛出 `OperationCanceledException`；解释器触发 `Canceled` + `Finally` 并停止。
+## (c) UI 线程跳转、取消与应用关闭守卫
+
+`SamplerSet.Apply` 为每个目标复用一个缓存闭包，把当前缓动时间经 `ProtectedInvoke` 交给 UI 线程。若目标分发器就是当前线程则内联执行；否则投递到目标所属分发器。`Prepare` 期间的读取同样经 `ProtectedGetValue` 编组。被取消的运行或已关闭的应用会跳过排队写入（即「过期帧守卫」），因此重置/退出的结果绝不会被覆盖。
 
 ```plantuml
 @startuml
 !theme plain
 
 participant "TransitionInterpreter" as TI
+participant "SamplerSet" as SET
+participant "UIThreadInspector" as UI
+participant "ISampler" as SM
+participant "Target" as TGT
 participant "Effect" as EF
-participant "TransitionEventArgs" as Args
 
-TI -> TI: sampling loop
-TI -> Args: Args.Handled read
-alt Args.Handled == true  (event handler short-circuit)
-    TI -> TI: throw OperationCanceledException
-else cts.IsCancellationRequested (Transition.Exit / new mutual)
-    TI -> TI: throw OperationCanceledException
+TI -> SET: Apply(target, easedT, priority)
+activate SET
+alt cts.IsCancellationRequested
+    SET --> TI: return (skip stale queued frame)
+else not CanSetValue()  (inspector.IsAppAlive() == false)
+    SET --> TI: return (no write, no further events)
+else
+    SET -> UI: ProtectedInvoke(target, cachedApply, priority)
+    activate UI
+    UI -> UI: CheckAccess()? run inline\nelse dispatch to the target's owning dispatcher
+    UI -> SM: InsertFrame(target, property, ref working, start, end, options, t)
+    SM -> TGT: write value (t <= 0/t >= 1 -> exact start/end)
+    UI --> SET
+    deactivate UI
+    SET --> TI: return
 end
+deactivate SET
+
+== Cancellation / short-circuit inside the sampling loop ==
+
+TI -> TI: cts cancelled (Transition.Exit / preempting new mutual run)\nor Args.Handled == true (an event handler killed the timeline)
+TI -> TI: throw OperationCanceledException
 TI -> EF: InvokeCancled(sender, args)
-EF --> TI: Canceled event fired
+EF --> TI: Canceled fired
 TI -> EF: InvokeFinally(sender, args)
-EF --> TI: Finally event fired
+EF --> TI: Finally fired (non-mutual runs also unregister from NoMutualSchedulers here)
 TI -> TI: stop immediately
 @enduml
 ```
 
-**应用关闭路径：** `SamplerSet.Apply` 会检查 `inspector.IsAppAlive()`（通过 `CanSetValue`）；当其为 `false`（例如 WinUI `DispatcherQueue` 入队失败）时跳过写入。`ApplyCore` 内的同一守卫会在一次采样中途停止，因此采样不再应用且不再触发更多事件。被取消的动画（`cts.IsCancellationRequested`）同样跳过已排队的写入 —— 即原 `ICancellableFrameSequence` 的过期帧守卫。
+来源：`TransitionSystem/SamplerSet.cs`（`Apply`、`SetCancellation`、`CanSetValue`、缓存 apply 闭包）、`TransitionInterpreter.cs`（`ExecuteSamplingLoopAsync`、`RunPassAsync`）、`TransitionEffect.cs`（事件触发）、`Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`（各平台编组）。
 
-## (d) 互斥 vs 非互斥调度器扇出
+## (d) 调度器选择、抢占与扇出
 
-一个目标**至多**持有一个共享互斥调度器（由 `SemaphoreSlim` 串行化），但可以同时持有**多个**并发的非互斥调度器。
+一个目标**至多**持有一个共享互斥调度器（由 `SemaphoreSlim` 串行化），但可同时运行**多个**并发的非互斥调度器。同一目标上的新互斥运行会抢占（取消）当前正在执行的那个。
 
-```plantuml
-@startuml
-!theme plain
-
-participant "StateSnapshot.Execute" as EX
-participant "Target" as T
-participant "MutualSchedulers (CWT)" as MWT
-participant "NoMutualSchedulers (CWT)" as NWT
-participant "Scheduler (mutual, shared)" as SA
-participant "Scheduler (non-mutual #1)" as SB1
-participant "Scheduler (non-mutual #2)" as SB2
-
-EX -> MWT: CanMutualTask: true -> FindOrCreate(target)
-MWT --> EX: shared scheduler (1 per target)
-EX -> SA: Execute(producer, state, effect, cts)
-SA -> SA: gate.WaitAsync() serializes; new mutual animation Exit()s the previous
-SA -> T: apply sampler writes (UI-marshalled)
-
-EX -> NWT: CanMutualTask: false -> AddNoMutual(target, [scheduler])
-EX -> SB1: Execute(...)
-EX -> SB2: Execute(...)
-SB1 -> T: apply sampler writes in parallel
-SB2 -> T: apply sampler writes in parallel
-SB1 -> NWT: RemoveNoMutual(target, [SB1]) on Completed
-SB2 -> NWT: RemoveNoMutual(target, [SB2]) on Completed
-@enduml
+```mermaid
+flowchart TD
+    A[Call snapshot.Execute target, CanMutualTask] --> B{CanMutualTask?}
+    B -->|true| C[FindOrCreate returns the shared scheduler from MutualSchedulers CWT]
+    C --> D[Exit current run - cancel the scheduler's active cts]
+    D --> E[New cts; queue all chained segments]
+    B -->|false| F[Allocate a fresh scheduler; AddNoMutual registers it under NoMutualSchedulers]
+    F --> E
+    E --> G[For each segment: await delay, then scheduler.Execute]
+    G --> H{Acquire _gate?}
+    H -->|no - previous Execute still running| G
+    H -->|yes| I[Awake on UI thread, Prepare SamplerSet]
+    I --> J[Interpreter sampling loop]
+    J --> K{End of segment?}
+    K -->|cancelled / Handled| L[InvokeCancled + InvokeFinally; release gate]
+    K -->|loop exhausted| M[InvokeCompleted + InvokeFinally; release gate]
+    L --> N[Non-mutual: Finally handler unregisters from NoMutualSchedulers]
+    M --> N
 ```
+
+`Transition.Exit(target, IncludeMutual, IncludeNoMutual)` 取消目标的互斥调度器，并可选择取消每个正在运行的非互斥调度器；这些调度器随后经上面的 `Canceled`/`Finally` 路径收尾。
 
 ## 流程汇总
 
 | 场景 | 行为 |
 |---|---|
-| 正常执行 | `InterpolatorCore.Prepare` 为每个属性解析 `ISampleable` 并 `Normalize` 得到 `ISampler`（读取 current=start、target=end）；解释器用 Stopwatch 连续采样（`t = elapsed/duration`，缓动 + 钳制），并经 `SamplerSet.Apply` 编组到 UI 线程应用；每次采样触发 `Update`/`LateUpdate` 事件；结束时触发 `Completed` + `Finally`。 |
-| `IsAutoReverse` | 正向程后，解释器运行反向程（复用同一批采样器；程末 `easedT` 强制为 0）。 |
-| `LoopTime` / `int.MaxValue` | 整个正向（+ 反向）程重复 `LoopTime` 次，或永远。 |
-| 同目标新的互斥动画 | 新运行前 `CoreExecute` 调用 `scheduler.Exit()`；先前调度器取消其当前 `cts`。 |
-| `TransitionEventArgs.Handled = true` | 抛出 `OperationCanceledException` → `Canceled` + `Finally`；时间线停止。 |
-| `Transition.Exit(target)` | 取消目标的互斥（可选非互斥）调度器。 |
-| 后台线程启动 | `UIThreadInspector.ProtectedInvoke`/`ProtectedGetValue` 把读取与写入编组到 UI 线程。 |
-| 属性无采样器 | `Prepare` 中跳过该属性（`UnreadablePath` 哨兵或未解析到 `ISampleable`）；其余属性照常动画。 |
-| 应用关闭 | `SamplerSet.CanSetValue()` 检查 `IsAppAlive()` → 跳过写入，不再触发事件。 |
+| 正常运行 | `CoreExecute` 排空每条链接的分段，然后逐段：`await delay` → 调度器 `Execute`（门控）→ UI 线程上 `Awake` → `Prepare` 为每个属性构建一个 `SamplerSet` 条目 → 解释器连续采样（`t = eased elapsed/duration`）并在 UI 线程应用每帧 → `Completed` + `Finally`。 |
+| `IsAutoReverse` | 正向程后解释器运行反向程（复用同一批采样器；程末 `easedT = 0`）。 |
+| `LoopTime` / `int.MaxValue` | 整个正向（+ 反向）对重复 `LoopTime + 1` 次（`cycle <= LoopTime`，自 0 起），或永远。 |
+| 分段 `Await` 延迟 | 每段的前置延迟（`CoreAwait`/`CoreAwaitThen`）；取消（`OperationCanceledException`）时跳过。 |
+| 同一目标的新互斥运行 | `CoreExecute` 先调用 `scheduler.Exit()`；先前调度器取消其当前 `cts`，排队帧被跳过。 |
+| `TransitionEventArgs.Handled = true` | 事件处理器抛出 `OperationCanceledException` → `Canceled` + `Finally`；时间线停止。 |
+| `Transition.Exit(target, …)` | 取消目标的互斥（可选非互斥）调度器；每个都经 `Finally` 注销。 |
+| 后台线程启动 | `UIThreadInspector` 把读取（`ProtectedGetValue`）与帧写入（`ProtectedInvoke`）编组到目标 UI 线程；生命周期事件仍在解释器的执行线程上触发（只有 `Awake` 与帧写入总在 UI 线程）。 |
+| 属性无采样器 / 路径无效 | `Prepare` 中跳过（编译 getter 的 `UnreadablePath` 哨兵，或未解析到 `ISampler`）；其余属性照常动画。 |
+| 应用关闭 | `SamplerSet.CanSetValue()` 返回 false → `Apply` 跳过写入，不再触发事件。 |
 
-> 源码引用：`Src/Core/VeloxDev.Core/TransitionSystem/TransitionInterpreter.cs`（Stopwatch 驱动采样循环、`ExecuteSamplingLoopAsync`）、`TransitionScheduler.cs`（`FindOrCreate`、`Execute`、门控）、`Interpolator.cs`（`Prepare`、采样器解析）、`SamplerSet.cs`（`Apply`、取消/应用存活跳过）、`StateSnapshot.cs`（`CoreExecute`）、`Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/TransitionScheduler.cs`（门控、CWT 表、弱目标）、`TransitionInterpreter.cs`（`ExecuteSamplingLoopAsync`/`RunPassAsync`）、`SamplerSet.cs`（`Apply` + 取消/应用存活守卫）、`Interpolator.cs`（`Prepare`）、`StateSnapshot.cs`（`CoreExecute`）、`TransitionEx.cs`、`Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`。
+
+相关分析：[设计模式 — 过渡动画](../../02_设计模式分析/03_过渡动画/index.md) · [复杂度 — 过渡动画](../../04_复杂度分析/03_过渡动画/index.md)

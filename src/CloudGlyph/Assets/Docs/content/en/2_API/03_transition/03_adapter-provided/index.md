@@ -1,42 +1,38 @@
-# Transition — Namespace: `VeloxDev.TransitionSystem` (adapter-provided)
+# Transition — Adapter-Provided Surface
 
-### Static Class: `TransitionEx` (per adapter)
+Each platform adapter (`Src/Adapters/VeloxDev.WPF|Avalonia|WinUI|MAUI|WinForms|Razor|Jalium`) provides, in its own assembly and in the **same** `VeloxDev.TransitionSystem` namespace, a full set of concrete types that subclass the engine base types from [01_abstractions](../01_abstractions/index.md). Programs `using VeloxDev.TransitionSystem;` therefore see one uniform API on every platform; only the platform value types differ.
 
-```csharp
-public static class TransitionEx
-{
-    public static Transition<T>.StateSnapshot Snapshot<T>(this T target, params Expression<Func<T, object?>>[] expressions) where T : class;
-    public static Transition<T>.StateSnapshot SnapshotAll<T>(this T target, params Expression<Func<T, object?>>[] extraExpressions) where T : class;
-    public static Transition<T>.StateSnapshot SnapshotExcept<T>(this T target, params Expression<Func<T, object?>>[] excludedExpressions) where T : class;
-}
-```
+## What each adapter ships
 
-**Notes:** `SnapshotAll`/`SnapshotExcept` use `Interpolator.TryGetInterpolator(type, out _)` as the "can animate" predicate (default `maxDepth = 4`).
-**Verified by:** WPF demo `Rec0.SnapshotAll()` / `Rec1.Snapshot(x => x.RenderTransform, x => x.Fill)`.
+| Type | Role | Derives from |
+|---|---|---|
+| `Transition` | Non-generic static entry (cancel / exit helpers) | `TransitionCore` |
+| `Transition<T>` | Generic static entry (`Create`, ...) | `TransitionCore<T, Transition<T>.StateSnapshot>` |
+| `Transition<T>.StateSnapshot` | Fluent snapshot builder (nested class) | 6- or 7-generic `StateSnapshotCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter[, TPriorityCore]>` |
+| `TransitionEx` | `Snapshot` / `SnapshotAll` / `SnapshotExcept` capture extensions on `T` | static class |
+| `Interpolator` | Platform sampler registry (subclasses `InterpolatorCore` and registers platform types in its static ctor) | `InterpolatorCore` |
+| `State` | Snapshot state bag | `StateCore` |
+| `TransitionEffect` | Timing descriptor with a default priority where applicable | `TransitionEffectCore` or `TransitionEffectCore<TPriorityCore>` |
+| `TransitionEffects` | `Empty` / `Theme` / `Hover` presets | static class (instance class on WinUI) |
+| `UIThreadInspector` | Platform UI-thread marshaling | `UIThreadInspectorCore` or `UIThreadInspectorCore<TPriorityCore>` |
+| `TransitionScheduler` | Per-target scheduler | `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter[, TPriorityCore]>` |
+| `TransitionInterpreter` | Sampling-loop interpreter | `TransitionInterpreterCore<TransitionEffect[, TPriorityCore]>` |
+| platform samplers | Registered value-type interpolators | `ISampler` (namespace `VeloxDev.Adapters.NativeSamplers` per adapter) |
 
-### Class: `Transition` / `Transition<T>` (per adapter)
+Priority-typed adapters (WPF, Avalonia, Jalium, WinUI) marshal writes at a dispatcher priority; MAUI, WinForms and Razor are non-priority.
 
-The non-generic `Transition : TransitionCore` and `Transition<T> : TransitionCore<T, Transition<T>.StateSnapshot>` are adapter subclasses. `Transition<T>.StateSnapshot` derives from the 6- or 7-generic `StateSnapshotCore` using the adapter's `State`, `TransitionEffect`, `Interpolator`, `UIThreadInspector`, and `TransitionInterpreter`.
-
-### Class: `StateSnapshot` — `.Property(...)` overload set (per adapter)
-
-Each overload: `StateSnapshot Property(Expression<Func<T, X>>, X newValue, object? interpolationOptions = null)`.
-
-| Adapter | Priority type | Extra overloads | Notable absence |
+| Adapter | Framework | Priority type | Priority default |
 |---|---|---|---|
-| WPF | `DispatcherPriority` | `Brush?`, `Transform?` (collection), `Point`, `CornerRadius`, `Thickness`, `Size`, `Rect`, `Vector`, `Color`, `DropShadowEffect?`, `Point3D`, `Vector3D` | — |
-| Avalonia | `DispatcherPriority` | `ITransform?`, `IBrush?`, `Thickness`, `Point`, `CornerRadius`, `Size`, `PixelPoint`, `PixelSize`, `PixelRect`, `RelativePoint`, `RelativeRect`, `Color`, `BoxShadows` | — |
-| WinUI | `DispatcherQueuePriority` | `Brush?`, `Transform?`, `Point`, `CornerRadius`, `Thickness`, `Projection?`, `Size`, `Rect`, `GridLength`, `Color` | — |
-| MAUI | none | `Brush?`, `Transform?`, `Point`, `PointF`, `CornerRadius`, `Thickness`, `Color?`, `Size`, `SizeF`, `Rect`, `RectF`, `Shadow?` | no `interpolationOptions` on `Transform?` |
-| WinForms | none | `Padding` | — |
-| Razor | none | `string?` | — |
+| WPF | `System.Windows.Threading` | `DispatcherPriority` | `DispatcherPriority.Render` |
+| Avalonia | Avalonia | `DispatcherPriority` | `DispatcherPriority.Render` |
+| Jalium | Jalium | `DispatcherPriority` | `DispatcherPriority.Render` |
+| WinUI | Microsoft.UI | `DispatcherQueuePriority` | `DispatcherQueuePriority.High` |
+| MAUI | .NET MAUI | — (no priority) | — |
+| WinForms | System.Windows.Forms | — | — |
+| Razor | Blazor / Razor | — | — |
 
-**Notes:** The old `IInterpolable?` overload is replaced by a generic `Property<TValue>(Expression<Func<T, TValue>>, TValue newValue, object? interpolationOptions = null)` that accepts any animatable type (including custom types that implement `ISampleable` or are backed by a registered `ISampleable`). Adapter samplers implement `ISampleable, ISampler`; WPF/Jalium reference-type targets (`SolidColorBrush`, `Transform`, `DropShadowEffect`) mutate the live `start` instance in place inside `Update` when possible (else compute-and-assign), rather than allocating new objects per frame.
+## Sub-pages
 
-Common overloads across all adapters: `int`, `double`, `float`, `decimal`, `System.Drawing.*`, and (non-netstandard2.0) `System.Numerics.*`.
-
-### Platform-specific types
-
-- **`UIThreadInspector`** — WPF: target-first `DispatcherObject.Dispatcher` then `Application.Current.Dispatcher`, priority `DispatcherPriority`; Avalonia: `Dispatcher.UIThread`; WinUI: `DependencyObject.DispatcherQueue` auto-marshalling + optional `CaptureUIThread()`; MAUI: `Application.Current.Dispatcher.Dispatch`; WinForms/Razor: `Control`/`SynchronizationContext` + optional `CaptureUIThread()`.
-- **`Interpolator`** static ctor registers platform types (WPF: `Brush`, `Thickness`, `Point`, `CornerRadius`, `Transform`, `Size`, `Rect`, `Vector`, `Color`, `DropShadowEffect`, `Point3D`, `Vector3D`; Avalonia: `IBrush`, `ITransform`, `BoxShadows`, `GridLength`, ...; WinUI: `Projection`, `GridLength`, ...; MAUI: `Shadow`, `RectF`, ...; WinForms: `Padding`; Razor: `string` → `StringSampler`).
-- **`TransitionEffects`** — static presets: `Empty` (0 s), `Theme` (0.46 s), `Hover` (0.32 s). **Note:** WinUI's `TransitionEffects` is a **non-static** class.
+- [00_transition](00_transition/index.md) — `Transition`, `Transition<T>`, `Transition<T>.StateSnapshot` (including the `Property` / `Effect` overload sets) and `TransitionEx`.
+- [01_effect-interpolator](01_effect-interpolator/index.md) — `Interpolator` and its per-adapter sampler registrations, `TransitionEffect`, `TransitionEffects`, and `State`.
+- [02_ui-inspector](02_ui-inspector/index.md) — `UIThreadInspector` per adapter, plus the `TransitionScheduler` / `TransitionInterpreter` adapter subclasses.

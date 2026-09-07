@@ -2,238 +2,29 @@
 
 ## 弱引用类型
 
-### 快速开始
+**weak-types** 特性提供四个与框架无关的集合类型，它们通过*弱引用*持有内容，因此条目永远不会让自己的目标存活。它们用来防止 .NET 中最经典的泄漏：长期存活的发布者、事件源或缓存，通过强引用把早就该结束生命周期的订阅者与键一直保活。
 
-#### 1. 环境准备（Prerequisites）
+四个类型都位于 `VeloxDev.Core` 包内的 `VeloxDev.WeakTypes` 命名空间（源码目录 `Src/Core/VeloxDev.Core/WeakTypes/`），没有 UI 适配器、没有运行时依赖，且都是 `sealed`：
 
-- **支持目标**（来自 `VeloxDev.Core.csproj`）：`netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0`。
-- **SDK / 运行时：** 带 Roslyn 4.x（5.0+）的 .NET SDK；已在 SDK 9.0/10.0 下验证 —— *被验证过*的环境。示例面向 `net9.0`。
-- **包管理器：** NuGet / `dotnet` CLI。
-- **所需服务：** 无 —— 四个弱集合类型位于 `VeloxDev.WeakTypes`，无运行时依赖。
+- `WeakDelegate<TDelegate>`（`where TDelegate : Delegate`）—— 一个类似事件的多处理器汇，把每个处理器存为 `WeakReference<Delegate>`。订阅者一旦被回收便自动从列表中消失，发布者不会因它而继续存活某个已死的监听者。读取走无锁的已缓存组合委托。
+- `WeakQueue<T>`（`where T : class`）—— `WeakReference<T>` 条目的 FIFO 缓冲；访问时剪除已死条目。
+- `WeakStack<T>`（`where T : class`）—— `WeakQueue<T>` 的 LIFO 对应物。
+- `WeakCache<TTargetKey, TCacheKey>`（`where TTargetKey : class`、`where TCacheKey : class`）—— 建立在 `System.Runtime.CompilerServices.ConditionalWeakTable<TTargetKey, TCacheKey>` 上的“按目标键”键值表。值随目标键一起消亡，而不是反过来把键保活。
 
+每个类型都通过内部锁保证线程安全，成员形状贴近其强引用版的 `System.Collections.Generic` 对应物，并由 `Src/Core/VeloxDev.Core.Test/WeakTypes/` 下的 MSTest 套件覆盖（`WeakDelegateTests.cs`、`WeakQueueTests.cs`、`WeakStackTests.cs`、`WeakCacheTests.cs`）。本特性**没有专用 GUI 示例** —— 测试是主要的行为证据，最后一页那个可运行的程序以无头方式跑遍全部四个类型。
 
-#### 2. 安装 / 添加依赖
+`VeloxDev.Core` 包多目标 `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0`；除此之外无需安装任何东西。
 
-```bash
-dotnet add package VeloxDev.Core
-```
+## 快速开始 — 子页面
 
-**预期结果：** 命令以 `0` 退出；`.csproj` 中出现 `<PackageReference Include="VeloxDev.Core" />` 并完成还原。四个类型在包的所有目标框架上都可用。
+本特性的快速入门拆分为下列页面（逐步导向最后一页那个可运行的单文件程序）：
 
-#### 3. 基础设置 / 注册
-
-直接实例化集合类型即可 —— 没有注册步骤。唯一的契约是泛型约束：队列 / 栈元素与缓存键必须是引用类型（`class`），委托类型必须派生自 `System.Delegate`。
-
-```csharp
-using System;
-using VeloxDev.WeakTypes;
-
-var queue = new WeakQueue<Payload>();          // T : class
-var stack = new WeakStack<Payload>();          // T : class
-var changed = new WeakDelegate<Action<string>>();  // TDelegate : Delegate
-var cache = new WeakCache<Payload, string>();  // TTargetKey : class, TCacheKey : class
-```
-
-**预期结果：** 四个对象无配置即可构造；集合存储 `WeakReference<T>`（缓存用 `ConditionalWeakTable`）而非强引用。
-
-#### 4. 核心用法（分步进行）
-
-**4.1 入队 / 压栈 / 添加处理器**
-
-（`Payload`、`Subscriber` 与 `Counter` 是下方完整代码中定义的辅助类；`queue`、`stack` 与 `changed` 来自第 3 步。）
-
-```csharp
-queue.Enqueue(new Payload(1));      // 弱持有
-var alive = new Payload(2);
-queue.Enqueue(alive);               // 仍被引用 -> 不会被 GC 回收
-
-stack.Push(new Payload(10));        // 弱持有
-
-changed.AddHandler(liveSub.Handle); // 处理器被弱持有
-```
-
-**预期结果：** 仅被弱引用持有的条目可被回收；`alive` 与 `liveSub` 因你仍持有强引用而存活。
-
-**4.2 强制执行 GC 并观察访问时清扫**
-
-```csharp
-ForceGc();
-Console.WriteLine($"Count after GC: {queue.Count}");   // 先剪除死亡引用
-if (queue.TryDequeue(out var item)) { }                // 跳过已回收条目
-```
-
-**预期结果：** `Count` 只反映存活条目；`TryDequeue` / `TryPop` / `TryPeek` 会跳过目标已被回收的条目。
-
-**4.3 缓存增改读**
-
-```csharp
-cache.AddOrUpdate(key1, "value-100");
-if (cache.TryGetCache(key1, out var v)) { }   // 摊还 O(1)
-cache.ForeachCache((k, val) => Console.WriteLine($"{k} -> {val}"));
-cache.Remove(key1);
-```
-
-**预期结果：** `TryGetCache` 对存活键返回对应值、对已回收键返回 `false`；`ForeachCache` 只遍历存活条目。
-
-**4.4 `WeakDelegate` 调用与克隆**
-
-```csharp
-changed.Invoke(["hello"]);          // 对缓存的组合委托做 DynamicInvoke
-var snapshot = changed.Clone();     // 仅从存活处理器重建
-snapshot.Invoke(["world"]);
-```
-
-**预期结果：** 调用克隆只运行订阅者仍存活的处理器 —— 已回收订阅者的处理器在重建时被剪除。
-
-#### 5. 验证
-
-运行下方完整程序。一次示例运行（Release 构建，`net9.0`）输出：
-
-```text
-== WeakQueue ==
-Count after GC: 1
-IsEmpty after GC: False
-Dequeued: 2
-
-== WeakStack ==
-Count after GC: 1
-Popped: 2
-
-== WeakDelegate ==
-counter after GC + invoke: 1
-counter after clone + invoke: 2
-
-== WeakCache ==
-TryGetCache(key1): True -> value-100
-TryGetCache(new key): False -> (null)
-ForeachCache: key=100 value=value-100
-TryGetCache(key1) after Remove: False
-```
-
-**预期结果：** 只在辅助方法内创建的条目被 `ForceGc` 回收，因此队列 / 栈报告 `Count: 1` 且只出队 / 出栈存活条目；已回收的委托处理器与缓存键被跳过。
-
-#### 6. 完整代码
-
-```csharp
-using System;
-using VeloxDev.WeakTypes;
-
-namespace WeakTypesQuickStart;
-
-// 一个可被 GC 回收的简单引用类型条目。
-public sealed class Payload
-{
-    public int Value;
-    public Payload(int value) => Value = value;
-    public override string ToString() => Value.ToString();
-}
-
-public sealed class Counter
-{
-    public int Value;
-}
-
-public sealed class Subscriber
-{
-    private readonly Counter _counter;
-    public Subscriber(Counter counter) => _counter = counter;
-    public void Handle(string msg) => _counter.Value++;
-}
-
-public static class Program
-{
-    public static void Main()
-    {
-        Console.WriteLine("== WeakQueue ==");
-        var queue = new WeakQueue<Payload>();
-        FillQueue(queue);
-        var alive = new Payload(2);
-        queue.Enqueue(alive);
-        ForceGc();
-        Console.WriteLine($"Count after GC: {queue.Count}");
-        Console.WriteLine($"IsEmpty after GC: {queue.IsEmpty}");
-        while (queue.TryDequeue(out var item))
-        {
-            Console.WriteLine($"Dequeued: {item}");
-        }
-
-        Console.WriteLine();
-        Console.WriteLine("== WeakStack ==");
-        var stack = new WeakStack<Payload>();
-        FillStack(stack);
-        stack.Push(alive);
-        ForceGc();
-        Console.WriteLine($"Count after GC: {stack.Count}");
-        while (stack.TryPop(out var item))
-        {
-            Console.WriteLine($"Popped: {item}");
-        }
-
-        Console.WriteLine();
-        Console.WriteLine("== WeakDelegate ==");
-        var changed = new WeakDelegate<Action<string>>();
-        var counter = new Counter();
-        var liveSub = new Subscriber(counter);
-        changed.AddHandler(liveSub.Handle);
-        AddDeadHandler(changed, counter);
-        ForceGc();
-        changed.Invoke(["first"]);
-        Console.WriteLine($"counter after GC + invoke: {counter.Value}");
-        var snapshot = changed.Clone();
-        snapshot.Invoke(["second"]);
-        Console.WriteLine($"counter after clone + invoke: {counter.Value}");
-
-        Console.WriteLine();
-        Console.WriteLine("== WeakCache ==");
-        var cache = new WeakCache<Payload, string>();
-        var key1 = new Payload(100);
-        cache.AddOrUpdate(key1, "value-100");
-        AddDeadCacheEntry(cache);
-        ForceGc();
-        Console.WriteLine($"TryGetCache(key1): {cache.TryGetCache(key1, out var v1)} -> {v1}");
-        Console.WriteLine($"TryGetCache(new key): {cache.TryGetCache(new Payload(200), out var v2)} -> {v2 ?? "(null)"}");
-        cache.ForeachCache((k, v) => Console.WriteLine($"ForeachCache: key={k.Value} value={v}"));
-        cache.Remove(key1);
-        Console.WriteLine($"TryGetCache(key1) after Remove: {cache.TryGetCache(key1, out _)}");
-        GC.KeepAlive(alive);
-        GC.KeepAlive(liveSub);
-    }
-
-    // 这里创建的条目在方法返回时离开作用域，因此只有弱引用还可达；下次 GC 会回收它们。
-    private static void FillQueue(WeakQueue<Payload> queue)
-    {
-        queue.Enqueue(new Payload(1));
-        queue.Enqueue(new Payload(3));
-    }
-
-    private static void FillStack(WeakStack<Payload> stack)
-    {
-        stack.Push(new Payload(10));
-        stack.Push(new Payload(30));
-    }
-
-    private static void AddDeadHandler(WeakDelegate<Action<string>> changed, Counter counter)
-    {
-        var deadSub = new Subscriber(counter);
-        // CanUpdateCache:false 避免立刻构建组合委托缓存，
-        // 否则缓存会以强引用保住已死亡订阅者。
-        changed.AddHandler(deadSub.Handle, CanUpdateCache: false);
-    }
-
-    private static void AddDeadCacheEntry(WeakCache<Payload, string> cache)
-    {
-        cache.AddOrUpdate(new Payload(200), "value-200");
-    }
-
-    private static void ForceGc()
-    {
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-    }
-}
-```
-
-#### 7. 运行声明（Run Declaration）
-
-- ✅ 已于 2026-08-17 实际构建并运行（`dotnet run -c Release`，目标 `net9.0`）。记录到的输出（见第 5 节）：`WeakQueue Count after GC: 1`、`Dequeued: 2`；`WeakStack Count after GC: 1`、`Popped: 2`；`WeakDelegate counter after GC + invoke: 1`、`counter after clone + invoke: 2`；`WeakCache TryGetCache(key1): True -> value-100`、`TryGetCache(new key): False`、`ForeachCache: key=100 value=value-100`、`TryGetCache(key1) after Remove: False`。
+- [00 前置条件](00_前置条件/) — 支持目标、SDK/运行时，以及行为证据所在位置
+- [01 安装依赖](01_安装依赖/) — 从 NuGet 添加 `VeloxDev.Core`，或在本仓库中项目引用它
+- [02 选择集合类型](02_选择集合类型/) — 哪个类型适合哪种场景（泄漏、FIFO/LIFO 缓冲、按目标键存值）
+- [03 弱委托订阅](03_弱委托订阅/) — 事件式弱订阅：`AddHandler` / `RemoveHandler` / `GetInvocationList` / `Invoke` / `Clone`
+- [04 弱队列](04_弱队列/) — 对临时工作项做 FIFO 处理
+- [05 弱栈](05_弱栈/) — 不能把对象保活的 LIFO 撤销/回退栈
+- [06 弱缓存](06_弱缓存/) — 随键消亡的“按目标键”值
+- [07 GC行为与注意](07_GC行为与注意/) — “弱”到底意味着什么、访问时清扫，以及 Debug/Release 下的注意事项
+- [08 验证与完整代码](08_验证与完整代码/) — 测试、可运行的单文件程序、记录到的输出、运行声明

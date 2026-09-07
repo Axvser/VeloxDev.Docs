@@ -99,5 +99,6 @@ Wiki_Root/2_API/00_{feature}/
 
 After writing API documentation:
 
+- [ ] **Update the Feature Inventory** — set each documented feature's Coverage Status to `API ✓` (see module-discovery)
 - [ ] **Regenerate navigation index** — Run the tree generator script (e.g. `python gen_tree.py`) to rebuild tree.json
 - [ ] **Build the project** — Run the project's build command to verify the new content embeds correctly

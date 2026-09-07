@@ -1,6 +1,6 @@
 # 复杂度分析 — MVVM
 
-所有上界均指 `Src/Core/VeloxDev.Core/MVVM/VeloxCommand.cs`、`Src/Core/VeloxDev.Core/MVVM/ObservableCollectionTracker.cs` 的实现，以及 `Src/Generators/VeloxDev.Core.Generator/Base/Analizer.cs` 中生成的代码。
+所有上界均指 `Src/Core/VeloxDev.Core/MVVM/{VeloxCommand.cs, ObservableCollectionTracker.cs}` 的运行时实现，以及 `Src/Generators/VeloxDev.Core.Generator/Base/Analizer.cs` 中由 `MVVMWriter` 发射的生成代码模板（`MVVMPropertyFactory` 类）。源码生成器本身在编译期为每个带注解类型新增 $O(P + C)$ 个生成成员，其中 $P$ 为 `[VeloxProperty]` 字段/partial 属性数，$C$ 为 `[VeloxCommand]` 方法数；这些工作在运行时不会重复。
 
 ## 生成的属性 setter（默认模式）
 
@@ -8,7 +8,7 @@
 
 $$O(1)$$
 
-步骤：`Object.Equals` 守卫、捕获 `old`、`OnPropertyChanging`、`OnXxxChanging`、字段赋值、`OnXxxChanged`、`OnPropertyChanged` — 全部常数时间。setter 体来源：`Base/Analizer.cs`，`GetSetterBodyLines`，第 287-307 行。
+步骤：`Object.Equals` 守卫、捕获 `old`、`OnPropertyChanging`、`OnXxxChanging`、字段赋值、`OnXxxChanged`、`OnPropertyChanged`——全部常数时间。setter 体来源：`MVVMPropertyFactory.GetSetterBodyLines`，`Base/Analizer.cs`，第 287-307 行（第 308-365 行的 `SetProperty`/`RaiseAndSetIfChanged`/`NotifyOfPropertyChange` 分支同样为 $O(1)$）。
 
 对于 `INotifyCollectionChanged` 属性，替换集合时还会额外调用 `ObservableCollectionTracker.Unsubscribe(old, ...)` 和 `EnsureSubscribed(value, ...)`，并对被替换集合的条目调用 `OnItemRemovedFromXxx` / `OnItemAddedToXxx`：
 
@@ -30,15 +30,15 @@ $$O(1) + O(H)$$
 
 $$O(m) \quad \text{其中 } m \text{ 为受影响的条目数}$$
 
-（`GenerateCollectionMembers`，第 575-700 行。）
+（`MVVMPropertyFactory.GenerateCollectionMembers`，`Base/Analizer.cs`，第 575-700 行。）
 
 ## ObservableCollectionTracker.EnsureSubscribed（订阅去重）
 
 $$O(1) \text{ 均摊}$$
 
-`ConditionalWeakTable.GetOrCreateValue` 加上 `HashSet<Delegate>` 添加（`Entry.TryAdd`）。去重键是处理器的 `(Method, Target)` 身份（`MethodTargetEqualityComparer`，第 96-114 行），因此即使每次 getter 访问都传入新的委托实例，重复的 getter 访问也保持幂等。每个集合首次调用时订阅，后续调用是快速的常数时间查找。弱引用键意味着当集合被垃圾回收时跟踪条目自动消失 — 无泄漏。
+`ConditionalWeakTable.GetOrCreateValue` 加上 `HashSet<Delegate>` 添加（`Entry.TryAdd`，由锁保护）。去重键是处理器的 `(Method, Target)` 身份（`MethodTargetEqualityComparer`，第 96-114 行），因此即使每次 getter 访问都传入新的委托实例，重复的 getter 访问也保持幂等。每个集合首次调用时订阅，后续调用是快速的常数时间查找。弱引用键意味着当集合被垃圾回收时跟踪条目自动消失——无泄漏。
 
-（源：`Src/Core/VeloxDev.Core/MVVM/ObservableCollectionTracker.cs`，第 15-114 行。）
+（源：`Src/Core/VeloxDev.Core/MVVM/ObservableCollectionTracker.cs`，第 15-115 行。）
 
 ## 命令执行
 
@@ -50,7 +50,7 @@ $$O(1) \text{ 每次触发，均摊}$$
 
 $$O(1) \text{ 入队, } \quad O(n) \text{ 最坏排队}$$
 
-其中 $n$ 为排队条数。`TryStartPendingAsync` 排空最多 `_maxConcurrency` 个条目，整个排空过程 $O(n)$（第 349-377 行）；由于队列由完成中的调用排空，每次触发均摊为 $O(1)$。
+其中 $n$ 为排队条数。`TryStartPendingAsync` 排空最多 `_maxConcurrency` 个条目，整个排空过程 $O(n)$（第 349-377 行）；由于队列由完成中的调用排空，每次触发均摊为 $O(1)$。`CanExecute` 以 $O(1)$ 求值用户谓词与强制锁标记（第 126 行）。
 
 `Notify()` → `RaiseCanExecuteChanged()` 为 $O(H)$，其中 $H$ 是已注册的 `CanExecuteChanged` 处理器数量（通常是一个绑定）。
 
@@ -60,7 +60,7 @@ $$O(1) \text{ 入队, } \quad O(n) \text{ 最坏排队}$$
 |---|---|
 | 每个带注解类型的生成成员 | $O(P + C)$ 每类型常数；$P$ = `[VeloxProperty]` 字段数，$C$ = `[VeloxCommand]` 方法数 |
 | `VeloxCommand` 状态 | $O(n)$ 活动 + 排队 `CommandEventArgs`，$n$ = 在途调用数 |
-| `ObservableCollectionTracker` 表 | $O(C)$ 个被跟踪集合，经 `ConditionalWeakTable`（随集合回收 — 无泄漏） |
+| `ObservableCollectionTracker` 表 | $O(C)$ 个被跟踪集合，经 `ConditionalWeakTable`（随集合回收——无泄漏） |
 | 每次执行的 `CommandEventArgs` | $O(1)$ 瞬时 |
 
 ## 逐操作汇总

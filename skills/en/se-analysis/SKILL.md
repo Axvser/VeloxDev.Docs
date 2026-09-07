@@ -33,7 +33,7 @@ Under each `00_{Feature}/` directory, **further nesting is allowed and encourage
 - `04_complexity/00_{Feature}/` can split by: `00_{CoreOperation}/index.md` (e.g., `00_Search/index.md`, `01_Sort/index.md`)
 
 > Guiding principle: when a single page exceeds **~300 lines** or covers **more than 3 distinct topics**, it should be split into sub-pages — splitting is the default for feature pages.
-> The parent directory's `index.md` serves as the feature overview/table of contents, linking to each sub-page.
+> The parent directory's `index.md` serves as the feature overview/table of contents, linking to each sub-page with the cross-page link syntax in 【Links & Navigation】.
 
 ### Page Detail
 

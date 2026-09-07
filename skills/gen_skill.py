@@ -223,15 +223,18 @@ def generate_template_table(templates: list[dict], lang: str) -> str:
         heading = "## 模板索引"
         header = "| 适用时机 (When) | 模板内容 (Template) |"
         note = (
-            "> 模板内容为 JSON 转义的单行字符串：`\\n` 表示换行，`\\|` 表示字面量 `|`。"
-            "读取时按 JSON 字符串解析即可还原原文。"
+            "> 模板单元为单行 JSON 字符串字面量：`\\n` 表示换行，`|` 被转义为 `\\|` 以保持 Markdown 表格合法。"
+            "精确还原：取原始单元文本，将每个 `\\|` 替换为 `|`，再把结果按 JSON 字符串解析"
+            "（`json.loads` / `JSON.parse`）。（若单元内不含 `\\|`，直接解析亦可。）"
         )
     else:
         heading = "## Template Index"
         header = "| When | Template |"
         note = (
-            "> Template cells are single-line JSON-escaped strings: `\\n` is a newline, "
-            "`\\|` is a literal `|`. Parse as a JSON string to restore the original text."
+            "> Template cells are single-line JSON string literals: `\\n` is a newline, and `|` is escaped "
+            "as `\\|` to keep the markdown table valid. To restore the body exactly: take the raw cell text, "
+            "replace every `\\|` with `|`, then parse the result as a JSON string (`json.loads` / `JSON.parse`). "
+            "(Parsing directly already works when the cell contains no `\\|`.)"
         )
 
     sep = "|---|---|"

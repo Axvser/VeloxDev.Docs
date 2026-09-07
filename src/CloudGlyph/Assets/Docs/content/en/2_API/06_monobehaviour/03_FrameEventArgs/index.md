@@ -1,6 +1,10 @@
 # MonoBehaviour — `FrameEventArgs`
 
+Namespace `VeloxDev.TimeLine`. Per-frame event arguments delivered to the behaviour hooks `Update(FrameEventArgs)`, `LateUpdate(FrameEventArgs)` and `FixedUpdate(FrameEventArgs)`.
+
 ```csharp
+namespace VeloxDev.TimeLine;
+
 public class FrameEventArgs : TimeLineEventArgs
 {
     public TimeSpan DeltaTime { get; internal set; } = TimeSpan.Zero;
@@ -12,16 +16,23 @@ public class FrameEventArgs : TimeLineEventArgs
 
 | Member | Type | Description |
 |---|---|---|
-| `DeltaTime` | `TimeSpan` | Scaled delta time since the last frame. |
-| `TotalTime` | `TimeSpan` | Total time since the channel started. |
-| `CurrentFPS` | `int` | Measured frames per second. |
-| `TargetFPS` | `int` | Configured target FPS. |
+| `DeltaTime` | `TimeSpan` | Delta time since the last frame, already scaled by the channel's time scale. |
+| `TotalTime` | `TimeSpan` | Total running time of the channel. |
+| `CurrentFPS` | `int` | Measured frames per second (updated once per second). |
+| `TargetFPS` | `int` | Configured target FPS of the channel. |
+| `Handled` (inherited) | `bool` | Virtual flag inherited from `TimeLineEventArgs`; `true` stops the remaining behaviours of the frame phase. |
 
-**Example:**
-```text
+**Example (real usage in the WPF demo):**
+
+```csharp
 // Source: Examples/MonoBehaviour/WPF/Demo/MainWindow.xaml.cs (line 24)
 _velocity += Gravity * e.DeltaTime.TotalSeconds;
 ```
 
 **Notes:**
-- Instances are pooled and reused; `internal` setters keep mutation inside the manager (defaults verified by `TimeLineEventArgsTests.FrameEventArgs_DefaultValues`).
+
+- The `internal` setters let the manager fill the fields each frame; consumers only read them. Instances are pooled and reused, so do not cache a `FrameEventArgs` across frames (defaults verified by `TimeLineEventArgsTests.FrameEventArgs_DefaultValues`).
+
+**Source:**
+
+`Src/Core/VeloxDev.Core/TimeLine/FrameEventArgs.cs`

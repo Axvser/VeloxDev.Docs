@@ -1,29 +1,43 @@
 # MVVM — `ObservableCollectionTracker`
 
-Weak-reference subscription helper so `CollectionChanged` stays subscribed even when the backing field is initialized directly (`= []`), bypassing the generated setter.
+`VeloxDev.MVVM.ObservableCollectionTracker` (`Src/Core/VeloxDev.Core/MVVM/ObservableCollectionTracker.cs`) is a `static` helper used by generated code to keep `INotifyCollectionChanged` subscriptions alive when the backing field of a collection property is assigned directly.
 
-**Signatures** (`Src/Core/VeloxDev.Core/MVVM/ObservableCollectionTracker.cs`, lines 15-56):
+**Signatures**
 
 ```csharp
-public static void EnsureSubscribed(object? collection, NotifyCollectionChangedEventHandler handler)
-public static void Unsubscribe(object? collection, NotifyCollectionChangedEventHandler handler)
+public static void EnsureSubscribed(
+    object? collection,
+    NotifyCollectionChangedEventHandler handler)
+
+public static void Unsubscribe(
+    object? collection,
+    NotifyCollectionChangedEventHandler handler)
 ```
 
-- **Notes:** Uses a `ConditionalWeakTable<object, Entry>` keyed by collection identity, so entries vanish when the collection is collected — no leak. Handlers are deduplicated by `(Method, Target)` identity (`MethodTargetEqualityComparer`, lines 96-114), not by delegate reference: generated getters pass a method group (e.g. `OnItemsCollectionChanged`), which produces a fresh delegate instance on every access; comparing by reference would re-subscribe on every getter access and grow the invocation list without bound. The generated getter calls `EnsureSubscribed` on every access but only truly subscribes once (`Base/Analizer.cs`, `GenerateGetter`, lines 444-464).
-- **Example:** the demo's `[VeloxProperty] private ObservableCollection<string> _items = [];` (`Examples/MVVM/WPF/Demo/MainWindowViewModel.cs`, line 30) relies on the getter-side `EnsureSubscribed` call because the initializer assigns the field directly.
+- `EnsureSubscribed` — if `collection` is an `INotifyCollectionChanged` that has not yet been subscribed for `handler`, subscribes it. Subsequent calls are a fast O(1) lookup. Called by the generated property getter on every access.
+- `Unsubscribe` — removes `handler` from `collection` and drops the tracking entry so the subscription is not accidentally restored later. Called by the generated setter when the collection is replaced.
 
-## Namespace `VeloxDev.Generators`
+## Why it exists
 
-Source-generator internals (assembly `VeloxDev.Core.Generator`, package version `7.0.0`, target `netstandard2.0`, Roslyn `Microsoft.CodeAnalysis.CSharp` 4.3.1).
+A `[VeloxProperty]` collection member such as
 
-| Item | Detail |
-|---|---|
-| Package | `VeloxDev.Core.Generator` `7.0.0`, referenced transitively by `VeloxDev.Core` |
-| Assembly namespace | `VeloxDev.Generators` |
-| MVVM generator | `VeloxDev.Generators.MVVM : IIncrementalGenerator` (`MVVM.cs`, lines 12-13) |
-| Command generator | `VeloxDev.Generators.Command : IIncrementalGenerator` (`Command.cs`, lines 12-13) |
-| Class filter | `Analizer.Filters.FilterContext` — only `partial` class declarations (`Base/Analizer.cs`, lines 13-24) |
-| Property writer | `Writers/MVVMWriter.cs` + `Base/Analizer.cs` (`MVVMPropertyFactory`, lines 208-729) |
-| Command writer | `Writers/CommandWriter.cs` |
-| MVVM output name | `{ClassName}_{Namespace}_MVVM.g.cs` (namespace dots replaced with `_`; `Global` when in the global namespace) — `MVVMWriter.cs`, lines 847-854 |
-| Command output name | `{ClassName}_{Namespace}_Commands.g.cs` — `CommandWriter.cs`, lines 121-130 |
+```csharp
+[VeloxProperty] private ObservableCollection<string> _items = [];
+```
+
+assigns its backing field through the initializer `= []`, which bypasses the generated setter. If subscription happened only in the setter, `CollectionChanged` would never be observed. Instead the generated getter calls `EnsureSubscribed` (see `Base/Analizer.cs`, `MVVMPropertyFactory.GenerateGetter`) so the first read subscribes the private `On{Property}CollectionChanged` handler, and every later read is a no-op:
+
+```csharp
+get
+{
+    global::VeloxDev.MVVM.ObservableCollectionTracker.EnsureSubscribed(_items, OnItemsCollectionChanged);
+    return _items;
+}
+```
+
+## Tracking model
+
+- Subscriptions are tracked in a `ConditionalWeakTable<object, Entry>` keyed by collection identity: when the collection is garbage-collected its entry disappears, so there is no leak. The table is safe for concurrent getter/setter access.
+- Handlers are de-duplicated by `(Method, Target)` identity (`MethodTargetEqualityComparer`), not by delegate reference. Generated getters pass a method group (for example `OnItemsCollectionChanged`), which produces a fresh delegate instance on every access; comparing by reference would re-subscribe on every getter read and grow the event invocation list without bound.
+
+The collection hooks the tracker feeds (`OnCollectionChanged<T>`, `OnItemAddedTo{Property}`, `OnItemRemovedFrom{Property}`, `OnItemMovedIn{Property}`, `OnItemsResetIn{Property}`) are generated by the MVVM generator — see [00_VeloxPropertyAttribute](../00_VeloxPropertyAttribute/index.md).

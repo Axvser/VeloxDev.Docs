@@ -76,7 +76,13 @@ Ultimately, the directory will present the following structure. These are five f
 
 ⚙ Complex features may nest further sub-capabilities (e.g. `00_user-registration/00_email-verification/`), obeying the same two-digit + kebab-case rule at every level.
 
-⚙ **Page-focus limit (default-split):** a feature page is NOT a single monolithic document — splitting is the default, not the exception. Split a page when it would exceed **~300 lines** OR cover more than **3 distinct topics**, along capability/operation/endpoint boundaries (e.g. `00_{Feature}/00_{Operation}/index.md`). The parent `index.md` becomes a short overview that links its sub-pages. When in doubt, split earlier. Apply uniformly across QuickStart / API / SE Analysis.
+⚙ **Page-focus limit & leaf budget (default-split):** a feature page is NOT a single monolithic document — splitting is the default, not the exception. A page WITHOUT sub-pages is a **leaf**; keep it at or under **~300 lines** and at most **3 distinct topics**. When a leaf would exceed that, split it along capability/operation/endpoint/type boundaries into **2+ child page directories** (e.g. `00_{Feature}/00_{Operation}/index.md`), and recurse if a child leaf also grows too large. Each parent `index.md` is then only a **short overview** (well under ~200 lines) that links **every** direct child using the same-language cross-page link syntax from 【Links & Navigation】.
+
+⚙ **Outline-first (mandatory order):** when a page needs splitting, DO NOT write the long page first and split afterwards. FIRST create the planned child-page directories — each with an (initially empty) `index.md`, and every ancestor `index.md` in place — then run `gen_tree.py` so the skeleton appears in the navigation, and ONLY THEN fill each leaf within its budget. Write toward an existing outline, never toward one page that silently grows.
+
+⚙ **Depth is free per dimension:** sub-pages under a feature are independent per dimension — QuickStart splits by setup/operations, API by namespace/type, SE by page-group — so nesting deeper in one dimension never forces the same split in another. Only the feature's own top-level name must stay consistent across `1_QuickStart` / `2_API` / `3_SE_Analysis`.
+
+⚙ **Atomic pages are opt-in, not the default:** a page that must genuinely stay a single document (a verbatim license/AUTHORS text, one self-contained spec) may opt out of the line budget by putting `<!-- cg:atomic -->` as the **first line** of its `index.md`; pages under the `4_Copyright` dimension are exempt automatically. Use this sparingly — it is the escape hatch, and the gate is enforced: `python validate-structure.py` reports every leaf over the hard cap and every parent overview that fails to link one of its children.
 
 **Illustrative example only — not a fixed requirement.** Fictional project "Acme Console" with three features (`user-registration`, `data-export`, `theme`). Every directory contains an `index.md`.
 
@@ -127,6 +133,22 @@ Wiki_Root/
 └── 4_Copyright/
     └── index.md
 ```
+
+## Links & Navigation
+
+⚙ A Wiki page may only contain these kinds of links:
+
+1. **External** — targets beginning `https://`, `http://`, `mailto:`, or `tel:`. They open in the system browser / mail client / dialer. Use sparingly.
+2. **Same-language page link (cross-page)** — a relative Markdown link whose destination resolves like a filesystem path (honoring `.` / `..`) to another page **directory inside the same language tree**. End the target with the directory path, an explicit `/index.md`, or a trailing `/`. Use **real folder names including numeric prefixes** (`0_Welcome`, `00_user-registration`); never link to a display title. Links must never cross languages.
+   Examples from page `1_QuickStart/00_user-registration/index.md`:
+   - child page inside the same feature: `[Email verification](00_email-verification/index.md)`
+   - sibling page in the same section: `[Data export](../01_data-export/index.md)`
+   - section overview (parent): `[QuickStart overview](../index.md)`
+   - any top-level dimension: `[Welcome](../../0_Welcome/)`
+   A parent `index.md` links its sub-pages exactly this way.
+3. **In-page anchor** — a `#slug` link to a heading on the **same** page. The App auto-assigns every heading an id (slug) derived from its exact final text: lower-case it; keep letters, digits, `_`, `-` (CJK characters are kept as-is); drop every other character (`.`, `:`, `(`, `)`, …); turn spaces and `_` into `-`; collapse runs of `-` and trim leading/trailing `-`; duplicate slugs get a `-1`, `-2`, … suffix. Only hand-write `#…` anchors for headings with plain, punctuation-free text — e.g. heading `## 2. Text Formatting` → `#2-text-formatting`; heading `## Overview` → `#overview`.
+
+⚙ **Prohibited:** any other local/absolute/`file:` link, a link to another language's content, a link that escapes the language root, a cross-page target carrying a `#`, or any target you cannot resolve to a real page or heading. When in doubt, do not link.
 
 ## Template Conventions
 

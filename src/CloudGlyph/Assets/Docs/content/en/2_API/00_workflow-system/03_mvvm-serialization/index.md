@@ -11,6 +11,6 @@
 | Streaming | `SerializeToUtf8Bytes`, `DeserializeFromUtf8Bytes`, `SerializeToTextWriterAsync`, `DeserializeFromTextReaderAsync`, `SerializeToStreamAsync`, `DeserializeFromStreamAsync` |
 | Options | `SerializationOptions.Create().WithIndented()/WithCompact()/WithTypeNameHandling(...)/WithNullValueHandling(...)/WithDefaultValueHandling(...)` |
 
-**Example** — save/load in the demo tree: `Examples/Workflow/Common/Lib/ViewModels/Workflow/TreeViewModel.cs`, lines 185-193 (`this.Serialize()`), and `Examples/Workflow/WPF/Demo/Views/Workflow/WorkflowView.xaml.cs`, lines 46-51 (`json.Deserialize<TreeViewModel>()` + `Layout.UpdateCommand.Execute(null)`).
+**Example** — save/load in the demo tree: `Examples/Workflow/Common/Lib/ViewModels/Workflow/TreeViewModel.cs`, `Save` command, line 252 (`var json = this.Serialize();`), and `Examples/Workflow/WPF/Demo/Views/Workflow/WorkflowView.xaml.cs`, lines 65-67 (`json.Deserialize<TreeViewModel>()` + `Layout.UpdateCommand.Execute(null)`).
 
 *Source: `Src/Core/VeloxDev.Core.Extension/ComponentModelEx.cs`.*

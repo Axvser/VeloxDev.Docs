@@ -1,19 +1,38 @@
-# 平台适配器 — Complete Code
+# 平台适配器 — 完整代码
 
-下面是一份自洽、可编译的 WPF 工程（net9.0-windows，引用 `VeloxDev.WPF`）。它把模板生成的文件（`wpf-v-tree`、`wpf-v-node`、`wpf-v-slot`、`wpf-v-link`、`wpf-v-selector`、`wpf-v-minimap`）与一份精简但完整的 `GridDecorator`、`LinkView` 组合在一起（模板会生成带标尺/箭头的更丰富版本；此处保持相同公开形状，保证每个符号都有定义）。把 `DataContext` 绑定到一个由 `[WorkflowBuilder.Tree]` 生成器产生的 `IWorkflowTreeViewModel`。
+下面的七个子页面**逐字重现**「配置」页 `dotnet new wpf-v-*` 命令所生成的文件（`-n` 名称与 `Demo.Views.Workflow` 命名空间已代入，模板默认颜色已填好）。合起来就是 WPF 工程的工作流**视图层**。
 
-Sub-pages (one per source file):
+## 工程文件
 
-- `workflow-view/`
-- `node-view/`
-- `slot-view/`
-- `link-view/`
-- `grid-decorator/`
-- `minimap-overlay/`
-- `template-selector/`
+该套件位于启用 `UseWPF` 并包引用适配器的 WPF 工程里：
 
----
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net9.0-windows</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UseWPF>true</UseWPF>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="VeloxDev.WPF" Version="8.0.0" />
+    </ItemGroup>
+</Project>
+```
 
-## Run Declaration
+要*看到*工作流，还需要一个应用外壳（`App` + `MainWindow`）来承载 `WorkflowView`，并把它的 `DataContext` 绑定到用 `[WorkflowBuilder.Tree]` 构建的 `IWorkflowTreeViewModel`——构树属于「工作流系统」特性，不属于本页。下面的视图文件本身是框架完整的，只差这个数据上下文。
 
-- ⚠️ 未实际运行 — 仅静态验证。（GUI 演示无法在此环境中运行。）上面的代码由模板生成文件与 WPF 演示（`Examples/Workflow/WPF/Demo/Views/Workflow/`）拼装而成，针对文档化的 API 面可编译，但尚未在此实际执行。
+子页面（每个源文件一页）：
+
+- [00 WorkflowView — 表面宿主](00_workflow-view/index.md)
+- [01 NodeView — 节点卡片](01_node-view/index.md)
+- [02 SlotView — 连接器](02_slot-view/index.md)
+- [03 LinkView — 折线连线](03_link-view/index.md)
+- [04 GridDecorator — 网格与标尺](04_grid-decorator/index.md)
+- [05 MinimapOverlay — 小地图](05_minimap-overlay/index.md)
+- [06 TemplateSelector — DataTemplate 选择器](06_template-selector/index.md)
+
+## 运行声明
+
+- ⚠️ 未实际运行 — 仅静态核验。每段代码都取自 `Src/Templates/VeloxDev.WPF.Templates/working/content` 下的真实模板源码（符号已替换为默认值），并与 `Src/Adapters/VeloxDev.WPF` 的适配器 API 面交叉核对；文件针对该 API 面可编译，但本环境未真正编译或执行，因此这套脚手架应视为「经检查而非经运行」的验证。

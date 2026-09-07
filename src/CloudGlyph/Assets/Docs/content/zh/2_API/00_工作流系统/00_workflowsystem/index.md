@@ -11,7 +11,7 @@
 | `[WorkflowBuilder.Slot<T>]` | class | `T : IWorkflowSlotViewModelHelper, new()` | — |
 | `[WorkflowBuilder.Link<T>(slotType = null)]` | class | `T : IWorkflowLinkViewModelHelper, new()` | `slotType` = 初始槽位类型 |
 
-**示例** —— 演示节点装饰：`Examples/Workflow/Common/Lib/ViewModels/Workflow/NodeViewModel.cs`，第 11-14 行（`[WorkflowBuilder.Node<HttpHelper<NodeViewModel>>(workSemaphore: 5)]`）。
+**示例** —— 演示控制器节点装饰：`Examples/Workflow/Common/Lib/ViewModels/Workflow/ControllerViewModel.cs`，第 10-12 行（`[WorkflowBuilder.Node<NodeHelper>]` + `[DefaultSize(220, 340)]`）。
 
 *源码：`Src/Core/VeloxDev.Core/WorkflowSystem/Templates/WorkflowBuilder.cs`，第 3-50 行。*
 
@@ -188,7 +188,7 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 
 - `TreeHelper()` 关闭虚拟化；`TreeHelper(double cellSize)` 开启。类型标注 `[MonoBehaviour(channel: nameof(TreeHelper), fps: 10)]`，`Install` 时调用 `tree.EnableMap(CellSize, VisibleItems)`。`CellSize` 默认 `200`。
 - `NodeHelper.SetAnchor/SetSize/Move` 在变更后调用 `Component.Parent.GetHelper().MarkDirty()`。
-- `NodeDefaultViewModel.ReceiveCommand` 把参数包装成 `TaskContext` 并调用 `Helper.ReceiveAsync(ctx, ct)` —— 携带可空 data/sender/receiver 的唯一接收路径（`NodeDefaultViewModel.cs` 第 67-72 行）。
+- `NodeDefaultViewModel.ReceiveCommand` 把参数包装成 `TaskContext` 并调用 `Helper.ReceiveAsync(ctx, ct)` —— 携带可空 data/sender/receiver 的唯一接收路径（`NodeDefaultViewModel.cs` 的 `Receive` 命令，约第 116-120 行）。
 - 四个默认 ViewModel 都实现 `IWorkflowIdentifiable`（`RuntimeId = Guid.NewGuid().ToString("N")`）。
 
 *源码：`Templates/ViewModels/*.cs`、`Templates/Helpers/*.cs`。*

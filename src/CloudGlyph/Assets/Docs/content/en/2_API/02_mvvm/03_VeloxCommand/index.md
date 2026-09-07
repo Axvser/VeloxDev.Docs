@@ -1,8 +1,8 @@
 # MVVM — `VeloxCommand`
 
-Sealed concrete `IVeloxCommand` (`Src/Core/VeloxDev.Core/MVVM/VeloxCommand.cs`).
+`VeloxDev.MVVM.VeloxCommand` (`Src/Core/VeloxDev.Core/MVVM/VeloxCommand.cs`) is the sealed concrete implementation of `IVeloxCommand` (see [02_IVeloxCommand](../02_IVeloxCommand/index.md)).
 
-**Primary constructor** (lines 16-18):
+**Primary constructor**
 
 ```csharp
 public sealed class VeloxCommand(Func<object?, CancellationToken, Task> command,
@@ -10,37 +10,42 @@ public sealed class VeloxCommand(Func<object?, CancellationToken, Task> command,
                     int semaphore = 1) : IVeloxCommand
 ```
 
-**Static factories and convenience constructors** (lines 20-77):
+**Convenience constructors and static factories**
 
 | Member | Signature |
 |---|---|
-| `CreateTaskOnlyWithParameter` | `static VeloxCommand(Func<object?, Task> command, Predicate<object?>? canExecute = null, int semaphore = 1)` — sets `_isCtsNeeded = false` |
-| `CreateTaskOnlyWithCancellationToken` | `static VeloxCommand(Func<CancellationToken, Task> command, Predicate<object?>? canExecute = null, int semaphore = 1)` |
-| `VeloxCommand(Func<Task>, ...)` | wraps `await command()`; sets `_isCtsNeeded = false` |
-| `VeloxCommand(Action<object?>, ...)` | synchronous with parameter; `_isCtsNeeded = false` |
-| `VeloxCommand(Action, ...)` | synchronous without parameter; `_isCtsNeeded = false` |
+| `VeloxCommand` | `(Func<Task> command, Predicate<object?>? canExecute = null, int semaphore = 1)` — wraps `await command()`; no per-execution cancellation token. |
+| `VeloxCommand` | `(Action<object?> command, Predicate<object?>? canExecute = null, int semaphore = 1)` — synchronous, parameterized. |
+| `VeloxCommand` | `(Action command, Predicate<object?>? canExecute = null, int semaphore = 1)` — synchronous, parameterless. |
+| `CreateTaskOnlyWithParameter` | `static VeloxCommand(Func<object?, Task> command, Predicate<object?>? canExecute = null, int semaphore = 1)` — awaits `command(parameter)`; no per-execution cancellation token. |
+| `CreateTaskOnlyWithCancellationToken` | `static VeloxCommand(Func<CancellationToken, Task> command, Predicate<object?>? canExecute = null, int semaphore = 1)` — awaits `command(ct)`; a token is created per execution. |
 
-**Exceptions:** `ArgumentNullException` when `command` is `null` (line 79). **Test:** `VeloxCommandTests.Constructor_NullCommand_Throws` (`Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandTests.cs`, lines 62-65).
+**Exception:** `ArgumentNullException` with parameter name `command` when the primary-constructor `command` delegate is `null` (`_command = command ?? throw new ArgumentNullException(nameof(command));`). Test: `VeloxCommandTests.Constructor_NullCommand_Throws` (`Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandTests.cs`).
 
-**Internal state** (lines 82-90): `SemaphoreSlim _stateLock(1, 1)`, `Queue<CommandEventArgs> _pendingQueue`, `List<CommandEventArgs> _active`, `int _maxConcurrency = Math.Max(1, semaphore)`, `bool _isForceLocked`, `bool _isCtsNeeded = true`, static `CancellationToken _defct`.
+**Cancellation note:** only the primary constructor and `CreateTaskOnlyWithCancellationToken` create a per-execution `CancellationTokenSource` (`_isCtsNeeded = true`). The other entry points run with the framework's default (never-canceled) token, so the underlying method is not interruptible by `Lock`/`Interrupt`/`Clear`, although the terminal `Canceled` event is still raised for those invocations.
 
-**Behavior:**
+## Members
 
-- `CanExecute(object?)` — `(_canExecute?.Invoke(parameter) ?? true) && !_isForceLocked` (line 126).
-- `Execute(object?)` — fire-and-forget: `_ = ExecuteAsync(parameter)` (line 128).
-- `ExecuteAsync(object?)` — creates a `CommandEventArgs(parameter, Created)` (allocating a `CancellationTokenSource` when `_isCtsNeeded`), raises `Created`, then under `_stateLock` either cancels the item if force-locked (raises `Canceled`), starts it immediately when `_active.Count < _maxConcurrency`, or enqueues it (raises `Enqueued`); finally releases the lock and calls `Notify()` (lines 139-174).
-- `ExecuteCoreAsync` — raises `Started`, invokes the command with the item's token (or `_defct`), then raises `Completed` / `Canceled` (on `OperationCanceledException`) / `Failed` (on any other `Exception`, with `CommandEventArgs.Exception`); finally `OnExecutionCompletedAsync` removes the item, raises `Exited`, raises `CanExecuteChanged`, and drains the queue (lines 176-222).
-- `LockAsync` / `UnLockAsync` — toggle `_isForceLocked`, notify, and (for `UnLock`) drain the queue (lines 224-253).
-- `InterruptAsync` — force-locks, snapshots and clears the active list, cancels each item's CTS and raises `Canceled`, then unlocks (lines 255-279).
-- `ClearAsync` — force-locks, snapshots active and dequeues all pending (raising `Dequeued` for each), cancels everything and raises `Canceled`, then unlocks (lines 281-313).
-- `ContinueAsync` — if not force-locked, drains the queue (lines 315-329).
-- `ChangeSemaphoreAsync` — ignores `< 1`, updates `_maxConcurrency`, drains the queue (lines 331-347).
-- `TryStartPendingAsync` — under `_stateLock` moves up to `_maxConcurrency` queued items into `_active` when not force-locked; raises `Dequeued` for each and starts them (lines 349-377).
-- `Notify()` — raises `CanExecuteChanged` (line 130). Event raising is exception-safe: `RaiseCommandEvent` swallows subscriber exceptions (lines 114-123).
+All `IVeloxCommand` events are implemented: `Created`, `Enqueued`, `Dequeued`, `Started`, `Completed`, `Failed`, `Canceled`, `Exited`, plus `ICommand.CanExecuteChanged`. Methods:
 
-**Test evidence:** `VeloxCommandTests` — `Execute_SyncAction_Completes`, `Execute_ActionWithParameter_ReceivesParameter`, `Execute_AsyncFunc_Completes`, `CanExecute_NoPredicate_ReturnsTrue`, `CanExecute_WithPredicate_RespectsIt`, `CreateTaskOnlyWithParameter_Works` (`Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandTests.cs`, lines 8-82).
+| Method | Behavior |
+|---|---|
+| `bool CanExecute(object? parameter)` | `(_canExecute?.Invoke(parameter) ?? true) && !_isForceLocked`. |
+| `void Execute(object? parameter)` | Fire-and-forget dispatch: `_ = ExecuteAsync(parameter);`. |
+| `Task ExecuteAsync(object? parameter)` | Allocate a `CommandEventArgs(parameter, Created)` (plus a CTS when cancellable), raise `Created`, then run immediately when below the concurrency cap (raise `Started` → terminal event → `Exited`), or enqueue (raise `Enqueued`; later `Dequeued` on dispatch). Returns when the item is dispatched, not when it finishes. |
+| `void Notify()` | Raise `CanExecuteChanged` (subscriber exceptions are swallowed). |
+| `void Lock()` / `Task LockAsync()` | Set the force-lock; further triggers are canceled, running invocations continue. |
+| `void UnLock()` / `Task UnLockAsync()` | Clear the force-lock and drain the pending queue. |
+| `void Interrupt()` / `Task InterruptAsync()` | Force-lock, snapshot and clear the active list, cancel each active item (raising `Canceled`), then unlock. |
+| `void Clear()` / `Task ClearAsync()` | Force-lock, snapshot the active list and dequeue all pending (raising `Dequeued` per item), cancel all (raising `Canceled`), then unlock. |
+| `void Continue()` / `Task ContinueAsync()` | Drain the pending queue unless force-locked. |
+| `void ChangeSemaphore(int)` / `Task ChangeSemaphoreAsync(int)` | Update `_maxConcurrency` (values `< 1` are ignored) and drain. |
 
-**Generated command-property template** (`CommandWriter.cs`, lines 154-186; `canValidate: true` branch, re-indented):
+Execution is internally synchronized with a `SemaphoreSlim`; events (`RaiseCommandEvent`) and `CanExecuteChanged` raising are exception-safe.
+
+## Usage from generated code
+
+The Command generator emits a lazily-initialized property that calls these constructors/factories. `canValidate: true` form (`CommandWriter.cs` template, applied to `Minus` in `Examples/MVVM/WPF/Demo/MainWindowViewModel.cs`):
 
 ```csharp
 private VeloxDev.MVVM.IVeloxCommand? _buffer_MinusCommand = null;
@@ -58,4 +63,4 @@ public VeloxDev.MVVM.IVeloxCommand MinusCommand
 private partial bool CanExecuteMinusCommand(object? parameter);
 ```
 
-The `canValidate: false` branch uses `canExecute: _ => true` (lines 172-186).
+Direct construction is covered by `Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandTests.cs` (`Execute_SyncAction_Completes`, `Execute_ActionWithParameter_ReceivesParameter`, `Execute_AsyncFunc_Completes`, `CanExecute_NoPredicate_ReturnsTrue`, `CanExecute_WithPredicate_RespectsIt`, `Constructor_NullCommand_Throws`, `CreateTaskOnlyWithParameter_Works`).

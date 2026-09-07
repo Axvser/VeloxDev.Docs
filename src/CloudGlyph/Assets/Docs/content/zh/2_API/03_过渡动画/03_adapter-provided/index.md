@@ -1,42 +1,38 @@
-# Transition — 命名空间：`VeloxDev.TransitionSystem`（适配器提供）
+# Transition — 适配器提供的表面
 
-### 静态类：`TransitionEx`（按适配器）
+每个平台适配器（`Src/Adapters/VeloxDev.WPF|Avalonia|WinUI|MAUI|WinForms|Razor|Jalium`）在自己的程序集里、且在**同一个** `VeloxDev.TransitionSystem` 命名空间中提供一组具体类型，子类化 [01_abstractions](../01_abstractions/index.md) 的引擎基础类型。因此 `using VeloxDev.TransitionSystem;` 的程序在每个平台上看到统一 API——只有平台值类型不同。
 
-```csharp
-public static class TransitionEx
-{
-    public static Transition<T>.StateSnapshot Snapshot<T>(this T target, params Expression<Func<T, object?>>[] expressions) where T : class;
-    public static Transition<T>.StateSnapshot SnapshotAll<T>(this T target, params Expression<Func<T, object?>>[] extraExpressions) where T : class;
-    public static Transition<T>.StateSnapshot SnapshotExcept<T>(this T target, params Expression<Func<T, object?>>[] excludedExpressions) where T : class;
-}
-```
+## 每个适配器提供什么
 
-**说明：** `SnapshotAll`/`SnapshotExcept` 以 `Interpolator.TryGetInterpolator(type, out _)` 作为「可动画」判定（默认 `maxDepth = 4`）。
-**验证依据：** WPF 示例 `Rec0.SnapshotAll()` / `Rec1.Snapshot(x => x.RenderTransform, x => x.Fill)`。
+| 类型 | 角色 | 派生自 |
+|---|---|---|
+| `Transition` | 非泛型静态入口（取消 / 退出辅助） | `TransitionCore` |
+| `Transition<T>` | 泛型静态入口（`Create`、……） | `TransitionCore<T, Transition<T>.StateSnapshot>` |
+| `Transition<T>.StateSnapshot` | 流式快照构建器（嵌套类） | 6 或 7 泛型元数 `StateSnapshotCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter[, TPriorityCore]>` |
+| `TransitionEx` | 目标上的 `Snapshot` / `SnapshotAll` / `SnapshotExcept` 捕获扩展 | 静态类 |
+| `Interpolator` | 平台采样器注册表（子类 `InterpolatorCore` 并在静态构造注册平台类型） | `InterpolatorCore` |
+| `State` | 快照状态集合 | `StateCore` |
+| `TransitionEffect` | 时序描述符，适用时带默认优先级 | `TransitionEffectCore` 或 `TransitionEffectCore<TPriorityCore>` |
+| `TransitionEffects` | `Empty` / `Theme` / `Hover` 预设 | 静态类（WinUI 上为实例类） |
+| `UIThreadInspector` | 平台 UI 线程编组 | `UIThreadInspectorCore` 或 `UIThreadInspectorCore<TPriorityCore>` |
+| `TransitionScheduler` | 按目标调度器 | `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter[, TPriorityCore]>` |
+| `TransitionInterpreter` | 采样循环解释器 | `TransitionInterpreterCore<TransitionEffect[, TPriorityCore]>` |
+| 平台采样器 | 已注册的值类型插值器 | `ISampler`（各适配器内命名空间 `VeloxDev.Adapters.NativeSamplers`） |
 
-### 类：`Transition` / `Transition<T>`（按适配器）
+优先级类型化适配器（WPF、Avalonia、Jalium、WinUI）以 dispatcher 优先级编组写入；MAUI、WinForms 与 Razor 无优先级。
 
-非泛型 `Transition : TransitionCore` 与 `Transition<T> : TransitionCore<T, Transition<T>.StateSnapshot>` 是适配器子类。`Transition<T>.StateSnapshot` 派生自 6 或 7 泛型元数的 `StateSnapshotCore`，使用适配器的 `State`、`TransitionEffect`、`Interpolator`、`UIThreadInspector` 与 `TransitionInterpreter`。
-
-### 类：`StateSnapshot` — `.Property(...)` 重载集（按适配器）
-
-每个重载：`StateSnapshot Property(Expression<Func<T, X>>, X newValue, object? interpolationOptions = null)`。
-
-| 适配器 | 优先级类型 | 额外重载 | 缺失 |
+| 适配器 | 框架 | 优先级类型 | 优先级默认 |
 |---|---|---|---|
-| WPF | `DispatcherPriority` | `Brush?`、`Transform?`（集合）、`Point`、`CornerRadius`、`Thickness`、`Size`、`Rect`、`Vector`、`Color`、`DropShadowEffect?`、`Point3D`、`Vector3D` | — |
-| Avalonia | `DispatcherPriority` | `ITransform?`、`IBrush?`、`Thickness`、`Point`、`CornerRadius`、`Size`、`PixelPoint`、`PixelSize`、`PixelRect`、`RelativePoint`、`RelativeRect`、`Color`、`BoxShadows` | — |
-| WinUI | `DispatcherQueuePriority` | `Brush?`、`Transform?`、`Point`、`CornerRadius`、`Thickness`、`Projection?`、`Size`、`Rect`、`GridLength`、`Color` | — |
-| MAUI | 无 | `Brush?`、`Transform?`、`Point`、`PointF`、`CornerRadius`、`Thickness`、`Color?`、`Size`、`SizeF`、`Rect`、`RectF`、`Shadow?` | `Transform?` 无 `interpolationOptions` |
-| WinForms | 无 | `Padding` | — |
-| Razor | 无 | `string?` | — |
+| WPF | `System.Windows.Threading` | `DispatcherPriority` | `DispatcherPriority.Render` |
+| Avalonia | Avalonia | `DispatcherPriority` | `DispatcherPriority.Render` |
+| Jalium | Jalium | `DispatcherPriority` | `DispatcherPriority.Render` |
+| WinUI | Microsoft.UI | `DispatcherQueuePriority` | `DispatcherQueuePriority.High` |
+| MAUI | .NET MAUI | —（无优先级） | — |
+| WinForms | System.Windows.Forms | — | — |
+| Razor | Blazor / Razor | — | — |
 
-**说明：** 旧的 `IInterpolable?` 重载已被泛型 `Property<TValue>(Expression<Func<T, TValue>>, TValue newValue, object? interpolationOptions = null)` 取代——它接受任何可动画类型（包括实现 `ISampleable` 的自定义类型）。适配器采样器实现 `ISampleable, ISampler`（`Normalize => this` + `Update`）；WPF/Jalium 引用类型目标（`SolidColorBrush`、`Transform`、`DropShadowEffect`）在 `Update` 内**原地修改** `start` 现有实例（不 new），否则走计算路径。
+## 子页
 
-所有适配器共有重载：`int`、`double`、`float`、`decimal`、`System.Drawing.*`、以及（非 netstandard2.0）`System.Numerics.*`。
-
-### 平台特定类型
-
-- **`UIThreadInspector`** — WPF：目标优先的 `DispatcherObject.Dispatcher` 再 `Application.Current.Dispatcher`，优先级 `DispatcherPriority`；Avalonia：`Dispatcher.UIThread`；WinUI：`DependencyObject.DispatcherQueue` 自动编组 + 可选 `CaptureUIThread()`；MAUI：`Application.Current.Dispatcher.Dispatch`；WinForms/Razor：`Control`/`SynchronizationContext` + 可选 `CaptureUIThread()`。
-- **`Interpolator`** 静态构造函数注册平台采样器（WPF：`Brush`、`Thickness`、`Point`、`CornerRadius`、`Transform`、`Size`、`Rect`、`Vector`、`Color`、`DropShadowEffect`、`Point3D`、`Vector3D`；Avalonia：`IBrush`、`ITransform`、`BoxShadows`、`GridLength`...；WinUI：`Projection`、`GridLength`...；MAUI：`Shadow`、`RectF`...；WinForms：`Padding`；Razor：`string` → `StringSampler`）。
-- **`TransitionEffects`** — 静态预设：`Empty`（0 秒）、`Theme`（0.46 秒）、`Hover`（0.32 秒）。**注意：** WinUI 的 `TransitionEffects` 是**非静态**类。
+- [00_transition](00_transition/index.md) — `Transition`、`Transition<T>`、`Transition<T>.StateSnapshot`（含 `Property` / `Effect` 重载集）与 `TransitionEx`。
+- [01_effect-interpolator](01_effect-interpolator/index.md) — `Interpolator` 及其各适配器采样器注册、`TransitionEffect`、`TransitionEffects` 与 `State`。
+- [02_ui-inspector](02_ui-inspector/index.md) — 各适配器的 `UIThreadInspector`，以及 `TransitionScheduler` / `TransitionInterpreter` 适配器子类。

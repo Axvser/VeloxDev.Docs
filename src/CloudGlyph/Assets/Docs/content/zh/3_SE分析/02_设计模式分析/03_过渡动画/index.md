@@ -1,111 +1,196 @@
 # 设计模式 — 过渡动画
 
+Transition（过渡动画）是一个与框架无关的动画引擎。它的核心位于 `Src/Core/VeloxDev.Core/TransitionSystem/**`（抽象/泛型的「核心」类型在 `VeloxDev.TransitionSystem.Abstractions` 命名空间，引擎契约在 `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/**`，原生采样器在 `TransitionSystem/NativeSamplers/**`）。它感知 UI 线程，但不对接任何具体 UI 栈。每个 UI 框架通过 `Src/Adapters/VeloxDev.*/PlatformAdapters` 下的平台适配器包接入（WPF、Avalonia、WinUI、MAUI、WinForms、Razor、Jalium），每个平台由 `Examples/Transition/**` 下的 Demo 验证。
+
+同一核心被实例化两次：一个**携带优先级**的管道，携带框架分发器优先级（`DispatcherPriority`、`DispatcherQueuePriority`…）；一个**无优先级**的普通管道。WPF/WinUI/Avalonia/Jalium 使用带优先级的一档；MAUI/WinForms/Razor 使用普通档。
+
+## 核心类图
+
 ```mermaid
 classDiagram
-    class TransitionCore~TTarget,TStateSnapshotCore~ {
-        <<abstract static>>
-        +Create() TStateSnapshotCore
-        +Execute(target, value, CanMutualTask) void
+    class TransitionCore~TTarget,TStateSnapshot~ {
+        <<static factory>>
+        +Create() TStateSnapshot
+        +Execute(target, snapshot, CanMutualTask) void
+    }
+    class TransitionCore {
+        <<abstract>>
         +Exit(target, IncludeMutual, IncludeNoMutual) void
     }
-    class StateSnapshotCore~T,State,Effect,Interpolator,Inspector,Interpreter~ {
-        <<abstract>>
-        +Property(lambda, value, options) T
-        +Effect(effect) T
-        +Await(span) T
-        +Then() T
-        +AwaitThen(span) T
-        +GetState() IFrameState
+    class StateSnapshotCore~TTarget,...~ {
+        <<fluent builder base>>
+        +GetState() TState
+        +CoreExecute(target, CanMutualTask) void
+        +CoreAwaitThen(span) / CoreThen()
+    }
+    class IFrameState {
+        <<interface>>
+        +Values / Interpolators / Options ConcurrentDictionary
+        +Clone() IFrameState
     }
     class StateCore {
-        +Values dict
-        +Interpolators dict
-        +Options dict
-        +SetValue(lambda, value) void
         +Clone() IFrameState
     }
     class TransitionProperty {
         +Path string
-        +GetValue(target) object
+        +Segments IReadOnlyList~PropertyInfo~
+        +GetValue(target) object?
         +SetValue(target, value) bool
-        +TryCreate(expression, out) bool
     }
     class InterpolatorCore {
         <<abstract>>
-        +NativeInterpolators dict
-        +TryGetInterpolator(type, out) bool
-        +RegisterInterpolator(type, sampleable) bool
+        +NativeInterpolators ConcurrentDictionary~Type, ISampler~
+        +TryGetInterpolator(type) bool
+        +RegisterInterpolator(type, sampler) bool
         +Prepare(target, state, effect, inspector) SamplerSet
-    }
-    class ISampleable {
-        <<interface>>
-        +Normalize(start, end, options) ISampler
     }
     class ISampler {
         <<interface>>
-        +Update(target, property, start, end, options, t) void
+        +NormalizeStart(start, end, options) object?
+        +NormalizeEnd(start, end, options) object?
+        +InsertFrame(target, property, ref working, start, end, options, t) void
+    }
+    class ISampleable {
+        <<interface>>
+        +GetAnimatableMembers() IReadOnlyList~ITransitionProperty~
+        +CreateFrameValue(memberValues) object?
+    }
+    class StructAssembler {
+        <<internal static>>
+        +Create(property, sampleable, start, end) ISampler?
     }
     class SamplerSet {
         +Apply(target, t, priority) void
         +CanSetValue() bool
     }
-    class TransitionEffectCore {
-        +FPS int
-        +Duration TimeSpan
-        +IsAutoReverse bool
-        +LoopTime int
-        +Ease IEaseCalculator
-        +events Awaked/Start/Update/LateUpdate/Canceled/Completed/Finally
-    }
-    class Eases {
-        <<static>>
-        +Default IEaseCalculator
-        +Sine.In IEaseCalculator
-        +Quad.In IEaseCalculator
-    }
     class TransitionSchedulerCore {
         <<abstract>>
-        +MutualSchedulers ConditionalWeakTable
-        +NoMutualSchedulers ConditionalWeakTable
-        +FindOrCreate(source, CanMutualTask) IScheduler
+        +MutualSchedulers / NoMutualSchedulers ConditionalWeakTable
+        +FindOrCreate(source, CanMutualTask) scheduler
         +Execute(producer, state, effect, cts) Task
         +Exit() void
     }
     class TransitionInterpreterCore {
         <<abstract>>
+        +Args TransitionEventArgs
         +Execute(target, samplerSet, effect, cts) Task
-        +Exit() void
+        +Exit() / Dispose()
+    }
+    class ITransitionSchedulerCore {
+        <<interface>>
+    }
+    class ITransitionInterpreterCore {
+        <<interface>>
+        +Args TransitionEventArgs
+    }
+    class TransitionEffectCore {
+        +FPS / Duration / IsAutoReverse / LoopTime
+        +Ease IEaseCalculator
+        +events Awaked Start Update LateUpdate Canceled Completed Finally
+    }
+    class IEaseCalculator {
+        <<interface>>
+        +Ease(t) double
+    }
+    class Eases {
+        <<static>>
+        +Default IEaseCalculator
+        +Sine / Quad / Cubic / Quart / Quint
+        +Expo / Circ / Back / Elastic / Bounce
     }
     class UIThreadInspectorCore {
         <<abstract>>
         +IsAppAlive() bool
         +IsUIThread() bool
         +ProtectedInvoke(target, action, priority) void
-        +ProtectedGetValue(target, property) object
+        +ProtectedGetValue(target, property) object?
+    }
+    class IUIThreadInspectorCore {
+        <<interface>>
     }
 
-    TransitionCore~TTarget,TStateSnapshotCore~ --> StateSnapshotCore~T,State,Effect,Interpolator,Inspector,Interpreter~
-    StateSnapshotCore~T,State,Effect,Interpolator,Inspector,Interpreter~ --> StateCore
-    StateCore --> TransitionProperty
-    TransitionSchedulerCore --> TransitionInterpreterCore
-    TransitionInterpreterCore --> SamplerSet
-    TransitionInterpreterCore --> TransitionEffectCore
-    TransitionEffectCore --> Eases
-    InterpolatorCore ..> ISampleable : registry
-    InterpolatorCore --> SamplerSet : Prepare
-    ISampleable --> ISampler : Normalize
-    SamplerSet --> ISampler : drives
-    SamplerSet --> UIThreadInspectorCore
+    TransitionCore~TTarget,TStateSnapshot~ --|> TransitionCore : Exit
+    TransitionCore~TTarget,TStateSnapshot~ --> StateSnapshotCore~TTarget,...~ : Create / Execute
+    StateSnapshotCore~TTarget,...~ --> IFrameState : records values
+    StateCore ..|> IFrameState
+    StateCore --> TransitionProperty : dictionary keys
+    InterpolatorCore ..> ISampler : registry & per-property override
+    InterpolatorCore ..> SamplerSet : Prepare builds
+    InterpolatorCore ..> StructAssembler : value-type ISampleable
+    StructAssembler ..> ISampleable : expands members
+    StructAssembler ..> ISampler : produces StructAssemblerSampler
+    SamplerSet --> ISampler : drives InsertFrame per frame
+    SamplerSet --> IUIThreadInspectorCore : marshals writes
+    TransitionSchedulerCore ..|> ITransitionSchedulerCore
+    TransitionInterpreterCore ..|> ITransitionInterpreterCore
+    TransitionSchedulerCore --> TransitionInterpreterCore : instantiates one per Execute
+    TransitionInterpreterCore --> SamplerSet : samples eased time
+    TransitionInterpreterCore --> TransitionEffectCore : lifecycle events + Ease
+    TransitionEffectCore --> IEaseCalculator : strategy
+    Eases ..> IEaseCalculator : produces (Sine/Quad/... )
 ```
+
+原生采样器实现 `ISampler`，位于 `TransitionSystem/NativeSamplers/*`：`DoubleSampler`、`FloatSampler`、`IntSampler`、`LongSampler`、`PointSampler`、`PointFSampler`、`SizeSampler`、`SizeFSampler`、`ColorSampler`、`RectangleSampler`、`RectangleFSampler`，以及（在 `netstandard2.0` 之外）`Vector2Sampler`、`Vector3Sampler`、`Vector4Sampler`、`QuaternionSampler`。
+
+## 适配器侧类图（以 WPF 为例）
+
+每个适配器用绑定到框架的子类填充核心的泛型参数。WPF 演示了带优先级的一档；同样的形状在每个适配器包里重复出现。
+
+```mermaid
+classDiagram
+    class Transition {
+        <<empty core subclass>>
+    }
+    class Transition~T~ {
+        <<static factory>>
+        +StateSnapshot nested
+    }
+    class StateSnapshot {
+        +Property(lambda, value, options) StateSnapshot
+        +Effect(effect) / Effect(Action~TransitionEffect~) StateSnapshot
+    }
+    class State {
+        <<StateCore subclass>>
+    }
+    class Interpolator {
+        <<InterpolatorCore subclass>>
+    }
+    class TransitionEffect {
+        <<TransitionEffectCore~DispatcherPriority~>>
+        +Priority DispatcherPriority = Render
+    }
+    class UIThreadInspector {
+        <<UIThreadInspectorCore~DispatcherPriority~>>
+        +ProtectedInvoke(target, action, DispatcherPriority)
+    }
+    class TransitionScheduler {
+        <<TransitionSchedulerCore~UIThreadInspector,TransitionInterpreter,DispatcherPriority~>>
+    }
+    class TransitionInterpreter {
+        <<TransitionInterpreterCore~TransitionEffect,DispatcherPriority~>>
+    }
+
+    Transition~T~ --|> TransitionCore~T,StateSnapshot~
+    StateSnapshot --|> StateSnapshotCore~T,State,TransitionEffect,Interpolator,UIThreadInspector,TransitionInterpreter,DispatcherPriority~
+    State --|> StateCore
+    Interpolator --|> InterpolatorCore
+    TransitionEffect --|> TransitionEffectCore~DispatcherPriority~
+    UIThreadInspector --|> UIThreadInspectorCore~DispatcherPriority~
+    TransitionScheduler --|> TransitionSchedulerCore
+    TransitionInterpreter --|> TransitionInterpreterCore
+    Transition --|> TransitionCore
+```
+
+来源：`Src/Core/VeloxDev.Core/TransitionSystem/Transition.cs`、`StateSnapshot.cs`、`State.cs`、`SamplerSet.cs`、`Interpolator.cs`、`TransitionScheduler.cs`、`TransitionInterpreter.cs`、`TransitionEffect.cs`、`StructAssembler.cs`、`TransitionProperty.cs`、`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs`、`Src/Adapters/VeloxDev.WPF/PlatformAdapters/*.cs`（以及同级的 `VeloxDev.{Avalonia,WinUI,MAUI,WinForms,Razor,Jalium}/PlatformAdapters` 目录）。
 
 ## 识别到的模式
 
-### 1. 流式构建器模式（`StateSnapshot`）
+### 1. 流式构建器 + 分段链（`Transition<T>.StateSnapshot`）
 
-`Transition<T>.Create()` 返回 `StateSnapshot` 流式构建器。`.Property(lambda, value)`、`.Effect(...)`、`.Await(...)`、`.AwaitThen(...)`、`.Then()` 每个都返回同一快照供链式调用；`.Execute(target, CanMutualTask)` 消费它。分段通过 `next` 指针链接成列表，因此一个「构建器」实际描述一个**分段序列**。
+`Transition<T>.Create()` 返回适配器的 `StateSnapshot`，其类型化的 `.Property(expr, value, options)` 重载与 `.Effect(...)` 各自返回同一快照。`.Await(span)`、`.Then()` 与 `.AwaitThen(span)`（`StateSnapshotCore` 上的扩展方法）创建**下一个**分段并通过 `next` 指针链接它，因此一个构建器表达式实际上描述了一个有序的**分段列表**——每段各自带有 `State`、`Effect`、`Interpolator` 与前置延迟。`Execute(target, CanMutualTask)` 消费整条链。
 
 ```csharp
-// Examples/Transition/WPF/Demo/MainWindow.xaml.cs
+// Examples/Transition/WPF/Demo/MainWindow.xaml.cs（Animation0，第 141-151 行）
 private static readonly Transition<Rectangle>.StateSnapshot Animation0 =
     Transition<Rectangle>.Create()
         .Property(r => r.Opacity, 0)
@@ -119,45 +204,62 @@ private static readonly Transition<Rectangle>.StateSnapshot Animation0 =
         });
 ```
 
-### 2. 注册表模式（`InterpolatorCore`）
+### 2. 注册表（`InterpolatorCore.NativeInterpolators`）
 
-全局 `ConcurrentDictionary<Type, ISampleable>`（`NativeInterpolators`）加 `RegisterInterpolator`/`TryGetInterpolator`/`UnregisterInterpolator`。`Prepare` 中的解析顺序：按属性自定义 `ISampleable`（`state.Interpolators`）→ 注册表 → 起始/结束值本身是 `ISampleable`，随后调用 `Normalize(start, end, options)` 得到无状态 `ISampler` 存入 `SamplerSet`。`RegisterInterpolator` 使用原子 `AddOrUpdate`（后写胜出，无丢失更新）。
+`NativeInterpolators` 是一个静态 `ConcurrentDictionary<Type, ISampler>`——注册的是**按属性类型**的采样器，而非「sampleable」。`InterpolatorCore` 的静态构造函数种子化跨平台类型（数值、`System.Drawing` 几何、`System.Numerics`），每个适配器的 `Interpolator` 静态构造函数加入框架类型（例如 WPF 的 `Brush`、`Thickness`、`Transform`、`Color`、`Point3D`、`DropShadowEffect`）。`RegisterInterpolator` 使用原子 `AddOrUpdate`（后写胜出，无丢失更新）。
 
-### 3. 策略模式（缓动 + 采样器）
+`Prepare` 按下列顺序解析每个已记录的属性：`state.Interpolators` 里的按属性覆盖 → 按 `PropertyType` 查注册表 → 仅对**值类型**属性，当 `currentValue is ISampleable` → `StructAssembler.Create`。解析不到的属性被跳过，因此一个坏路径绝不会扭曲其它属性。
 
-`IEaseCalculator.Ease(double t)` 策略来自 `Eases.*`（`Sine`、`Quad`、`Bounce`...）。`ISampler.Update(target, property, start, end, options, t)` 策略在归一化时间点直接更新属性（如 `DoubleSampler`、`ColorSampler`、`QuaternionSampler`）。缓动由解释器在**采样前**应用：它把归一化时间缓动并钳制到 `easedT ∈ [0,1]`，再让采样器更新 —— 不再有需要重新索引的预计算帧数组。
+### 3. `ISampleable` 成员展开 / 结构体装配
 
-### 4. 模板方法模式（核心引擎）
+`ISampleable` **不是**采样器。类型实现它，用来声明它哪些成员是可动画的（`GetAnimatableMembers`），并对结构体声明如何用插值后的成员重建该值（`CreateFrameValue`）。引用类型的 `ISampleable` 值会在**捕获阶段**由快照辅助方法展开成成员路径。值类型的 `ISampleable` 属性由 `StructAssembler` 整体动画（一个内部适配对象：用各自的 `ISampler` 插值每个成员，再通过结构体构造函数重建——运行时零反射）。
 
-核心类（6/7 泛型元数的 `StateSnapshotCore`、非泛型 `InterpolatorCore`、`TransitionSchedulerCore<TUIThreadInspector, TTransitionInterpreter[, TPriorityCore]>`、`TransitionInterpreterCore<TEffectCore[, TPriorityCore]>`、`UIThreadInspectorCore<TPriorityCore>`）定义算法骨架；每个**适配器**为其平台提供具体子类（`TransitionEffect` 优先级、`Interpolator` 采样器注册、`UIThreadInspector` 调度）。
+### 4. 策略（缓动 + 采样）
 
-### 5. 代理 / 适配器模式（平台适配器）
+`IEaseCalculator.Ease(double t)` 是由 `effect.Ease` 选择的缓动策略；`Eases` 是策略集（Sine/Quad/Cubic/… 各有 In/Out/InOut，另有 `Default` = 恒等）。`ISampler` 是值插值策略：核心在准备阶段调用一次 `NormalizeStart`/`NormalizeEnd` 固定精确端点值，再调用 `InsertFrame(target, property, ref working, start, end, options, t)` 计算中间帧。`t` 已由解释器缓动并钳制；每个采样器把 `t <= 0`/`t >= 1` 当作精确端点写入（绝不依赖 `Ease(1)` 恰为 `1`）。引用类型采样器复用每个动画一个的 `working` 暂存对象（绝不突变共享的 `start`/`end`，否则会污染快照）。
 
-`UIThreadInspector` 包装各平台的分发器（`Application.Current.Dispatcher`、`Dispatcher.UIThread`、`DispatcherQueue.TryEnqueue`、`SynchronizationContext.Post`、`Control.Invoke/BeginInvoke`），使引擎可在任意线程启动动画并把帧写回 UI 线程。
+### 5. 模板方法 / 泛型策略管道
 
-### 6. 调度器 + `ConditionalWeakTable` 缓存
+核心类固定算法骨架，把框架特定选择交给经由泛型参数注入的子类：
 
-`TransitionSchedulerCore.MutualSchedulers` 是 `ConditionalWeakTable<object, ITransitionSchedulerCore>` —— 每个目标一个共享**互斥**调度器，随目标一起被 GC 回收（无泄漏）。`FindOrCreate(source, CanMutualTask)` 返回它，或在并行动画时返回一次性**非互斥**调度器（登记在 `NoMutualSchedulers`）。`SemaphoreSlim` 门控串行化互斥调度器上的执行。
+| 核心骨架 | 适配器填充的内容 |
+|---|---|
+| `StateSnapshotCore<…>` | `State`、`TransitionEffect`、`Interpolator`、`UIThreadInspector`、`TransitionInterpreter`（+ 可选 `TPriority`） |
+| `TransitionSchedulerCore<TInspector,TInterpreter[,TPriority]>` | 每次 `Execute` 用（`new()` 的）具体 inspector/interpreter |
+| `TransitionInterpreterCore<TEffect[,TPriority]>` | 采样循环的 `apply` 回调（带/不带分发器优先级的帧写入） |
+| `UIThreadInspectorCore[<TPriority>]` | 分发器编组、`IsAppAlive`/`IsUIThread` |
+| `TransitionEffectCore[<TPriority>]` | 默认 `Priority`、默认 `FPS` |
 
-### 7. 组合（状态分段）
+### 6. 适配器（各平台包）
 
-`.AwaitThen(...)` 把快照链接成**分段链表**，每段有独立的 `State` + `Effect`；解释器按顺序播放，尊重每段的延迟、缓动与循环设置。
+各适配器里的 `Transition<T>` / `State` / `Interpolator` / `TransitionEffect` / `TransitionScheduler` / `TransitionInterpreter` / `UIThreadInspector` 把引擎适配到一个 UI 栈：平台化 `Property` 重载（类型化到框架值类型，如 WPF 的 `Brush`、`Transform`、`CornerRadius`、`Point3D`）、框架采样器注册、分发器优先级类型化的效果，以及线程编组。
 
-### 8. 观察者模式（效果生命周期事件）
+### 7. 调度器 + `ConditionalWeakTable` 缓存（`TransitionSchedulerCore`）
 
-`TransitionEffectCore` 暴露 `Awaked/Start/Update/LateUpdate/Canceled/Completed/Finally` 事件，由 `WeakDelegate`（无泄漏）支撑；`TransitionInterpreterCore` 在每次采样与完成/取消时触发它们。
+`MutualSchedulers` 是 `ConditionalWeakTable<object, ITransitionSchedulerCore>`——每个目标一个共享**互斥**调度器，随目标被回收（无泄漏）。`FindOrCreate(target, CanMutualTask)` 返回它，或在**非互斥**场景分配全新调度器：后者在运行期间登记进 `NoMutualSchedulers`（每目标一个 `List`），在其效果的 `Finally` 触发时移除。`SemaphoreSlim` 门控串行化调度器上的 `Execute`；每个调度器还持有目标的 `WeakReference`，因此结束的动画不会让目标保持存活。
+
+### 8. 组合（多段时间线）
+
+每个分段是持有 `State + Effect + Interpolator + delay` 的小对象，分段以 `next` 链接。`CoreExecute` 先沿链走一遍排空每段队列，再按顺序播放（尊重每段的 `Await` 延迟），从而构成复合时间线（见数据流分析）。
+
+### 9. 观察者（效果生命周期事件）
+
+`TransitionEffectCore` 暴露 `Awaked/Start/Update/LateUpdate/Canceled/Completed/Finally` 事件，由 `WeakDelegate`（无泄漏）支撑。处理器可把 `TransitionEventArgs.Handled` 置为 `true` 以终止时间线；解释器在每次采样前后触发 `Update`/`LateUpdate`，在运行收尾触发 `Completed`/`Canceled`/`Finally`。
 
 ## 模式汇总
 
 | 模式 | 出现位置 | 作用 |
 |---|---|---|
-| 流式构建器 | `StateSnapshotCore` 链 | 用描述性方式表达目标状态 + 时序，无需可变配置对象 |
-| 注册表 | `InterpolatorCore.NativeInterpolators` | 运行时把类型映射到 `ISampleable` |
-| 策略 | `IEaseCalculator`/`Eases`、`ISampler` | 无需改动引擎即可更换缓动曲线与值插值 |
-| 模板方法 | `InterpolatorCore`、`TransitionSchedulerCore`、`TransitionInterpreterCore`、`UIThreadInspectorCore` | 固定算法骨架；由适配器填充平台细节 |
-| 适配器 / 代理 | 各平台的 `UIThreadInspector` | 用一个接口隐藏分发器差异 |
+| 流式构建器 + 链 | `StateSnapshot`/`StateSnapshotCore.next` | 用描述性方式表达目标状态 + 分段时序，无需可变配置对象 |
+| 注册表 | `InterpolatorCore.NativeInterpolators` | 运行时把属性类型映射到 `ISampler` |
+| `ISampleable` 展开 | 快照辅助 + `StructAssembler` | 动画化注册表没有采样器的对象成员 / 结构体 |
+| 策略 | `IEaseCalculator`/`Eases`、`ISampler` | 无需改动引擎即可更换缓动曲线与逐类型插值 |
+| 模板方法 / 策略 | `StateSnapshotCore`、`InterpolatorCore`、调度器/解释器/inspector/效果核心 | 固定骨架；适配器经泛型提供平台细节 |
+| 适配器 | 各平台 `PlatformAdapters/*` | 把引擎桥接到一个 UI 框架的类型与分发器 |
 | 调度器 + CWT 缓存 | `TransitionSchedulerCore` 互斥/非互斥表 | 每目标一个串行动画；无泄漏 |
 | 组合 | `StateSnapshotCore.next` 链 | 组合多段时间线 |
-| 观察者 | `TransitionEffectCore` 事件 | 无需轮询即可观察生命周期 |
+| 观察者 | `TransitionEffectCore` 事件 + `WeakDelegate` | 无需轮询即可观察生命周期 |
 
-> 源码引用：`Src/Core/VeloxDev.Core/TransitionSystem/*.cs`、`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs`、`Src/Adapters/VeloxDev.{WPF,...}/PlatformAdapters/*.cs`、`Examples/Transition/WPF/Demo/MainWindow.xaml.cs`。
+来源：`Src/Core/VeloxDev.Core/TransitionSystem/*.cs`、`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs`、`Src/Core/VeloxDev.Core/TransitionSystem/NativeSamplers/*.cs`、`Src/Adapters/VeloxDev.{WPF,Avalonia,WinUI,MAUI,WinForms,Razor,Jalium}/PlatformAdapters/*.cs`、`Examples/Transition/WPF/Demo/MainWindow.xaml.cs`。
+
+相关分析：[数据流 — 过渡动画](../../03_数据流分析/03_过渡动画/index.md) · [复杂度 — 过渡动画](../../04_复杂度分析/03_过渡动画/index.md)

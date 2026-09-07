@@ -1,15 +1,24 @@
 # Transition — API Reference
 
-The engine lives in `VeloxDev.Core` (`VeloxDev.TransitionSystem` + `.Abstractions`); each platform adapter (WPF/Avalonia/WinUI/MAUI/WinForms/Razor) exposes the same public shapes in the `VeloxDev.TransitionSystem` namespace with its own `Interpolator`, `TransitionEffect`, `UIThreadInspector`, and native samplers.
+The transition system is the animation engine shared by every VeloxDev UI adapter. The engine itself lives in the `VeloxDev.Core` assembly — implementations under `Src/Core/VeloxDev.Core/TransitionSystem/**`, contracts under `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/**` — and its public API spans four core namespaces:
 
-Every member below is verified against source and, where noted, against `Src/Core/VeloxDev.Core.Test/TransitionSystem/*` and `Examples/Transition/*`.
+| Namespace | Contents |
+|---|---|
+| `VeloxDev.TransitionSystem` | Core contracts (`IEaseCalculator`, `ISampler`, `ISampleable`, `ITransitionProperty`, `IFrameState`, `ITransitionEffect*`, `ITransitionScheduler*`, `ITransitionInterpreter*`, `IUIThreadInspector*`), the `RotationDirection` enum, the `Eases` factory with the concrete ease classes, and the `TransitionCoreEx` snapshot-builder extensions |
+| `VeloxDev.TransitionSystem.Abstractions` | Engine base types: `TransitionCore`, the `StateSnapshotCore` family, `StateCore`, `InterpolatorCore`, `SamplerSet`, `TransitionEffectCore`, `TransitionSchedulerCore`, `TransitionInterpreterCore`, `UIThreadInspectorCore`, `TransitionProperty`, `TransitionSnapshotHelper` |
+| `VeloxDev.TransitionSystem.NativeSamplers` | Built-in stateless samplers (`DoubleSampler`, `QuaternionSampler`, ...) |
+| `VeloxDev.TimeLine` | `TransitionEventArgs` (and its base `TimeLineEventArgs`) |
 
-## API — Sections
+Each platform adapter — WPF, Avalonia, WinUI, MAUI, WinForms, Razor, Jalium (`Src/Adapters/VeloxDev.*`) — re-exposes the same public shapes in the `VeloxDev.TransitionSystem` namespace: its own `Transition`, `Transition<T>`, `Transition<T>.StateSnapshot`, `TransitionEx`, `Interpolator`, `TransitionEffect`, `TransitionEffects`, `State`, `UIThreadInspector`, `TransitionScheduler`, and `TransitionInterpreter`, plus the platform samplers it registers.
 
-This feature's API reference is split into:
+Members below are verified against the source files above. Behavioral claims cite `Src/Core/VeloxDev.Core.Test/TransitionSystem/*` and the demos under `Examples/Transition/*`; signatures not confirmed by a demo or a test are marked *inferred*.
 
-- `00_transitionsystem/`
-- `01_abstractions/`
-- `02_nativesamplers/`
-- `03_adapter-provided/`
-- `04_timeline/`
+## Sections
+
+This feature's API reference is split into five sections:
+
+- [00_transitionsystem](00_transitionsystem/index.md) — the `VeloxDev.TransitionSystem` core contracts: sampling / property contracts, effect-scheduler-interpreter contracts, `RotationDirection`, `Eases`, and the concrete ease classes.
+- [01_abstractions](01_abstractions/index.md) — the engine implementation base types in `VeloxDev.TransitionSystem.Abstractions`.
+- [02_nativesamplers](02_nativesamplers/index.md) — the built-in samplers in `VeloxDev.TransitionSystem.NativeSamplers`.
+- [03_adapter-provided](03_adapter-provided/index.md) — the per-platform surface each adapter ships in `VeloxDev.TransitionSystem`.
+- [04_timeline](04_timeline/index.md) — `VeloxDev.TimeLine.TransitionEventArgs` and `Handled` cancellation.

@@ -1,8 +1,8 @@
 # MonoBehaviour — `MonoBehaviourManager`
 
-Constant: `public const string DEFAULT_CHANNEL = "default";`
+Namespace `VeloxDev.TimeLine`. A static, thread-safe facade over per-name loop channels. `public const string DEFAULT_CHANNEL = "default";` is the channel used whenever the `channel` argument is omitted.
 
-#### Lifecycle
+### Lifecycle
 
 #### `MonoBehaviourManager.Start`
 
@@ -76,7 +76,7 @@ await MonoBehaviourManager.StopAsync();
 **Notes:**
 - Pauses if running, resumes if paused; delegates to `Pause`/`Resume`.
 
-#### Registration
+### Registration
 
 #### `MonoBehaviourManager.RegisterBehaviour`
 
@@ -108,7 +108,7 @@ await MonoBehaviourManager.StopAsync();
 **Notes:**
 - Queued and processed at the start of the next frame; the wrapper is returned to the object pool.
 
-#### Configuration
+### Configuration
 
 #### `MonoBehaviourManager.SetTargetFPS`
 
@@ -154,7 +154,7 @@ MonoBehaviourManager.SetTargetFPS(30, "game");
 
 **Example:**
 ```text
-// Runtime probe, 2026-08-17: SetTimeScale(0.5f) halved DeltaTime (ratio ≈ 0.49)
+// Time scale 0.5 halves every FrameEventArgs.DeltaTime (ScaleDuration in the loop)
 MonoBehaviourManager.SetTimeScale(0.5f, "game");
 ```
 
@@ -206,7 +206,7 @@ MonoBehaviourManager.SetTimeScale(0.5f, "game");
 **Notes:**
 - Removes this channel's override and falls back to the global `UseAsyncLoop`.
 
-#### Status queries
+### Status queries
 
 All status queries share the shape `(string channel = DEFAULT_CHANNEL)` and return `false`/`0`/`"Stopped"` when the channel has never been created.
 
@@ -227,14 +227,16 @@ All status queries share the shape `(string channel = DEFAULT_CHANNEL)` and retu
 
 **Example (status queries):**
 ```text
-// Source: Examples/MonoBehaviour/WPF/Demo/MainWindow.xaml.cs (lines 182-188)
-MonoBehaviourManager.IsRunning();
-MonoBehaviourManager.CurrentFPS();
+// Source: Examples/MonoBehaviour/WPF/Demo/MainWindow.xaml.cs (lines 158, 182-188)
+MonoBehaviourManager.TotalFrames();
 MonoBehaviourManager.ActiveBehaviorCount();
 MonoBehaviourManager.IsUpdateThreadAlive();
+MonoBehaviourManager.IsFixedUpdateThreadAlive();
+MonoBehaviourManager.IsRunning();
+MonoBehaviourManager.IsPaused();
 ```
 
-#### Events
+### Events
 
 #### `MonoBehaviourManager.OnChannelStarted`
 
@@ -261,11 +263,10 @@ MonoBehaviourManager.IsUpdateThreadAlive();
 
 **Example (subscribing):**
 ```text
-// Runtime probe, 2026-08-17: printed "event OnChannelStarted  -> demo"
-MonoBehaviourManager.OnChannelStarted += (s, e) => Console.WriteLine(e.ChannelName);
+MonoBehaviourManager.OnChannelStarted += (s, e) => Console.WriteLine($"OnChannelStarted -> {e.ChannelName}");
 ```
 
-#### Properties
+### Properties
 
 #### `MonoBehaviourManager.UseAsyncLoop`
 
@@ -273,7 +274,8 @@ MonoBehaviourManager.OnChannelStarted += (s, e) => Console.WriteLine(e.ChannelNa
 `public static bool UseAsyncLoop { get; set; }`
 
 **Notes:**
-- Auto-enabled on browsers (WASM) and iOS via `OperatingSystem.IsBrowser() || OperatingSystem.IsIOS()`; otherwise defaults to `false` (native threads).
+- The default comes from the build target of the `VeloxDev.Core` assembly that is linked. On .NET 5+ targets it initializes to `true` only when running in a browser (`OperatingSystem.IsBrowser()`, WASM) or on iOS (`OperatingSystem.IsIOS()`); everywhere else it defaults to `false` (native threads). On the pre-.NET 5 targets (`netstandard2.0`, `netcoreapp3.0`, `netframework4.6.1`) the initializer falls back to `true`, because `OperatingSystem.IsBrowser` is not available there.
+- `SetUseAsyncLoop` / `ClearUseAsyncLoopOverride` override this global value per channel.
 
 #### `MonoBehaviourManager.ChannelNames`
 

@@ -1,8 +1,8 @@
 # MonoBehaviour — `MonoBehaviourManager`
 
-常量：`public const string DEFAULT_CHANNEL = "default";`
+命名空间 `VeloxDev.TimeLine`。一个静态、线程安全的门面，封装按名称划分的循环通道。省略 `channel` 实参时使用默认通道常量：`public const string DEFAULT_CHANNEL = "default";`
 
-#### 生命周期
+### 生命周期
 
 #### `MonoBehaviourManager.Start`
 
@@ -76,7 +76,7 @@ await MonoBehaviourManager.StopAsync();
 **说明：**
 - 运行中则暂停，暂停中则恢复；委托给 `Pause` / `Resume`。
 
-#### 注册
+### 注册
 
 #### `MonoBehaviourManager.RegisterBehaviour`
 
@@ -108,7 +108,7 @@ await MonoBehaviourManager.StopAsync();
 **说明：**
 - 入队后在下一帧开始处理；包装对象归还给对象池。
 
-#### 配置
+### 配置
 
 #### `MonoBehaviourManager.SetTargetFPS`
 
@@ -154,7 +154,7 @@ MonoBehaviourManager.SetTargetFPS(30, "game");
 
 **示例：**
 ```text
-// 运行时探针，2026-08-17：SetTimeScale(0.5f) 使 DeltaTime 减半（比值 ≈ 0.49）
+// 时间缩放 0.5 会让每个 FrameEventArgs.DeltaTime 减半（循环内 ScaleDuration）
 MonoBehaviourManager.SetTimeScale(0.5f, "game");
 ```
 
@@ -206,7 +206,7 @@ MonoBehaviourManager.SetTimeScale(0.5f, "game");
 **说明：**
 - 移除该通道的独立覆盖，回退到全局 `UseAsyncLoop`。
 
-#### 状态查询
+### 状态查询
 
 所有状态查询共享 `(string channel = DEFAULT_CHANNEL)` 形态；当通道从未创建时返回 `false` / `0` / `"Stopped"`。
 
@@ -227,14 +227,16 @@ MonoBehaviourManager.SetTimeScale(0.5f, "game");
 
 **示例（状态查询）：**
 ```text
-// 出处：Examples/MonoBehaviour/WPF/Demo/MainWindow.xaml.cs（第 182-188 行）
-MonoBehaviourManager.IsRunning();
-MonoBehaviourManager.CurrentFPS();
+// 出处：Examples/MonoBehaviour/WPF/Demo/MainWindow.xaml.cs（第 158、182-188 行）
+MonoBehaviourManager.TotalFrames();
 MonoBehaviourManager.ActiveBehaviorCount();
 MonoBehaviourManager.IsUpdateThreadAlive();
+MonoBehaviourManager.IsFixedUpdateThreadAlive();
+MonoBehaviourManager.IsRunning();
+MonoBehaviourManager.IsPaused();
 ```
 
-#### 事件
+### 事件
 
 #### `MonoBehaviourManager.OnChannelStarted`
 
@@ -261,11 +263,10 @@ MonoBehaviourManager.IsUpdateThreadAlive();
 
 **示例（订阅）：**
 ```text
-// 运行时探针，2026-08-17：打印 "event OnChannelStarted  -> demo"
-MonoBehaviourManager.OnChannelStarted += (s, e) => Console.WriteLine(e.ChannelName);
+MonoBehaviourManager.OnChannelStarted += (s, e) => Console.WriteLine($"OnChannelStarted -> {e.ChannelName}");
 ```
 
-#### 属性
+### 属性
 
 #### `MonoBehaviourManager.UseAsyncLoop`
 
@@ -273,7 +274,8 @@ MonoBehaviourManager.OnChannelStarted += (s, e) => Console.WriteLine(e.ChannelNa
 `public static bool UseAsyncLoop { get; set; }`
 
 **说明：**
-- 在浏览器（WASM）与 iOS 上通过 `OperatingSystem.IsBrowser() || OperatingSystem.IsIOS()` 自动启用；其余平台默认 `false`（原生线程）。
+- 默认值取自所链接的 `VeloxDev.Core` 程序集的构建目标。在 .NET 5+ 目标上，仅当运行于浏览器（`OperatingSystem.IsBrowser()`，WASM）或 iOS（`OperatingSystem.IsIOS()`）时才初始化为 `true`；其余环境默认 `false`（原生线程）。在 .NET 5 之前的目标（`netstandard2.0`、`netcoreapp3.0`、`netframework4.6.1`）上，因 `OperatingSystem.IsBrowser` 不可用，初始化回退为 `true`。
+- `SetUseAsyncLoop` / `ClearUseAsyncLoopOverride` 可按通道覆盖该全局值。
 
 #### `MonoBehaviourManager.ChannelNames`
 

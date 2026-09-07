@@ -22,7 +22,7 @@ public partial class TreeViewModel { public TreeViewModel() => InitializeWorkflo
 
 **异常：** 若 `THelper` 不满足 `IWorkflowTreeViewModelHelper, new()`，编译报错。
 
-**示例：** `Examples/Workflow/Common/Lib/ViewModels/Workflow/TreeViewModel.cs`，第 11-13 行。
+**示例：** `Examples/Workflow/Common/Lib/ViewModels/Workflow/TreeViewModel.cs`，第 14-15 行（`[WorkflowBuilder.Tree<AgentHelper>]`）。
 
 **说明：** 属性的泛型参数是树的 Helper；`InitializeWorkflow()` 由生成器发出。
 
@@ -50,22 +50,26 @@ void ReceiveConnection(IWorkflowSlotViewModel slot);
 **签名：**
 
 ```csharp
-Task<IReadOnlyList<CompiledGraph>> CompileAsync<T>(T component) where T : IWorkflowViewModel;
+Task<IReadOnlyList<CompiledGraph>> CompileAsync<T>(
+    T component, CompileRole role, CancellationToken ct = default)
+    where T : IWorkflowViewModel;
 ```
 
 **参数：**
 
 | 参数 | 类型 | 说明 |
 |---|---|---|
-| `component` | `T : IWorkflowViewModel` | 必须是 `IWorkflowNodeViewModel`（起点 / 控制器节点） |
+| `component` | `T : IWorkflowViewModel` | 必须是 `IWorkflowNodeViewModel`；按 `role` 扮演起点或终端 |
+| `role` | `CompileRole` | `Root` = 沿下游 `Targets` 分解起点可达子图；`Terminal` = 沿 `Sources` 反向编译目标节点的祖先锥 |
+| `ct` | `CancellationToken` | 可选取消令牌 |
 
-**返回：** `IReadOnlyList<CompiledGraph>` —— 每个起点一张编译图；同时填充 `Graphs`。
+**返回：** `IReadOnlyList<CompiledGraph>` —— 当前实现恒返回一张编译图；同时清空并重填 `Graphs`。
 
-**异常：** 若 `component` 不是 `IWorkflowNodeViewModel`，抛 `ArgumentException`。
+**异常：** 若 `component` 不是 `IWorkflowNodeViewModel`，抛 `ArgumentException`；`role` 越界抛 `ArgumentOutOfRangeException`；`Terminal` 锥不可表达（前驱不汇聚、多条路由分支到达目标）抛 `InvalidOperationException`。
 
-**示例：** `Examples/Workflow/Common/Lib/ViewModels/Workflow/ControllerViewModel.cs`，第 29-34 行（`await Compiler.CompileAsync(this);`）。
+**示例：** `Examples/Workflow/Common/Lib/ViewModels/Workflow/ControllerViewModel.cs` 的 `Compile` 命令（`await Compiler.CompileAsync(this, CompileRole.Root);`，约第 33 行）。
 
-**说明：** 线性段 → `ExecuteEntry`、路由点 → `BranchEntry`、多目标路由 → `ParallelEntry`。
+**说明：** 线性段 → `ChainSegment`、路由点 → `BranchSegment`、单键/普通节点多目标扇出 → `ParallelSegment`；编译完给每个 `ICompileTimeAware` 节点注入 `CompileContext`（`Order`/`ChainIndex`/`Offset`，未选中分支 `Order = -1`）。
 
 ### `ComponentModelEx.Serialize` / `Deserialize`
 
@@ -87,6 +91,6 @@ T Deserialize<T>(this string json) where T : INotifyPropertyChanged;
 
 **异常：** `Serialize` 对 null workflow 抛 `ArgumentNullException`；`Deserialize` 对 null / 空 JSON 抛 `ArgumentException`，结果为空时抛 `JsonSerializationException`。`TryDeserialize` 返回 `false` 而非抛出。
 
-**示例：** `Examples/Workflow/Common/Lib/ViewModels/Workflow/TreeViewModel.cs`，第 185-193 行（`this.Serialize()`）；`Examples/Workflow/WPF/Demo/Views/Workflow/WorkflowView.xaml.cs`，第 46-51 行。
+**示例：** `Examples/Workflow/Common/Lib/ViewModels/Workflow/TreeViewModel.cs` 的 `Save` 命令（约第 252 行 `var json = this.Serialize();`）；`Examples/Workflow/WPF/Demo/Views/Workflow/WorkflowView.xaml.cs` 的 `SelectWorkflow`（约第 65 行 `json.Deserialize<TreeViewModel>()` + `Layout.UpdateCommand.Execute(null)`）。
 
 **说明：** 设置包含 `TypeNameHandling.Auto`、`PreserveReferencesHandling.Objects`、`WritablePropertiesOnlyResolver`。

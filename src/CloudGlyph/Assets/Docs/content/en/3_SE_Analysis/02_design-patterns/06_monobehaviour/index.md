@@ -1,6 +1,6 @@
 # Design Patterns — MonoBehaviour
 
-The `VeloxDev.TimeLine` frame loop combines a Template Method skeleton (the loop lives in the manager, the variable steps in user partial methods), a Publisher-Subscriber event surface, a pooled event-argument type, and the weak-interaction contract defined by `IMonoBehaviour`.
+`VeloxDev.TimeLine` runs a Unity-like, frame-driven lifecycle for classes decorated with `[MonoBehaviour]`. The static `MonoBehaviourManager` is a facade and channel registry / observable: it owns one named `LoopChannel` engine per channel and publishes channel state transitions. A Roslyn source generator turns the attribute into an `IMonoBehaviour` implementation whose entry points forward to the user's `partial void` hooks — the manager fixes the loop skeleton, the user supplies the variable steps (Template Method). The event-argument hierarchy is shared with the Transition system, and the hot-path argument type is pooled.
 
 ```mermaid
 classDiagram
@@ -8,6 +8,14 @@ classDiagram
         <<attribute>>
         +Channel string
         +TargetFPS int
+    }
+    class GeneratedBehaviour {
+        <<user class, decorated>>
+        +partial void Awake()
+        +partial void Start()
+        +partial void Update(FrameEventArgs e)
+        +partial void LateUpdate(FrameEventArgs e)
+        +partial void FixedUpdate(FrameEventArgs e)
     }
     class IMonoBehaviour {
         <<interface>>
@@ -20,29 +28,29 @@ classDiagram
         +InvokeFixedUpdate(FrameEventArgs e) void
     }
     class MonoBehaviourManager {
-        <<static>>
+        <<static facade / registry>>
+        +UseAsyncLoop bool
         +Start(channel) void
         +StopAsync(channel) Task
         +Pause(channel) void
         +Resume(channel) void
+        +RestartAsync(channel) Task
         +SetTargetFPS(fps, channel) void
+        +SetFixedUpdateInterval(ms, channel) void
         +SetTimeScale(scale, channel) void
+        +SetUseAsyncLoop(bool, channel) void
         +RegisterBehaviour(b, channel) void
-        +OnChannelStarted event
-        +OnChannelPaused event
-        +OnChannelResumed event
-        +OnChannelStopped event
+        +UnregisterBehaviour(b, channel) void
+        +ExecuteOnMainThread(action, channel) void
+        +OnChannelStarted/Paused/Resumed/Stopped event
     }
     class LoopChannel {
-        -UpdateLoop(token)
-        -FixedUpdateLoop(token)
-        -ExecuteBehaviorsUpdateSync(e, token)
-        -ExecuteBehaviorsLateUpdateSync(e, token)
-        -ExecuteBehaviorsFixedUpdateSync(e, token)
-        -Started event
-        -Paused event
-        -Resumed event
-        -Stopped event
+        <<private engine, one per channel>>
+        -UpdateLoop(token) void
+        -FixedUpdateLoop(token) void
+        -UpdateLoopAsync(token) Task
+        -FixedUpdateLoopAsync(token) Task
+        -Started/Paused/Resumed/Stopped event
     }
     class TimeLineEventArgs {
         <<abstract>>
@@ -54,21 +62,33 @@ classDiagram
         +CurrentFPS int
         +TargetFPS int
     }
-    MonoBehaviourAttribute ..> IMonoBehaviour : generator implements
-    MonoBehaviourManager --> LoopChannel : owns (per channel name)
-    MonoBehaviourManager --> IMonoBehaviour : invokes
-    LoopChannel --> IMonoBehaviour : Invoke* bridge
-    LoopChannel --> FrameEventArgs : creates from pool
+    class ThreadSafeFrameEventArgs {
+        +Handled bool (lock guarded)
+    }
+    class TransitionEventArgs
+    class MonoBehaviourChannelEventArgs {
+        +ChannelName string
+    }
+
+    MonoBehaviourAttribute ..> GeneratedBehaviour : source generator selects
+    GeneratedBehaviour ..|> IMonoBehaviour : generated partial realizes
+    GeneratedBehaviour --> MonoBehaviourManager : InitializeMonoBehaviour() registers
+    MonoBehaviourManager --> LoopChannel : GetOrCreateChannel(name)
+    LoopChannel ..> IMonoBehaviour : Awake/Start on drain, ticks each frame
     FrameEventArgs --|> TimeLineEventArgs
-    LoopChannel ..> MonoBehaviourManager : forwards Started/Paused/Resumed/Stopped
+    ThreadSafeFrameEventArgs --|> FrameEventArgs
+    TransitionEventArgs --|> TimeLineEventArgs
+    MonoBehaviourManager ..> MonoBehaviourChannelEventArgs : raises OnChannel*
 ```
+
+> Source: `Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs`, `.../Interfaces/MonoBehaviour/IMonoBehaviour.cs`, `Src/Generators/VeloxDev.Core.Generator/Writers/MonoWriter.cs`, `Examples/MonoBehaviour/WPF/Demo/MainWindow.xaml.cs`.
 
 ## 1. Template Method — frame-loop lifecycle
 
-The frame loop's skeleton is fixed in `LoopChannel.UpdateLoop` / `FixedUpdateLoop`; the variable steps are the user's partial hooks `Awake` / `Start` / `Update` / `LateUpdate` / `FixedUpdate`.
+The loop skeleton is fixed in `LoopChannel`: `UpdateLoop` (lines 444-489) and `FixedUpdateLoop` (lines 395-442) drive the per-frame pacing, queue draining and error isolation; `UpdateLoopAsync` (548-605) / `FixedUpdateLoopAsync` (492-546) are async/`Task.Delay` twins used when async-loop mode is enabled. The variable steps are the user's `partial void Awake` / `Start` / `Update` / `LateUpdate` / `FixedUpdate` hooks. The source generator emits the bridge: each `Invoke*` method on the generated partial forwards the event args into the matching partial hook, and `InitializeMonoBehaviour()` / `CloseMonoBehaviour()` provide the registration / unregistration entry points. The generated code never calls them itself — the user invokes `InitializeMonoBehaviour()` from the constructor (as the demo does) and `CloseMonoBehaviour()` when the instance must leave the channel.
 
 ```csharp
-// Src/Generators/VeloxDev.Core.Generator/Writers/MonoWriter.cs (lines 80-121)
+// Src/Generators/VeloxDev.Core.Generator/Writers/MonoWriter.cs — MonoWriter.GenerateBody (lines 80-121)
 public void InitializeMonoBehaviour()
 {
     VeloxDev.TimeLine.MonoBehaviourManager.RegisterBehaviour(this, "default");
@@ -78,7 +98,8 @@ public void InvokeUpdate(VeloxDev.TimeLine.FrameEventArgs e)
 {
     Update(e);
 }
-// ...
+// ... InvokeAwake/InvokeStart/InvokeLateUpdate/InvokeFixedUpdate forward the same way,
+//     and the generator declares the partial hooks:
 partial void Awake();
 partial void Start();
 partial void Update(VeloxDev.TimeLine.FrameEventArgs e);
@@ -86,63 +107,75 @@ partial void LateUpdate(VeloxDev.TimeLine.FrameEventArgs e);
 partial void FixedUpdate(VeloxDev.TimeLine.FrameEventArgs e);
 ```
 
+When the attribute supplies a `fps >= 1` (positional second argument or named `TargetFPS`), `InitializeMonoBehaviour()` first calls `SetTargetFPS(fps, channel)` and only then `RegisterBehaviour(this, channel)`; `CloseMonoBehaviour()` calls `UnregisterBehaviour(this, channel)`.
+
 | Role | Element |
 |---|---|
-| Skeleton (invariant algorithm) | `LoopChannel.UpdateLoop` / `FixedUpdateLoop` — pacing, config processing, error isolation |
-| Hook methods | `partial void Awake/Start/Update/LateUpdate/FixedUpdate` |
+| Skeleton (invariant algorithm) | `LoopChannel.UpdateLoop` / `FixedUpdateLoop` (thread) or `*Async` twins — pacing, config processing, error isolation |
+| Hook methods | `partial void Awake` / `Start` / `Update` / `LateUpdate` / `FixedUpdate` |
 | Bridge | Generated `Invoke*` methods on the `[MonoBehaviour]` class |
 | Registration | Generated `InitializeMonoBehaviour()` / `CloseMonoBehaviour()` |
 
-Source: `MonoBehaviourManager.cs` lines 443-488 (UpdateLoop), 394-441 (FixedUpdateLoop), 610-656 (execution loops).
+Source: `MonoBehaviourManager.cs` lines 444-489 (UpdateLoop), 395-442 (FixedUpdateLoop), 492-605 (async twins), 611-657 (per-behavior execution loops).
 
 ## 2. Lifecycle Hook — Awake / Start / Update / LateUpdate / FixedUpdate
 
-The manager invokes `InvokeAwake()` then `InvokeStart()` when a behaviour is added (`ProcessAddedBehaviors`, lines 710-726), and then per frame `InvokeUpdate` → `InvokeLateUpdate` on the update thread and `InvokeFixedUpdate` on the fixed thread.
+Registration is deferred through a per-channel queue. When the update driver drains it (`ProcessAddedBehaviors`, lines 711-727) — the first frame after `Start` for pre-registered behaviours, or the next frame when added to a running channel — the manager invokes `InvokeAwake()` then `InvokeStart()` once each on the update driver.
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs (lines 710-726)
+// Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs (lines 718-724)
+var wrapper = _wrapperPool.Get();
 wrapper.Reset(behavior, Interlocked.Increment(ref _instanceCounter));
+
 _behaviors[RuntimeHelpers.GetHashCode(behavior)] = wrapper;
 SafeExecute(behavior.InvokeAwake);
 SafeExecute(behavior.InvokeStart);
 added = true;
 ```
 
-| Hook | Thread | Frequency |
+After registration, each frame calls `InvokeUpdate` → `InvokeLateUpdate` on the update driver and `InvokeFixedUpdate` on the fixed driver, which runs concurrently at its own interval.
+
+| Hook | Driver | Frequency |
 |---|---|---|
-| `Awake` | update thread | Once, on registration |
-| `Start` | update thread | Once, immediately after `Awake` |
-| `Update` | update thread | Every frame |
-| `LateUpdate` | update thread | Every frame, after all `Update` |
-| `FixedUpdate` | fixed thread | Every `SetFixedUpdateInterval` ms (default 16) |
+| `Awake` | update driver | Once, when the registration is drained |
+| `Start` | update driver | Once, immediately after `Awake` |
+| `Update` | update driver | Every frame |
+| `LateUpdate` | update driver | Every frame, after all `Update` |
+| `FixedUpdate` | fixed driver | Every `SetFixedUpdateInterval` ms (default 16), concurrent with the update driver |
 
-## 3. Publisher-Subscriber — channel lifecycle events
+## 3. Publisher-Subscriber / Observable — channel lifecycle events
 
-`LoopChannel` exposes `Started` / `Paused` / `Resumed` / `Stopped`; the static `MonoBehaviourManager` forwards them as `OnChannelStarted` / `OnChannelPaused` / `OnChannelResumed` / `OnChannelStopped`, carrying a `MonoBehaviourChannelEventArgs` with the channel name.
+`LoopChannel` exposes `Started` / `Paused` / `Resumed` / `Stopped`; `GetOrCreateChannel` (lines 983-994) subscribes them to the static manager events, re-raising each with a fresh `MonoBehaviourChannelEventArgs` that carries the channel name.
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs (lines 987-991)
+// Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs (lines 988-991)
 ch.Started += (s, e) => OnChannelStarted?.Invoke(s, new MonoBehaviourChannelEventArgs(n));
 ch.Paused  += (s, e) => OnChannelPaused?.Invoke(s, new MonoBehaviourChannelEventArgs(n));
 ch.Resumed += (s, e) => OnChannelResumed?.Invoke(s, new MonoBehaviourChannelEventArgs(n));
 ch.Stopped += (s, e) => OnChannelStopped?.Invoke(s, new MonoBehaviourChannelEventArgs(n));
 ```
 
-Subscribers observe the whole manager (all channels), filtering by `ChannelName` if needed.
+The manager is also the channel registry: channels are created lazily and held in a static `ConcurrentDictionary` (`ChannelNames` exposes them). Subscribers observe the whole manager and filter by `ChannelName` when they care about one channel.
 
-## 4. Object Pool — pooled `FrameEventArgs`
+## 4. Object Pool — pooled event args and request/registry objects
 
-`FrameEventArgs` instances are drawn from a per-channel `ObjectPool<FrameEventArgs>` (default size 50) and returned after each frame, avoiding per-frame allocation in the hot loop.
+`LoopChannel` keeps three fixed-capacity object pools (default `DEFAULT_OBJECT_POOL_SIZE = 50`): `ObjectPool<FrameEventArgs>`, `ObjectPool<ConfigChangeRequest>` and `ObjectPool<BehaviorWrapper>`. Config setters draw a `ConfigChangeRequest` from the pool, fill it and enqueue it; the per-frame drain resets and returns it. The behavior registry recycles `BehaviorWrapper` objects, and each frame draws one `FrameEventArgs` instead of allocating.
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs (lines 744-754)
+// Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs (lines 745-755)
 private FrameEventArgs CreateFrameEventArgs(long deltaTime)
 {
+    var ts = (float)BitConverter.Int64BitsToDouble(Interlocked.Read(ref _timeScaleBits));
     var frameArgs = _frameEventArgsPool.Get();
     frameArgs.DeltaTime = ScaleDuration(ConvertStopwatchTicksToTimeSpan(deltaTime), ts);
+    frameArgs.TotalTime = TimeSpan.FromTicks(Interlocked.Read(ref _totalTimeTicks));
+    frameArgs.CurrentFPS = _currentFPS;
+    frameArgs.TargetFPS = Volatile.Read(ref _targetFPS);
     frameArgs.Handled = false;
     return frameArgs;
 }
 ```
 
-> Source references: `Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs`, `Src/Generators/VeloxDev.Core.Generator/Writers/MonoWriter.cs`, `Examples/MonoBehaviour/WPF/Demo/MainWindow.xaml.cs`.
+Unhandled `FixedUpdate` events are enqueued and returned to the pool by the update driver at the top of the next frame (`DrainFixedUpdateEvents`, lines 757-761); a `FixedUpdate` that set `Handled = true` is returned to the pool immediately.
+
+> Sibling analyses of the same feature: [Data Flow — MonoBehaviour](../../03_data-flow/06_monobehaviour/index.md) and [Complexity Analysis — MonoBehaviour](../../04_complexity/06_monobehaviour/index.md).

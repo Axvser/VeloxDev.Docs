@@ -6,7 +6,8 @@
         xmlns:views="using:CloudGlyph.Views"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="CloudGlyph.Views.MainWindow"
-        Title="VeloxDev Docs"
+        x:DataType="vm:MainViewModel"
+        Title="{Binding Document.Title}"
         Width="1200"
         Height="800">
         <views:MainView />

@@ -2,186 +2,28 @@
 
 ## MonoBehaviour
 
-### 快速开始
+**monobehaviour** 特性把 Unity 风格的行为循环带到纯 .NET。你给一个 `partial` 类打上 `[MonoBehaviour]`，Roslyn 源生成器（位于程序集 `VeloxDev.Core.Generator`）就把桥接写进 `.g.cs`：该类实现运行时接口 `VeloxDev.MonoBehaviour.IMonoBehaviour`，并获得生命周期入口 `Awake`、`Start`、`Update`、`LateUpdate`、`FixedUpdate` 作为 `partial void` 钩子，由你在类的另一半自行实现。不需要继承基类、没有可重写的虚方法 `OnFrame`、也没有 `[Update]` 特性 —— 钩子方法本身就是 API。
 
-#### 1. 环境准备（Prerequisites）
+运行时方面，静态门面 `VeloxDev.TimeLine.MonoBehaviourManager` 驱动多个具名**通道（channel）**。每个通道拥有两个帧泵：Update 泵（按目标 FPS、默认 60 派发每帧的 `Update` / `LateUpdate`）与 FixedUpdate 泵（固定步长 `FixedUpdate`，默认每 16 ms 一次）。两个泵在后台线程上运行（当平台禁止 `Thread` —— 例如 WASM/iOS —— 则改为 `async` 任务），并按注册顺序调用该通道上每个行为的钩子。管理器还提供按通道的配置（`SetTargetFPS`、`SetFixedUpdateInterval`、`SetTimeScale`、`SetUseAsyncLoop`、`ExecuteOnMainThread`）、生命周期控制（`Start`、`StopAsync`、`Pause`、`Resume`、`TogglePause`、`RestartAsync`）与状态查询（`SystemStatus`、`IsRunning`、`CurrentFPS`、`TotalFrames`、`ActiveBehaviorCount` 等）。
 
-- **支持目标**（来自 `VeloxDev.Core.csproj`）：`netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0` —— 可用于 .NET Framework 4.6.1+、.NET Core 3.0+ 与 .NET 5+。
-- **SDK / 运行时：** 带 Roslyn 4.x（5.0+）的 .NET SDK 以运行源码生成器；已在 SDK 9.0/10.0 下验证 —— *被验证过*的环境，并非要求。WPF 示例面向 `net10.0-windows`。
-- **包管理器：** NuGet / `dotnet` CLI。
-- **所需服务：** 无 —— 示例使用纯控制台宿主，便于在终端观察帧循环。
+关键公开类型及其位置：
 
+- `VeloxDev.TimeLine.MonoBehaviourAttribute` —— 类特性，带 `channel` / `fps` 参数。
+- `VeloxDev.TimeLine.MonoBehaviourManager` —— 静态通道运行时。
+- `VeloxDev.TimeLine.FrameEventArgs`、`VeloxDev.TimeLine.TimeLineEventArgs`、`VeloxDev.TimeLine.ThreadSafeFrameEventArgs`、`VeloxDev.TimeLine.TransitionEventArgs` —— 传给钩子的事件载荷类型。
+- `VeloxDev.MonoBehaviour.IMonoBehaviour` —— 生成器替你实现的接口。
+- `VeloxDev.TimeLine.MonoBehaviourChannelEventArgs` —— 通道 `OnChannel*` 事件的载荷。
 
-#### 2. 安装 / 添加依赖
+一切皆为纯 .NET（`VeloxDev.Core` 目标框架为 `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0`）。**循环本身不需要 UI 适配器、不需要服务、不需要配置文件** —— 生成器唯一的要求是类必须 `partial`。仓库附带一个 WPF GUI 示例（`Examples/MonoBehaviour/WPF/Demo`），`Src/Core/VeloxDev.Core.Test/TimeLine/` 下的测试则无头地驱动该循环。
 
-```bash
-dotnet add package VeloxDev.Core
-```
+## 快速开始 — 子页面
 
-**预期结果：** 命令以 `0` 退出；`.csproj` 中出现 `<PackageReference Include="VeloxDev.Core" />` 并完成还原。包内含运行时（`VeloxDev.TimeLine`、`VeloxDev.MonoBehaviour`），并依赖源生成器 `VeloxDev.Core.Generator`，后者在编译期把 `[MonoBehaviour]` 类变成 `IMonoBehaviour` 实现。
+本特性的快速入门拆分为下列页面（逐步导向最后一页那个可运行的单文件程序）：
 
-#### 3. 基础设置 / 注册
-
-声明 `[MonoBehaviour] partial` 类，并在构造函数中调用 `InitializeMonoBehaviour()`。生成器会生成 `InitializeMonoBehaviour()`（内部调用 `MonoBehaviourManager.RegisterBehaviour(this, channel)`）并声明 partial 钩子 `Awake`、`Start`、`Update(FrameEventArgs)`、`LateUpdate(FrameEventArgs)`、`FixedUpdate(FrameEventArgs)`。
-
-```csharp
-using System.Threading;
-using VeloxDev.TimeLine;
-
-namespace MonoQuickStart;
-
-[MonoBehaviour(channel: "game", fps: 60)]
-public partial class FrameCounter
-{
-    public int UpdateCount;
-    public int FixedUpdateCount;
-
-    public FrameCounter() => InitializeMonoBehaviour();   // 注册当前实例
-
-    partial void Update(FrameEventArgs e)
-    {
-        Interlocked.Increment(ref UpdateCount);
-    }
-}
-```
-
-**预期结果：** 无需手写 `IMonoBehaviour` 实现即可编译 —— 生成器补齐了桥接。实例化 `FrameCounter` 即完成在 `"game"` 通道上的注册。
-
-#### 4. 核心用法（分步进行）
-
-**4.1 配置通道**
-
-```csharp
-MonoBehaviourManager.SetTargetFPS(60, "game");           // 钳位：1..1000
-MonoBehaviourManager.SetFixedUpdateInterval(16, "game"); // 毫秒，钳位：1..1000
-MonoBehaviourManager.SetTimeScale(1.0f, "game");         // 钳位：0..10
-```
-
-**预期结果：** 数值作为配置请求入队，在下一帧开始时生效；越界值被静默钳位（出处：`MonoBehaviourManager.cs` 第 184-210 行）。
-
-**4.2 实现生命周期钩子**
-
-```csharp
-partial void Awake() => Console.WriteLine("[Awake] behaviour registered");
-
-partial void Start() => Console.WriteLine("[Start] loop is running");
-
-partial void Update(FrameEventArgs e)
-{
-    Interlocked.Increment(ref UpdateCount);
-}
-
-partial void LateUpdate(FrameEventArgs e)
-{
-}
-
-partial void FixedUpdate(FrameEventArgs e)
-{
-    Interlocked.Increment(ref FixedUpdateCount);
-}
-```
-
-**预期结果：** `Awake` 与 `Start` 在被循环拾取时各执行一次；`Update` 与 `LateUpdate` 每帧执行；`FixedUpdate` 在固定时间线程上按 `SetFixedUpdateInterval` 毫秒（默认 16）执行。
-
-**4.3 启动循环**
-
-```csharp
-var counter = new FrameCounter();
-MonoBehaviourManager.Start("game");
-```
-
-**预期结果：** `Start` 启动 Update 与 FixedUpdate 线程（`UseAsyncLoop` 为 `true` 时改为异步任务）并触发 `OnChannelStarted`。`SystemStatus("game")` 返回 `"Running"`，`ActiveBehaviorCount("game")` 返回 `1`。
-
-**4.4 停止循环**
-
-```csharp
-await MonoBehaviourManager.StopAsync("game");
-```
-
-**预期结果：** 两个线程被取消并汇合（带 1 秒关闭超时）、统计被重置、队列被清空，触发 `OnChannelStopped`。`SystemStatus("game")` 返回 `"Stopped"`。
-
-#### 5. 验证
-
-运行下方完整程序并观察帧计数器。一次示例运行输出：
-
-```text
-[Awake] behaviour registered
-[Start] loop is running
-SystemStatus: Running
-ActiveBehaviorCount: 1
-CurrentFPS: 34
-TotalFrames: 49
-UpdateCount: 50
-FixedUpdateCount: 54
-SystemStatus after stop: Stopped
-```
-
-**预期结果：** 循环运行期间 `SystemStatus` 为 `Running`；在 1.5 秒窗口内 `UpdateCount` 与 `FixedUpdateCount` 持续增长；`StopAsync` 之后状态变为 `Stopped`。
-
-#### 6. 完整代码
-
-```csharp
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-using VeloxDev.TimeLine;
-
-namespace MonoQuickStart;
-
-[MonoBehaviour(channel: "game", fps: 60)]
-public partial class FrameCounter
-{
-    public int UpdateCount;
-    public int FixedUpdateCount;
-
-    public FrameCounter() => InitializeMonoBehaviour();
-
-    partial void Awake() => Console.WriteLine("[Awake] behaviour registered");
-
-    partial void Start() => Console.WriteLine("[Start] loop is running");
-
-    partial void Update(FrameEventArgs e)
-    {
-        Interlocked.Increment(ref UpdateCount);
-    }
-
-    partial void LateUpdate(FrameEventArgs e)
-    {
-    }
-
-    partial void FixedUpdate(FrameEventArgs e)
-    {
-        Interlocked.Increment(ref FixedUpdateCount);
-    }
-}
-
-public static class Program
-{
-    public static async Task Main()
-    {
-        MonoBehaviourManager.SetTargetFPS(60, "game");
-        MonoBehaviourManager.SetFixedUpdateInterval(16, "game");
-        MonoBehaviourManager.SetTimeScale(1.0f, "game");
-
-        var counter = new FrameCounter();
-        MonoBehaviourManager.Start("game");
-
-        await Task.Delay(1500);
-
-        Console.WriteLine($"SystemStatus: {MonoBehaviourManager.SystemStatus("game")}");
-        Console.WriteLine($"ActiveBehaviorCount: {MonoBehaviourManager.ActiveBehaviorCount("game")}");
-        Console.WriteLine($"CurrentFPS: {MonoBehaviourManager.CurrentFPS("game")}");
-        Console.WriteLine($"TotalFrames: {MonoBehaviourManager.TotalFrames("game")}");
-        Console.WriteLine($"UpdateCount: {counter.UpdateCount}");
-        Console.WriteLine($"FixedUpdateCount: {counter.FixedUpdateCount}");
-
-        await MonoBehaviourManager.StopAsync("game");
-        Console.WriteLine($"SystemStatus after stop: {MonoBehaviourManager.SystemStatus("game")}");
-    }
-}
-```
-
-#### 7. 运行声明（Run Declaration）
-
-- ✅ 已于 2026-08-17 实际构建并运行。记录到的输出（见第 5 节）：`[Awake] behaviour registered`、`[Start] loop is running`、`SystemStatus: Running`、`ActiveBehaviorCount: 1`、`CurrentFPS: 34`、`TotalFrames: 49`、`UpdateCount: 50`、`FixedUpdateCount: 54`、`SystemStatus after stop: Stopped`。
-- 仓库自带的 WPF 示例（`Examples/MonoBehaviour/WPF/Demo`）未在本环境运行；上述控制台示例覆盖了相同的管理器 API（`Start`、`StopAsync`、`SetTargetFPS`、`SetFixedUpdateInterval`、`SetTimeScale`、状态查询）以及生成的生命周期钩子。
+- [00 前置条件](00_前置条件/) — 支持目标、SDK/运行时，以及“控制台宿主、无需服务”说明
+- [01 安装依赖](01_安装依赖/) — 从 NuGet 添加 `VeloxDev.Core`，或在本仓库中项目引用它
+- [02 定义行为](02_定义行为/) — `[MonoBehaviour]` 类、`channel` / `fps` 与生成的 `partial void` 生命周期钩子
+- [03 运行与配置循环](03_运行与配置循环/) — 通道配置旋钮、`Start` / `StopAsync`、状态查询与通道事件
+- [04 暂停恢复与重启](04_暂停恢复与重启/) — `Pause` / `Resume` / `TogglePause` / `RestartAsync` 及其可观察状态
+- [05 帧事件与线程安全](05_帧事件与线程安全/) — 事件载荷类型、`Handled` 标志与线程模型
+- [06 验证与完整代码](06_验证与完整代码/) — 覆盖该特性的演示与测试、可运行的单文件程序、运行声明

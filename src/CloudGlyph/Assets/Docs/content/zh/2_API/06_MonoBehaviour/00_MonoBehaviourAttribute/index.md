@@ -1,5 +1,7 @@
 # MonoBehaviour — `MonoBehaviourAttribute`
 
+命名空间 `VeloxDev.TimeLine`。把 `partial` 类标记为帧驱动行为。Roslyn 源生成器读取该特性并生成 `IMonoBehaviour` 桥接（`MonoWriter.cs` 第 13-50、80-121 行）。
+
 `[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]`
 
 ```csharp
@@ -10,7 +12,7 @@ public sealed class MonoBehaviourAttribute(string channel = MonoBehaviourManager
 }
 ```
 
-把 `partial` 类标记为帧驱动行为。源生成器读取该特性并生成 `IMonoBehaviour` 桥接（`MonoWriter.cs` 第 13-50、80-121 行）。
+### 构造函数
 
 #### `MonoBehaviourAttribute.MonoBehaviourAttribute`（构造函数）
 
@@ -24,11 +26,18 @@ public sealed class MonoBehaviourAttribute(string channel = MonoBehaviourManager
 
 **返回：** `MonoBehaviourAttribute`
 
-**示例：**
-```text
-// 出处：Examples/MonoBehaviour/WPF/Demo/MainWindow.xaml.cs（第 8 行）
+**示例（WPF 示例中的真实用法）：**
+
+```csharp
+// 出处：Examples/MonoBehaviour/WPF/Demo/MainWindow.xaml.cs（第 8-9、117-119 行）
 [MonoBehaviour]
-public partial class MainWindow : Window { ... }
+public partial class MainWindow : Window
+{
+    partial void Update(FrameEventArgs e)
+    {
+        _windowUpdateCount++;
+    }
+}
 ```
 
 **说明：**

@@ -1,8 +1,8 @@
 # API — Dynamic Theme · Backing Engine (TransitionSystem)
 
-The Dynamic Theme feature drives its animation through the TransitionSystem engine. `InterpolatorCore` and the `ITransitionEffectCore`/`IEaseCalculator` contracts are shared with the transition feature; the theme feature uses them to sample themed property values and to time the switch.
+The dynamic-theme feature animates themed properties through the TransitionSystem engine. `ThemeManager` does not drive the engine's high-level `Transition` / `SamplerSet` / `State` pipeline: it resolves a sampler per property type, normalizes start/end values, and then calls the sampler itself inside a Stopwatch-based loop. This page documents the engine surface that `ThemeManager` actually consumes; the full engine is documented by the transition feature.
 
-> Namespace note: `ISampler`, `ISampleable`, `ITransitionEffectCore`, `IEaseCalculator`, and `Eases` are declared in `VeloxDev.TransitionSystem`; the abstract `InterpolatorCore` and the concrete `SamplerSet` are declared in `VeloxDev.TransitionSystem.Abstractions`.
+> The engine contracts live in `VeloxDev.TransitionSystem`; the engine base types and the concrete `TransitionProperty` live in `VeloxDev.TransitionSystem.Abstractions`. The complete engine reference lives under the transition feature (`2_API/03_transition`).
 
 ## Namespace: `VeloxDev.TransitionSystem.Abstractions`
 
@@ -10,61 +10,95 @@ The Dynamic Theme feature drives its animation through the TransitionSystem engi
 
 `public abstract class InterpolatorCore`
 
-Base for all value samplers — the former frame-interpolator hierarchy (`IValueInterpolator`, `IInterpolable`, the generic `InterpolatorCore<TOutputCore[, TPriorityCore]>` forms, `InterpolatorOutputBase`) is gone; `InterpolatorCore` is now a single non-generic class that no longer implements an interface. The static constructor pre-registers native samplers for primitive and BCL types: `double`, `float`, `int`, `long`, `Point`, `PointF`, `Size`, `SizeF`, `Color`, `Rectangle`, `RectangleF`, and (outside `NETSTANDARD2_0`) `Vector2`, `Vector3`, `Vector4`, `Quaternion`.
+Base class for platform interpolators and holder of the static per-type sampler registry. The static constructor pre-registers native samplers for `double`, `float`, `int`, `long`, `Point`, `PointF`, `Size`, `SizeF`, `Color`, `Rectangle`, `RectangleF`, and (outside `NETSTANDARD2_0`) `Vector2`, `Vector3`, `Vector4`, `Quaternion`.
 
 Source: `Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`.
 
-##### Static Members
-
 | Member | Signature | Description |
 |---|---|---|
-| `NativeInterpolators` | `public static ConcurrentDictionary<Type, ISampleable> NativeInterpolators { get; protected set; }` | Registry of per-type sampleable definitions. |
-| `TryGetInterpolator` | `public static bool TryGetInterpolator(Type type, out ISampleable? sampleable)` | Looks up a sampleable for a type. |
-| `RegisterInterpolator` | `public static bool RegisterInterpolator(Type type, ISampleable sampleable)` | Registers a sampleable (atomic add-or-update). |
-| `UnregisterInterpolator` | `public static bool UnregisterInterpolator(Type type, out ISampleable? sampleable)` | Removes a sampleable. |
-
-**Instance member:** `public virtual SamplerSet Prepare(object target, IFrameState state, ITransitionEffectCore effect, IUIThreadInspectorCore inspector)` — resolves the per-property `ISampleable` (custom from state → registered by property type → the value IS `ISampleable`), calls `Normalize` once, and stores each `(ITransitionProperty, ISampler, start, end, options)` entry in a `SamplerSet`. Replaces the old `Interpolate(...) IFrameSequenceCore` instance method.
+| `NativeInterpolators` | `public static ConcurrentDictionary<Type, ISampler> NativeInterpolators { get; protected set; }` | The per-type sampler registry. |
+| `TryGetInterpolator` | `public static bool TryGetInterpolator(Type type, out ISampler? sampler)` | Looks up a registered sampler for a type. |
+| `RegisterInterpolator` | `public static bool RegisterInterpolator(Type type, ISampler sampler)` | Registers a sampler (atomic last-writer-wins). |
+| `UnregisterInterpolator` | `public static bool UnregisterInterpolator(Type type, out ISampler? sampler)` | Removes a registered sampler. |
+| `Prepare` (instance, `virtual`) | `public virtual SamplerSet Prepare(object target, IFrameState state, ITransitionEffectCore effect, IUIThreadInspectorCore inspector)` | Normalizes every property in a state snapshot into a `SamplerSet`. Used by the transition feature, not by `ThemeManager`. |
 
 **Notes:**
-- The platform `Interpolator` (adapter) extends the non-generic `InterpolatorCore` and registers platform samplers in its static constructor.
-- `RegisterInterpolator` is last-writer-wins and atomic (`AddOrUpdate`).
+- `ThemeManager.PrepareSamplers` uses `InterpolatorCore.TryGetInterpolator` to resolve a property's sampler by `PropertyInfo.PropertyType`. When no sampler is registered for that type, the property falls back to a simple hold-until-end switch.
+- The platform adapter `Interpolator` extends `InterpolatorCore` and registers platform samplers in its static constructor (see [04 PlatformAdapters](../04_PlatformAdapters/index.md)).
 
-### Class: `SamplerSet`
+### Class: `TransitionProperty`
 
-`public sealed class SamplerSet`
+`public sealed class TransitionProperty : ITransitionProperty, IEquatable<TransitionProperty>`
 
-The prepared per-property sampler container (renamed from `FrameUpdaterSet`; replaces `IFrameSequence` + `InterpolatorOutputBase`). Non-generic: it holds the per-property `(ITransitionProperty, ISampler, start, end, options)` entries and the Core-level inspector, and priority flows through the `object?` overload of `IUIThreadInspectorCore.ProtectedInvoke`. The animation's cancellation token is attached via `SetCancellation`, giving `Apply` the former `ICancellableFrameSequence` stale-frame guard.
+Compiled getter/setter implementation of `ITransitionProperty`. A property path is one or more `PropertyInfo` segments; reads and writes go through lazily compiled delegates. When an intermediate object is non-null but its runtime type does not match the path, reads return the sentinel `UnreadablePath` and writes return `false`, so callers skip the property instead of treating it as null/identity.
 
-Source: `Src/Core/VeloxDev.Core/TransitionSystem/SamplerSet.cs`.
+Source: `Src/Core/VeloxDev.Core/TransitionSystem/TransitionProperty.cs`.
 
 | Member | Signature | Description |
 |---|---|---|
-| `Apply` | `public void Apply(object target, double t, object? priority = default)` | Marshals to the UI thread and calls each `sampler.Update(target, property, start, end, options, t)`; returns immediately when the animation is cancelled or the app is no longer alive, so stale queued frames never overwrite a reset result. |
-| `CanSetValue` | `public bool CanSetValue()` | `true` while `inspector.IsAppAlive()`. |
+| `UnreadablePath` | `public static readonly object UnreadablePath` | Sentinel returned by `GetValue` when the path is invalid for the current target. |
+| `FromProperty` | `public static TransitionProperty FromProperty(PropertyInfo propertyInfo)` | Creates a single-segment path for one property. |
+| `Members<TSource>` | `public static IReadOnlyList<ITransitionProperty> Members<TSource>(params Expression<Func<TSource, object?>>[] expressions)` | Builds readable+writable member paths from expressions (for `ISampleable`). |
+| `ReadableMembers<TSource>` | `public static IReadOnlyList<ITransitionProperty> ReadableMembers<TSource>(params Expression<Func<TSource, object?>>[] expressions)` | Builds readable member paths (for struct `ISampleable` assembly). |
+| `Combine` | `public static TransitionProperty Combine(ITransitionProperty prefix, ITransitionProperty suffix)` | Concatenates two paths into one. |
+| `TryCreate` | `public static bool TryCreate(LambdaExpression expression, out TransitionProperty? property)` | Parses an expression tree into a path. |
+| `Path` | `string Path` | Dot-joined segment names. |
+| `PropertyType` / `PropertyInfo` / `Segments` | `Type` / `PropertyInfo` / `IReadOnlyList<PropertyInfo>` | Type, final segment info, and full segment list. |
+| `CanRead` / `CanWrite` | `bool` | Readability of all segments / writability of the final segment. |
+| `GetValue` / `SetValue` | `object? GetValue(object target)` / `bool SetValue(object target, object? value)` | Compiled path read/write. |
+
+**Notes:**
+- `ThemeManager.PrepareSamplers` wraps each animated property with `TransitionProperty.FromProperty(propertyInfo)` and later writes endpoint/working values through `SetValue`.
 
 ## Namespace: `VeloxDev.TransitionSystem`
 
+### Interface: `ITransitionProperty`
+
+`public interface ITransitionProperty`
+
+Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionProperty.cs`.
+
+| Member | Signature |
+|---|---|
+| `Path` | `string Path { get; }` |
+| `PropertyType` | `Type PropertyType { get; }` |
+| `PropertyInfo` | `PropertyInfo PropertyInfo { get; }` |
+| `Segments` | `IReadOnlyList<PropertyInfo> Segments { get; }` |
+| `CanRead` / `CanWrite` | `bool CanRead { get; }` / `bool CanWrite { get; }` |
+| `GetValue` | `object? GetValue(object target)` |
+| `SetValue` | `bool SetValue(object target, object? value)` |
+
 ### Interface: `ISampler`
 
-`public interface ISampler { void Update(object target, ITransitionProperty property, object? start, object? end, object? options, double t); }`
+`public interface ISampler`
 
-Stateless, thread-safe, shared-singleton sampling processor that directly updates the property at a normalized time `t ∈ [0,1]`: `t <= 0` writes the exact `start`, `t >= 1` the exact `end`, and `0 < t < 1` computes-and-assigns (value types) or MUTATES the live `start` instance in place (reference types). The caller (interpreter) applies easing and clamps the time before invoking. Replaces `IValueInterpolator` / `IInterpolable`.
+Stateless, thread-safe sampler. A sampler is normally a shared singleton registered in `InterpolatorCore.NativeInterpolators`. `ThemeManager` calls `NormalizeStart` / `NormalizeEnd` once per property at switch time and then `InsertFrame` once per sampled frame.
 
 Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ISampler.cs`.
 
+| Member | Signature | Description |
+|---|---|---|
+| `NormalizeStart` | `object? NormalizeStart(object? start, object? end, object? options)` | Value to write at `t <= 0`. May return a copy so the target never aliases the shared start instance. |
+| `NormalizeEnd` | `object? NormalizeEnd(object? start, object? end, object? options)` | Value to write at `t >= 1`. May return a copy for the same aliasing reason. |
+| `InsertFrame` | `void InsertFrame(object target, ITransitionProperty property, ref object? working, object? start, object? end, object? options, double t)` | Computes the interpolated frame at `t ∈ [0, 1]` and writes it to `property` on `target`. `working` is a per-animation reusable scratch object (created lazily via `ref` on the first middle-frame call). |
+
+**Notes:**
+- Endpoints are handled inside `InsertFrame`; implementations must not mutate the `start` / `end` arguments.
+- A registered sampler is resolved for the theme switch by property type via `InterpolatorCore.TryGetInterpolator`.
+
 ### Interface: `ISampleable`
 
-`public interface ISampleable { ISampler Normalize(object? start, object? end, object? options); }`
-
-可采样定义 (sampleable definition) at the type level. User-defined types implement it to be directly animatable without registering a sampler. `Normalize` normalizes start/end once (called by the interpreter when it is created with the FrameState, per animated property) and returns the stateless `ISampler`. The former `IInPlaceSampler.CreateUpdater` / in-place `FrameUpdater` classes are now the per-type `ISampler.Update`: reference-type samplers mutate `start` in place inside `Update`; value types compute-and-assign.
+`public interface ISampleable { IReadOnlyList<ITransitionProperty> GetAnimatableMembers(); object? CreateFrameValue(IReadOnlyList<object?> memberValues); }`
 
 Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ISampleable.cs`.
+
+**Notes:**
+- Declares which members of a type are animatable (one level) and how to rebuild a value from interpolated members. Used during the transition feature's capture/`Prepare` for property types that have no registered sampler.
+- `ThemeManager` resolves samplers from the registry only, so `ISampleable` member expansion is not part of a theme switch.
 
 ### Interface: `ITransitionEffectCore`
 
 `public interface ITransitionEffectCore`
-
-Describes a transition effect: frame rate, duration, loop/easing, and lifecycle events.
 
 Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionEffect.cs`.
 
@@ -80,30 +114,19 @@ Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionEffect.cs
 | `Clone` | `ITransitionEffectCore Clone()` |
 
 **Notes:**
-- Default `FPS` is 60; default `Duration` is zero; default `Ease` is `Eases.Default`.
-- `FPS` is the **maximum sample-rate cap** — the interpreter's sampling loop is Stopwatch-driven (`t = elapsed / Duration`) and does not step to `FPS` frames; the yield interval is `1000 / FPS` ms.
-- `TransitionEffectCore` (base implementation) backs the adapter's `TransitionEffect`.
+- `ThemeManager` reads exactly two members: `Ease` (to compute the eased time) and `Duration` (to derive the total elapsed time in milliseconds). `FPS`, `IsAutoReverse`, `LoopTime`, the lifecycle events and `Clone` belong to the higher-level engine pipeline.
+- The base implementation `TransitionEffectCore` defaults `FPS = 60`, `Duration = 0 ms`, `Ease = Eases.Default`. The adapter presets that the theme demos use are listed in [04 PlatformAdapters](../04_PlatformAdapters/index.md).
 
-### Interface: `IEaseCalculator`
+### Interface: `IEaseCalculator` and Static Class: `Eases`
 
 `public interface IEaseCalculator { double Ease(double t); }`
 
-Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/IEaseCalculator.cs`.
-
-**Notes:**
-- Implementations map a normalized time `t ∈ [0, 1]` to an eased value.
-
-### Static Class: `Eases`
-
-Factory of `IEaseCalculator` strategies.
-
-Source: `Src/Core/VeloxDev.Core/TransitionSystem/Eases.cs`.
+Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/IEaseCalculator.cs` and `Src/Core/VeloxDev.Core/TransitionSystem/Eases.cs`.
 
 | Member | Description |
 |---|---|
-| `Default` | `IEaseCalculator` — linear (`t → t`). |
-| `Sine` / `Quad` / `Cubic` / `Quart` / `Quint` / `Expo` / `Circ` / `Back` / `Elastic` / `Bounce` | Nested static classes, each exposing `In`, `Out`, `InOut` members returning `IEaseCalculator`. |
+| `Eases.Default` | `IEaseCalculator` — linear (`Ease(t) = t`, backed by `EaseDefault`). Used by `ThemeManager.Jump` for its zero-duration pass. |
+| `Sine` / `Quad` / `Cubic` / `Quart` / `Quint` / `Expo` / `Circ` / `Back` / `Elastic` / `Bounce` | Nested static classes, each exposing `In`, `Out`, `InOut` returning `IEaseCalculator`. |
 
 **Notes:**
-- `EaseDefault` is the concrete class behind `Eases.Default`.
-- `ThemeManager.Jump` uses `Eases.Default` for its zero-duration pass.
+- The full ease catalogue is documented under the transition feature's Eases section (`2_API/03_transition`).

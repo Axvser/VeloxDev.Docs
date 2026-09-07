@@ -1,5 +1,7 @@
 # MonoBehaviour — `MonoBehaviourAttribute`
 
+Namespace `VeloxDev.TimeLine`. Marks a `partial` class as a frame-driven behaviour. The Roslyn source generator reads this attribute and emits the `IMonoBehaviour` bridge (`MonoWriter.cs` lines 13-50, 80-121).
+
 `[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]`
 
 ```csharp
@@ -10,7 +12,7 @@ public sealed class MonoBehaviourAttribute(string channel = MonoBehaviourManager
 }
 ```
 
-Marks a `partial` class as a frame-driven behaviour. The source generator reads this attribute and emits the `IMonoBehaviour` bridge (`MonoWriter.cs` lines 13-50, 80-121).
+### Constructor
 
 #### `MonoBehaviourAttribute.MonoBehaviourAttribute` (constructor)
 
@@ -24,11 +26,18 @@ Marks a `partial` class as a frame-driven behaviour. The source generator reads 
 
 **Returns:** `MonoBehaviourAttribute`
 
-**Example:**
-```text
-// Source: Examples/MonoBehaviour/WPF/Demo/MainWindow.xaml.cs (line 8)
+**Example (real usage in the WPF demo):**
+
+```csharp
+// Source: Examples/MonoBehaviour/WPF/Demo/MainWindow.xaml.cs (lines 8-9, 117-119)
 [MonoBehaviour]
-public partial class MainWindow : Window { ... }
+public partial class MainWindow : Window
+{
+    partial void Update(FrameEventArgs e)
+    {
+        _windowUpdateCount++;
+    }
+}
 ```
 
 **Notes:**

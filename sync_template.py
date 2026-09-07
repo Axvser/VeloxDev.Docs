@@ -13,9 +13,21 @@ import tempfile
 from pathlib import Path
 
 # ---- Configuration ----
-PRESERVE_RELATIVE = "src/CloudGlyph/Assets/Docs/content"
+# Paths that are USER-owned in a child wiki repo and must never be overwritten by a sync:
+# the wiki content itself, and the local config (site title in site.json, the language map in
+# languages.json). Everything else (app code, skills, validators) is replaced from the template.
+PRESERVE_RELATIVES = (
+    "src/CloudGlyph/Assets/Docs/content",
+    "src/CloudGlyph/Assets/Docs/config",
+)
+PRESERVE_PARTS = [tuple(Path(p).parts) for p in PRESERVE_RELATIVES]
 IGNORE_DIRS = {".git", "bin", "obj", ".vs"}
 IGNORE_FILES = {".gitattributes"}
+
+
+def is_preserved(rel_parts: tuple[str, ...]) -> bool:
+    """True when a relative path is at or beneath one of the user-owned PRESERVE_RELATIVES."""
+    return any(rel_parts[: len(pp)] == pp for pp in PRESERVE_PARTS)
 REPO_URL = "https://github.com/Axvser/CloudGlyph.git"
 BRANCH = "master"
 
@@ -47,12 +59,10 @@ def clone_to_temp(repo_root: Path) -> Path:
 
 
 def sync_files(source: Path, target: Path) -> None:
-    """Copy all files from source to target, preserving PRESERVE_RELATIVE and ignoring build artifacts."""
+    """Copy all files from source to target, preserving user-owned paths and ignoring build artifacts."""
 
-    preserve_path = (source / PRESERVE_RELATIVE).resolve()
-    target_preserve_path = (target / PRESERVE_RELATIVE).resolve()
-
-    log(f"Preserving directory: {PRESERVE_RELATIVE}")
+    for pr in PRESERVE_RELATIVES:
+        log(f"Preserving user-owned: {pr}")
 
     for src_path in source.rglob("*"):
         # Normalize to relative path
@@ -67,13 +77,9 @@ def sync_files(source: Path, target: Path) -> None:
         if any(part in IGNORE_DIRS for part in parts):
             continue
 
-        # Skip the preserve directory and everything under it
-        try:
-            resolved_src = src_path.resolve()
-            if resolved_src == preserve_path or preserve_path in resolved_src.parents:
-                continue
-        except (ValueError, OSError):
-            pass
+        # Skip the user-owned preserve paths and everything under them
+        if is_preserved(parts):
+            continue
 
         dst_path = target / rel
 
@@ -101,13 +107,9 @@ def sync_files(source: Path, target: Path) -> None:
         if any(part in IGNORE_DIRS for part in parts):
             continue
 
-        # Skip preserve dir and its contents
-        try:
-            resolved_dst = dst_path.resolve()
-            if resolved_dst == target_preserve_path or target_preserve_path in resolved_dst.parents:
-                continue
-        except (ValueError, OSError):
-            pass
+        # Skip user-owned preserve paths and their contents
+        if is_preserved(parts):
+            continue
 
         src_path = source / rel
         if not src_path.exists():

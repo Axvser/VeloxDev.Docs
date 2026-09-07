@@ -5,8 +5,17 @@ Scans each language directory under Assets/Docs/content/ for index.md files,
 builds a hierarchical tree.json index used by the Avalonia Markdown viewer.
 Pages are ordered by directory name; numeric prefixes like "1_QuickStart"
 are stripped in the displayed title but preserved in the path for file loading.
+
+Directory hygiene (enforced by validate-structure.py, mirrored here):
+  * A directory that does NOT contain an index.md is NOT a page. It is skipped
+    (with a WARNING) rather than silently auto-created, so an author who forgets
+    an index.md can no longer hide behind this generator.
+  * --strict turns any such skip into a non-zero exit code (used by the Review
+    gate / CI); without it the build still succeeds so a half-finished tree does
+    not break local compilation.
 """
 
+import argparse
 import json
 import os
 import re
@@ -30,35 +39,29 @@ def _title(name: str) -> str:
     return m.group(1) if m else name
 
 
-def _ensure_index_md(dir_path: str) -> None:
-    """Create a blank index.md if missing. This ensures the directory
-    appears in the navigation tree even when content hasn't been written yet.
-    """
-    index_path = os.path.join(dir_path, "index.md")
-    if not os.path.isfile(index_path):
-        with open(index_path, "w", encoding="utf-8") as f:
-            f.write("")
-        print(f"[gen_tree] Created blank: {index_path}")
-
-
-def _scan(dir_path: str, lang_root: str) -> list[dict]:
+def _scan(dir_path: str, lang_root: str, missing: list[str]) -> list[dict]:
     """Scan *dir_path* for subdirectories that contain index.md and return
     them as a list of ``{title, path, children}`` dicts.
 
     Sorting is natural (OS order) — use numeric prefixes to control sequence.
     *lang_root* is the language root — paths are computed relative to it.
-    Missing index.md files are auto-created as blank.
+    Subdirectories lacking an index.md are NOT page directories: they are
+    recorded in *missing*, warned about, and skipped (never auto-created).
     """
     nodes: list[dict] = []
     for entry in sorted(os.listdir(dir_path)):
         child_path = os.path.join(dir_path, entry)
         if not os.path.isdir(child_path):
             continue
-        _ensure_index_md(child_path)
 
         rel_path = os.path.relpath(child_path, lang_root).replace("\\", "/")
-        children = _scan(child_path, lang_root)
+        if not os.path.isfile(os.path.join(child_path, "index.md")):
+            missing.append(rel_path)
+            print(f"[gen_tree] WARNING no index.md in {rel_path} — directory omitted from the tree"
+                  f" (add an index.md, even an empty one; see validate-structure.py)")
+            continue
 
+        children = _scan(child_path, lang_root, missing)
         nodes.append({
             "title": _title(entry),
             "path": rel_path,
@@ -74,28 +77,45 @@ def main():
         try:
             stream.reconfigure(encoding="utf-8")
         except (AttributeError, ValueError):
-            pass
+            pass  # Python < 3.7 or non-text stream: keep platform default
 
-    for lang in sorted(os.listdir(CONTENT_DIR)):
+    parser = argparse.ArgumentParser(description="Build tree.json per language from index.md directories")
+    parser.add_argument("--strict", action="store_true",
+                        help="exit 1 if any directory lacks an index.md (quality gate)")
+    parser.add_argument("--lang", help="only process one language subdir (e.g. en, zh)")
+    args = parser.parse_args()
+
+    languages = [d for d in sorted(os.listdir(CONTENT_DIR))
+                 if os.path.isdir(os.path.join(CONTENT_DIR, d))
+                 and not d.startswith(".")
+                 and d not in _SKIP]
+    if args.lang:
+        languages = [l for l in languages if l == args.lang]
+
+    total_missing = 0
+    for lang in languages:
         lang_dir = os.path.join(CONTENT_DIR, lang)
-        if not os.path.isdir(lang_dir):
-            continue
-        if lang.startswith(".") or lang in _SKIP:
-            continue
 
         pages: list[dict] = []
+        missing: list[str] = []
         for entry in sorted(os.listdir(lang_dir)):
             child_path = os.path.join(lang_dir, entry)
             if not os.path.isdir(child_path):
                 continue
-            _ensure_index_md(child_path)
-
-            children = _scan(child_path, lang_dir)
+            rel = entry
+            if not os.path.isfile(os.path.join(child_path, "index.md")):
+                missing.append(rel)
+                print(f"[gen_tree] WARNING no index.md in {rel} — directory omitted from the tree"
+                      f" (add an index.md, even an empty one; see validate-structure.py)")
+                continue
+            children = _scan(child_path, lang_dir, missing)
             pages.append({
                 "title": _title(entry),
-                "path": entry,
+                "path": rel,
                 "children": children,
             })
+
+        total_missing += len(missing)
 
         tree = {"Pages": pages}
         tree_path = os.path.join(lang_dir, "tree.json")
@@ -103,7 +123,12 @@ def main():
         with open(tree_path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(tree, f, ensure_ascii=False, indent=2)
         n = len(pages)
-        print(f"[gen_tree] Updated: {tree_path} ({n} root pages)")
+        extra = f" ({len(missing)} dir(s) skipped: missing index.md)" if missing else ""
+        print(f"[gen_tree] Updated: {tree_path} ({n} root pages){extra}")
+
+    print(f"[gen_tree] {len(languages)} language(s) processed; {total_missing} directory(ies) missing index.md")
+    if args.strict and total_missing:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -49,7 +49,7 @@ public partial class DocumentViewModel : ObservableObject
     private LanguageOption _selectedLanguage = new(DefaultLanguage, "🌐 English");
 
     [ObservableProperty]
-    private string _title = "VeloxDev Docs";
+    private string _title = "Cloud Glyph";
 
     [ObservableProperty]
     private bool _isLoading;
@@ -61,8 +61,36 @@ public partial class DocumentViewModel : ObservableObject
 
     private async Task InitializeAsync()
     {
+        await LoadSiteConfigAsync();
         await LoadLanguagesAsync();
         await LoadTreeAsync();
+    }
+
+    /// <summary>
+    /// Reads the site title from <c>Assets/Docs/config/site.json</c> (e.g. the product name shown in
+    /// the window title). Falls back to the default <see cref="Title"/> if the asset is absent.
+    /// A child wiki repo should edit its own site.json — never hardcode a product name in code.
+    /// </summary>
+    private async Task LoadSiteConfigAsync()
+    {
+        try
+        {
+            var uri = new Uri("avares://CloudGlyph/Assets/Docs/config/site.json");
+            using var stream = AssetLoader.Open(uri);
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            var json = await reader.ReadToEndAsync();
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String)
+            {
+                var value = title.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                    Title = value.Trim();
+            }
+        }
+        catch
+        {
+            // Asset missing/malformed → keep the default Title.
+        }
     }
 
     partial void OnSelectedLanguageChanged(LanguageOption value)
@@ -224,6 +252,122 @@ public partial class DocumentViewModel : ObservableObject
             result.Add(node);
         }
         return result;
+    }
+
+    /// <summary>
+    /// Handles a hyperlink clicked inside the rendered Markdown.
+    /// <para>
+    /// Returns <see langword="true"/> when the link is "internal" — i.e. consumed by the app
+    /// (a same-language page link that navigates the viewer) or intentionally swallowed because it
+    /// cannot be opened safely (unknown scheme, unresolved page path). The caller must set the
+    /// event args' <c>Handled</c> flag so the default OS-browser launch is suppressed.
+    /// </para>
+    /// <para>
+    /// Returns <see langword="false"/> for <c>http(s)</c>, <c>mailto:</c> and <c>tel:</c> links so the
+    /// default behaviour (open in the system browser / mail client) still applies.
+    /// </para>
+    /// </summary>
+    public bool TryHandleNavigation(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || url.StartsWith('#'))
+            return true; // fragment / empty: never reach the OS browser
+
+        if (IsSchemeUrl(url))
+        {
+            var scheme = url[..url.IndexOf(':')].ToLowerInvariant();
+            return scheme is not ("http" or "https" or "mailto" or "tel");
+        }
+
+        // No scheme → treat as a same-language page reference. Resolve the target directory
+        // path relative to the currently displayed page and select the matching tree node.
+        var target = ResolvePagePath(url);
+        if (target is null)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CloudGlyph] Unresolvable link target: {url}");
+            return true; // swallow — never throw / open the browser for a bad local link
+        }
+
+        var node = FindNodeByPath(Nodes, target);
+        if (node is null)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CloudGlyph] No page matches link target: {target} ({url})");
+            return true;
+        }
+
+        SelectedNode = node; // two-way TreeView binding highlights it; LoadContentAsync runs
+        return true;
+    }
+
+    private static bool IsSchemeUrl(string url)
+    {
+        if (url.Length < 2) return false;
+        var c0 = url[0];
+        if (!char.IsAsciiLetter(c0)) return false;
+        for (var i = 1; i < url.Length; i++)
+        {
+            var c = url[i];
+            if (c == ':') return true;
+            if (!(char.IsAsciiLetterOrDigit(c) || c is '+' or '-' or '.')) return false;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Resolves a relative / root-relative Markdown link destination to a language-root-relative
+    /// page directory path. Honors <c>.</c>/<c>..</c> segments and accepts a trailing <c>index.md</c>
+    /// or slash. Returns <see langword="null"/> when the target escapes the language root or points
+    /// at something that is not a page directory (e.g. a non-index <c>.md</c> file).
+    /// </summary>
+    private string? ResolvePagePath(string url)
+    {
+        // Strip any in-page fragment — the viewer navigates to the page itself.
+        var frag = url.IndexOf('#');
+        if (frag >= 0) url = url[..frag];
+        if (string.IsNullOrWhiteSpace(url)) return null;
+
+        // Start from the currently displayed page's directory; a leading '/' resets to the root.
+        var stack = (url.StartsWith('/')
+            ? null
+            : SelectedNode?.Path)
+            ?.Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .ToList() ?? [];
+
+        foreach (var raw in url.Split('/'))
+        {
+            switch (raw)
+            {
+                case "" or ".":
+                    continue;
+                case "..":
+                    if (stack.Count == 0) return null; // escaped above the language root
+                    stack.RemoveAt(stack.Count - 1);
+                    break;
+                default:
+                    stack.Add(raw);
+                    break;
+            }
+        }
+
+        // Trailing "index.md" names the directory it lives in; any other .md is not a page dir.
+        if (stack.Count > 0 && stack[^1] == "index.md")
+            stack.RemoveAt(stack.Count - 1);
+        if (stack.Count > 0 && stack[^1].EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        return stack.Count == 0 ? "" : string.Join('/', stack);
+    }
+
+    /// <summary>Depth-first search for a page node whose <see cref="PageNode.Path"/> equals <paramref name="path"/>.</summary>
+    private static PageNode? FindNodeByPath(IEnumerable<PageNode> nodes, string path)
+    {
+        foreach (var node in nodes)
+        {
+            if (string.Equals(node.Path, path, StringComparison.OrdinalIgnoreCase))
+                return node;
+            if (FindNodeByPath(node.Children, path) is { } child)
+                return child;
+        }
+        return null;
     }
 
     // ── JSON deserialization types ──────────────────────────────────────

@@ -1,29 +1,43 @@
 # MVVM — `ObservableCollectionTracker`
 
-弱引用订阅辅助类，确保即使在字段直接初始化（`= []`）而绕过生成的 setter 时，`CollectionChanged` 仍保持订阅。
+`VeloxDev.MVVM.ObservableCollectionTracker`（`Src/Core/VeloxDev.Core/MVVM/ObservableCollectionTracker.cs`）是一个 `static` 辅助类，供生成代码在集合属性的后备字段被直接赋值时，仍能保持 `INotifyCollectionChanged` 订阅。
 
-**签名**（`Src/Core/VeloxDev.Core/MVVM/ObservableCollectionTracker.cs`，第 15-56 行）：
+**签名**
 
 ```csharp
-public static void EnsureSubscribed(object? collection, NotifyCollectionChangedEventHandler handler)
-public static void Unsubscribe(object? collection, NotifyCollectionChangedEventHandler handler)
+public static void EnsureSubscribed(
+    object? collection,
+    NotifyCollectionChangedEventHandler handler)
+
+public static void Unsubscribe(
+    object? collection,
+    NotifyCollectionChangedEventHandler handler)
 ```
 
-- **备注：** 使用以集合身份为键的 `ConditionalWeakTable<object, Entry>`，因此当集合被回收时条目随之消失 — 无泄漏。处理器按 `(Method, Target)` 身份去重（`MethodTargetEqualityComparer`，第 96-114 行），而非按委托引用：生成的 getter 传的是方法组（例如 `OnItemsCollectionChanged`），每次访问 getter 都会产生新的委托实例；按引用比较会在每次访问时重复订阅并让事件调用列表无限增长。生成的 getter 每次访问都调用 `EnsureSubscribed`，但真正订阅只发生一次（`Base/Analizer.cs`，`GenerateGetter`，第 444-464 行）。
-- **示例：** 示例中的 `[VeloxProperty] private ObservableCollection<string> _items = [];`（`Examples/MVVM/WPF/Demo/MainWindowViewModel.cs`，第 30 行）依赖 getter 侧的 `EnsureSubscribed` 调用，因为初始化器直接给字段赋值。
+- `EnsureSubscribed` — 若 `collection` 是 `INotifyCollectionChanged` 且尚未为 `handler` 订阅，则完成订阅。后续调用是 O(1) 的快速查找。由生成的属性 getter 在每次访问时调用。
+- `Unsubscribe` — 从 `collection` 移除 `handler` 并删除追踪条目，避免订阅日后被意外恢复。由生成 setter 在集合被替换时调用。
 
-## 命名空间 `VeloxDev.Generators`
+## 为什么需要它
 
-源生成器内部实现（程序集 `VeloxDev.Core.Generator`，包版本 `7.0.0`，目标 `netstandard2.0`，Roslyn `Microsoft.CodeAnalysis.CSharp` 4.3.1）。
+像下面这样的 `[VeloxProperty]` 集合成员通过初始化器 `= []` 直接给后备字段赋值，绕过了生成的 setter：
 
-| 项目 | 详情 |
-|---|---|
-| 包 | `VeloxDev.Core.Generator` `7.0.0`，由 `VeloxDev.Core` 传递引用 |
-| 程序集命名空间 | `VeloxDev.Generators` |
-| MVVM 生成器 | `VeloxDev.Generators.MVVM : IIncrementalGenerator`（`MVVM.cs`，第 12-13 行） |
-| 命令生成器 | `VeloxDev.Generators.Command : IIncrementalGenerator`（`Command.cs`，第 12-13 行） |
-| 类过滤 | `Analizer.Filters.FilterContext` — 仅 `partial` 类声明（`Base/Analizer.cs`，第 13-24 行） |
-| 属性写入器 | `Writers/MVVMWriter.cs` + `Base/Analizer.cs`（`MVVMPropertyFactory`，第 208-729 行） |
-| 命令写入器 | `Writers/CommandWriter.cs` |
-| MVVM 输出文件名 | `{ClassName}_{Namespace}_MVVM.g.cs`（命名空间的点替换为 `_`；全局命名空间为 `Global`）— `MVVMWriter.cs`，第 847-854 行 |
-| 命令输出文件名 | `{ClassName}_{Namespace}_Commands.g.cs` — `CommandWriter.cs`，第 121-130 行 |
+```csharp
+[VeloxProperty] private ObservableCollection<string> _items = [];
+```
+
+如果只在 setter 里订阅，`CollectionChanged` 将永远不会被观察到。因此生成的 getter 会调用 `EnsureSubscribed`（见 `Base/Analizer.cs`，`MVVMPropertyFactory.GenerateGetter`），让首次读取完成对私有 `On{Property}CollectionChanged` 处理器的订阅，之后的每次读取都是无操作：
+
+```csharp
+get
+{
+    global::VeloxDev.MVVM.ObservableCollectionTracker.EnsureSubscribed(_items, OnItemsCollectionChanged);
+    return _items;
+}
+```
+
+## 追踪模型
+
+- 订阅记录在以集合身份为键的 `ConditionalWeakTable<object, Entry>` 中：集合被回收时其条目随之消失，因此没有泄漏。该表对并发的 getter/setter 访问是安全的。
+- 处理器按 `(Method, Target)` 身份去重（`MethodTargetEqualityComparer`），而非按委托引用。生成的 getter 传入方法组（例如 `OnItemsCollectionChanged`），每次访问都会产生全新的委托实例；若按引用比较，就会在每次 getter 读取时重复订阅，让事件调用列表无界增长。
+
+该追踪器所支撑的集合钩子（`OnCollectionChanged<T>`、`OnItemAddedTo{Property}`、`OnItemRemovedFrom{Property}`、`OnItemMovedIn{Property}`、`OnItemsResetIn{Property}`）由 MVVM 生成器产出——见 [00_VeloxPropertyAttribute](../00_VeloxPropertyAttribute/index.md)。

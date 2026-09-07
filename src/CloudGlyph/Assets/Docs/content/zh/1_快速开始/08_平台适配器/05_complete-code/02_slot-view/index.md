@@ -1,145 +1,88 @@
-# 平台适配器 — `SlotView.xaml / SlotView.xaml.cs`
+# 平台适配器 - `SlotView.xaml / SlotView.xaml.cs`
 
-Source file from the complete scaffold.
+`dotnet new wpf-v-slot -n SlotView -ns Demo.Views.Workflow` 的精确输出。`WorkflowSlotConnectionBehavior.IsEnabled="True"` 把按下/松开接到槽的连接命令；code-behind 用显式指针处理器重复这一行为，在 `IWorkflowSlotViewModel` 上调用 `SendConnectionCommand` / `ReceiveConnectionCommand`。`SlotState` 决定连接器颜色。
 
 ```xml
-
-<!-- ====================== SlotView.xaml ====================== -->
-
+<!-- VeloxDev customization: Customize the connector shape or colors; keep WorkflowSlotConnectionBehavior enabled for interactive links. -->
 <UserControl x:Class="Demo.Views.Workflow.SlotView"
-
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-
-             xmlns:behaviors="clr-namespace:VeloxDev.WorkflowSystem.AttachedBehaviors;assembly=VeloxDev.WPF"
-
-             Background="Transparent"
-
+              xmlns:behaviors="clr-namespace:VeloxDev.WorkflowSystem.AttachedBehaviors;assembly=VeloxDev.WPF"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="20" d:DesignWidth="20"
+             Background="#01000000"
              behaviors:WorkflowSlotConnectionBehavior.IsEnabled="True"
-
              MouseLeftButtonUp="OnPointerReleased"
-
              MouseLeftButtonDown="OnPointerPressed">
-
     <Viewbox>
-
         <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=UserControl}}"
-
-              Data="M 0,0 A 10,10 0 1 0 20,0 A 10,10 0 1 0 0,0 Z" />
-
+              Data="M517.3248,511.488 m-123.6992,0 a123.6992,123.6992 0 1 0 247.3984,0 a123.6992,123.6992 0 1 0 -247.3984,0 Z M366.848,991.5904 a47.2064,47.2064 0 0 1 -15.36,-2.5088 A506.368,506.368 0 0 1 32.8704,655.36 a46.08,46.08 0 1 1 88.32,-26.2144 A414.0544,414.0544 0 0 0 383.9616,928.2048 a46.08,46.08 0 0 1 -15.104,89.6 Z M648.2944,997.888 a46.08,46.08 0 0 1 -13.1072,-90.2656 A413.952,413.952 0 0 0 920.9344,646.8608 a46.08,46.08 0 1 1 87.04,30.208 A506.3168,506.3168 0 0 1 674.5088,996.9408 a45.2608,45.2608 0 0 1 -13.1072,1.9456 Z M957.44,426.5984 a46.08,46.08 0 0 1 -44.1344,-32.9728 A414.0544,414.0544 0 0 0 652.544,120.9728 a46.08,46.08 0 1 1 30.1568,-87.04 A506.368,506.368 0 0 1 991.6416,467.3984 a46.08,46.08 0 0 1 -31.0272,57.2928 a45.2608,45.2608 0 0 1 -13.1584,1.8944 Z M83.3024,407.0912 a46.08,46.08 0 0 1 -43.5712,-61.44 A506.4704,506.4704 0 0 1 373.248,26.9824 a46.08,46.08 0 1 1 26.112,88.3712 A413.952,413.952 0 0 0 100.7104,367.0528 a46.08,46.08 0 0 1 -43.52,31.0272 Z" />
     </Viewbox>
-
 </UserControl>
-
 ```
 
 ```csharp
-
-// ====================== SlotView.xaml.cs ======================
-
+// VeloxDev customization: Add connector-specific interaction here only when the platform behavior does not already cover it.
 using System.Windows;
-
 using System.Windows.Controls;
-
 using System.Windows.Input;
-
 using System.Windows.Media;
-
 using VeloxDev.WorkflowSystem;
-
-
 
 namespace Demo.Views.Workflow;
 
-
-
 public partial class SlotView : UserControl
-
 {
-
     public static readonly DependencyProperty SlotStateProperty = DependencyProperty.Register(
-
-        nameof(SlotState), typeof(SlotState), typeof(SlotView),
-
+        nameof(SlotState),
+        typeof(SlotState),
+        typeof(SlotView),
         new PropertyMetadata(SlotState.StandBy, OnSlotStateChanged));
 
-
-
     public SlotView()
-
     {
-
         InitializeComponent();
-
         UpdateForeground();
-
     }
-
-
 
     public SlotState SlotState
-
     {
-
         get => (SlotState)GetValue(SlotStateProperty);
-
         set => SetValue(SlotStateProperty, value);
-
     }
-
-
 
     private static void OnSlotStateChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-
         => ((SlotView)d).UpdateForeground();
 
-
-
     private void UpdateForeground()
-
     {
-
         Foreground = SlotState switch
-
         {
-
             var state when state.HasFlag(SlotState.Sender) && state.HasFlag(SlotState.Receiver) => Brushes.Violet,
-
             var state when state.HasFlag(SlotState.Sender) => Brushes.Tomato,
-
             var state when state.HasFlag(SlotState.Receiver) => Brushes.Lime,
-
-            _ => Brushes.White,
-
+            _ => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DD1E1E1E")),
         };
-
     }
-
-
 
     private void OnPointerPressed(object sender, MouseButtonEventArgs e)
-
     {
+        if (DataContext is not IWorkflowSlotViewModel context) return;
 
-        if (DataContext is IWorkflowSlotViewModel context) context.SendConnectionCommand.Execute(null);
+        context.SendConnectionCommand.Execute(null);
 
         e.Handled = true;
-
     }
-
-
 
     private void OnPointerReleased(object sender, MouseButtonEventArgs e)
-
     {
+        if (DataContext is not IWorkflowSlotViewModel context) return;
 
-        if (DataContext is IWorkflowSlotViewModel context) context.ReceiveConnectionCommand.Execute(null);
+        context.ReceiveConnectionCommand.Execute(null);
 
         e.Handled = true;
-
     }
-
 }
-
 ```

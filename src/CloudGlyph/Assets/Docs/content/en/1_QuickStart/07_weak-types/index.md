@@ -2,239 +2,29 @@
 
 ## Weak Types
 
-### Quick Start
+The **weak-types** feature ships four framework-agnostic collection types that hold their contents through *weak references*, so an entry never keeps its target alive. They exist to prevent the classic .NET memory leak where a long-lived publisher, event source or cache keeps short-lived subscribers and keys reachable through a strong reference long after they are done.
 
-#### 1. Prerequisites
+All four types live in the `VeloxDev.WeakTypes` namespace inside the `VeloxDev.Core` package (source folder `Src/Core/VeloxDev.Core/WeakTypes/`), have no UI adapter and no runtime dependency, and are `sealed`:
 
-- **Supported targets** (from `VeloxDev.Core.csproj`): `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0`.
-- **SDK / runtime:** a .NET SDK with Roslyn 4.x (5.0+); verified against SDK 9.0/10.0 — a *tested* environment. The example targets `net9.0`.
-- **Package manager:** NuGet / `dotnet` CLI.
-- **Required services:** none — the four weak-collection types live in `VeloxDev.WeakTypes` and have no runtime dependencies.
+- `WeakDelegate<TDelegate>` (`where TDelegate : Delegate`) — an event-like, multi-handler sink that stores each handler as a `WeakReference<Delegate>`. Subscribers are dropped automatically once they are collected, so a publisher never outlives its value to a dead listener. Reads go through a lock-free cached combined delegate.
+- `WeakQueue<T>` (`where T : class`) — a FIFO buffer of `WeakReference<T>` entries; dead entries are pruned on access.
+- `WeakStack<T>` (`where T : class`) — the LIFO counterpart of `WeakQueue<T>`.
+- `WeakCache<TTargetKey, TCacheKey>` (`where TTargetKey : class`, `where TCacheKey : class`) — a per-target key/value map built on `System.Runtime.CompilerServices.ConditionalWeakTable<TTargetKey, TCacheKey>`. The value dies with its target key instead of keeping the key alive.
 
+Each type is thread-safe through an internal lock, mirrors the shape of its strong `System.Collections.Generic` counterpart, and is exercised by the MSTest suite in `Src/Core/VeloxDev.Core.Test/WeakTypes/` (`WeakDelegateTests.cs`, `WeakQueueTests.cs`, `WeakStackTests.cs`, `WeakCacheTests.cs`). There is **no dedicated GUI demo** for this feature — the tests are the primary behavioural evidence, and the runnable program on the last sub-page exercises all four types headless.
 
-#### 2. Install / Add Dependency
+The package `VeloxDev.Core` multi-targets `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0`; nothing else needs to be installed.
 
-```bash
-dotnet add package VeloxDev.Core
-```
+## Quick Start — Sub-pages
 
-**Expected result:** The command exits `0`; a `<PackageReference Include="VeloxDev.Core" />` is added to the `.csproj` and restore completes. All four types are available on every target framework of the package.
+This feature's Quick Start is split into the following pages (they build toward the single runnable program on the last page):
 
-#### 3. Basic Setup / Registration
-
-Instantiate the collection types directly — there is no registration step. The only contract is the generic constraint: queue/stack items and cache keys must be reference types (`class`), and the delegate type must derive from `System.Delegate`.
-
-```csharp
-using System;
-using VeloxDev.WeakTypes;
-
-var queue = new WeakQueue<Payload>();          // T : class
-var stack = new WeakStack<Payload>();          // T : class
-var changed = new WeakDelegate<Action<string>>();  // TDelegate : Delegate
-var cache = new WeakCache<Payload, string>();  // TTargetKey : class, TCacheKey : class
-```
-
-**Expected result:** All four objects construct with no configuration; the collection stores `WeakReference<T>` (or a `ConditionalWeakTable` in the cache) instead of strong references.
-
-#### 4. Core Usage (Step by Step)
-
-**4.1 Enqueue / Push / add a handler**
-
-(`Payload`, `Subscriber` and `Counter` are tiny helper classes defined in the Complete Code below; `queue`, `stack` and `changed` come from step 3.)
-
-```csharp
-queue.Enqueue(new Payload(1));      // held weakly
-var alive = new Payload(2);
-queue.Enqueue(alive);               // still referenced -> survives GC
-
-stack.Push(new Payload(10));        // held weakly
-
-changed.AddHandler(liveSub.Handle); // handler held weakly
-```
-
-**Expected result:** Entries whose only reference is the weak one become collectible; `alive` and `liveSub` stay alive because you still hold them.
-
-**4.2 Force a GC and observe sweep-on-access**
-
-```csharp
-ForceGc();
-Console.WriteLine($"Count after GC: {queue.Count}");   // prunes dead refs first
-if (queue.TryDequeue(out var item)) { }                // skips collected entries
-```
-
-**Expected result:** `Count` reflects only live items; `TryDequeue` / `TryPop` / `TryPeek` skip entries whose target was collected.
-
-**4.3 Cache add / update / read**
-
-```csharp
-cache.AddOrUpdate(key1, "value-100");
-if (cache.TryGetCache(key1, out var v)) { }   // O(1) amortized
-cache.ForeachCache((k, val) => Console.WriteLine($"{k} -> {val}"));
-cache.Remove(key1);
-```
-
-**Expected result:** `TryGetCache` returns the value for a live key and `false` for a collected one; `ForeachCache` iterates only live entries.
-
-**4.4 `WeakDelegate` invoke and clone**
-
-```csharp
-changed.Invoke(["hello"]);          // DynamicInvoke on the cached combined delegate
-var snapshot = changed.Clone();     // rebuilds from live handlers only
-snapshot.Invoke(["world"]);
-```
-
-**Expected result:** Invoking the clone runs only the handlers whose subscribers are still alive — the collected subscriber's handler is pruned during the rebuild.
-
-#### 5. Verification
-
-Run the complete program below. A sample run (release build, `net9.0`) prints:
-
-```text
-== WeakQueue ==
-Count after GC: 1
-IsEmpty after GC: False
-Dequeued: 2
-
-== WeakStack ==
-Count after GC: 1
-Popped: 2
-
-== WeakDelegate ==
-counter after GC + invoke: 1
-counter after clone + invoke: 2
-
-== WeakCache ==
-TryGetCache(key1): True -> value-100
-TryGetCache(new key): False -> (null)
-ForeachCache: key=100 value=value-100
-TryGetCache(key1) after Remove: False
-```
-
-**Expected result:** Items created only inside the helper methods are collected by `ForceGc`, so the queue/stack report `Count: 1` and dequeue/pop only the alive item; the dead delegate handler and dead cache key are skipped.
-
-#### 6. Complete Code
-
-```csharp
-using System;
-using VeloxDev.WeakTypes;
-
-namespace WeakTypesQuickStart;
-
-// A simple reference-type item that the GC can collect.
-public sealed class Payload
-{
-    public int Value;
-    public Payload(int value) => Value = value;
-    public override string ToString() => Value.ToString();
-}
-
-public sealed class Counter
-{
-    public int Value;
-}
-
-public sealed class Subscriber
-{
-    private readonly Counter _counter;
-    public Subscriber(Counter counter) => _counter = counter;
-    public void Handle(string msg) => _counter.Value++;
-}
-
-public static class Program
-{
-    public static void Main()
-    {
-        Console.WriteLine("== WeakQueue ==");
-        var queue = new WeakQueue<Payload>();
-        FillQueue(queue);
-        var alive = new Payload(2);
-        queue.Enqueue(alive);
-        ForceGc();
-        Console.WriteLine($"Count after GC: {queue.Count}");
-        Console.WriteLine($"IsEmpty after GC: {queue.IsEmpty}");
-        while (queue.TryDequeue(out var item))
-        {
-            Console.WriteLine($"Dequeued: {item}");
-        }
-
-        Console.WriteLine();
-        Console.WriteLine("== WeakStack ==");
-        var stack = new WeakStack<Payload>();
-        FillStack(stack);
-        stack.Push(alive);
-        ForceGc();
-        Console.WriteLine($"Count after GC: {stack.Count}");
-        while (stack.TryPop(out var item))
-        {
-            Console.WriteLine($"Popped: {item}");
-        }
-
-        Console.WriteLine();
-        Console.WriteLine("== WeakDelegate ==");
-        var changed = new WeakDelegate<Action<string>>();
-        var counter = new Counter();
-        var liveSub = new Subscriber(counter);
-        changed.AddHandler(liveSub.Handle);
-        AddDeadHandler(changed, counter);
-        ForceGc();
-        changed.Invoke(["first"]);
-        Console.WriteLine($"counter after GC + invoke: {counter.Value}");
-        var snapshot = changed.Clone();
-        snapshot.Invoke(["second"]);
-        Console.WriteLine($"counter after clone + invoke: {counter.Value}");
-
-        Console.WriteLine();
-        Console.WriteLine("== WeakCache ==");
-        var cache = new WeakCache<Payload, string>();
-        var key1 = new Payload(100);
-        cache.AddOrUpdate(key1, "value-100");
-        AddDeadCacheEntry(cache);
-        ForceGc();
-        Console.WriteLine($"TryGetCache(key1): {cache.TryGetCache(key1, out var v1)} -> {v1}");
-        Console.WriteLine($"TryGetCache(new key): {cache.TryGetCache(new Payload(200), out var v2)} -> {v2 ?? "(null)"}");
-        cache.ForeachCache((k, v) => Console.WriteLine($"ForeachCache: key={k.Value} value={v}"));
-        cache.Remove(key1);
-        Console.WriteLine($"TryGetCache(key1) after Remove: {cache.TryGetCache(key1, out _)}");
-        GC.KeepAlive(alive);
-        GC.KeepAlive(liveSub);
-    }
-
-    // Items created here go out of scope when the method returns, so only the
-    // weak reference keeps them reachable; the next GC collects them.
-    private static void FillQueue(WeakQueue<Payload> queue)
-    {
-        queue.Enqueue(new Payload(1));
-        queue.Enqueue(new Payload(3));
-    }
-
-    private static void FillStack(WeakStack<Payload> stack)
-    {
-        stack.Push(new Payload(10));
-        stack.Push(new Payload(30));
-    }
-
-    private static void AddDeadHandler(WeakDelegate<Action<string>> changed, Counter counter)
-    {
-        var deadSub = new Subscriber(counter);
-        // CanUpdateCache:false avoids eagerly building the combined-delegate cache,
-        // which would otherwise keep the dead subscriber alive.
-        changed.AddHandler(deadSub.Handle, CanUpdateCache: false);
-    }
-
-    private static void AddDeadCacheEntry(WeakCache<Payload, string> cache)
-    {
-        cache.AddOrUpdate(new Payload(200), "value-200");
-    }
-
-    private static void ForceGc()
-    {
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-    }
-}
-```
-
-#### 7. Run Declaration
-
-- ✅ Actually built and ran on 2026-08-17 (`dotnet run -c Release`, target `net9.0`). Recorded output (see §5): `WeakQueue Count after GC: 1`, `Dequeued: 2`; `WeakStack Count after GC: 1`, `Popped: 2`; `WeakDelegate counter after GC + invoke: 1`, `counter after clone + invoke: 2`; `WeakCache TryGetCache(key1): True -> value-100`, `TryGetCache(new key): False`, `ForeachCache: key=100 value=value-100`, `TryGetCache(key1) after Remove: False`.
+- [00 Prerequisites](00_prerequisites/) — supported targets, SDK/runtime, and where the behavioural evidence lives
+- [01 Install](01_install/) — add `VeloxDev.Core` from NuGet or project-reference it from this repo
+- [02 Pick a Collection](02_choose-a-collection/) — which of the four types fits a scenario (leaks, FIFO/LIFO buffers, per-target values)
+- [03 WeakDelegate](03_weak-delegate/) — event-like weak subscription: `AddHandler` / `RemoveHandler` / `GetInvocationList` / `Invoke` / `Clone`
+- [04 WeakQueue](04_weak-queue/) — FIFO processing of ephemeral work items
+- [05 WeakStack](05_weak-stack/) — LIFO undo/redo-style stacks that cannot hold items alive
+- [06 WeakCache](06_weak-cache/) — target-keyed values that die with their key
+- [07 GC Behavior](07_gc-behavior/) — what “weak” really means, sweep-on-access, and the Debug/Release caveats
+- [08 Verify & Complete Code](08_verify-and-complete-code/) — the tests, the single runnable program, the recorded output, and the run declaration

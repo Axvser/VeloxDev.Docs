@@ -1,117 +1,115 @@
-# 平台适配器 — `LinkView.xaml / LinkView.xaml.cs`
+# 平台适配器 - `LinkView.xaml / LinkView.xaml.cs`
 
-Source file from the complete scaffold.
+`dotnet new wpf-v-link -n LinkView -ns Demo.Views.Workflow` 的精确输出。一种被动的正交（折线）连线，带黄金比例短桩，仅当 `CanRender` 为 true 且连线报告可渲染（`IsRenderReady()`）时才绘制自身。
 
 ```xml
-
-<!-- ====================== LinkView.xaml ====================== -->
-
-<UserControl x:Class="Demo.Views.Workflow.LinkView"
-
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-
+<!-- VeloxDev customization: Customize line geometry, color, thickness, hit testing, and virtual-link rendering in the code-behind. -->
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Demo.Views.Workflow.LinkView">
 </UserControl>
-
 ```
 
 ```csharp
-
-// ====================== LinkView.xaml.cs ======================
-
+// VeloxDev customization: Customize line geometry, color, and thickness here.
+using System;
+using System.Collections.Generic;
 using System.Windows;
-
 using System.Windows.Controls;
-
 using System.Windows.Media;
-
-
+using VeloxDev.WorkflowSystem;
 
 namespace Demo.Views.Workflow;
 
-
-
+/// <summary>
+/// Orthogonal (polyline) connection with golden-ratio stubs.
+/// Passive visual only — no hover, highlight, or keyboard interaction.
+/// </summary>
 public partial class LinkView : UserControl
-
 {
-
-    public static readonly DependencyProperty StartLeftProperty = RegisterPointProperty(nameof(StartLeft));
-
-    public static readonly DependencyProperty StartTopProperty = RegisterPointProperty(nameof(StartTop));
-
-    public static readonly DependencyProperty EndLeftProperty = RegisterPointProperty(nameof(EndLeft));
-
-    public static readonly DependencyProperty EndTopProperty = RegisterPointProperty(nameof(EndTop));
-
-    public static readonly DependencyProperty CanRenderProperty =
-
-        DependencyProperty.Register(nameof(CanRender), typeof(bool), typeof(LinkView),
-
-            new PropertyMetadata(true, OnRenderChanged));
-
-    public static readonly DependencyProperty LineColorProperty =
-
-        DependencyProperty.Register(nameof(LineColor), typeof(Color), typeof(LinkView),
-
-            new PropertyMetadata(Colors.White, OnRenderChanged));
-
-
-
-    public double StartLeft { get => (double)GetValue(StartLeftProperty); set => SetValue(StartLeftProperty, value); }
-
-    public double StartTop { get => (double)GetValue(StartTopProperty); set => SetValue(StartTopProperty, value); }
-
-    public double EndLeft { get => (double)GetValue(EndLeftProperty); set => SetValue(EndLeftProperty, value); }
-
-    public double EndTop { get => (double)GetValue(EndTopProperty); set => SetValue(EndTopProperty, value); }
-
-    public bool CanRender { get => (bool)GetValue(CanRenderProperty); set => SetValue(CanRenderProperty, value); }
-
-    public Color LineColor { get => (Color)GetValue(LineColorProperty); set => SetValue(LineColorProperty, value); }
-
-
-
     public LinkView()
-
     {
-
         InitializeComponent();
-
         IsHitTestVisible = false;
-
         Panel.SetZIndex(this, -100);
 
+        DataContextChanged += (_, _) => InvalidateVisual();
     }
 
+    #region Dependency properties
 
+    public static readonly DependencyProperty StartLeftProperty =
+        DependencyProperty.Register(nameof(StartLeft), typeof(double), typeof(LinkView), new PropertyMetadata(0d, OnRenderChanged));
+    public static readonly DependencyProperty StartTopProperty =
+        DependencyProperty.Register(nameof(StartTop), typeof(double), typeof(LinkView), new PropertyMetadata(0d, OnRenderChanged));
+    public static readonly DependencyProperty EndLeftProperty =
+        DependencyProperty.Register(nameof(EndLeft), typeof(double), typeof(LinkView), new PropertyMetadata(0d, OnRenderChanged));
+    public static readonly DependencyProperty EndTopProperty =
+        DependencyProperty.Register(nameof(EndTop), typeof(double), typeof(LinkView), new PropertyMetadata(0d, OnRenderChanged));
+    public static readonly DependencyProperty CanRenderProperty =
+        DependencyProperty.Register(nameof(CanRender), typeof(bool), typeof(LinkView), new PropertyMetadata(true, OnRenderChanged));
+    public static readonly DependencyProperty IsVirtualProperty =
+        DependencyProperty.Register(nameof(IsVirtual), typeof(bool), typeof(LinkView), new PropertyMetadata(false, OnRenderChanged));
+    public static readonly DependencyProperty LineColorProperty =
+        DependencyProperty.Register(nameof(LineColor), typeof(Color), typeof(LinkView), new PropertyMetadata((Color)ColorConverter.ConvertFromString("#DDFFFFFF"), OnRenderChanged));
 
-    private static DependencyProperty RegisterPointProperty(string name)
-
-        => DependencyProperty.Register(name, typeof(double), typeof(LinkView), new PropertyMetadata(0d, OnRenderChanged));
-
-
+    public double StartLeft { get => (double)GetValue(StartLeftProperty); set => SetValue(StartLeftProperty, value); }
+    public double StartTop { get => (double)GetValue(StartTopProperty); set => SetValue(StartTopProperty, value); }
+    public double EndLeft { get => (double)GetValue(EndLeftProperty); set => SetValue(EndLeftProperty, value); }
+    public double EndTop { get => (double)GetValue(EndTopProperty); set => SetValue(EndTopProperty, value); }
+    public bool CanRender { get => (bool)GetValue(CanRenderProperty); set => SetValue(CanRenderProperty, value); }
+    public bool IsVirtual { get => (bool)GetValue(IsVirtualProperty); set => SetValue(IsVirtualProperty, value); }
+    public Color LineColor { get => (Color)GetValue(LineColorProperty); set => SetValue(LineColorProperty, value); }
 
     private static void OnRenderChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-
         => ((LinkView)d).InvalidateVisual();
 
+    private bool IsVirtualLink
+        => IsVirtual
+            || DataContext is IWorkflowLinkViewModel
+            {
+                Sender.Parent: null,
+                Receiver.Parent: null
+            };
 
+    #endregion
+
+    #region Render
 
     protected override void OnRender(DrawingContext ctx)
-
     {
-
         base.OnRender(ctx);
-
         if (!CanRender) return;
 
-        ctx.DrawLine(new Pen(new SolidColorBrush(LineColor), 1.5),
+        if (DataContext is IWorkflowLinkViewModel link && !link.IsRenderReady()) return;
 
-            new Point(StartLeft, StartTop), new Point(EndLeft, EndTop));
+        var points = BuildPoints();
+        if (points.Count < 2) return;
 
+        var color = LineColor;
+        var thickness = 2;
+        var brush = new SolidColorBrush(color);
+
+        var pen = IsVirtualLink
+            ? new Pen(brush, thickness) { DashStyle = new DashStyle(new double[] { 4, 2 }, 0) }
+            : new Pen(brush, thickness);
+
+        for (int i = 0; i < points.Count - 1; i++)
+            ctx.DrawLine(pen, points[i], points[i + 1]);
     }
 
-}
+    private List<Point> BuildPoints()
+    {
+        var s = new Point(StartLeft, StartTop);
+        var e = new Point(EndLeft, EndTop);
+        double dx = EndLeft - StartLeft;
+        const double phi = 0.6180339887;
+        double stub = dx / 2.0 * (1.0 - phi);
+        var p1 = new Point(s.X + stub, s.Y);
+        var p4 = new Point(e.X - stub, e.Y);
+        return [s, p1, p4, e];
+    }
 
+    #endregion
+}
 ```

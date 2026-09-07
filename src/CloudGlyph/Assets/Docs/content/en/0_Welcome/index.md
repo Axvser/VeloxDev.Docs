@@ -152,7 +152,7 @@
     <span class="gradient-text">VeloxDev</span>
   </h1>
   <p class="cg-subtitle">
-    Build modern, AI-controllable workflow editors on any .NET GUI
+    Build modern, AI-controllable workflow editors on any .NET GUI — WPF · Avalonia · WinUI · MAUI · WinForms · Razor · Jalium
   </p>
 
   <hr class="gradient-rule" />
@@ -172,7 +172,7 @@
     <div class="step-card cg-step" style="animation-delay: 0.24s;">
       <div class="step-icon-slow" style="font-size: clamp(1.4em, 4vw, 2em); margin-bottom: 6px;">🚀</div>
       <div style="font-weight: 600; font-size: clamp(0.8em, 2vw, 0.95em);">Run</div>
-      <div style="font-size: clamp(0.65em, 1.6vw, 0.78em); opacity: 0.7; margin-top: 4px;"><code>WPF · Avalonia · WinUI · MAUI</code></div>
+      <div style="font-size: clamp(0.65em, 1.6vw, 0.78em); opacity: 0.7; margin-top: 4px;"><code>WPF · Avalonia · WinUI · MAUI · WinForms · Razor · Jalium</code></div>
     </div>
   </div>
 
@@ -200,7 +200,10 @@
       <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">⚙️</span> MonoBehaviour<br><span style="opacity: 0.6;">Frame-driven loop · Tick-based</span>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.35s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🧩</span> Adapters<br><span style="opacity: 0.6;">WPF · Avalonia · WinUI · MAUI · WinForms · Razor</span>
+      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📎</span> Weak References<br><span style="opacity: 0.6;">WeakDelegate · WeakQueue · WeakStack · WeakCache</span>
+    </div>
+    <div class="feat-card cg-feat" style="animation-delay: 0.4s;">
+      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🧩</span> Adapters<br><span style="opacity: 0.6;">7 GUIs — WPF · Avalonia · WinUI · MAUI · WinForms · Razor · Jalium</span>
     </div>
   </div>
 
@@ -213,3 +216,35 @@
     Open Source · MIT
   </p>
 </div>
+
+This is the documentation site for **VeloxDev** — a .NET foundation for building **interactive workflow editors**. One model with compile-time identity and a compiled execution engine (`CompilerEx`) lives in `VeloxDev.Core` with zero UI dependencies; platform adapters supply only the views; and a function-calling **Workflow Agent** (+ optional MCP) makes an LLM a first-class graph controller, sharing the GUI's undo/redo, validation and lifecycle.
+
+**Repositories** — source code: [github.com/Axvser/VeloxDev](https://github.com/Axvser/VeloxDev) · online wiki: [axvser.github.io/VeloxDev.Docs](https://axvser.github.io/VeloxDev.Docs/) (a WebAssembly app, so its load speed depends on your network).
+
+## Explore the documentation
+
+The Wiki has five dimensions, each present in English and Chinese. From this page the other four dimensions are one level up:
+
+| Dimension | Contents |
+|---|---|
+| **0_Welcome** | this page — the project pitch and where to go next |
+| [1_QuickStart](../1_QuickStart/index.md) | runnable, end-to-end tutorials — one per feature |
+| [2_API](../2_API/index.md) | full reference of every documented public type and member |
+| [3_SE_Analysis](../3_SE_Analysis/index.md) | file/functional structure, design patterns, data flow, complexity |
+| [4_Copyright](../4_Copyright/index.md) | license information and attribution |
+
+## Documented features
+
+Nine features are documented, each covered consistently across the QuickStart, API and SE Analysis trees:
+
+| Feature | What it provides |
+|---|---|
+| [Workflow system](../1_QuickStart/00_workflow-system/index.md) | Tree / Node / Slot / Link model with undo-redo, spatial indexing, deep-zoom canvas math, serialization and a compiled execution engine (forward + reverse) |
+| [Workflow Agent](../1_QuickStart/01_workflow-agent/index.md) | 60+ function-calling tools + MCP — an AI can inspect, build and mutate graphs at runtime |
+| [MVVM](../1_QuickStart/02_mvvm/index.md) | source generators for observable properties and async, cancellable commands |
+| [Transition](../1_QuickStart/03_transition/index.md) | cross-platform interpolation animation with easing and a fluent API |
+| [Dynamic theme](../1_QuickStart/04_dynamic-theme/index.md) | runtime theme switching with animated transitions |
+| [AOP](../1_QuickStart/05_aop/index.md) | compile-time aspect proxies to intercept node execution |
+| [MonoBehaviour](../1_QuickStart/06_monobehaviour/index.md) | frame-driven lifecycle loop for tick-based simulation |
+| [Weak references](../1_QuickStart/07_weak-types/index.md) | `WeakDelegate` · `WeakQueue` · `WeakStack` · `WeakCache` |
+| [Platform adapters](../1_QuickStart/08_platform-adapters/index.md) | seven view layers — WPF · Avalonia · WinUI · MAUI · WinForms · Razor · Jalium |

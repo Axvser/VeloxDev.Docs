@@ -1,4 +1,8 @@
-﻿using Avalonia.Controls;
+using System;
+using System.ComponentModel;
+using System.Threading;
+using System.Threading.Tasks;
+using Avalonia.Controls;
 using Avalonia.Platform;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
@@ -10,14 +14,31 @@ namespace CloudGlyph.Views
     [ThemeConfig<ObjectConverter, Dark, Light>(nameof(Background), ["#1e1e1e"], ["#ffffff"])]
     public partial class MainView : UserControl
     {
+        private MainViewModel? _viewModel;
+        private CancellationTokenSource? _scrollResetCts;
+
         public MainView()
         {
             InitializeComponent();
+
+            // Route links clicked inside the rendered Markdown: same-language page links navigate
+            // the tree; web/mail links keep the library's default (open in the OS browser).
+            MarkdownPreview.LinkClicked += (_, e) =>
+            {
+                if (DataContext is not MainViewModel vm) return;
+                if (vm.Document.TryHandleNavigation(e.Url))
+                {
+                    e.Handled = true;
+                    _ = ResetScrollTopAsync();
+                }
+            };
 
             InitializeTheme();
 
             Loaded += (s, e) =>
             {
+                AttachViewModel(DataContext as MainViewModel);
+
                 var settings = this.GetPlatformSettings();
 
                 if (settings?.GetColorValues() is PlatformColorValues colors)
@@ -33,6 +54,50 @@ namespace CloudGlyph.Views
                     }
                 };
             };
+        }
+
+        private void AttachViewModel(MainViewModel? vm)
+        {
+            if (_viewModel == vm) return;
+            if (_viewModel is not null)
+                _viewModel.Document.PropertyChanged -= OnDocumentPropertyChanged;
+            _viewModel = vm;
+            if (_viewModel is not null)
+                _viewModel.Document.PropertyChanged += OnDocumentPropertyChanged;
+        }
+
+        private void OnDocumentPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            // A new page was selected (left tree or an in-content link): start the page at the top.
+            if (e.PropertyName == nameof(DocumentViewModel.SelectedNode))
+                _ = ResetScrollTopAsync();
+        }
+
+        /// <summary>
+        /// Best-effort scroll-to-top after the document is replaced. Content rendering is async after
+        /// <c>Text</c> changes, so retry for a short window and swallow any "not ready" errors.
+        /// </summary>
+        private async Task ResetScrollTopAsync()
+        {
+            _scrollResetCts?.Cancel();
+            var cts = new CancellationTokenSource();
+            _scrollResetCts = cts;
+            try
+            {
+                for (var i = 0; i < 6; i++)
+                {
+                    await Task.Delay(80, cts.Token);
+                    await MarkdownPreview.ScrollToProgressAsync(0);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // superseded by a newer navigation
+            }
+            catch
+            {
+                // preview not ready yet / control detached — nothing to reset
+            }
         }
 
         private static void UpdateTheme(PlatformColorValues colors)

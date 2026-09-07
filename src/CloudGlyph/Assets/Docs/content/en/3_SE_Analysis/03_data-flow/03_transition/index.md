@@ -1,214 +1,218 @@
 # Data Flow — Transition
 
-## (a) Normal execution flow
+The engine is executed through the same core pipeline on every platform adapter. A run is **two-phase** inside each segment: first the scheduler *prepares* a normalized `SamplerSet` (reads current values, resolves samplers, fixes endpoints), then the interpreter drives a *continuous* Stopwatch-based sampling loop that marshals each frame write to the UI thread. This page shows the run lifecycle, the effect-scheduling loop, the UI-thread hop, and the scheduler fan-out/preemption rules.
 
-The complete call chain from `snapshot.Execute(target)` to the Stopwatch-driven sampling loop. This flow works identically across all six platform adapters.
+## (a) Segment run lifecycle
+
+`Execute(target)` walks the fluent `StateSnapshot` chain (`root`…`next`), queues each segment's `(state, effect-clone, interpolator, delay)`, then plays them one at a time on a per-target scheduler. Cancellation is carried by one `CancellationTokenSource` shared across all segments of the run.
 
 ```plantuml
 @startuml
 !theme plain
 
-actor User as User
+actor "Caller" as Caller
 participant "StateSnapshot" as SS
-participant "TransitionCore" as TC
 participant "TransitionScheduler" as Sch
-participant "InterpolatorCore" as IC
 participant "UIThreadInspector" as UI
-participant "SamplerSet" as FUS
-participant "ISampler" as SM
+participant "InterpolatorCore" as IC
+participant "SamplerSet" as SET
 participant "TransitionInterpreter" as TI
 participant "Effect" as EF
-participant "Target (UI element)" as T
+participant "Target" as TGT
 
-User -> SS: Execute(Rec0, CanMutualTask)
+Caller -> SS: Execute(target, CanMutualTask)
 activate SS
 
-SS -> TC: (static) Execute(target, snapshot, CanMutualTask)
-activate TC
+SS -> SS: Walk root -> next chain;\nqueue (interpolator, delay, effect-clone, state) per segment
 
-TC -> Sch: FindOrCreate(target, CanMutualTask)
+SS -> Sch: FindOrCreate(target, CanMutualTask)
 activate Sch
 alt CanMutualTask == true
-    Sch -> Sch: return shared mutual scheduler (ConditionalWeakTable)
+    Sch --> SS: shared scheduler cached in MutualSchedulers (ConditionalWeakTable)
 else CanMutualTask == false
-    Sch -> Sch: return one-off non-mutual scheduler
+    Sch --> SS: fresh scheduler; registered in NoMutualSchedulers
 end
-Sch --> TC: scheduler
+opt CanMutualTask == true
+    SS -> Sch: Exit()  (cancel the scheduler's active cts, if any -> new run preempts old)
+end
 deactivate Sch
 
-TC -> Sch: Execute(producer, state, effect, cts)
-activate Sch
+loop one iteration per chained segment
+    SS -> SS: await Task.Delay(segment.delay, cts)  (skip on OperationCanceledException)
+    SS -> Sch: Execute(interpolator, state, effect, cts)
+    activate Sch
+    Sch -> Sch: _gate.WaitAsync()  (serialize executions on this scheduler)
+    Sch -> UI: ProtectedInvoke(target, () => effect.InvokeAwake(target, args))
+    activate UI
+    UI -> EF: Awaked event (raised on the UI thread)
+    UI --> Sch
+    deactivate UI
 
-Sch -> IC: Prepare(target, state, effect, inspector)
-activate IC
-
-loop every recorded property
-    IC -> UI: ProtectedGetValue(target, property)  (marshalled if needed)
-    UI --> IC: currentValue (start)
-    alt custom sampleable (state.Interpolators)
-        IC -> IC: sampleable = state.Interpolators[property]
-    else registry TryGetInterpolator(propertyType)
-        IC -> IC: sampleable = NativeInterpolators[type]
-    else current/new value is ISampleable
-        IC -> IC: sampleable = value
+    Sch -> IC: Prepare(target, state, effect, inspector)
+    activate IC
+    loop every recorded property
+        IC -> UI: ProtectedGetValue(target, property)  (marshal the read if off-thread)
+        UI --> IC: current value (start)
+        IC -> IC: resolve sampler: state override -> registry -> value-type ISampleable (StructAssembler)
+        IC -> IC: normStart = NormalizeStart(cur, new, opt);\nnormEnd = NormalizeEnd(cur, new, opt)
+        IC -> SET: Add(property, sampler, normStart, normEnd, options)
     end
-    IC -> IC: sampler = sampleable.Normalize(current, new, options)
-    IC -> FUS: Add(property, sampler, start, end, options)
+    IC --> Sch: SamplerSet (one entry per property)
+    deactivate IC
+
+    alt cts cancelled or Args.Handled set by Awake
+        Sch --> SS: run skipped (no sampling)
+    else
+        Sch -> TI: Execute(target, samplerSet, effect, cts)
+        activate TI
+        TI -> TI: Start/Update/Apply/LateUpdate ... Completed\n(b: sampling loop)
+        TI --> Sch: completed
+        deactivate TI
+    end
+    Sch -> Sch: finally: release _gate; clear cts
+    Sch --> SS
+    deactivate Sch
 end
 
-IC --> Sch: SamplerSet (one prepared sampler entry per property)
-deactivate IC
-
-Sch -> TI: Execute(target, samplerSet, effect, cts)
-activate TI
-
-TI -> EF: InvokeStart(sender, args)
-EF --> TI: Start event fired
-
-loop each pass (forward; backward when IsAutoReverse)
-    loop sample until rawT >= 1 (Stopwatch-driven)
-        TI -> TI: rawT = elapsed / durationMs  (clamped to [0,1])
-        TI -> TI: easedT = Ease(rawT), clamped to [0,1]
-        TI -> EF: InvokeUpdate(sender, args)
-        TI -> FUS: Apply(target, easedT, priority)
-        activate FUS
-        FUS -> UI: ProtectedInvoke(target, applyCore, priority)\n(skipped if cancelled / app dead)
-        UI -> SM: Update(target, property, start, end, options, easedT)
-        SM -> T: t<=0 → exact start / t>=1 → exact end /\nmiddle → SetValue (value) or in-place mutation (reference)
-        deactivate FUS
-        TI -> EF: InvokeLateUpdate(sender, args)
-        TI -> TI: await Task.Delay(1)  (coarse yield only; Stopwatch is the timing source)
-    end
-end
-
-TI -> EF: InvokeCompleted(sender, args)
-EF --> TI: Completed event fired
-deactivate TI
-Sch --> TC: completed
-deactivate Sch
-TC --> SS
-deactivate TC
-SS --> User: return
+SS --> Caller: return
 deactivate SS
 @enduml
 ```
 
-## (b) Auto-reverse / loop flow
+Sources: `TransitionSystem/StateSnapshot.cs` (`CoreExecute`, segment queueing and play loop), `TransitionScheduler.cs` (`FindOrCreate`, `Execute`, `_gate`, weak target reference), `Interpolator.cs` (`Prepare`, sampler resolution), `SamplerSet.cs`.
 
-When `IsAutoReverse` or `LoopTime` is set, the interpreter wraps the sampling passes. `LoopTime = int.MaxValue` loops forever.
+## (b) Effect scheduling and the sampling loop
+
+Each segment's interpreter runs one continuous loop. `Duration`/`FPS` come from the segment's `Effect`; `FPS` is a **maximum sample-rate cap** — the yield interval is `1000 / FPS` ms, while the Stopwatch is the only timing source (so `Task.Delay` imprecision never skews the animation). `LoopTime = int.MaxValue` loops forever.
 
 ```plantuml
 @startuml
 !theme plain
 
 participant "TransitionInterpreter" as TI
-participant "SamplerSet" as FUS
 participant "Effect" as EF
 
-TI -> TI: durationMs = effect.Duration.TotalMilliseconds
-TI -> TI: stopwatch = Stopwatch.StartNew()
 TI -> EF: InvokeStart(sender, args)
+EF --> TI: Start fired
+TI -> TI: frameSet.SetCancellation(cts);\ndurationMs = effect.Duration.TotalMilliseconds
+TI -> TI: sampleIntervalMs = 1000 / max(1, effect.FPS)\nforeverloop = (effect.LoopTime == int.MaxValue)
+TI -> TI: stopwatch = Stopwatch.StartNew(); cycle = 0
 
-loop loop in 0 .. effect.LoopTime (forever when int.MaxValue)
-    loop forward pass (sample until rawT >= 1)
-        TI -> TI: cts/Args.Handled check
-        TI -> TI: rawT = stopwatch.Elapsed / durationMs
-        TI -> TI: easedT = clamp(Ease(rawT), 0, 1)
-        TI -> EF: InvokeUpdate
-        TI -> FUS: Apply(target, easedT, priority)
-        TI -> EF: InvokeLateUpdate
-        TI -> TI: await Task.Delay(1)  (coarse yield)
+loop while (foreverloop || cycle <= effect.LoopTime)
+    loop forward pass until rawT >= 1
+        TI -> TI: throw OperationCanceledException if cts cancelled or Args.Handled
+        TI -> TI: rawT = (stopwatch.Elapsed - passStartMs) / durationMs
+        TI -> TI: easedT = rawT >= 1 ? 1 : clamp(effect.Ease.Ease(rawT), 0, 1)
+        TI -> EF: InvokeUpdate(sender, args)
+        TI -> TI: apply(easedT) -> SamplerSet.Apply (UI-thread hop, see (c))
+        TI -> EF: InvokeLateUpdate(sender, args)
+        TI -> TI: await Task.Delay(sampleIntervalMs, cts)\n(Stopwatch is the timing authority)
     end
-    alt effect.IsAutoReverse
-        loop backward pass (sample until rawT >= 1)
-            TI -> TI: cts/Args.Handled check
-            TI -> TI: easedT = clamp(Ease(1 - rawT), 0, 1); endpoint easedT = 0
-            TI -> EF: InvokeUpdate
-            TI -> FUS: Apply(target, easedT, priority)
-            TI -> EF: InvokeLateUpdate
-            TI -> TI: await Task.Delay(1)  (coarse yield)
+    opt effect.IsAutoReverse
+        loop backward pass until rawT >= 1
+            TI -> TI: throw OperationCanceledException if cts cancelled or Args.Handled
+            TI -> TI: easedT = rawT >= 1 ? 0 : clamp(effect.Ease.Ease(1 - rawT), 0, 1)
+            TI -> EF: InvokeUpdate / apply(easedT) / InvokeLateUpdate
         end
     end
 end
-
 TI -> EF: InvokeCompleted(sender, args)
-EF --> TI: Completed event fired
+EF --> TI: Completed fired
+TI -> EF: InvokeFinally(sender, args)
+EF --> TI: Finally fired
 @enduml
 ```
 
-## (c) Cancellation / `TransitionEventArgs.Handled = true` short-circuit
+Each pass writes an **exact endpoint** on its last sample (`forward → easedT = 1`, `reverse → easedT = 0`) rather than relying on `Ease(1)`; each sampler maps `t <= 0` / `t >= 1` to the exact normalized start/end value.
 
-A cancelled `cts` (from `Transition.Exit` or a new mutual animation) or a handler setting `Handled = true` throws `OperationCanceledException`; the interpreter fires `Canceled` + `Finally` and stops.
+## (c) UI-thread hop, cancellation, and app-shutdown guard
+
+`SamplerSet.Apply` reuses one cached closure per target and hands the current eased time to the UI thread via `ProtectedInvoke`. If the target's dispatcher is the current thread the write runs inline; otherwise it is posted to the target's dispatcher. Reads during `Prepare` are marshaled the same way by `ProtectedGetValue`. A cancelled run or a dead app skips queued writes (the "stale-frame guard"), so a reset/exit result is never overwritten.
 
 ```plantuml
 @startuml
 !theme plain
 
 participant "TransitionInterpreter" as TI
+participant "SamplerSet" as SET
+participant "UIThreadInspector" as UI
+participant "ISampler" as SM
+participant "Target" as TGT
 participant "Effect" as EF
-participant "TransitionEventArgs" as Args
 
-TI -> TI: sampling loop
-TI -> Args: Args.Handled read
-alt Args.Handled == true  (event handler short-circuit)
-    TI -> TI: throw OperationCanceledException
-else cts.IsCancellationRequested (Transition.Exit / new mutual)
-    TI -> TI: throw OperationCanceledException
+TI -> SET: Apply(target, easedT, priority)
+activate SET
+alt cts.IsCancellationRequested
+    SET --> TI: return (skip stale queued frame)
+else not CanSetValue()  (inspector.IsAppAlive() == false)
+    SET --> TI: return (no write, no further events)
+else
+    SET -> UI: ProtectedInvoke(target, cachedApply, priority)
+    activate UI
+    UI -> UI: CheckAccess()? run inline\nelse dispatch to the target's owning dispatcher
+    UI -> SM: InsertFrame(target, property, ref working, start, end, options, t)
+    SM -> TGT: write value (t <= 0/t >= 1 -> exact start/end)
+    UI --> SET
+    deactivate UI
+    SET --> TI: return
 end
+deactivate SET
+
+== Cancellation / short-circuit inside the sampling loop ==
+
+TI -> TI: cts cancelled (Transition.Exit / preempting new mutual run)\nor Args.Handled == true (an event handler killed the timeline)
+TI -> TI: throw OperationCanceledException
 TI -> EF: InvokeCancled(sender, args)
-EF --> TI: Canceled event fired
+EF --> TI: Canceled fired
 TI -> EF: InvokeFinally(sender, args)
-EF --> TI: Finally event fired
+EF --> TI: Finally fired (non-mutual runs also unregister from NoMutualSchedulers here)
 TI -> TI: stop immediately
 @enduml
 ```
 
-**App-shutdown path:** `SamplerSet.Apply` checks `inspector.IsAppAlive()` (via `CanSetValue`); when it is `false` (e.g. WinUI `DispatcherQueue` enqueue fails) the write is skipped. The same guard inside `ApplyCore` stops mid-pass, so samples stop being applied without firing further events. Cancelled animations (`cts.IsCancellationRequested`) skip their queued writes the same way — the former `ICancellableFrameSequence` stale-frame guard.
+Sources: `TransitionSystem/SamplerSet.cs` (`Apply`, `SetCancellation`, `CanSetValue`, cached apply closure), `TransitionInterpreter.cs` (`ExecuteSamplingLoopAsync`, `RunPassAsync`), `TransitionEffect.cs` (event invocation), `Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs` (per-platform marshaling).
 
-## (d) Mutual vs non-mutual scheduler fan-out
+## (d) Scheduler selection, preemption, and fan-out
 
-One target holds **at most one** shared mutual scheduler (serialized by a `SemaphoreSlim`) but **many** concurrent non-mutual schedulers.
+One target holds **at most one** shared mutual scheduler (serialized by a `SemaphoreSlim`) but can run **many** concurrent non-mutual schedulers. A new mutual run on the same target preempts (cancels) the one currently executing.
 
-```plantuml
-@startuml
-!theme plain
-
-participant "StateSnapshot.Execute" as EX
-participant "Target" as T
-participant "MutualSchedulers (CWT)" as MWT
-participant "NoMutualSchedulers (CWT)" as NWT
-participant "Scheduler (mutual, shared)" as SA
-participant "Scheduler (non-mutual #1)" as SB1
-participant "Scheduler (non-mutual #2)" as SB2
-
-EX -> MWT: CanMutualTask: true -> FindOrCreate(target)
-MWT --> EX: shared scheduler (1 per target)
-EX -> SA: Execute(producer, state, effect, cts)
-SA -> SA: gate.WaitAsync() serializes; new mutual animation Exit()s the previous
-SA -> T: apply updater writes (UI-marshalled)
-
-EX -> NWT: CanMutualTask: false -> AddNoMutual(target, [scheduler])
-EX -> SB1: Execute(...)
-EX -> SB2: Execute(...)
-SB1 -> T: apply updater writes in parallel
-SB2 -> T: apply updater writes in parallel
-SB1 -> NWT: RemoveNoMutual(target, [SB1]) on Completed
-SB2 -> NWT: RemoveNoMutual(target, [SB2]) on Completed
-@enduml
+```mermaid
+flowchart TD
+    A[Call snapshot.Execute target, CanMutualTask] --> B{CanMutualTask?}
+    B -->|true| C[FindOrCreate returns the shared scheduler from MutualSchedulers CWT]
+    C --> D[Exit current run - cancel the scheduler's active cts]
+    D --> E[New cts; queue all chained segments]
+    B -->|false| F[Allocate a fresh scheduler; AddNoMutual registers it under NoMutualSchedulers]
+    F --> E
+    E --> G[For each segment: await delay, then scheduler.Execute]
+    G --> H{Acquire _gate?}
+    H -->|no - previous Execute still running| G
+    H -->|yes| I[Awake on UI thread, Prepare SamplerSet]
+    I --> J[Interpreter sampling loop]
+    J --> K{End of segment?}
+    K -->|cancelled / Handled| L[InvokeCancled + InvokeFinally; release gate]
+    K -->|loop exhausted| M[InvokeCompleted + InvokeFinally; release gate]
+    L --> N[Non-mutual: Finally handler unregisters from NoMutualSchedulers]
+    M --> N
 ```
+
+`Transition.Exit(target, IncludeMutual, IncludeNoMutual)` cancels the target's mutual scheduler and, optionally, every running non-mutual scheduler; those schedulers then unwind through the `Canceled`/`Finally` path above.
 
 ## Flow Summary
 
 | Scenario | Behavior |
 |---|---|
-| Normal execution | `InterpolatorCore.Prepare` resolves one per-property `ISampleable` and calls `Normalize` (reads current=start, target=end), storing a per-property `(property, sampler, start, end, options)` entry; the interpreter samples continuously with a Stopwatch (`t = elapsed/duration`, eased + clamped) and applies via `SamplerSet.Apply`, marshalled to the UI thread; `Update`/`LateUpdate` events fire per sample; `Completed` + `Finally` at the end. |
-| `IsAutoReverse` | After the forward pass, the interpreter runs a backward pass (same samplers; the endpoint `easedT` is forced to 0). |
-| `LoopTime` / `int.MaxValue` | The whole forward (+ reverse) pass repeats `LoopTime` times, or forever. |
-| New mutual animation on same target | `CoreExecute` calls `scheduler.Exit()` before the new run; the previous scheduler cancels its current `cts`. |
-| `TransitionEventArgs.Handled = true` | Throws `OperationCanceledException` → `Canceled` + `Finally`; timeline stops. |
-| `Transition.Exit(target)` | Cancels the target's mutual (and optionally non-mutual) schedulers. |
-| Background-thread start | `UIThreadInspector.ProtectedInvoke`/`ProtectedGetValue` marshal reads and writes to the UI thread. |
-| Property without a sampler | The property is skipped in `Prepare` (`UnreadablePath` sentinel or no resolved `ISampleable`); other properties still animate. |
-| App shutting down | `SamplerSet.CanSetValue()` checks `IsAppAlive()` → writes skipped, no further events. |
+| Normal run | `CoreExecute` queues every chained segment, then per segment: `await delay` → scheduler `Execute` (gate) → `Awake` on UI thread → `Prepare` builds one `SamplerSet` entry per property → interpreter samples continuously (`t = eased elapsed/duration`) and applies each frame on the UI thread → `Completed` + `Finally`. |
+| `IsAutoReverse` | After the forward pass the interpreter runs a backward pass (same samplers; pass end `easedT = 0`). |
+| `LoopTime` / `int.MaxValue` | The whole forward (+ reverse) pair repeats `LoopTime + 1` times (`cycle <= LoopTime`, `cycle` from 0), or forever. |
+| Segment `Await` delay | A pre-delay per segment (`CoreAwait`/`CoreAwaitThen`); skipped on cancellation (`OperationCanceledException`). |
+| New mutual run on the same target | `CoreExecute` calls `scheduler.Exit()` first; the previous scheduler cancels its current `cts`, so queued frames are skipped. |
+| `TransitionEventArgs.Handled = true` | An event handler throws `OperationCanceledException` → `Canceled` + `Finally`; the timeline stops. |
+| `Transition.Exit(target, …)` | Cancels the target's mutual (and optionally non-mutual) schedulers; each unregisters via `Finally`. |
+| Started on a background thread | `UIThreadInspector` marshals reads (`ProtectedGetValue`) and frame writes (`ProtectedInvoke`) to the target's UI thread; lifecycle events still run on the interpreter's execution thread (only `Awake` and frame writes are always on the UI thread). |
+| Property without a sampler / invalid path | Skipped in `Prepare` (`UnreadablePath` sentinel from the compiled getter, or no resolved `ISampler`); other properties keep animating. |
+| App shutting down | `SamplerSet.CanSetValue()` returns false → `Apply` skips the write and fires no further events. |
 
-> Source references: `Src/Core/VeloxDev.Core/TransitionSystem/TransitionInterpreter.cs` (Stopwatch-driven sampling loop, `ExecuteSamplingLoopAsync`), `TransitionScheduler.cs` (`FindOrCreate`, `Execute`, gate), `Interpolator.cs` (`Prepare`, sampler resolution), `SamplerSet.cs` (`Apply`, cancellation/app-alive skip), `StateSnapshot.cs` (`CoreExecute`), `Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`.
+> Sources: `Src/Core/VeloxDev.Core/TransitionSystem/TransitionScheduler.cs` (gate, CWT tables, weak target), `TransitionInterpreter.cs` (`ExecuteSamplingLoopAsync`/`RunPassAsync`), `SamplerSet.cs` (`Apply` + cancellation/app-alive guard), `Interpolator.cs` (`Prepare`), `StateSnapshot.cs` (`CoreExecute`), `TransitionEx.cs`, `Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`.
+
+Related analysis: [Design patterns — Transition](../../02_design-patterns/03_transition/index.md) · [Complexity — Transition](../../04_complexity/03_transition/index.md)

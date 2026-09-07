@@ -57,14 +57,25 @@ $$T_{\text{tool}} = O(\text{per-tool work}), \qquad T_{\text{tracked}} = T_{\tex
 | `PatchNodeProperties` / `PatchComponentById` | $O(P)$ | reflection patch, per-property rejection rules |
 | `SetEnumSlotCollection` / `GetEnumSlotByValue` | $O(\text{members})$ | selector switch rebuilds items |
 | `ExecuteNode` / `ExecuteNodes` | $O(\text{node work})$ | awaits real completion |
-| `RunCompiledWorkflow` | $O(V + E)$ compile + $O(\text{chain work})$ | `CompilerViewModel.CompileAsync` + `CompilerEngine.RunAsync` |
+| `CompileWorkflow` (Root) / `CompileNodeResult` (Terminal) | $O(V + E)$ | `CompilerViewModel.CompileAsync(node, CompileRole{Root,Terminal})` builds `CompiledGraph` entries |
+| `RunCompiledWorkflow` | $O(V + E)$ compile + $O(\text{chain work})$ | `CompilerViewModel.CompileAsync` + `RuntimeEngine.RunAsync` |
+| `GetNodeResult` | $O(V_{\text{cone}} + E_{\text{cone}})$ compile + $O(\text{cone work})$ | Terminal reverse-compile of the ancestor cone only |
 | `ListCreatableTypes` | $O(A \cdot T)$ | scans assemblies for creatable node/slot types |
 | `ValidateWorkflow` | $O(V + E)$ | node/link pass with `HashSet` dedup of duplicate links |
 | `GetNodeStatistics` | $O(S + \text{conns})$ | slot/target/source walk |
 | `RequestSelection` / `RequestConfirmation` | $O(1)$ + handler | user wait dominates |
 | `TakeSnapshot` / `GetChangesSinceSnapshot` | $O(V \cdot P + E)$ | see above |
 
-*Source: `WorkflowAgentToolkit.cs` — tool bodies across the class; `TrackedAIFunction` lines 175-239; `QueryToolNames` lines 245-255.*
+*Source: `WorkflowAgentToolkit.cs` — tool bodies across the class; `TrackedAIFunction` lines 178-242; `QueryToolNames` lines 248-258.*
+
+## Compiled run / terminal result
+
+Both chain entries share `RunCompiledRoleAsync` (`WorkflowAgentToolkit.cs`, lines 1804-1861). The compile step builds the compiled graph from the tree; a Root run then drives the whole reachable chain, while a Terminal run drives only the queried node's ancestor cone (so its compile and run costs scale with the cone, not the whole tree):
+
+$$T_{\text{Root}} = O\big(V + E\big)_{\text{compile}} + O(\text{chain work}), \qquad
+T_{\text{Terminal}} = O\big(V_{\text{cone}} + E_{\text{cone}}\big)_{\text{compile}} + O(\text{cone work})$$
+
+The engine maintains a runtime session (`RuntimeContext`): run bookkeeping (`Status`, `Attempt`, `Logs`) is $O(1)$ per driven step, and the log is $O(\text{steps})$. The forward-consistent Terminal contract — a router selecting a sibling branch means `TargetReached = false` and an explicit `error` with **no** fabricated value — costs $O(1)$ to check after the run.
 
 ## `McpScope.LoadAsync`
 
@@ -72,17 +83,17 @@ $$T_{\text{tool}} = O(\text{per-tool work}), \qquad T_{\text{tracked}} = T_{\tex
 
 $$T_{\text{load}}(N) = \sum_{i=1}^{N} \left( T_{\text{install}}(i) + T_{\text{connect}}(i) \right)$$
 
-**npm install idempotence.** `EnsureNpmPackageAsync` keys on `"node:{package}@{version}"` in a process-wide `HashSet` guarded by a global `SemaphoreSlim(1,1)`. The memoized check is $O(1)$; the first install runs `npm install` once and records the key, so repeated loads of the same package are $O(1)$ install-wise:
+**npm/pip install idempotence.** `EnsureNpmPackageAsync` keys on `"node:{package}@{version}"` (pip: `"py:..."`) in a process-wide list guarded by a global `SemaphoreSlim(1,1)`. The memoized check is $O(1)$ (contains) after the first install; the first install runs the CLI once and records the key, so repeated loads of the same package are $O(1)$ install-wise:
 
 $$T_{\text{install}} = \begin{cases} O(\text{npm/pip work}) & \text{first time} \\ O(1) & \text{memoized} \end{cases}$$
 
-**stdio spawn + handshake.** `ConnectServerAsync` builds a `StdioClientTransport`, creates the MCP client, and performs the JSON-RPC `initialize`/`tools/list` handshake. Cost is dominated by the server process startup and the tool list:
+**transport + handshake.** `ConnectServerAsync` builds a `StdioClientTransport` (or `HttpClientTransport` for `Http`), creates the MCP client, and performs the JSON-RPC `initialize`/`tools/list` handshake. Cost is dominated by the server process startup and the tool list:
 
 $$T_{\text{connect}} = O(\text{spawn} + \text{handshake} + \text{toolSchemaSize})$$
 
 Per-server failures cost $O(1)$ and do not abort the batch (the `ServerError` event fires; the server contributes zero tools). Aggregate status maintenance (`McpStatusViewModel`) is $O(1)$ per state change, marshalled to the UI thread when a `SynchronizationContext` is registered.
 
-*Source: `McpScope.cs` `LoadAsync` lines 163-187, `EnsureNpmPackageAsync` lines 296-328, `ConnectServerAsync` lines 378-413.*
+*Source: `McpScope.cs` `LoadAsync` lines 167-191, `EnsureNpmPackageAsync` lines 300-332, `ConnectServerAsync` lines 382-418.*
 
 ## Summary
 
@@ -96,5 +107,7 @@ Per-server failures cost $O(1)$ and do not abort the batch (the `ServerError` ev
 | Traversal (`SearchForward`, `FindPath`, `IsConnected`) | $O(V + E)$ | $O(V)$ | BFS + visited/parent |
 | `CreateNode` overlap avoidance | $O(V)$ linear, $O(1)$ spatial | $O(1)$ scratch | query cells $k = O(1)$ expected |
 | `SetEnumSlotCollection` | $O(\text{members})$ | $O(\text{members})$ | selector switch rebuild |
-| `RunCompiledWorkflow` | $O(V + E)$ + chain work | $O(V + E)$ | compile + engine drive |
+| Compile (`CompileWorkflow`/`CompileNodeResult`) | $O(V + E)$ / $O(V_{\text{cone}} + E_{\text{cone}})$ | $O(V + E)$ | `CompilerViewModel.CompileAsync` builds entries |
+| `RunCompiledWorkflow` | $O(V + E)$ compile + chain work | $O(V + E)$ | compile + `RuntimeEngine` drive |
+| `GetNodeResult` | $O(V_{\text{cone}} + E_{\text{cone}})$ + cone work | $O(V_{\text{cone}} + E_{\text{cone}})$ | Terminal reverse-compile cone only |
 | `McpScope.LoadAsync` | $O(N \cdot (T_{\text{install}} + T_{\text{connect}}))$ | $O(\text{tools})$ | install memoized $O(1)$ after first load |

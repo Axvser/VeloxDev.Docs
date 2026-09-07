@@ -1,73 +1,76 @@
 # Complexity Analysis — Dynamic Theme
 
-Let $N$ = number of registered theme-aware objects, $P$ = number of themed properties per object, $T$ = number of registered types, and $K$ = number of themes. (Sampling is continuous/Stopwatch-driven, so there is no pre-computed frame count $S$.)
+Let $N$ = number of registered theme-aware objects, $P$ = number of themed properties per object, $T$ = number of registered types, $K$ = number of themes, and $C$ = number of registered converters. Theme switching is continuous/Stopwatch-driven: there is no precomputed frame count, and the frame rate is bounded by a coarse `Task.Delay(1)` yield rather than by the effect's `FPS`.
 
 ## Core Operations
 
-### Theme value lookup (`ThemeCache`)
+### Static registration & lookup (`ThemeCache`)
 
-$$O(P) \quad \text{per type (property scan)}, \quad O(1) \quad \text{per property lookup}$$
+$$O(P) \ \text{per type registration}, \quad O(\text{depth}) \approx O(1) \ \text{per default lookup}$$
 
-- Static defaults are stored in a `Dictionary<Type, Dictionary<string, PropertyEntry>>`; `TryGetDefaultValue` walks the inheritance chain (`type.BaseType`), so a lookup is $O(\text{depth}) \approx O(1)$ for shallow hierarchies.
-- `GetStaticForType` rebuilds a merged dictionary each call by walking the inheritance chain and copying entries — $O(P \cdot \text{depth})$ worst case per call.
+- Defaults are stored in a `Dictionary<Type, Dictionary<string, PropertyEntry>>`, where `PropertyEntry` pairs a `PropertyInfo` with a `Dictionary<Type, object?>` of theme values. `RegisterType` copies $P$ entries once per type and is guarded by `IsTypeRegistered` ($O(1)$) — duplicates are ignored.
+- `TryGetDefaultValue` walks `type.BaseType` until `object`, doing hash lookups per level: $O(\text{depth})$.
+- `GetStaticForType` (called by generated `GetStaticThemeCache`) rebuilds a merged dictionary on every call by walking the inheritance chain and copying entries: $O(P \cdot \text{depth})$ per call.
 
-### Per-instance active cache (`GetOrCreateActiveEntry`)
+### Per-instance active cache (`ThemeCache`)
 
-$$O(1) \quad \text{amortized}$$
+$$O(1) \ \text{amortized per lookup/override}$$
 
-- Backed by `ConditionalWeakTable<IThemeObject, InstanceCache>.GetValue`, which is a hash-based lookup — amortized $O(1)$. The entry is created once per instance and collected with the instance.
+Backed by `ConditionalWeakTable<IThemeObject, InstanceCache>.GetValue` (hash-based, amortized $O(1)$). `PrepareSamplers` calls the generated `GetActiveThemeCache()` for every registered object, so on the first switch an empty `InstanceCache` is created for each of the $N$ objects; entries are weak-keyed and collected with their instance.
 
 ### Register / Unregister (`ThemeManager`)
 
-$$O(1) \quad \text{per call}$$
+$$O(1) \ \text{per call} \quad (O(N) \ \text{worst for RemoveAll})$$
 
-- `Register` does a `ConditionalWeakTable.TryGetValue` (guarding duplicates) then adds one `WeakReference<IThemeObject>` to a list. `Unregister` removes the cache entry and removes the matching weak reference via `RemoveAll` — $O(N)$ worst case for `RemoveAll`, $O(1)$ amortized per typical call.
-- `InitializeTheme()` additionally registers the type once in `ThemeCache` ($O(P)$ amortized) and applies the current theme to the instance ($O(P)$).
+`Register` guards with `_act_cache.TryGetValue`, then appends a `WeakReference<IThemeObject>` to a list — $O(1)$. `Unregister` removes the cache entry and scans the list with `RemoveAll` — $O(N)$ worst, $O(1)$ typical. `InitializeTheme` adds one-time type registration ($O(P)$ amortized) plus applying the current theme to the instance ($O(P)$ reflection writes).
+
+### Switch preparation (`PrepareSamplers`)
+
+$$O(N \cdot P)$$
+
+For each of the $N$ objects and each of its $P$ properties: current/target values are resolved from the active cache then the static dict ($O(1)$ hash lookups), a sampler is resolved via `InterpolatorCore.TryGetInterpolator` ($O(1)$, `ConcurrentDictionary`), and the sampler's `NormalizeStart`/`NormalizeEnd` produce the endpoints ($O(1)$ for value samplers). Rebuilding each object's merged static cache is $O(P \cdot \text{depth})$, giving $O(N \cdot P)$ overall for shallow hierarchies. Temporary memory for the prepared entries is $O(N \cdot P)$.
 
 ### Animated switch (`Transition<T>`)
 
-$$O(N \cdot P) \text{ preparation} \quad + \quad O(N \cdot P) \text{ per sample}$$
+$$O(N \cdot P) \ \text{preparation} \ +\ O(N \cdot P) \ \text{per frame},\quad \text{frames} \approx \frac{\text{Duration}}{\text{yield period}}$$
 
-For each of the $N$ objects, for each of its $P$ properties, `PrepareSamplers` resolves an `ISampleable` (`InterpolatorCore.TryGetInterpolator` → self-`ISampleable` → null), calls `Normalize`, and captures current/target values — $O(1)$ per property, **no frame list is built**. `ExecuteTransition` then runs a Stopwatch-driven sampling loop:
-
-- Per-sample work: $O(N \cdot P)$ — one `ISampler.Update` (or a held current value) per property.
-- The sample count is **not** `FPS`-derived: it is `elapsed / duration`, throttled by a coarse yield interval capped at `1000 / FPS` ms (a yield, not a timing source), so a pass issues at most ~`FPS` samples per second — **wall-clock** bounded by `Duration`. `FPS` is the maximum sample-rate cap.
-- Temporary memory for the prepared entries: $O(N \cdot P)$ (each holds target / property / sampler / current / targetValue).
+`ExecuteTransition` awaits a static `SemaphoreSlim` (passes serialize, $O(1)$), then runs a Stopwatch loop. Each frame calls one `ISampler.InsertFrame` (or an end-value write) per property — $O(N \cdot P)$ — and yields with `await Task.Delay(1)`. Because `Task.Delay(1)` resolves at OS-timer granularity (~1-15 ms on Windows), the number of frames is roughly `Duration` divided by that period; no frame list is ever built. A new switch cancels the running pass via `CancellationTokenSource`.
 
 ### Instant switch (`Jump<T>`)
 
 $$O(N \cdot P)$$
 
-No sampling beyond the endpoint; `ExecuteTransition` runs with `durationMs = 0`, so the first sample has `rawT = 1` and each property is written directly to its target value.
+`Jump` reuses `PrepareSamplers` + `ExecuteTransition` with `durationMs = 0`, so the first frame has `rawT = 1` and every property is written directly to its target value — a single $O(N \cdot P)$ pass.
 
-### Runtime override (`SetThemeValue<T>`)
+### Runtime override (`SetThemeValue<T>` / `RestoreThemeValue<T>`)
 
-$$O(P)$$
+$$O(1) \ \text{amortized per property}$$
 
-Writes one override entry into the instance's active cache (`InstanceCache.Overrides`) and updates the property to the current theme.
+A generated call stores one override entry in the instance's `Overrides` dictionary (or removes it), then refreshes that single property via `UpdatePropertyToCurrentTheme` — dictionary lookups plus at most one inheritance-chain walk in `TryGetDefaultValue` ($O(\text{depth})$).
 
 ## Memory Usage
 
 | Structure | Complexity | Notes |
 |---|---|---|
-| Static theme cache (per registered type) | $O(T \cdot P \cdot K)$ | `ThemeCache._staticCache`, keyed by declaring type; holds one value per property per theme. |
-| Active instance overrides | $O(N \cdot P)$ | `ConditionalWeakTable<IThemeObject, InstanceCache>` — weak-keyed, no leaks. |
-| `ThemeManager` live-instance list | $O(N)$ | `List<WeakReference<IThemeObject>>`; dead entries pruned on each transition ($O(N)$). |
-| Prepared sampler entries | $O(N \cdot P)$ | Temporary during a transition; freed after `ExecuteTransition` completes. |
-| Converter registry | $O(C)$ | `Dictionary<string, IThemeValueConverter>`, $C$ = registered converters. |
+| Static theme cache | $O(T \cdot P \cdot K)$ | `ThemeCache._staticCache`, keyed by declaring type; one value reference per property per theme plus `PropertyInfo` metadata. |
+| Active instance overrides | $O(N \cdot P)$ worst | `ConditionalWeakTable<IThemeObject, InstanceCache>` — weak-keyed, no leaks; entries are created lazily on the first switch even when empty. |
+| `ThemeManager` membership | $O(N)$ | `_act_cache` (`ConditionalWeakTable`, empty dict per object) + `activeThemes` (`List<WeakReference<IThemeObject>>`); dead entries pruned per pass. |
+| Prepared sampler entries | $O(N \cdot P)$ | Transient per switch; freed when `ExecuteTransition` returns. |
+| Converter registry | $O(C)$ | `ThemeCache._converters`; currently unpopulated because the generator instantiates converters inline at registration. |
 
 ## Lookup Cost of Supporting Structures
 
 | Operation | Complexity |
 |---|---|
-| Interpolator registry lookup (`InterpolatorCore.NativeInterpolators`) | $O(1)$ — `ConcurrentDictionary<Type, ISampleable>` |
+| Sampler registry lookup (`InterpolatorCore.NativeInterpolators`) | $O(1)$ — `ConcurrentDictionary<Type, ISampler>` |
 | Converter lookup by key (`ThemeCache.GetConverter`) | $O(1)$ — `Dictionary<string, IThemeValueConverter>` |
-| `StartModel.Cache` start-value read | $O(1)$ — active cache then static dictionary |
-| `StartModel.Reflect` start-value read | $O(1)$ per property via `PropertyInfo.GetValue` — $O(P)$ per object per transition |
+| `StartModel.Cache` start-value read | $O(1)$ — active cache first, then static dictionary |
+| `StartModel.Reflect` start-value read | $O(1)$ per property via `PropertyInfo.GetValue` — $O(P)$ per object per switch |
 
 ## Notes
 
-- `StartModel.Cache` avoids reflection during animation start; `StartModel.Reflect` reads the live property value via `PropertyInfo.GetValue` — negligible per property, but $O(P)$ per object per transition.
-- The weak-reference design means a registered object that is otherwise unreachable is collected (and pruned at the next transition), so long-running editors do not accumulate theme registrations.
+- `StartModel` defaults to `Cache`, avoiding per-property reflection at animation start; `Reflect` trades that for reading the live property value.
+- The weak-reference design means a registered object that is otherwise unreachable is collected (and pruned at the next switch), so long-running editors do not accumulate theme registrations.
+- The animated pass is CPU-light per frame because the sampler writes go through a compiled `TransitionProperty` setter rather than per-frame reflection (`Src/Core/VeloxDev.Core/TransitionSystem/TransitionProperty.cs`, lines 60-68, 124-184).
 
-> Source references: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` (`Transition`, `Jump`, `PrepareSamplers`, `ExecuteTransition`), `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`.
+> Source references: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` (`Transition`, `Jump`, `PrepareSamplers`, `ExecuteTransition`), `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`, `Src/Generators/VeloxDev.Core.Generator/Theme.cs`.

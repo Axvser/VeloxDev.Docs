@@ -11,6 +11,6 @@
 | 流式 | `SerializeToUtf8Bytes`、`DeserializeFromUtf8Bytes`、`SerializeToTextWriterAsync`、`DeserializeFromTextReaderAsync`、`SerializeToStreamAsync`、`DeserializeFromStreamAsync` |
 | 选项 | `SerializationOptions.Create().WithIndented()/WithCompact()/WithTypeNameHandling(...)/WithNullValueHandling(...)/WithDefaultValueHandling(...)` |
 
-**示例** —— 演示树中的保存 / 加载：`Examples/Workflow/Common/Lib/ViewModels/Workflow/TreeViewModel.cs`，第 185-193 行（`this.Serialize()`）；`Examples/Workflow/WPF/Demo/Views/Workflow/WorkflowView.xaml.cs`，第 46-51 行（`json.Deserialize<TreeViewModel>()` + `Layout.UpdateCommand.Execute(null)`）。
+**示例** —— 演示树中的保存 / 加载：`Examples/Workflow/Common/Lib/ViewModels/Workflow/TreeViewModel.cs` 的 `Save` 命令（约第 252 行 `var json = this.Serialize();`）；`Examples/Workflow/WPF/Demo/Views/Workflow/WorkflowView.xaml.cs` 的 `SelectWorkflow`（约第 65 行 `json.Deserialize<TreeViewModel>()`，随后 `result.Layout.UpdateCommand.Execute(null)`）。
 
 *源码：`Src/Core/VeloxDev.Core.Extension/ComponentModelEx.cs`。*

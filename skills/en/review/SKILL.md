@@ -4,6 +4,30 @@
 
 Review and correct each deliverable one by one
 
+## Reviewer Assignment
+
+### Delegate by default
+
+Reviewing your own output invites self-approval: the fixes you already believe in, the samples you are already convinced are correct. Whenever the run environment can launch an **independent reviewer** — a separate sub-agent whose context did NOT take part in the writing phases (e.g. Claude: spawn the `wiki-reviewer` sub-agent installed with this SKILL, or any fresh-context sub-agent; other hosts: their equivalent) — you MUST delegate this phase to it. This is the default path, not an optimization. A writer judging its own Review checklist will tend to wave itself through; an independent reviewer does not share that bias.
+
+Hand the reviewer a self-contained brief:
+
+- **Paths** — Project_Root; Wiki_Root for each selected language; the Feature Inventory working file; the validator scripts directory.
+- **Access** — read-only. The reviewer reports findings; the WRITER applies fixes.
+- **Instructions** — trust nothing the writer asserted. Re-check code authenticity and the public API surface against Demo / test files, never against the writer's prose. Run every machine validator itself (`validate-links.py`, `validate-structure.py`, `validate-plantuml.py --engine java`, `validate-mermaid.js`, `validate-katex.js`, `gen_tree.py`) and paste the raw output. Produce the Coverage Reconciliation Matrix independently from the Feature Inventory.
+- **Output** — an ordered FAIL / PASS list with file paths, plus the Coverage Reconciliation Matrix.
+
+After the report returns, the WRITER triages and fixes the findings only — and never "re-reviews" and clears its own findings.
+
+### Fallback when no separate agent exists
+
+If the platform cannot spawn an independent reviewer (single-context hosts), review in-process while assuming you will rubber-stamp your own work, and counter it:
+
+- Every machine validator runs and its raw output is cited — a PASS quotes output, not intent.
+- For every page, name one thing you would challenge if you had NOT authored it, then fix or justify it.
+- Write the Coverage Reconciliation Matrix from the Feature Inventory file, not from memory.
+- Anything that can only be confirmed "by the author" is downgraded to a residual and marked as such.
+
 ## Checklist
 
 ### Coverage Reconciliation Matrix (HARD GATE)
@@ -84,11 +108,13 @@ Diagrams and math are validated by the **actual rendering engines** — ground t
 ### Structural Consistency
 
 - [ ] Numeric prefixes follow conventions (e.g. `01_`, `02_`)
-- [ ] `index.md` exists in **every** page directory (root and sub-pages)
+- [ ] `index.md` exists in **every** page directory (root and sub-pages) — machine-enforced by `validate-structure.py` (see below); do not rely on `gen_tree.py` creating it
 - [ ] Code block indentation uses real spaces, not tab characters, matching the Code Style Conventions
-- [ ] No local Markdown links (`[text](local/path/)`) — use relative navigation via the tree instead
-- [ ] Pages exceeding **~300 lines / 3 topics** are split into sub-pages, with the parent `index.md` acting as an overview/table of contents
-- [ ] **Prune untracked entries** — Any document page or directory **not produced by the current workflow** must be deleted. If removing all affected files empties a parent directory and that does not break the current output structure, the empty directory must also be removed.
+- [ ] **Links** — every link is exactly one of the three allowed kinds and resolves (see 【Links & Navigation】): external `http(s):`/`mailto:`/`tel:` opens in the system app; a same-language cross-page link resolves to an existing page directory in the same language root; a `#…` anchor equals the auto slug of a heading on that same page. No other local/absolute/cross-language links.
+- [ ] **Run the link validator** — `python validate-links.py <Wiki_Root>` reports no ERROR (each `#…` matches a real heading slug in that file; each cross-page target exists under the same language root)
+- [ ] **Run the structure validator** — `python validate-structure.py <content root>` reports no ERROR. It machine-checks the structural rules that have no other gate: every directory (root, intermediate and leaf) contains an index.md; a **leaf** page stays within the split budget (≈300 lines, hard cap) — an over-long leaf is an ERROR telling you to split it into `NN_` sub-pages (outline-first); a **parent** index.md is a short overview that links EVERY child page (a missing child link is an ERROR); the tree shape is identical across the selected languages; and the QuickStart (`1_*`) / API (`2_*`) feature sets agree within each language. Pages under `4_Copyright` and pages whose index.md starts with `<!-- cg:atomic -->` are exempt from the line budget.
+- [ ] Pages exceeding **~300 lines / 3 topics** are split into sub-pages (outline-first), with the parent `index.md` acting as an overview/table of contents that links every child — machine-checked by `validate-structure.py`
+- [ ] **Prune stale entries** — Deletion is limited to page directories that are ALL of: (a) not on this run's output list, (b) not a prior page recorded during Context Setup's scan (previous runs' valid output must be preserved and updated in place), and (c) not linked from any kept page — run `python validate-links.py <Wiki_Root>` to confirm no kept page points at them. List every candidate explicitly before deleting; if deleting them empties a parent directory that no kept page references, remove that directory too. Never delete a page merely because this run did not rewrite it.
 
 ---
 
@@ -96,6 +122,7 @@ Diagrams and math are validated by the **actual rendering engines** — ground t
 
 - [ ] If multi-language is enabled, **every** page exists in **all** selected languages
 - [ ] No missing or outdated pages across language versions
+- [ ] Run `python validate-structure.py <content root>`; its cross-language tree-shape check reports no ERROR. The script compares structure (numeric-prefix topology), so page-by-page confirm translations are current wording too.
 
 ---
 
@@ -109,11 +136,15 @@ Diagrams and math are validated by the **actual rendering engines** — ground t
 
 ## Pre-Commit Verification Flow
 
+> **Assign the review first** — when an independent reviewer sub-agent can be launched, delegate the entire checklist below to it (see Reviewer Assignment) and fix what it reports; the in-process fallback applies only to hosts without sub-agents.
+
 1. Walk through the checklist item by item; **fix issues immediately** before moving to the next item
 2. Code authenticity issues → search source to confirm signatures, then fix docs
 3. Diagram/KaTeX issues → run the real-engine validators (`validate-plantuml.py --engine java`, `validate-mermaid.js`, `validate-katex.js`), fix every ERROR, re-run until clean
-4. Reconcile the **Coverage Reconciliation Matrix**: if any Demo/Test feature has a ❌, or the matrix was not written, the quality gate FAILS
-5. Run the **Reproducibility Spot-check** against the QuickStart pages
-6. Run `python gen_tree.py`, confirm no pages are missing
-7. Run the project's build command, confirm compilation succeeds
-8. Only after all items are ✅, mark the quality gate as passed
+4. Link issues → run `python validate-links.py <Wiki_Root>`, fix every ERROR, re-run until clean
+5. Structure issues → run `python validate-structure.py <content root>` (index.md coverage in every directory, cross-language tree shape, QuickStart/API feature parity); fix every ERROR, re-run until clean
+6. Reconcile the **Coverage Reconciliation Matrix**: if any Demo/Test feature has a ❌, or the matrix was not written, the quality gate FAILS
+7. Run the **Reproducibility Spot-check** against the QuickStart pages
+8. Run `python gen_tree.py`, confirm no pages are missing (once structure is clean there is no missing index.md, so `--strict` is unnecessary here)
+9. Run the project's build command, confirm compilation succeeds
+10. Only after all items are ✅, mark the quality gate as passed

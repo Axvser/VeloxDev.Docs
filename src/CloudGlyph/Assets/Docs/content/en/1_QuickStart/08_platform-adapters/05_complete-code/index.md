@@ -1,19 +1,38 @@
 # Platform Adapters — Complete Code
 
-The complete scaffold below is a single, self-consistent WPF project that compiles against `VeloxDev.WPF` (net9.0-windows). It combines the template-generated files (`wpf-v-tree`, `wpf-v-node`, `wpf-v-slot`, `wpf-v-link`, `wpf-v-selector`, `wpf-v-minimap`) with a minimal but complete `GridDecorator` and `LinkView` (the templates emit richer versions with rulers and arrowheads; the version below keeps the same public shape so every symbol is defined). Bind an `IWorkflowTreeViewModel` (produced by the `[WorkflowBuilder.Tree]` generator) as the `DataContext`.
+The seven sub-pages reproduce, **verbatim**, the files that the Setup page's `dotnet new wpf-v-*` commands generate (`-n` names and the `Demo.Views.Workflow` namespace already substituted, template default colors filled in). Combined they are the workflow **view layer** of a WPF project.
 
-Sub-pages (one per source file):
+## The project file
 
-- `workflow-view/`
-- `node-view/`
-- `slot-view/`
-- `link-view/`
-- `grid-decorator/`
-- `minimap-overlay/`
-- `template-selector/`
+The suite lives in a WPF project with `UseWPF` enabled and a package reference to the adapter:
 
----
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net9.0-windows</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UseWPF>true</UseWPF>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="VeloxDev.WPF" Version="8.0.0" />
+    </ItemGroup>
+</Project>
+```
 
-## Run Declaration
+To *see* the workflow you still need an app shell (an `App` + `MainWindow`) that hosts `WorkflowView` and binds its `DataContext` to an `IWorkflowTreeViewModel` built with `[WorkflowBuilder.Tree]` — that tree construction is part of the workflow-system feature, not of this page. The view files below are framework-complete and need only that data context.
 
-- ⚠️ Not actually run — statically verified only. (GUI demos cannot be run in this environment.) The code above is assembled from template-generated files and the WPF demo (`Examples/Workflow/WPF/Demo/Views/Workflow/`); it compiles against the documented API surface but has not been executed here.
+Sub-pages (one page per source file):
+
+- [00 WorkflowView — the surface host](00_workflow-view/index.md)
+- [01 NodeView — the node card](01_node-view/index.md)
+- [02 SlotView — the connector](02_slot-view/index.md)
+- [03 LinkView — the polyline link](03_link-view/index.md)
+- [04 GridDecorator — grid + rulers](04_grid-decorator/index.md)
+- [05 MinimapOverlay — the minimap](05_minimap-overlay/index.md)
+- [06 TemplateSelector — the DataTemplate selector](06_template-selector/index.md)
+
+## Run declaration
+
+- ⚠️ Not actually run — statically verified only. Each code block was produced from the real template sources under `Src/Templates/VeloxDev.WPF.Templates/working/content` (symbols substituted with their default values) and cross-checked against the adapter API surface in `Src/Adapters/VeloxDev.WPF`; the files compile against that surface but were not compiled or executed in this environment, so treat the scaffold as verified-by-inspection rather than proven-by-run.

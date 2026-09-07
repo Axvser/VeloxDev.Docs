@@ -1,6 +1,6 @@
 # Complexity Analysis — MVVM
 
-All bounds refer to the implementation in `Src/Core/VeloxDev.Core/MVVM/VeloxCommand.cs`, `Src/Core/VeloxDev.Core/MVVM/ObservableCollectionTracker.cs`, and the generated code in `Src/Generators/VeloxDev.Core.Generator/Base/Analizer.cs`.
+All bounds refer to the runtime in `Src/Core/VeloxDev.Core/MVVM/{VeloxCommand.cs, ObservableCollectionTracker.cs}` and the generated code templates in `Src/Generators/VeloxDev.Core.Generator/Base/Analizer.cs` (the `MVVMPropertyFactory` class emitted by `MVVMWriter`). The source generator itself adds $O(P + C)$ generated members per annotated type at compile time, where $P$ is the number of `[VeloxProperty]` fields/partial properties and $C$ the number of `[VeloxCommand]` methods; none of that work repeats at run time.
 
 ## Generated property setter (default mode)
 
@@ -8,7 +8,7 @@ The generated setter performs a constant number of operations regardless of valu
 
 $$O(1)$$
 
-Steps: `Object.Equals` guard, capture `old`, `OnPropertyChanging`, `OnXxxChanging`, field assignment, `OnXxxChanged`, `OnPropertyChanged` — all constant time. Setter body source: `Base/Analizer.cs`, `GetSetterBodyLines`, lines 287-307.
+Steps: `Object.Equals` guard, capture `old`, `OnPropertyChanging`, `OnXxxChanging`, field assignment, `OnXxxChanged`, `OnPropertyChanged` — all constant time. Setter body source: `MVVMPropertyFactory.GetSetterBodyLines`, `Base/Analizer.cs`, lines 287-307 (the `SetProperty`/`RaiseAndSetIfChanged`/`NotifyOfPropertyChange` branches at lines 308-365 are likewise $O(1)$).
 
 For an `INotifyCollectionChanged` property, replacing the collection additionally calls `ObservableCollectionTracker.Unsubscribe(old, ...)` and `EnsureSubscribed(value, ...)` plus `OnItemRemovedFromXxx` / `OnItemAddedToXxx` over the replaced collections' items:
 
@@ -30,15 +30,15 @@ The generated `OnXxxCollectionChanged` forwards the raw event to `OnCollectionCh
 
 $$O(m) \quad \text{for } m \text{ affected items}$$
 
-(`GenerateCollectionMembers`, lines 575-700.)
+(`MVVMPropertyFactory.GenerateCollectionMembers`, `Base/Analizer.cs`, lines 575-700.)
 
 ## ObservableCollectionTracker.EnsureSubscribed (subscription dedup)
 
 $$O(1) \text{ amortized}$$
 
-`ConditionalWeakTable.GetOrCreateValue` plus a `HashSet<Delegate>` add (`Entry.TryAdd`). The dedup key is the `(Method, Target)` identity of the handler (`MethodTargetEqualityComparer`, lines 96-114), which makes repeated getter accesses idempotent even though every getter access passes a fresh delegate instance. The first call per collection subscribes; subsequent calls are a fast constant-time lookup. Weak-reference keys mean the tracking entry disappears when the collection is garbage-collected — no leaks.
+`ConditionalWeakTable.GetOrCreateValue` plus a `HashSet<Delegate>` add (`Entry.TryAdd`, guarded by a lock). The dedup key is the `(Method, Target)` identity of the handler (`MethodTargetEqualityComparer`, lines 96-114), which makes repeated getter accesses idempotent even though every getter access passes a fresh delegate instance. The first call per collection subscribes; subsequent calls are a fast constant-time lookup. Weak-reference keys mean the tracking entry disappears when the collection is garbage-collected — no leaks.
 
-(Source: `Src/Core/VeloxDev.Core/MVVM/ObservableCollectionTracker.cs`, lines 15-114.)
+(Source: `Src/Core/VeloxDev.Core/MVVM/ObservableCollectionTracker.cs`, lines 15-115.)
 
 ## Command execution
 
@@ -50,7 +50,7 @@ $$O(1) \text{ per trigger, amortized}$$
 
 $$O(1) \text{ enqueue, } \quad O(n) \text{ worst-case queued}$$
 
-where $n$ is the number of queued items. `TryStartPendingAsync` drains up to `_maxConcurrency` items in $O(n)$ total for the drain (lines 349-377); because the queue is drained by the completing invocation, each trigger costs amortized $O(1)$.
+where $n$ is the number of queued items. `TryStartPendingAsync` drains up to `_maxConcurrency` items in $O(n)$ total for the drain (lines 349-377); because the queue is drained by the completing invocation, each trigger costs amortized $O(1)$. `CanExecute` evaluates the user predicate plus the force-lock flag in $O(1)$ (line 126).
 
 `Notify()` → `RaiseCanExecuteChanged()` is $O(H)$, where $H$ is the number of registered `CanExecuteChanged` handlers (typically one binding).
 

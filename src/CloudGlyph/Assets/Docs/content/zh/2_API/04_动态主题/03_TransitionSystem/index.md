@@ -1,8 +1,8 @@
 # API — 动态主题 · 支撑引擎（TransitionSystem）
 
-动态主题功能通过 TransitionSystem 引擎驱动其动画。`InterpolatorCore` 以及 `ITransitionEffectCore`/`IEaseCalculator` 契约与过渡动画功能共享；主题功能使用它们来采样主题属性值并控制切换时序。
+动态主题功能通过 TransitionSystem 引擎对主题属性做动画。`ThemeManager` 并不驱动引擎高层的 `Transition` / `SamplerSet` / `State` 管道：它按属性类型解析一个采样器、归一化起始/结束值，然后在 Stopwatch 循环中自行调用该采样器。本页记录 `ThemeManager` 实际消费的引擎表面；完整引擎由过渡动画功能记录。
 
-> 命名空间说明：`ISampler`、`ISampleable`、`ITransitionEffectCore`、`IEaseCalculator` 与 `Eases` 声明于 `VeloxDev.TransitionSystem`；抽象的 `InterpolatorCore` 与具体的 `SamplerSet` 声明于 `VeloxDev.TransitionSystem.Abstractions`。
+> 引擎契约位于 `VeloxDev.TransitionSystem`；引擎基础类型与具体的 `TransitionProperty` 位于 `VeloxDev.TransitionSystem.Abstractions`。完整引擎参考位于过渡动画功能（`2_API/03_transition`）。
 
 ## 命名空间：`VeloxDev.TransitionSystem.Abstractions`
 
@@ -10,61 +10,95 @@
 
 `public abstract class InterpolatorCore`
 
-所有值采样器的基类 —— 先前的帧插值器层级（`IValueInterpolator`、`IInterpolable`、泛型 `InterpolatorCore<TOutputCore[, TPriorityCore]>` 形式、`InterpolatorOutputBase`）已移除，`InterpolatorCore` 现在是单一非泛型类。静态构造函数会为原始类型与 BCL 类型预注册原生采样器：`double`、`float`、`int`、`long`、`Point`、`PointF`、`Size`、`SizeF`、`Color`、`Rectangle`、`RectangleF`，以及（在 `NETSTANDARD2_0` 之外）`Vector2`、`Vector3`、`Vector4`、`Quaternion`。
+平台插值器的基类，也是静态的按类型采样器注册表的持有者。静态构造函数会预注册原生采样器：`double`、`float`、`int`、`long`、`Point`、`PointF`、`Size`、`SizeF`、`Color`、`Rectangle`、`RectangleF`，以及（在 `NETSTANDARD2_0` 之外）`Vector2`、`Vector3`、`Vector4`、`Quaternion`。
 
 源码：`Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`。
 
-##### 静态成员
-
 | 成员 | 签名 | 描述 |
 |---|---|---|
-| `NativeInterpolators` | `public static ConcurrentDictionary<Type, ISampleable> NativeInterpolators { get; protected set; }` | 按类型注册的采样器表。 |
-| `TryGetInterpolator` | `public static bool TryGetInterpolator(Type type, out ISampleable? sampleable)` | 查找某类型的采样器。 |
-| `RegisterInterpolator` | `public static bool RegisterInterpolator(Type type, ISampleable sampleable)` | 注册采样器（原子的「添加或更新」）。 |
-| `UnregisterInterpolator` | `public static bool UnregisterInterpolator(Type type, out ISampleable? sampleable)` | 移除采样器。 |
-
-**实例成员：** `public virtual SamplerSet Prepare(object target, IFrameState state, ITransitionEffectCore effect, IUIThreadInspectorCore inspector)` —— 每次动画只归一化一次首/末帧：读取每个属性的当前值（start）与目标值（end），解析 `ISampleable`（按属性自定义 → 注册的原生 → 值本身是 `ISampleable`），并调用 `Normalize(start, end, options)` 得到无状态 `ISampler` 逐属性存入 `SamplerSet`。取代旧的 `Interpolate(...) IFrameSequenceCore` 实例方法。
+| `NativeInterpolators` | `public static ConcurrentDictionary<Type, ISampler> NativeInterpolators { get; protected set; }` | 按类型注册的采样器表。 |
+| `TryGetInterpolator` | `public static bool TryGetInterpolator(Type type, out ISampler? sampler)` | 查找某类型已注册的采样器。 |
+| `RegisterInterpolator` | `public static bool RegisterInterpolator(Type type, ISampler sampler)` | 注册采样器（原子的「后写者胜」）。 |
+| `UnregisterInterpolator` | `public static bool UnregisterInterpolator(Type type, out ISampler? sampler)` | 移除已注册的采样器。 |
+| `Prepare`（实例、`virtual`） | `public virtual SamplerSet Prepare(object target, IFrameState state, ITransitionEffectCore effect, IUIThreadInspectorCore inspector)` | 把状态快照中的每个属性归一化进一个 `SamplerSet`。供过渡动画功能使用，`ThemeManager` 不使用。 |
 
 **说明：**
-- 平台 `Interpolator`（适配器）继承自非泛型 `InterpolatorCore`，并在其静态构造函数中注册平台采样器。
-- `RegisterInterpolator` 是「后写者胜」且原子（`AddOrUpdate`）。
+- `ThemeManager.PrepareSamplers` 通过 `InterpolatorCore.TryGetInterpolator` 按 `PropertyInfo.PropertyType` 解析属性的采样器。当该类型没有注册采样器时，该属性退化为简单的「保持到结束再切换」。
+- 平台适配器 `Interpolator` 继承 `InterpolatorCore`，并在其静态构造函数中注册平台采样器（见 [04 PlatformAdapters](../04_PlatformAdapters/index.md)）。
 
-### 类：`SamplerSet`
+### 类：`TransitionProperty`
 
-`public sealed class SamplerSet`
+`public sealed class TransitionProperty : ITransitionProperty, IEquatable<TransitionProperty>`
 
-已准备的每属性采样容器（取代 `IFrameSequence` + `InterpolatorOutputBase` + `FrameUpdaterSet`）。每个属性持有 `(ITransitionProperty, ISampler, start, end, options)`。非泛型：只持有 Core 级 inspector，优先级经 `IUIThreadInspectorCore.ProtectedInvoke` 的 `object?` 重载传递。动画的取消令牌经 `SetCancellation` 附加，使 `Apply` 具备原 `ICancellableFrameSequence` 的过期帧守卫。
+`ITransitionProperty` 的编译版 getter/setter 实现。属性路径由一个或多个 `PropertyInfo` 段组成；读写经由惰性编译的委托。当中间对象非空但其运行时类型与路径不匹配时，读返回哨兵 `UnreadablePath`，写返回 `false`，调用方据此跳过该属性而不是把它当作 null/identity 处理。
 
-源码：`Src/Core/VeloxDev.Core/TransitionSystem/SamplerSet.cs`。
+源码：`Src/Core/VeloxDev.Core/TransitionSystem/TransitionProperty.cs`。
 
 | 成员 | 签名 | 描述 |
 |---|---|---|
-| `Apply` | `public void Apply(object target, double t, object? priority = default)` | 经 UI 线程 marshal 后逐个调用 `sampler.Update(target, property, start, end, options, t)`；当动画被取消或应用不再存活时立即返回，因此已排队的过期帧永远不会覆盖重置结果。 |
-| `CanSetValue` | `public bool CanSetValue()` | `inspector.IsAppAlive()` 时为 `true`。 |
+| `UnreadablePath` | `public static readonly object UnreadablePath` | 路径对当前目标无效时 `GetValue` 返回的哨兵。 |
+| `FromProperty` | `public static TransitionProperty FromProperty(PropertyInfo propertyInfo)` | 为单个属性创建单段路径。 |
+| `Members<TSource>` | `public static IReadOnlyList<ITransitionProperty> Members<TSource>(params Expression<Func<TSource, object?>>[] expressions)` | 从表达式构建可读可写的成员路径（供 `ISampleable` 使用）。 |
+| `ReadableMembers<TSource>` | `public static IReadOnlyList<ITransitionProperty> ReadableMembers<TSource>(params Expression<Func<TSource, object?>>[] expressions)` | 构建可读成员路径（供结构体 `ISampleable` 组装）。 |
+| `Combine` | `public static TransitionProperty Combine(ITransitionProperty prefix, ITransitionProperty suffix)` | 把两个路径拼接为一个。 |
+| `TryCreate` | `public static bool TryCreate(LambdaExpression expression, out TransitionProperty? property)` | 把表达式树解析为路径。 |
+| `Path` | `string Path` | 以点号连接的段名。 |
+| `PropertyType` / `PropertyInfo` / `Segments` | `Type` / `PropertyInfo` / `IReadOnlyList<PropertyInfo>` | 类型、末段属性信息、完整段列表。 |
+| `CanRead` / `CanWrite` | `bool` | 各段可读性 / 末段可写性。 |
+| `GetValue` / `SetValue` | `object? GetValue(object target)` / `bool SetValue(object target, object? value)` | 编译版路径读写。 |
+
+**说明：**
+- `ThemeManager.PrepareSamplers` 用 `TransitionProperty.FromProperty(propertyInfo)` 包装每个动画属性，随后通过 `SetValue` 写入端点/工作值。
 
 ## 命名空间：`VeloxDev.TransitionSystem`
 
+### 接口：`ITransitionProperty`
+
+`public interface ITransitionProperty`
+
+源码：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionProperty.cs`。
+
+| 成员 | 签名 |
+|---|---|
+| `Path` | `string Path { get; }` |
+| `PropertyType` | `Type PropertyType { get; }` |
+| `PropertyInfo` | `PropertyInfo PropertyInfo { get; }` |
+| `Segments` | `IReadOnlyList<PropertyInfo> Segments { get; }` |
+| `CanRead` / `CanWrite` | `bool CanRead { get; }` / `bool CanWrite { get; }` |
+| `GetValue` | `object? GetValue(object target)` |
+| `SetValue` | `bool SetValue(object target, object? value)` |
+
 ### 接口：`ISampler`
 
-`public interface ISampler { void Update(object target, ITransitionProperty property, object? start, object? end, object? options, double t); }`
+`public interface ISampler`
 
-无状态、线程安全、共享单例采样处理器：不返回值，直接更新属性。语义：`t <= 0` 写精确 `start`；`t >= 1` 写精确 `end`；`0 < t < 1` 时值类型算好即赋、引用类型**原地修改** `start` 现有实例（不 new）。取代 `IValueInterpolator` / `IInterpolable` / `IInPlaceSampler` / `IFrameUpdater`。
+无状态、线程安全的采样器。采样器通常是注册在 `InterpolatorCore.NativeInterpolators` 中的共享单例。`ThemeManager` 在切换时对每个属性调用一次 `NormalizeStart` / `NormalizeEnd`，然后在每个采样帧调用一次 `InsertFrame`。
 
 源码：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ISampler.cs`。
 
+| 成员 | 签名 | 描述 |
+|---|---|---|
+| `NormalizeStart` | `object? NormalizeStart(object? start, object? end, object? options)` | 在 `t <= 0` 时写入的值。可返回副本，使目标永不同名共享的起始实例。 |
+| `NormalizeEnd` | `object? NormalizeEnd(object? start, object? end, object? options)` | 在 `t >= 1` 时写入的值。同样可返回副本。 |
+| `InsertFrame` | `void InsertFrame(object target, ITransitionProperty property, ref object? working, object? start, object? end, object? options, double t)` | 计算 `t ∈ [0, 1]` 处的插值帧并写入 `target` 上的 `property`。`working` 是每次动画可复用的临时对象（在首个中间帧经 `ref` 惰性创建）。 |
+
+**说明：**
+- 端点在 `InsertFrame` 内部处理；实现不得修改传入的 `start` / `end` 实参。
+- 主题切换中，采样器按属性类型经 `InterpolatorCore.TryGetInterpolator` 从注册表解析。
+
 ### 接口：`ISampleable`
 
-`public interface ISampleable { ISampler Normalize(object? start, object? end, object? options); }`
-
-可采样定义（类型级）：用户自定义类型实现它即可直接用于动画，无需注册采样器。`Normalize` 归一化 start/end/options——解释器创建并知晓 `FrameState` 时对每个动画属性调用一次，返回该类型的无状态 `ISampler`；`start` 为 target 上的现值（引用类型即现有实例，供原地修改），`end` 为目标值。取代 `IInPlaceSampler` / `IFrameUpdater` / `IFrameUpdaterProducer`（引用类型的原地修改逻辑现在在各自 `ISampler.Update` 内）。
+`public interface ISampleable { IReadOnlyList<ITransitionProperty> GetAnimatableMembers(); object? CreateFrameValue(IReadOnlyList<object?> memberValues); }`
 
 源码：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ISampleable.cs`。
+
+**说明：**
+- 声明某个类型的哪些成员可动画（一层）以及如何从插值后的成员重建一个值。供过渡动画功能的捕获/`Prepare` 阶段用于没有注册采样器的属性类型。
+- `ThemeManager` 只从注册表解析采样器，因此 `ISampleable` 的成员展开不参与主题切换。
 
 ### 接口：`ITransitionEffectCore`
 
 `public interface ITransitionEffectCore`
-
-描述过渡效果：帧率、时长、循环/缓动以及生命周期事件。
 
 源码：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionEffect.cs`。
 
@@ -80,30 +114,19 @@
 | `Clone` | `ITransitionEffectCore Clone()` |
 
 **说明：**
-- 默认 `FPS` 为 60；默认 `Duration` 为零；默认 `Ease` 为 `Eases.Default`。
-- `FPS` 是**最大采样率上限** —— 解释器的采样循环是 Stopwatch 驱动的（`t = elapsed / Duration`），不会按 `FPS` 逐帧步进；yield 间隔为 `1000 / FPS` ms。
-- `TransitionEffectCore`（基实现）为适配器的 `TransitionEffect` 提供支撑。
+- `ThemeManager` 只读取两个成员：`Ease`（计算缓动后时间）与 `Duration`（推导总耗时毫秒数）。`FPS`、`IsAutoReverse`、`LoopTime`、生命周期事件与 `Clone` 属于更高层的引擎管道。
+- 基实现 `TransitionEffectCore` 的默认值：`FPS = 60`、`Duration = 0 ms`、`Ease = Eases.Default`。主题示例所用到的适配器预设见 [04 PlatformAdapters](../04_PlatformAdapters/index.md)。
 
-### 接口：`IEaseCalculator`
+### 接口：`IEaseCalculator` 与静态类：`Eases`
 
 `public interface IEaseCalculator { double Ease(double t); }`
 
-源码：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/IEaseCalculator.cs`。
-
-**说明：**
-- 实现把归一化时间 `t ∈ [0, 1]` 映射为缓动后的值。
-
-### 静态类：`Eases`
-
-`IEaseCalculator` 策略的工厂。
-
-源码：`Src/Core/VeloxDev.Core/TransitionSystem/Eases.cs`。
+源码：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/IEaseCalculator.cs` 与 `Src/Core/VeloxDev.Core/TransitionSystem/Eases.cs`。
 
 | 成员 | 描述 |
 |---|---|
-| `Default` | `IEaseCalculator` — 线性（`t → t`）。 |
+| `Eases.Default` | `IEaseCalculator` — 线性（`Ease(t) = t`，由 `EaseDefault` 支撑）。`ThemeManager.Jump` 的零时长程使用它。 |
 | `Sine` / `Quad` / `Cubic` / `Quart` / `Quint` / `Expo` / `Circ` / `Back` / `Elastic` / `Bounce` | 嵌套静态类，每个都暴露 `In`、`Out`、`InOut` 成员，返回 `IEaseCalculator`。 |
 
 **说明：**
-- `EaseDefault` 是 `Eases.Default` 背后的具体类。
-- `ThemeManager.Jump` 的零时长程使用 `Eases.Default`。
+- 完整缓动目录记录在过渡动画功能的 Eases 章节（`2_API/03_transition`）。
