@@ -11,6 +11,32 @@ Produce rigorous software engineering analysis documentation. Use **PlantUML** f
 - Do not fabricate method signatures, class names, or execution flows
 - If code is inferred (no example available), it must be explicitly marked as such
 
+### KaTeX writing rules (must render in the CloudGlyph viewer)
+
+The CloudGlyph viewer renders math with KaTeX through a Markdown parser whose
+**display-math blocks are only recognized in standalone multi-line form**. Write
+formulas so they always render:
+
+- **Inline math** — single `$…$` within a sentence: `each insert is $O(1)$`.
+- **Display math** — MUST be a standalone three-line block, never `$$x$$` on one line:
+
+  ```markdown
+  $$
+  T(n) = O(n \log n)
+  $$
+  ```
+
+  Forbidden (the viewer will NOT render it):
+  `$$T(n) = O(n \log n)$$` — do not open and close `$$` on the same line.
+
+- **Text inside a formula** must use `\text{...}`: `$O(\text{成员数})$`. Never put
+  prose/CJK directly in math mode; KaTeX has no CJK glyphs and only warns — put
+  annotation outside the formula or inside `\text{...}`.
+- Prefer ASCII identifiers and math operators; keep Chinese descriptions in prose or
+  `\text{...}`.
+- After writing, run `python validate-katex.py` **and** `node validate-katex.js` on the
+  wiki root; both flag single-line display math as an ERROR and bare CJK-in-math as a WARN.
+
 ## Page Plan
 
 The Architecture section is organized into the following pages. Each page after `01_functional-structure` uses **sub-pages grouped by feature** (from the Feature Inventory), so each feature gets its own dedicated analysis.

@@ -10,6 +10,10 @@ not math (e.g. C# string interpolation `$"..."` in code) and produced false posi
 Checks:
   ERROR  odd count of `$$` block-math delimiters across a file (unbalanced $$ ... $$)
   ERROR  odd count of remaining `$` after removing $$ blocks (unbalanced inline $...$)
+  ERROR  single-line display math `$$expr$$` (open+close on the same line) — the CloudGlyph
+         viewer's block parser only recognizes multi-line `$$\n…\n$$`, so these never render
+  WARN   a CJK character used directly in math outside a `\text{...}` group — KaTeX lacks CJK
+         glyphs and only warns; wrap prose in `\text{...}` or keep it outside the formula
   WARN   `$"` seen outside code fences (a C#-style interpolated string leaked into prose)
   WARN   `$ ` or ` $` (dollar adjacent to a space) — probably currency, not math
 
@@ -29,6 +33,51 @@ from pathlib import Path
 FENCE_RE = re.compile(r"^```\w*\s*$")
 DOLLAR_DOLLAR_RE = re.compile(r"\$\$")
 DOLLAR_RE = re.compile(r"\$(?!\$)")  # single $ not followed by another $
+CJK_RE = re.compile(r"[一-鿿]")
+SAME_LINE_DISPLAY_RE = re.compile(r"\$\$.+?\$\$")
+TEXT_CMD = "\\text{"
+
+
+def _cjk_outside_text(math: str) -> str:
+    """Characters in a math snippet that are CJK and NOT inside a \\text{...} group."""
+    found = []
+    i, n = 0, len(math)
+    while i < n:
+        if math.startswith(TEXT_CMD, i):
+            depth, j = 1, i + len(TEXT_CMD)
+            while j < n and depth > 0:
+                if math[j] == "{":
+                    depth += 1
+                elif math[j] == "}":
+                    depth -= 1
+                j += 1
+            i = j
+            continue
+        if math[i] == "\\" and i + 1 < n and math[i + 1].isalpha():
+            i += 2
+            continue
+        if CJK_RE.match(math[i]):
+            found.append(math[i])
+        i += 1
+    return "".join(found)
+
+
+def _math_spans(line: str):
+    """Yield the content of every $...$ / $$...$$ span on one prose line."""
+    i, n = 0, len(line)
+    while i < n:
+        if line[i] != "$":
+            i += 1
+            continue
+        j = i + 1
+        dbl = j < n and line[j] == "$"
+        if dbl:
+            j += 1
+        end = line.find("$$", j) if dbl else line.find("$", j)
+        if end == -1:
+            break
+        yield line[j:end]
+        i = end + (2 if dbl else 1)
 
 
 def split_fences(lines):
@@ -72,6 +121,22 @@ def validate_file(lines):
         # right after the digits and must not be flagged)
         if re.search(r"\$[\d]+(?=[\s.,;:!?]|$)", line):
             issues.append(("WARN", f"line {ln}: '$' followed by digits — likely currency, verify it is math"))
+
+    # Renderer-compatibility checks (the CloudGlyph viewer = AvalonMarkdown block parser):
+    for i, (in_code, line) in enumerate(fenced):
+        if in_code:
+            continue
+        ln = i + 1
+        if SAME_LINE_DISPLAY_RE.search(line):
+            issues.append(("ERROR",
+                f"line {ln}: single-line display math '$$…$$' — open and close on the same line; "
+                "the viewer only renders display math as a standalone multi-line '$$' block"))
+        for math in _math_spans(line):
+            bare = _cjk_outside_text(math)
+            if bare:
+                issues.append(("WARN",
+                    f"line {ln}: CJK characters {bare!r} used in math outside \\text{{}} — "
+                    "wrap them in \\text{...} or move the prose out of the formula"))
 
     return issues
 
