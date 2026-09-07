@@ -4,19 +4,25 @@
 
 ## 每帧分发
 
-$$O(b), \quad b = \text{活动行为数}$$
+$$
+O(b), \quad b = \text{活动行为数}
+$$
 
 `ExecuteBehaviorsUpdateSync` / `ExecuteBehaviorsLateUpdateSync` / `ExecuteBehaviorsFixedUpdateSync` 对缓存的包装器数组遍历一次，逐个调用 `InvokeUpdate` / `InvokeLateUpdate` / `InvokeFixedUpdate` —— `MonoBehaviourManager.cs` 第 611-657 行。
 
 包装器数组由 `GetCachedWrappers`（第 663-673 行）在注册 / 移除触发排序标记时或每 `MAX_CONFIG_CACHE_DURATION_MS = 1000` ms 重建一次；重建会复制活动包装器并按 `ExecutionOrder` 插入排序（`RebuildCachedWrappers`，第 805-834 行）。行为数量通常很小，因此每帧排序代价被摊还掉：
 
-$$T_{\text{update}} = O(b) \text{ 每帧}, \quad b \ll n_{\text{registered}}$$
+$$
+T_{\text{update}} = O(b) \text{ 每帧}, \quad b \ll n_{\text{registered}}
+$$
 
 当某行为把 `FrameEventArgs.Handled` 置 `true` 时，循环提前 break，实际代价变为 $O(k)$，其中 $k$ 是短路前已执行的行为数（$k \le b$）。
 
 ## 固定更新间隔
 
-$$O(b) \text{ 每约 } \approx \text{interval 毫秒}$$
+$$
+O(b) \text{ 每约 } \approx \text{interval 毫秒}
+$$
 
 固定驱动与更新驱动并发运行 `ExecuteBehaviorsFixedUpdateSync`，按 `SetFixedUpdateInterval` 间隔驱动（默认 `DEFAULT_FIXED_UPDATE_INTERVAL_MS = 16`）。其稳态代价与帧率无关 —— 物理 / 固定时间步逻辑与渲染 FPS 解耦。
 
@@ -24,7 +30,9 @@ $$O(b) \text{ 每约 } \approx \text{interval 毫秒}$$
 
 每帧更新驱动调用 `CreateFrameEventArgs`（第 745-755 行），从每通道 `ObjectPool<FrameEventArgs>`（默认 `DEFAULT_OBJECT_POOL_SIZE = 50`）取出而非重新分配：
 
-$$O(1) \text{ 每帧取/还，稳态零分配}$$
+$$
+O(1) \text{ 每帧取/还，稳态零分配}
+$$
 
 对象池是无锁 `ConcurrentStack` 且有界容量，被两个驱动共享（固定事件来自同一池）。未被处理的 `FixedUpdate` 事件入队，由更新驱动在下一帧开头排空时归还（`DrainFixedUpdateEvents`，第 757-761 行）；已处理者立即归还。`ConfigChangeRequest` 与 `BehaviorWrapper` 对象来自各自同容量的池，因此注册 / 配置抖动也不会造成稳态分配。
 

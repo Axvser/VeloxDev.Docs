@@ -6,7 +6,9 @@
 
 ### 静态注册与查找（`ThemeCache`）
 
-$$O(P) \ \text{每类型注册}, \quad O(\text{深度}) \approx O(1) \ \text{每次默认值查找}$$
+$$
+O(P) \ \text{每类型注册}, \quad O(\text{深度}) \approx O(1) \ \text{每次默认值查找}
+$$
 
 - 默认值存于 `Dictionary<Type, Dictionary<string, PropertyEntry>>`，其中 `PropertyEntry` 将一个 `PropertyInfo` 与一个主题值 `Dictionary<Type, object?>` 配对。`RegisterType` 每类型复制 $P$ 条并以 `IsTypeRegistered`（$O(1)$）守卫 —— 重复被忽略。
 - `TryGetDefaultValue` 沿 `type.BaseType` 走到 `object`，每层做哈希查找：$O(\text{深度})$。
@@ -14,37 +16,49 @@ $$O(P) \ \text{每类型注册}, \quad O(\text{深度}) \approx O(1) \ \text{每
 
 ### 按实例活跃缓存（`ThemeCache`）
 
-$$O(1) \ \text{每次查找/覆盖摊还}$$
+$$
+O(1) \ \text{每次查找/覆盖摊还}
+$$
 
 由 `ConditionalWeakTable<IThemeObject, InstanceCache>.GetValue`（基于哈希，摊还 $O(1)$）支撑。`PrepareSamplers` 会对每个已注册对象调用生成的 `GetActiveThemeCache()`，因此首次切换时 $N$ 个对象各创建一个空 `InstanceCache`；条目是弱键的，随实例一起被回收。
 
 ### 注册 / 注销（`ThemeManager`）
 
-$$O(1) \ \text{每次调用} \quad (O(N) \ \text{最坏 RemoveAll})$$
+$$
+O(1) \ \text{每次调用} \quad (O(N) \ \text{最坏 RemoveAll})
+$$
 
 `Register` 先以 `_act_cache.TryGetValue` 守卫，再向列表追加一个 `WeakReference<IThemeObject>` —— $O(1)$。`Unregister` 移除缓存条目并以 `RemoveAll` 扫描列表 —— 最坏 $O(N)$，典型 $O(1)$。`InitializeTheme` 附带一次性类型注册（摊还 $O(P)$）并向实例应用当前主题（$O(P)$ 反射写入）。
 
 ### 切换准备（`PrepareSamplers`）
 
-$$O(N \cdot P)$$
+$$
+O(N \cdot P)
+$$
 
 对 $N$ 个对象中的每个及其 $P$ 个属性中的每个：起始/目标值从活跃缓存再退到静态字典解析（$O(1)$ 哈希查找）；经 `InterpolatorCore.TryGetInterpolator` 解析采样器（$O(1)$，`ConcurrentDictionary`）；再由采样器 `NormalizeStart`/`NormalizeEnd` 产生端点（值采样器 $O(1)$）。为每个对象重建合并静态缓存为 $O(P \cdot \text{深度})$，浅层级下整体 $O(N \cdot P)$。已准备条目的临时内存为 $O(N \cdot P)$。
 
 ### 带动画切换（`Transition<T>`）
 
-$$O(N \cdot P) \ \text{准备} \ +\ \text{每帧 } O(N \cdot P),\quad \text{帧数} \approx \frac{\text{Duration}}{\text{让出周期}}$$
+$$
+O(N \cdot P) \ \text{准备} \ +\ \text{每帧 } O(N \cdot P),\quad \text{帧数} \approx \frac{\text{Duration}}{\text{让出周期}}
+$$
 
 `ExecuteTransition` 先等待静态 `SemaphoreSlim`（各趟串行，$O(1)$），再运行 Stopwatch 循环。每帧对每个属性调用一次 `ISampler.InsertFrame`（或端点写入）—— $O(N \cdot P)$ —— 并以 `await Task.Delay(1)` 让出。由于 `Task.Delay(1)` 以操作系统定时器粒度（Windows 上约 1-15 ms）解析，帧数大致等于 `Duration` 除以该周期；从不构建帧列表。新切换会经 `CancellationTokenSource` 取消正在运行的那一趟。
 
 ### 即时切换（`Jump<T>`）
 
-$$O(N \cdot P)$$
+$$
+O(N \cdot P)
+$$
 
 `Jump` 复用 `PrepareSamplers` + `ExecuteTransition` 并以 `durationMs = 0` 运行，因此首帧即 `rawT = 1`，每个属性直接写为目标值 —— 单趟 $O(N \cdot P)$。
 
 ### 运行时覆盖（`SetThemeValue<T>` / `RestoreThemeValue<T>`）
 
-$$O(1) \ \text{每属性摊还}$$
+$$
+O(1) \ \text{每属性摊还}
+$$
 
 生成的调用向实例的 `Overrides` 字典写入（或移除）一条覆盖记录，再经 `UpdatePropertyToCurrentTheme` 刷新该单个属性 —— 字典查找外加至多一次 `TryGetDefaultValue` 的继承链遍历（$O(\text{深度})$）。
 

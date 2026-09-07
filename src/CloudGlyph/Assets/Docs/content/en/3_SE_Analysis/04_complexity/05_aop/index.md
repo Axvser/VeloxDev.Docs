@@ -4,23 +4,31 @@ The AOP hot paths are the proxy cache lookup (`AopCache.Resolve`), the per-call 
 
 ## Proxy resolution (`AopCache.Resolve` / `Aop()`)
 
-$$O(1) \text{ amortized per } Aop()$$
+$$
+O(1) \text{ amortized per } Aop()
+$$
 
 `AopCache.Resolve` is a single `ConditionalWeakTable<TClass, TInterface>.GetValue` call (`AopCache.cs`, lines 24-32, table declared at 14-19). `ConditionalWeakTable` is a CLR hash table with weak keys, so the get-or-create lookup is amortized $O(1)$:
 
-$$T_{\text{Aop()}} = O(1) \text{ amortized}$$
+$$
+T_{\text{Aop()}} = O(1) \text{ amortized}
+$$
 
 The first call for a given target pays the factory cost once — `ProxyEx.CreateProxy` runs `DispatchProxy.Create<T, ProxyInstance>()` (`ProxyEx.cs`, lines 17-25), which allocates the instance and registers it in the static `ProxyIDs` map. (`DispatchProxy` generates and caches the concrete proxy *type* only once for the whole `(interface, ProxyInstance)` pair, so later targets skip that.) Every later `Aop()` for that target is a pure cache hit. Because one proxy is created per target instance, the per-instance creation cost is $O(1)$ amortized over that instance's lifetime.
 
 ## Dispatch + hook lookup (`ProxyInstance.Invoke`)
 
-$$O(1) \text{ per dispatch} \;+\; O(h) \text{ hook handlers},\quad h \le 3$$
+$$
+O(1) \text{ per dispatch} \;+\; O(h) \text{ hook handlers},\quad h \le 3
+$$
 
 `Invoke` computes the member name once (`ProxyInstance.cs`, line 25), selects one of three dictionaries by its `get_*` / `set_*` prefix (lines 29-52), and resolves the hook triple with a `Dictionary<string, Tuple<ProxyHandler?, ProxyHandler?, ProxyHandler?>>` lookup (`GetterActions` / `SetterActions` / `MethodActions`, declared at lines 19-21). Dictionary access is amortized $O(1)$; the dispatch itself does no reflection.
 
 Each intercepted call then pays the cost of the active hooks — at most three handlers (`start`, `coverage`, `end`):
 
-$$T_{\text{intercept}} = O(1) + O(h),\quad h \le 3$$
+$$
+T_{\text{intercept}} = O(1) + O(h),\quad h \le 3
+$$
 
 ## Reflection fallback path (`coverage == null`)
 
@@ -33,13 +41,17 @@ var R1 = actions?.Item2 == null ? _targetType?.GetMethod(Name)?.Invoke(_target, 
 
 `Type.GetMethod(string)` scans the type's metadata linearly, and `MethodInfo.Invoke` boxes the arguments:
 
-$$O(m) \text{ lookup} + O(a) \text{ invoke},\quad m = \text{members in type},\; a = \text{argument count}$$
+$$
+O(m) \text{ lookup} + O(a) \text{ invoke},\quad m = \text{members in type},\; a = \text{argument count}
+$$
 
 The reflection fallback is therefore strictly more expensive than a `coverage` handler and is the dominant per-call cost for unhooked members. *This characterization follows from the `GetMethod`/`Invoke` call at `ProxyInstance.cs` line 49; the underlying algorithms are standard BCL behavior.*
 
 ## Reverse lookup (`Aop.GetTarget`)
 
-$$O(1) \text{ amortized}$$
+$$
+O(1) \text{ amortized}
+$$
 
 `Aop.GetTarget<TTarget>` is a `ConditionalWeakTable<object, object>.TryGetValue` reverse lookup (`Aop.cs`, lines 13, 25-26) — amortized $O(1)$, independent of the number of mapped proxies.
 

@@ -6,7 +6,9 @@ Let $N$ = number of registered theme-aware objects, $P$ = number of themed prope
 
 ### Static registration & lookup (`ThemeCache`)
 
-$$O(P) \ \text{per type registration}, \quad O(\text{depth}) \approx O(1) \ \text{per default lookup}$$
+$$
+O(P) \ \text{per type registration}, \quad O(\text{depth}) \approx O(1) \ \text{per default lookup}
+$$
 
 - Defaults are stored in a `Dictionary<Type, Dictionary<string, PropertyEntry>>`, where `PropertyEntry` pairs a `PropertyInfo` with a `Dictionary<Type, object?>` of theme values. `RegisterType` copies $P$ entries once per type and is guarded by `IsTypeRegistered` ($O(1)$) — duplicates are ignored.
 - `TryGetDefaultValue` walks `type.BaseType` until `object`, doing hash lookups per level: $O(\text{depth})$.
@@ -14,37 +16,49 @@ $$O(P) \ \text{per type registration}, \quad O(\text{depth}) \approx O(1) \ \tex
 
 ### Per-instance active cache (`ThemeCache`)
 
-$$O(1) \ \text{amortized per lookup/override}$$
+$$
+O(1) \ \text{amortized per lookup/override}
+$$
 
 Backed by `ConditionalWeakTable<IThemeObject, InstanceCache>.GetValue` (hash-based, amortized $O(1)$). `PrepareSamplers` calls the generated `GetActiveThemeCache()` for every registered object, so on the first switch an empty `InstanceCache` is created for each of the $N$ objects; entries are weak-keyed and collected with their instance.
 
 ### Register / Unregister (`ThemeManager`)
 
-$$O(1) \ \text{per call} \quad (O(N) \ \text{worst for RemoveAll})$$
+$$
+O(1) \ \text{per call} \quad (O(N) \ \text{worst for RemoveAll})
+$$
 
 `Register` guards with `_act_cache.TryGetValue`, then appends a `WeakReference<IThemeObject>` to a list — $O(1)$. `Unregister` removes the cache entry and scans the list with `RemoveAll` — $O(N)$ worst, $O(1)$ typical. `InitializeTheme` adds one-time type registration ($O(P)$ amortized) plus applying the current theme to the instance ($O(P)$ reflection writes).
 
 ### Switch preparation (`PrepareSamplers`)
 
-$$O(N \cdot P)$$
+$$
+O(N \cdot P)
+$$
 
 For each of the $N$ objects and each of its $P$ properties: current/target values are resolved from the active cache then the static dict ($O(1)$ hash lookups), a sampler is resolved via `InterpolatorCore.TryGetInterpolator` ($O(1)$, `ConcurrentDictionary`), and the sampler's `NormalizeStart`/`NormalizeEnd` produce the endpoints ($O(1)$ for value samplers). Rebuilding each object's merged static cache is $O(P \cdot \text{depth})$, giving $O(N \cdot P)$ overall for shallow hierarchies. Temporary memory for the prepared entries is $O(N \cdot P)$.
 
 ### Animated switch (`Transition<T>`)
 
-$$O(N \cdot P) \ \text{preparation} \ +\ O(N \cdot P) \ \text{per frame},\quad \text{frames} \approx \frac{\text{Duration}}{\text{yield period}}$$
+$$
+O(N \cdot P) \ \text{preparation} \ +\ O(N \cdot P) \ \text{per frame},\quad \text{frames} \approx \frac{\text{Duration}}{\text{yield period}}
+$$
 
 `ExecuteTransition` awaits a static `SemaphoreSlim` (passes serialize, $O(1)$), then runs a Stopwatch loop. Each frame calls one `ISampler.InsertFrame` (or an end-value write) per property — $O(N \cdot P)$ — and yields with `await Task.Delay(1)`. Because `Task.Delay(1)` resolves at OS-timer granularity (~1-15 ms on Windows), the number of frames is roughly `Duration` divided by that period; no frame list is ever built. A new switch cancels the running pass via `CancellationTokenSource`.
 
 ### Instant switch (`Jump<T>`)
 
-$$O(N \cdot P)$$
+$$
+O(N \cdot P)
+$$
 
 `Jump` reuses `PrepareSamplers` + `ExecuteTransition` with `durationMs = 0`, so the first frame has `rawT = 1` and every property is written directly to its target value — a single $O(N \cdot P)$ pass.
 
 ### Runtime override (`SetThemeValue<T>` / `RestoreThemeValue<T>`)
 
-$$O(1) \ \text{amortized per property}$$
+$$
+O(1) \ \text{amortized per property}
+$$
 
 A generated call stores one override entry in the instance's `Overrides` dictionary (or removes it), then refreshes that single property via `UpdatePropertyToCurrentTheme` — dictionary lookups plus at most one inheritance-chain walk in `TryGetDefaultValue` ($O(\text{depth})$).
 

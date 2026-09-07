@@ -4,19 +4,25 @@ All per-frame bounds below hold for a channel with $b$ active behaviours, driven
 
 ## Per-frame dispatch
 
-$$O(b), \quad b = \text{active behaviours}$$
+$$
+O(b), \quad b = \text{active behaviours}
+$$
 
 `ExecuteBehaviorsUpdateSync` / `ExecuteBehaviorsLateUpdateSync` / `ExecuteBehaviorsFixedUpdateSync` iterate the cached wrapper array once, calling `InvokeUpdate` / `InvokeLateUpdate` / `InvokeFixedUpdate` per behaviour — `MonoBehaviourManager.cs` lines 611-657.
 
 The wrapper array is rebuilt by `GetCachedWrappers` (lines 663-673) only when a registration/removal flagged a sort, or every `MAX_CONFIG_CACHE_DURATION_MS = 1000` ms. The rebuild copies the active wrappers and insertion-sorts them by `ExecutionOrder` (`RebuildCachedWrappers`, lines 805-834). Behaviour counts are typically tiny, so the per-frame sort cost is amortized away:
 
-$$T_{\text{update}} = O(b) \text{ per frame}, \quad b \ll n_{\text{registered}}$$
+$$
+T_{\text{update}} = O(b) \text{ per frame}, \quad b \ll n_{\text{registered}}
+$$
 
 When a behaviour sets `FrameEventArgs.Handled = true`, the loop breaks early, so the effective cost becomes $O(k)$ where $k$ is the number of behaviours executed before the short-circuit ($k \le b$).
 
 ## Fixed-update interval
 
-$$O(b) \text{ every } \approx \text{interval ms}$$
+$$
+O(b) \text{ every } \approx \text{interval ms}
+$$
 
 The fixed driver runs `ExecuteBehaviorsFixedUpdateSync` concurrently with the update driver, paced by `SetFixedUpdateInterval` (default `DEFAULT_FIXED_UPDATE_INTERVAL_MS = 16`). Its steady-state cost is independent of the frame rate — physics/timestep logic is decoupled from rendering FPS.
 
@@ -24,7 +30,9 @@ The fixed driver runs `ExecuteBehaviorsFixedUpdateSync` concurrently with the up
 
 Each frame the update driver calls `CreateFrameEventArgs` (lines 745-755), which draws from a per-channel `ObjectPool<FrameEventArgs>` (default `DEFAULT_OBJECT_POOL_SIZE = 50`) instead of allocating:
 
-$$O(1) \text{ pool get/return per frame, zero steady-state allocation}$$
+$$
+O(1) \text{ pool get/return per frame, zero steady-state allocation}
+$$
 
 The pool is a lock-free `ConcurrentStack` with a bounded capacity, shared by both drivers (fixed events come from the same pool). Unhandled `FixedUpdate` events are enqueued and drained back to the pool by the update driver at the top of the next frame (`DrainFixedUpdateEvents`, lines 757-761); handled ones are returned immediately. `ConfigChangeRequest` and `BehaviorWrapper` objects come from their own pools of the same capacity, so registration/config churn also avoids steady-state allocation.
 

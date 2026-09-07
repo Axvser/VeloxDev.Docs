@@ -6,13 +6,17 @@
 
 生成的 setter 无论值类型如何都执行常数次操作：
 
-$$O(1)$$
+$$
+O(1)
+$$
 
 步骤：`Object.Equals` 守卫、捕获 `old`、`OnPropertyChanging`、`OnXxxChanging`、字段赋值、`OnXxxChanged`、`OnPropertyChanged`——全部常数时间。setter 体来源：`MVVMPropertyFactory.GetSetterBodyLines`，`Base/Analizer.cs`，第 287-307 行（第 308-365 行的 `SetProperty`/`RaiseAndSetIfChanged`/`NotifyOfPropertyChange` 分支同样为 $O(1)$）。
 
 对于 `INotifyCollectionChanged` 属性，替换集合时还会额外调用 `ObservableCollectionTracker.Unsubscribe(old, ...)` 和 `EnsureSubscribed(value, ...)`，并对被替换集合的条目调用 `OnItemRemovedFromXxx` / `OnItemAddedToXxx`：
 
-$$O(k) \quad \text{其中 } k = |\text{旧集合}| + |\text{新集合}|$$
+$$
+O(k) \quad \text{其中 } k = |\text{旧集合}| + |\text{新集合}|
+$$
 
 *$O(k)$ 的替换代价依据生成的集合 setter 行推断（`GetCollectionBeforeAssignmentLines` / `GetCollectionAfterAssignmentLines`，第 486-526 行）；非替换的 getter 路径为 $O(1)$。*
 
@@ -20,7 +24,9 @@ $$O(k) \quad \text{其中 } k = |\text{旧集合}| + |\text{新集合}|$$
 
 设置一个属性会触发 `OnXxxChanged` partial 钩子以及通知事件，事件再扇出到每个订阅者：
 
-$$O(1) + O(H)$$
+$$
+O(1) + O(H)
+$$
 
 其中 $H$ 是已订阅 `PropertyChanged` / `PropertyChanging` 的处理器数量（通常是 WPF/Avalonia 的一两个绑定）。扇出由订阅者数量主导，与属性数量无关。
 
@@ -28,13 +34,17 @@ $$O(1) + O(H)$$
 
 生成的 `OnXxxCollectionChanged` 把原始事件转发给 `OnCollectionChanged<T>`（$O(1)$），并在 Add / Remove / Replace / Move 时通过 `EnumerateXxxItems` → `ToArray` 物化受影响的条目：
 
-$$O(m) \quad \text{其中 } m \text{ 为受影响的条目数}$$
+$$
+O(m) \quad \text{其中 } m \text{ 为受影响的条目数}
+$$
 
 （`MVVMPropertyFactory.GenerateCollectionMembers`，`Base/Analizer.cs`，第 575-700 行。）
 
 ## ObservableCollectionTracker.EnsureSubscribed（订阅去重）
 
-$$O(1) \text{ 均摊}$$
+$$
+O(1) \text{ 均摊}
+$$
 
 `ConditionalWeakTable.GetOrCreateValue` 加上 `HashSet<Delegate>` 添加（`Entry.TryAdd`，由锁保护）。去重键是处理器的 `(Method, Target)` 身份（`MethodTargetEqualityComparer`，第 96-114 行），因此即使每次 getter 访问都传入新的委托实例，重复的 getter 访问也保持幂等。每个集合首次调用时订阅，后续调用是快速的常数时间查找。弱引用键意味着当集合被垃圾回收时跟踪条目自动消失——无泄漏。
 
@@ -44,11 +54,15 @@ $$O(1) \text{ 均摊}$$
 
 容量可用时的正常执行：
 
-$$O(1) \text{ 每次触发，均摊}$$
+$$
+O(1) \text{ 每次触发，均摊}
+$$
 
 `ExecuteAsync` 执行 `SemaphoreSlim.WaitAsync` + `_active.Add` + fire-and-forget（`VeloxCommand.cs`，第 139-174 行）。容量耗尽时条目入队：
 
-$$O(1) \text{ 入队, } \quad O(n) \text{ 最坏排队}$$
+$$
+O(1) \text{ 入队, } \quad O(n) \text{ 最坏排队}
+$$
 
 其中 $n$ 为排队条数。`TryStartPendingAsync` 排空最多 `_maxConcurrency` 个条目，整个排空过程 $O(n)$（第 349-377 行）；由于队列由完成中的调用排空，每次触发均摊为 $O(1)$。`CanExecute` 以 $O(1)$ 求值用户谓词与强制锁标记（第 126 行）。
 

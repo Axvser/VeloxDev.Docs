@@ -4,25 +4,33 @@ Let $P$ = the number of properties recorded in a snapshot and $k$ = the depth of
 
 ## Building a snapshot (`.Property(...)` calls)
 
-$$O(P \cdot \bar{k})$$
+$$
+O(P \cdot \bar{k})
+$$
 
 Each `.Property(lambda, value, options)` parses the lambda into a `TransitionProperty` ($O(k)$ on the path segments — `TransitionProperty.TryCreate` unwraps and walks the member chain once), stores the value (and optional interpolation options) in a `ConcurrentDictionary` (amortized $O(1)$), and, if options were given, stores the options entry. The compiled getter/setter delegate is built lazily on first read/write ($O(k)$ compile, once) and reused. For the usual single-segment property this is effectively $O(1)$ per call, i.e. $O(P)$ for a whole snapshot.
 
 ## Sampler resolution
 
-$$O(1)$$
+$$
+O(1)
+$$
 
 `InterpolatorCore.TryGetInterpolator(Type, out _)` is a `ConcurrentDictionary` lookup over `NativeInterpolators` (`ConcurrentDictionary<Type, ISampler>`). Per-property overrides (`state.Interpolators`) add one constant-time check. `RegisterInterpolator`/`UnregisterInterpolator` are atomic `AddOrUpdate`/`TryRemove`, also $O(1)$.
 
 ## Updater preparation (`InterpolatorCore.Prepare`)
 
-$$O(P) + O\!\left(\sum m_j\right)$$
+$$
+O(P) + O\!\left(\sum m_j\right)
+$$
 
 `Prepare` runs once per segment/animation. For each of the $P$ recorded properties it: reads the current value through the compiled getter (marshalled by `ProtectedGetValue`, $O(1)$), resolves an `ISampler` ($O(1)$; per-property override → registry → value-type `ISampleable`), calls `NormalizeStart`/`NormalizeEnd` once to fix the exact endpoint values, and stores a per-property `(property, sampler, start, end, options)` entry in the `SamplerSet`. A value-type `ISampleable` property adds $O(m_j)$ for the `StructAssembler`, where $m_j$ = the number of declared members (each member gets one registry lookup and one current-value read). **No per-property frame list is built.**
 
 ## Sampling loop (`TransitionInterpreterCore.Execute`)
 
-$$O(P)\ \text{per sample}$$
+$$
+O(P)\ \text{per sample}
+$$
 
 Each sample iteration evaluates one eased/clamped time and applies it through `SamplerSet.Apply`, which walks the $P$ prepared entries (per property $O(1)$):
 
@@ -39,13 +47,17 @@ Each sample iteration evaluates one eased/clamped time and applies it through `S
 
 The number of samples is **not** dictated by `FPS` — it is the Stopwatch-derived `elapsed / duration`, paced by the `1000 / FPS` ms yield (a throttle, not a timing source). A duration-$D$ pass therefore issues up to $D \cdot \text{FPS}/1000$ samples, each $O(P)$. Auto-reverse doubles the pass count; `LoopTime` adds repeats (`cycle ≤ LoopTime`). The wall-clock time for a finite run is
 
-$$T_{\text{wall}} \approx D \times (\text{LoopTime} + 1) \times (1 + [\text{IsAutoReverse}])$$
+$$
+T_{\text{wall}} \approx D \times (\text{LoopTime} + 1) \times (1 + [\text{IsAutoReverse}])
+$$
 
 (or forever when $\text{LoopTime} = \text{int.MaxValue}$). No eased-index list is precomputed ($O(1)$ extra space), and no per-frame `Task.Delay` calibration is needed.
 
 ## Scheduler lookup (`FindOrCreate`)
 
-$$O(1)$$
+$$
+O(1)
+$$
 
 `TransitionSchedulerCore.FindOrCreate(target, CanMutualTask)` performs a `ConditionalWeakTable` lookup (`MutualSchedulers`) or allocates a fresh non-mutual scheduler. A `SemaphoreSlim.WaitAsync()` gate serializes executions on a scheduler; per-target `NoMutualSchedulers` list operations are $O(M)$ where $M$ = concurrent non-mutual animations.
 
@@ -53,7 +65,9 @@ $$O(1)$$
 
 Snapshot discovery (`DiscoverAnimatableProperties`) is a recursive DFS over the object graph guarded by an object-revisit set and an ancestor-**type** guard (no fixed depth cap):
 
-$$O(V \cdot d)$$
+$$
+O(V \cdot d)
+$$
 
 where $V$ = number of reachable composite objects/properties enumerated and $d$ = the path depth (bounded in practice by the ancestor-type guard — a member whose type is already on the current path stops the recursion). The search refuses to descend into primitives, enums, value types, `string`, `object`, `IEnumerable`, and `Delegate`, and is `ISampleable`-aware: it expands a reference-type `ISampleable` into declared member paths and captures a value-type `ISampleable` as a whole path (later assembled by `StructAssembler`). `CaptureAll`/`CaptureAllExcept` use `Interpolator.TryGetInterpolator(type, out _)` (or `ISampler` implementors) as the "can animate" predicate. Each captured property is then read once through the compiled getter: $O(P)$ read cost.
 

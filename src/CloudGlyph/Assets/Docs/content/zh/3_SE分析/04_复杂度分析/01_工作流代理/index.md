@@ -6,13 +6,17 @@
 
 对单个程序集的一次调用：
 
-$$T_{\text{discovery}} = O\!\left(T + \sum_{C \in \text{registered}} (P_C + F_C + M_C) \cdot k\right)$$
+$$
+T_{\text{discovery}} = O\!\left(T + \sum_{C \in \text{registered}} (P_C + F_C + M_C) \cdot k\right)
+$$
 
 其中 $k$ 是泛型参数递归因子（受最大泛型嵌套深度约束）。注册桶是 `HashSet`，故 `TryRegister*` 期望 $O(1)$。
 
 空间即已注册类型集合：
 
-$$S_{\text{discovery}} = O(R_{\text{comp}} + R_{\text{enum}} + R_{\text{iface}} + R_{\text{data}})$$
+$$
+S_{\text{discovery}} = O(R_{\text{comp}} + R_{\text{enum}} + R_{\text{iface}} + R_{\text{data}})
+$$
 
 对多个程序集的重复调用会累积组件；全局 `_globallyDiscoveredTypes` 集合保证一个类型在所有语言间只被深度扫描一次。
 
@@ -22,11 +26,15 @@ $$S_{\text{discovery}} = O(R_{\text{comp}} + R_{\text{enum}} + R_{\text{iface}} 
 
 `BuildSnapshot` 遍历整张图：$V$ 个节点与 $E$ 条可见连接。对每个节点反射公共实例属性（`AppendScalarProps`，每节点 $P$）并生成 JSON 树：
 
-$$T_{\text{snapshot}} = O(V \cdot P + E), \qquad S_{\text{snapshot}} = O(V \cdot P + E)$$
+$$
+T_{\text{snapshot}} = O(V \cdot P + E), \qquad S_{\text{snapshot}} = O(V \cdot P + E)
+$$
 
 `ComputeDiff` 以 $O(V + E)$ 为节点/连接构建 `RuntimeId → JObject` 字典，再对每个节点经 `JToken.DeepEquals` 比较标量/枚举属性：
 
-$$T_{\text{diff}} = O(V + E + V \cdot P') = O(V \cdot P' + E)$$
+$$
+T_{\text{diff}} = O(V + E + V \cdot P') = O(V \cdot P' + E)
+$$
 
 其中 $P' \le P$ 是 JSON 中的标量属性数。只捕获标量与枚举类型属性，因此差异绝不物化整棵子树比较。
 
@@ -36,7 +44,9 @@ $$T_{\text{diff}} = O(V + E + V \cdot P') = O(V \cdot P' + E)$$
 
 每个工具被 `TrackedAIFunction` 包装，其每次调用开销为 $O(1)$（互锁计数器 + 事件触发 + 可选 `MarkDirty`）。工具体占主导：
 
-$$T_{\text{tool}} = O(\text{per-tool work}), \qquad T_{\text{tracked}} = T_{\text{tool}} + O(1)$$
+$$
+T_{\text{tool}} = O(\text{per-tool work}), \qquad T_{\text{tracked}} = T_{\text{tool}} + O(1)
+$$
 
 ### 每工具复杂度
 
@@ -81,15 +91,21 @@ T_{\text{Terminal}} = O\big(V_{\text{cone}} + E_{\text{cone}}\big)_{\text{compil
 
 `LoadAsync` 迭代 $N$ 个服务器配置；每个服务器的成本 = 安装（本地模式）+ 连接：
 
-$$T_{\text{load}}(N) = \sum_{i=1}^{N} \left( T_{\text{install}}(i) + T_{\text{connect}}(i) \right)$$
+$$
+T_{\text{load}}(N) = \sum_{i=1}^{N} \left( T_{\text{install}}(i) + T_{\text{connect}}(i) \right)
+$$
 
 **npm/pip 安装幂等。** `EnsureNpmPackageAsync` 以 `"node:{package}@{version}"`（pip 用 `"py:..."`）为键，存放在由全局 `SemaphoreSlim(1,1)` 守护的进程级列表中。首次安装后记忆化检查为 $O(1)$（contains）；首次安装执行一次 CLI 并记录键，因此重复加载同一包在安装上是 $O(1)$：
 
-$$T_{\text{install}} = \begin{cases} O(\text{npm/pip work}) & \text{首次} \\ O(1) & \text{记忆化} \end{cases}$$
+$$
+T_{\text{install}} = \begin{cases} O(\text{npm/pip work}) & \text{首次} \\ O(1) & \text{记忆化} \end{cases}
+$$
 
 **传输 + 握手。** `ConnectServerAsync` 构建 `StdioClientTransport`（`Http` 用 `HttpClientTransport`），创建 MCP 客户端并完成 JSON-RPC `initialize`/`tools/list` 握手。成本由服务器进程启动与工具列表主导：
 
-$$T_{\text{connect}} = O(\text{spawn} + \text{handshake} + \text{toolSchemaSize})$$
+$$
+T_{\text{connect}} = O(\text{spawn} + \text{handshake} + \text{toolSchemaSize})
+$$
 
 单服务器失败为 $O(1)$ 且不中止整批（`ServerError` 事件触发；该服务器贡献零工具）。配置了 `SynchronizationContext` 时，聚合状态维护（`McpStatusViewModel`）每次状态变更 $O(1)$ 并 marshal 到 UI 线程。
 

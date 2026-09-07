@@ -6,11 +6,15 @@ The three shapes of weak container share one cost model: an **amortized O(1) hot
 
 Mutation is a lock-guarded `Queue`/`Stack` push/pop on a `WeakReference<T>`:
 
-$$\text{Enqueue / Push: } O(1), \qquad \text{TryDequeue / TryPop / TryPeek: } O(1 + d) \text{ amortized}$$
+$$
+\text{Enqueue / Push: } O(1), \qquad \text{TryDequeue / TryPop / TryPeek: } O(1 + d) \text{ amortized}
+$$
 
 where $d$ = dead references at the front / top. `TryDequeue`/`TryPop`/`TryPeek` pop and drop dead wrappers until they reach a live item (or empty), so each dead wrapper is dropped exactly once over its lifetime — the accumulated cost of skipping dead entries is amortized O(1) per entry added. `Count`, `GetEnumerator` and `TrimExcess` first compact the whole structure (`Prune()`, `WeakQueue.cs` lines 124-135; `WeakStack.cs` lines 124-136, which also reverses so LIFO order survives):
 
-$$O(n), \quad n = \text{stored reference wrappers}$$
+$$
+O(n), \quad n = \text{stored reference wrappers}
+$$
 
 | Operation | Complexity |
 |---|---|
@@ -37,7 +41,9 @@ private static int GetNextCleanupThreshold(int currentCount)
 
 The sweep threshold grows geometrically with the live count, so the per-insert amortized cost stays constant:
 
-$$\text{sweep: } O(n) \text{ worst-case}, \qquad \text{amortized } O(1) \text{ per insert}$$
+$$
+\text{sweep: } O(n) \text{ worst-case}, \qquad \text{amortized } O(1) \text{ per insert}
+$$
 
 | Operation | Complexity |
 |---|---|
@@ -52,7 +58,9 @@ $$\text{sweep: } O(n) \text{ worst-case}, \qquad \text{amortized } O(1) \text{ p
 
 The hot path is a single `volatile` field read, which is why the per-frame invocation in the transition engine is lock-free:
 
-$$O(1) \text{ — cached combined delegate is read, then invoked typed or via DynamicInvoke}$$
+$$
+O(1) \text{ — cached combined delegate is read, then invoked typed or via DynamicInvoke}
+$$
 
 Rebuilding the multicast cache costs a pass over the handler list: `RebuildCache` runs `CleanupCollectedHandlers` ($O(h)$) and then `Delegate.Combine`s every live handler ($O(h)$), where $h$ = stored handler wrappers.
 

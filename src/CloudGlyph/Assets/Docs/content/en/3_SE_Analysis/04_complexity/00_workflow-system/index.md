@@ -8,11 +8,15 @@ KaTeX is used for the asymptotic bounds. Every figure is grounded in the cited s
 
 Insert, remove and (property-changed) reindex touch a bounded number of cells per item — effectively constant for typical node sizes:
 
-$$T_{\text{insert}}(n) = O\left(\left\lceil \frac{w}{s} \right\rceil \cdot \left\lceil \frac{h}{s} \right\rceil\right) \approx O(1)$$
+$$
+T_{\text{insert}}(n) = O\left(\left\lceil \frac{w}{s} \right\rceil \cdot \left\lceil \frac{h}{s} \right\rceil\right) \approx O(1)
+$$
 
 A query over a viewport of width $W$ and height $H$ visits $k$ cells and filters the items inside them:
 
-$$k = \left\lceil \frac{W}{s} \right\rceil \cdot \left\lceil \frac{H}{s} \right\rceil, \qquad T_{\text{query}} = O(k + m)$$
+$$
+k = \left\lceil \frac{W}{s} \right\rceil \cdot \left\lceil \frac{H}{s} \right\rceil, \qquad T_{\text{query}} = O(k + m)
+$$
 
 where $m$ is the number of items in those cells. `_queryScratch` deduplicates so each distinct item is emitted once, and each item's bounds are tested against the viewport (`IntersectsWith`/`Contains`). Worst case: all items collapse into one cell, degrading to $O(n)$. A re-entrancy guard defers grid mutations fired mid-reindex and re-syncs once (`_rerunPending` + `ResyncGrid`), keeping nested zoom cascades amortized $O(1)$ per change.
 
@@ -22,7 +26,9 @@ where $m$ is the number of items in those cells. `_queryScratch` deduplicates so
 
 `Virtualize` (lines 99-117) is a re-entrancy-guarded wrapper around `VirtualizeCore` (lines 119-192), which performs `manager.QueryAgentBounds(query, expansionDepth: 1)` (node-pair providers) plus `manager.QueryNodes(query)`, builds the desired item set and reconciles `VisibleItems` in place. With $k_{\text{pair}}$ / $k_{\text{node}}$ cells visited and $m$ items in those cells:
 
-$$T_{\text{virtualize}} = O\left(k_{\text{pair}} + m_{\text{pair}} + k_{\text{node}} + m_{\text{node}} + v\right)$$
+$$
+T_{\text{virtualize}} = O\left(k_{\text{pair}} + m_{\text{pair}} + k_{\text{node}} + m_{\text{node}} + v\right)
+$$
 
 where $v$ is the number of items added/removed from the observable (bounded by the visible set). The depth-1 expansion walks, per directly-visible pair, the connected pairs of its two endpoint nodes via the reverse index (`WorkflowSpatialManager.QueryAgentBounds` lines 79-120), adding $O(\text{degree})$ work per visible node. Expected case: a typical viewport covers $O(1)$ cells, so the whole pass is expected $O(m + v)$. Nested `Virtualize` calls bail in $O(1)$ via the per-tree `Virtualizing` flag.
 
@@ -32,7 +38,9 @@ where $v$ is the number of items added/removed from the observable (bounded by t
 
 Compilation is a remembered decomposition. With $V$ nodes and $E$ edges (connections):
 
-$$T_{\text{compile}} = O(V + E)$$
+$$
+T_{\text{compile}} = O(V + E)
+$$
 
 - **Root** (`CompileGraphAsync`, lines 59-232): walks downstream from the controller. `CompileState.Visited` guarantees each node is processed once; each node enumerates its output slots' `Targets`, and every edge runs the sender's `AccessAsync` static gate (`GetValidTargetsAsync` lines 397-430) — rejected edges are dropped, so invalid edges only cost one `AccessAsync` call each. Linear runs fold into a `ChainSegment`; routers expand each route key recursively (`BranchSegment`, each option a child `CompiledGraph`); plain-node fan-out and multi-key fan-outs become `ParallelSegment`s whose branches are each a sub-graph. Order is a monotonically continuous counter (`Offset` is carried into downstream graphs, not reset to zero), and join registration is $O(\text{inputs})$ per join point. Static pruning (`MarkStoppedBranch` lines 264-278) walks a skipped branch's topology once to stamp `Order = -1`; it too is `Visited`-guarded.
 - **Terminal** (`CompilerViewModel.Reverse.cs`): `BuildAncestorConeAsync` (lines 33-74) is a reverse BFS over `Sources` with the same per-edge `AccessAsync` gate — $O(V + E)$ over the cone. `CompileConeAsync` (lines 82-134) derives the entry frontier, then delegates to the same forward walk restricted to the cone; routers keep real `BranchSegment` semantics with only the in-cone branch compiled (`RestrictRouteToCone`).
@@ -55,7 +63,9 @@ Each `DriveAsync` (lines 227-261) is $O(1)$ bookkeeping plus the node's own work
 
 Over the whole graph with $N$ driven nodes:
 
-$$T_{\text{execute}} = \sum_{i=1}^{N} T_{\text{work}}(i) = O(N)$$
+$$
+T_{\text{execute}} = \sum_{i=1}^{N} T_{\text{work}}(i) = O(N)
+$$
 
 in the number of nodes (wall-clock time is dominated by node workloads, e.g. `Task.Delay` in demos). Redirects re-run the whole graph toward a target Order, skipping the contract-preserved prefix (`Order < target`); with at most 50 redirects (`MaxRedirects`), worst case $T_{\text{redirect}} = O(50 \cdot N)$.
 
@@ -65,7 +75,9 @@ in the number of nodes (wall-clock time is dominated by node workloads, e.g. `Ta
 
 Each mutating operation pushes one `IWorkflowActionPair` onto the undo stack. With $n$ actions:
 
-$$T_{\text{undo}}(k) = O(k), \qquad S_{\text{stack}} = O(n)$$
+$$
+T_{\text{undo}}(k) = O(k), \qquad S_{\text{stack}} = O(n)
+$$
 
 `StandardUndo`/`StandardRedo` pop in $O(1)$ and run a constant-work action. Both stacks are `ConcurrentStack<IWorkflowActionPair>` in the per-tree `TreeCache`. A batch operation such as `StandardRemoveConnections` aggregates many micro-actions into a single pair, keeping stack depth proportional to logical user actions.
 
@@ -75,7 +87,9 @@ $$T_{\text{undo}}(k) = O(k), \qquad S_{\text{stack}} = O(n)$$
 
 `TrySelect` is a dictionary lookup over the condition map maintained incrementally when items are added/removed:
 
-$$T_{\text{TrySelect}} = O(1) \text{ expected}$$
+$$
+T_{\text{TrySelect}} = O(1) \text{ expected}
+$$
 
 `SetSelector` (lines 260-382) rebuilds the item list and condition map for the new enum/bool/`ISlotProvider` type, and submits an undoable `WorkflowActionPair`; rebuilding costs $O(\text{enum members})$ per selector switch. Deferred removals flush lazily so re-entrant collection changes stay $O(1)$ amortized.
 
@@ -85,7 +99,9 @@ $$T_{\text{TrySelect}} = O(1) \text{ expected}$$
 
 `JsonConvert.SerializeObject` performs a graph traversal. With `PreserveReferencesHandling.Objects`, every object is visited once and assigned a reference id, so the traversal is linear in the number of serialized objects/properties. With $P$ = total serialized objects + properties (bounded by $O(V + E + \text{custom properties})$, $V$ nodes, $E$ links):
 
-$$T_{\text{serialize}} = O(P), \qquad T_{\text{deserialize}} = O(P)$$
+$$
+T_{\text{serialize}} = O(P), \qquad T_{\text{deserialize}} = O(P)
+$$
 
 Two constant factors worth noting:
 
@@ -94,7 +110,9 @@ Two constant factors worth noting:
 
 Settings (and their resolver's Newtonsoft contract cache) are cached statically, so repeated calls do not re-reflect the type system (`ComponentModelEx.cs`, lines 52-102). Deserialization re-resolves a `SlotEnumerator`'s selector type from the serialized `SelectorTypeName` before consumers re-raise derived values. The async overloads still materialize the full JSON string / byte array in memory, so memory usage is:
 
-$$S_{\text{json}} = O(P \cdot \text{avg bytes per value})$$
+$$
+S_{\text{json}} = O(P \cdot \text{avg bytes per value})
+$$
 
 *Source: `Src/Core/VeloxDev.Core.Extension/ComponentModelEx.cs`.*
 

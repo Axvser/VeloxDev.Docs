@@ -6,11 +6,15 @@
 
 变更是对 `WeakReference<T>` 的加锁 `Queue`/`Stack` 压入/弹出：
 
-$$\text{Enqueue / Push: } O(1), \qquad \text{TryDequeue / TryPop / TryPeek: } O(1 + d) \text{ 摊还}$$
+$$
+\text{Enqueue / Push: } O(1), \qquad \text{TryDequeue / TryPop / TryPeek: } O(1 + d) \text{ 摊还}
+$$
 
 其中 $d$ = 队头 / 栈顶的死亡引用数。`TryDequeue`/`TryPop`/`TryPeek` 弹出并丢弃死亡包装，直到抵达存活条目（或为空）；每个死亡包装在其生命周期内恰好被丢弃一次，因此跳过死亡条目的累计代价摊还到每个新增条目为 O(1)。`Count`、`GetEnumerator` 与 `TrimExcess` 会先压缩整个结构（`Prune()`，`WeakQueue.cs` 第 124-135 行；`WeakStack.cs` 第 124-136 行，后者还会反转以保证 LIFO 顺序）：
 
-$$O(n), \quad n = \text{存储的引用包装数}$$
+$$
+O(n), \quad n = \text{存储的引用包装数}
+$$
 
 | 操作 | 复杂度 |
 |---|---|
@@ -37,7 +41,9 @@ private static int GetNextCleanupThreshold(int currentCount)
 
 清扫阈值按存活数几何增长，因此每次插入的摊还代价保持恒定：
 
-$$\text{清扫: } O(n) \text{ 最坏}, \qquad \text{每次插入摊还 } O(1)$$
+$$
+\text{清扫: } O(n) \text{ 最坏}, \qquad \text{每次插入摊还 } O(1)
+$$
 
 | 操作 | 复杂度 |
 |---|---|
@@ -52,7 +58,9 @@ $$\text{清扫: } O(n) \text{ 最坏}, \qquad \text{每次插入摊还 } O(1)$$
 
 热路径是单次 `volatile` 字段读取，这正是过渡引擎每帧调用无锁的原因：
 
-$$O(1) \text{ — 读取已缓存组合委托，然后类型化或经 DynamicInvoke 调用}$$
+$$
+O(1) \text{ — 读取已缓存组合委托，然后类型化或经 DynamicInvoke 调用}
+$$
 
 重建多播缓存需要对处理器列表做一次遍历：`RebuildCache` 运行 `CleanupCollectedHandlers`（$O(h)$）再对每个存活处理器 `Delegate.Combine`（$O(h)$），其中 $h$ = 存储的处理器包装数。
 

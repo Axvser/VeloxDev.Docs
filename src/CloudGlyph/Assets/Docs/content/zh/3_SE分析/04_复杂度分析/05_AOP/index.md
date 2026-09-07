@@ -4,23 +4,31 @@ AOP 的热点路径是代理缓存查找（`AopCache.Resolve`）、每次调用�
 
 ## 代理解析（`AopCache.Resolve` / `Aop()`）
 
-$$O(1) \text{ amortized per } Aop()$$
+$$
+O(1) \text{ amortized per } Aop()
+$$
 
 `AopCache.Resolve` 就是一次 `ConditionalWeakTable<TClass, TInterface>.GetValue` 调用（`AopCache.cs`，第 24-32 行；表声明于第 14-19 行）。`ConditionalWeakTable` 是带弱键的 CLR 哈希表，因此 get-or-create 查找是摊还 $O(1)$：
 
-$$T_{\text{Aop()}} = O(1) \text{ amortized}$$
+$$
+T_{\text{Aop()}} = O(1) \text{ amortized}
+$$
 
 某个目标的首次调用要付一次工厂代价——`ProxyEx.CreateProxy` 运行 `DispatchProxy.Create<T, ProxyInstance>()`（`ProxyEx.cs`，第 17-25 行），分配实例并登记进静态 `ProxyIDs` 表。（`DispatchProxy` 只对整个 `(interface, ProxyInstance)` 对生成并缓存一次具体的代理*类型*，后续目标可跳过该步。）之后对该目标的每次 `Aop()` 都是纯缓存命中。由于每个目标实例只创建一个代理，单个实例的创建代价在其整个生命周期内摊还 $O(1)$。
 
 ## 分发 + 钩子查找（`ProxyInstance.Invoke`）
 
-$$O(1) \text{ per dispatch} \;+\; O(h) \text{ hook handlers},\quad h \le 3$$
+$$
+O(1) \text{ per dispatch} \;+\; O(h) \text{ hook handlers},\quad h \le 3
+$$
 
 `Invoke` 只计算一次成员名（`ProxyInstance.cs`，第 25 行），按 `get_*` / `set_*` 前缀在三个字典中选一（第 29-52 行），再用 `Dictionary<string, Tuple<ProxyHandler?, ProxyHandler?, ProxyHandler?>>` 解析钩子三元组（`GetterActions` / `SetterActions` / `MethodActions`，声明于第 19-21 行）。字典访问摊还 $O(1)$；分发本身不涉及反射。
 
 随后每次被拦截调用要付出活动钩子的代价——至多三个处理器（`start`、`coverage`、`end`）：
 
-$$T_{\text{intercept}} = O(1) + O(h),\quad h \le 3$$
+$$
+T_{\text{intercept}} = O(1) + O(h),\quad h \le 3
+$$
 
 ## 反射回退路径（`coverage == null`）
 
@@ -33,13 +41,17 @@ var R1 = actions?.Item2 == null ? _targetType?.GetMethod(Name)?.Invoke(_target, 
 
 `Type.GetMethod(string)` 对类型元数据做线性扫描，`MethodInfo.Invoke` 会对实参装箱：
 
-$$O(m) \text{ lookup} + O(a) \text{ invoke},\quad m = \text{members in type},\; a = \text{argument count}$$
+$$
+O(m) \text{ lookup} + O(a) \text{ invoke},\quad m = \text{members in type},\; a = \text{argument count}
+$$
 
 因此反射回退严格比 `coverage` 处理器更贵，也是无钩子成员的单次调用中占主导的代价。*该刻画由 `ProxyInstance.cs` 第 49 行的 `GetMethod` / `Invoke` 用法推出；底层算法属于标准 BCL 行为。*
 
 ## 逆向查找（`Aop.GetTarget`）
 
-$$O(1) \text{ amortized}$$
+$$
+O(1) \text{ amortized}
+$$
 
 `Aop.GetTarget<TTarget>` 是对 `ConditionalWeakTable<object, object>.TryGetValue` 的逆向查找（`Aop.cs`，第 13、25-26 行）——摊还 $O(1)$，与已映射的代理数量无关。
 

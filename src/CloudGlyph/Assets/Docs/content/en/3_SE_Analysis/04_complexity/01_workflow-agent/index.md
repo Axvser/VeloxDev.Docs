@@ -6,13 +6,17 @@
 
 Per call over one assembly:
 
-$$T_{\text{discovery}} = O\!\left(T + \sum_{C \in \text{registered}} (P_C + F_C + M_C) \cdot k\right)$$
+$$
+T_{\text{discovery}} = O\!\left(T + \sum_{C \in \text{registered}} (P_C + F_C + M_C) \cdot k\right)
+$$
 
 where $k$ is the generic-argument recursion factor (bounded by the maximum generic nesting depth). Registration buckets are `HashSet`s, so `TryRegister*` is $O(1)$ expected.
 
 Space is the registered type sets:
 
-$$S_{\text{discovery}} = O(R_{\text{comp}} + R_{\text{enum}} + R_{\text{iface}} + R_{\text{data}})$$
+$$
+S_{\text{discovery}} = O(R_{\text{comp}} + R_{\text{enum}} + R_{\text{iface}} + R_{\text{data}})
+$$
 
 Repeated calls over multiple assemblies accumulate components; the global `_globallyDiscoveredTypes` set guarantees a type is deep-scanned only once across all languages.
 
@@ -22,11 +26,15 @@ Repeated calls over multiple assemblies accumulate components; the global `_glob
 
 `BuildSnapshot` walks the whole graph: $V$ nodes and $E$ visible links. For each node it reflects over public instance properties (`AppendScalarProps`, $P$ per node) and emits the JSON tree:
 
-$$T_{\text{snapshot}} = O(V \cdot P + E), \qquad S_{\text{snapshot}} = O(V \cdot P + E)$$
+$$
+T_{\text{snapshot}} = O(V \cdot P + E), \qquad S_{\text{snapshot}} = O(V \cdot P + E)
+$$
 
 `ComputeDiff` builds `RuntimeId → JObject` dictionaries for nodes and links in $O(V + E)$, then for each node compares scalar/enum properties via `JToken.DeepEquals`:
 
-$$T_{\text{diff}} = O(V + E + V \cdot P') = O(V \cdot P' + E)$$
+$$
+T_{\text{diff}} = O(V + E + V \cdot P') = O(V \cdot P' + E)
+$$
 
 where $P' \le P$ is the scalar-prop count in the JSON. Only scalar and enum-typed properties are captured, so the diff never materializes full subtree comparisons.
 
@@ -36,7 +44,9 @@ where $P' \le P$ is the scalar-prop count in the JSON. Only scalar and enum-type
 
 Each tool is wrapped by `TrackedAIFunction` whose overhead is $O(1)$ per call (interlocked counters + event raise + optional `MarkDirty`). The tool bodies dominate:
 
-$$T_{\text{tool}} = O(\text{per-tool work}), \qquad T_{\text{tracked}} = T_{\text{tool}} + O(1)$$
+$$
+T_{\text{tool}} = O(\text{per-tool work}), \qquad T_{\text{tracked}} = T_{\text{tool}} + O(1)
+$$
 
 ### Per-tool complexity
 
@@ -81,15 +91,21 @@ The engine maintains a runtime session (`RuntimeContext`): run bookkeeping (`Sta
 
 `LoadAsync` iterates $N$ server configurations; per server the cost is install (local modes) + connect:
 
-$$T_{\text{load}}(N) = \sum_{i=1}^{N} \left( T_{\text{install}}(i) + T_{\text{connect}}(i) \right)$$
+$$
+T_{\text{load}}(N) = \sum_{i=1}^{N} \left( T_{\text{install}}(i) + T_{\text{connect}}(i) \right)
+$$
 
 **npm/pip install idempotence.** `EnsureNpmPackageAsync` keys on `"node:{package}@{version}"` (pip: `"py:..."`) in a process-wide list guarded by a global `SemaphoreSlim(1,1)`. The memoized check is $O(1)$ (contains) after the first install; the first install runs the CLI once and records the key, so repeated loads of the same package are $O(1)$ install-wise:
 
-$$T_{\text{install}} = \begin{cases} O(\text{npm/pip work}) & \text{first time} \\ O(1) & \text{memoized} \end{cases}$$
+$$
+T_{\text{install}} = \begin{cases} O(\text{npm/pip work}) & \text{first time} \\ O(1) & \text{memoized} \end{cases}
+$$
 
 **transport + handshake.** `ConnectServerAsync` builds a `StdioClientTransport` (or `HttpClientTransport` for `Http`), creates the MCP client, and performs the JSON-RPC `initialize`/`tools/list` handshake. Cost is dominated by the server process startup and the tool list:
 
-$$T_{\text{connect}} = O(\text{spawn} + \text{handshake} + \text{toolSchemaSize})$$
+$$
+T_{\text{connect}} = O(\text{spawn} + \text{handshake} + \text{toolSchemaSize})
+$$
 
 Per-server failures cost $O(1)$ and do not abort the batch (the `ServerError` event fires; the server contributes zero tools). Aggregate status maintenance (`McpStatusViewModel`) is $O(1)$ per state change, marshalled to the UI thread when a `SynchronizationContext` is registered.
 
