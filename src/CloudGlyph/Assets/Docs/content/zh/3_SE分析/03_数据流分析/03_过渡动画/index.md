@@ -4,14 +4,14 @@
 
 ## (a) 分段运行生命周期
 
-`Execute(target)` 沿流式 `StateSnapshot` 链（`root`…`next`）行走，为每段排队 `(state, effect-clone, interpolator, delay)`，然后在每目标一个的调度器上一次播放一段。取消由一次运行共享的一个 `CancellationTokenSource` 承载，贯穿该运行的所有分段。
+`Execute(target)` 沿流式分段链（`root`…`next`，节点类型是适配器的 `Transition<T>`）行走，为每段排队 `(state, effect-clone, interpolator, delay)`，然后在每目标一个的调度器上一次播放一段。取消由一次运行共享的一个 `CancellationTokenSource` 承载，贯穿该运行的所有分段。
 
 ```plantuml
 @startuml
 !theme plain
 
 actor "Caller" as Caller
-participant "StateSnapshot" as SS
+participant "Transition~T~" as SS
 participant "TransitionScheduler" as Sch
 participant "UIThreadInspector" as UI
 participant "InterpolatorCore" as IC
@@ -79,7 +79,7 @@ deactivate SS
 @enduml
 ```
 
-来源：`TransitionSystem/StateSnapshot.cs`（`CoreExecute`，分段排队与播放循环）、`TransitionScheduler.cs`（`FindOrCreate`、`Execute`、`_gate`、弱目标引用）、`Interpolator.cs`（`Prepare`，采样器解析）、`SamplerSet.cs`。
+来源：`TransitionSystem/Transition.cs`（`CoreExecute`，分段排队与播放循环）、`TransitionScheduler.cs`（`FindOrCreate`、`Execute`、`_gate`、弱目标引用）、`Interpolator.cs`（`Prepare`，采样器解析）、`SamplerSet.cs`。
 
 ## (b) 效果调度与采样循环
 
@@ -213,6 +213,6 @@ flowchart TD
 | 属性无采样器 / 路径无效 | `Prepare` 中跳过（编译 getter 的 `UnreadablePath` 哨兵，或未解析到 `ISampler`）；其余属性照常动画。 |
 | 应用关闭 | `SamplerSet.CanSetValue()` 返回 false → `Apply` 跳过写入，不再触发事件。 |
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/TransitionScheduler.cs`（门控、CWT 表、弱目标）、`TransitionInterpreter.cs`（`ExecuteSamplingLoopAsync`/`RunPassAsync`）、`SamplerSet.cs`（`Apply` + 取消/应用存活守卫）、`Interpolator.cs`（`Prepare`）、`StateSnapshot.cs`（`CoreExecute`）、`TransitionEx.cs`、`Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/TransitionScheduler.cs`（门控、CWT 表、弱目标、Awake 的 await 时序）、`TransitionInterpreter.cs`（`ExecuteSamplingLoopAsync`/`RunPassAsync`）、`SamplerSet.cs`（`Apply` + 取消/应用存活守卫）、`Interpolator.cs`（`Prepare<TPriorityCore>`）、`Transition.cs`（`CoreExecute` / `CoreValidate`）、`TransitionEx.cs`（`TransitionCoreEx` 流程扩展）、`Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`。
 
 相关分析：[设计模式 — 过渡动画](../../02_设计模式分析/03_过渡动画/index.md) · [复杂度 — 过渡动画](../../04_复杂度分析/03_过渡动画/index.md)

@@ -2,68 +2,74 @@
 
 Namespace `VeloxDev.TransitionSystem.Abstractions` in the `VeloxDev.Core` assembly (source: `Src/Core/VeloxDev.Core/TransitionSystem/*.cs`). These concrete / abstract base types implement the contracts documented in [00_transitionsystem](../00_transitionsystem/index.md). Each platform adapter subclasses them to produce the `VeloxDev.TransitionSystem` types you actually construct (see [03_adapter-provided](../03_adapter-provided/index.md)).
 
-## Snapshot builder & state
+## Builder & state
 
-### Class: `TransitionCore<TTarget, TStateSnapshotCore>` / `TransitionCore`
+### Class: `TransitionCore` / `TransitionCore<T, TStateCore, TEffectCore, TInterpolatorCore, TUIThreadInspectorCore, TTransitionInterpreterCore, TPriorityCore>`
 
 ```csharp
 public abstract class TransitionCore
 {
+    public static TSnapshot Create<TSnapshot>() where TSnapshot : StateSnapshotCore, new();
     public static void Exit<T>(T target, bool IncludeMutual = true, bool IncludeNoMutual = false) where T : class;
 }
 
-public class TransitionCore<TTarget, TStateSnapshotCore> : TransitionCore
-    where TStateSnapshotCore : new()
-{
-    public static TStateSnapshotCore Create();
-
-    public static void Execute<T>(T target, StateSnapshotCore value, bool CanMutualTask = true) where T : class, TTarget;
-    public static void Execute(StateSnapshotCore values, bool CanMutualTask = true);
-    public static void Execute<T>(T target, IEnumerable<StateSnapshotCore> values, bool CanMutualTask = false) where T : class, TTarget;
-    public static void Execute(IEnumerable<StateSnapshotCore> values, bool CanMutualTask = false);
-}
-```
-
-| Member | Description |
-|---|---|
-| `Exit<T>(T target, bool IncludeMutual, bool IncludeNoMutual)` | Stops the target's running animations: cancels the mutual scheduler (animations started with `CanMutualTask: true`) when `IncludeMutual`, and/or all non-mutual schedulers when `IncludeNoMutual`. |
-| `Create()` | Returns a new `TStateSnapshotCore` (a fresh, un-linked snapshot) and marks it as the *root* of a chain so subsequent `Then()` / `AwaitThen()` segments share it. |
-| `Execute(...)` | Runs one or more snapshot(s) against `target` (or against each snapshot's recorded target when the target-less overload is used). A single snapshot defaults to `CanMutualTask: true` — the per-target *mutual* scheduler, interrupting a running animation; `false` runs concurrently via a one-off non-mutual scheduler. The `IEnumerable` overloads default to `CanMutualTask: false`. |
-
-**Notes:** Each adapter exposes non-generic `Transition : TransitionCore` and `Transition<T> : TransitionCore<T, Transition<T>.StateSnapshot>` — you normally call `Transition<T>.Create()`, `Transition.Exit(...)`, and the `Execute` extension (see [03_adapter-provided](../03_adapter-provided/index.md)). `AddNoMutual` / `RemoveNoMutual` are `internal`. *Verified by:* WPF demo `MainWindow.xaml.cs`.
-
-### Class: `StateSnapshotCore` (fluent-builder base family)
-
-```csharp
-public class StateSnapshotCore<T, TStateCore, TEffectCore, TInterpolatorCore, TUIThreadInspectorCore, TTransitionInterpreterCore> : StateSnapshotCore<T>
-    where TStateCore : IFrameState, new()
-    where TEffectCore : ITransitionEffectCore, new()
-    where TInterpolatorCore : InterpolatorCore, new()
-    where TUIThreadInspectorCore : IUIThreadInspector, new()
-    where TTransitionInterpreterCore : class, ITransitionInterpreter, new()
-{
-    public TStateCore GetState();
-}
-
-public class StateSnapshotCore<T, TStateCore, TEffectCore, TInterpolatorCore, TUIThreadInspectorCore, TTransitionInterpreterCore, TPriorityCore> : StateSnapshotCore<T>
+public class TransitionCore<
+    T,
+    TStateCore,
+    TEffectCore,
+    TInterpolatorCore,
+    TUIThreadInspectorCore,
+    TTransitionInterpreterCore,
+    TPriorityCore> : StateSnapshotCore<T>
+    where T : class
     where TStateCore : IFrameState, new()
     where TEffectCore : ITransitionEffect<TPriorityCore>, new()
     where TInterpolatorCore : InterpolatorCore, new()
     where TUIThreadInspectorCore : IUIThreadInspector<TPriorityCore>, new()
     where TTransitionInterpreterCore : class, ITransitionInterpreter<TPriorityCore>, new()
 {
+    protected TStateCore state = new();
+    protected TransitionCore<...>? root;
+    protected TransitionCore<...>? next;
+
     public TStateCore GetState();
+    public static void Execute(T target, IEnumerable<TransitionCore<...>> values, bool CanMutualTask = false);
+}
+```
+
+| Member | Description |
+|---|---|
+| `Exit<T>(T target, bool IncludeMutual, bool IncludeNoMutual)` | Stops the target's running animations: cancels the mutual scheduler (animations started with `CanMutualTask: true`) when `IncludeMutual`, and/or every non-mutual scheduler when `IncludeNoMutual`. |
+| `Create<TSnapshot>()` | Returns a fresh, un-linked builder and marks it as the *root* of a chain so subsequent `Then()` / `AwaitThen()` segments share it. |
+| `GetState()` | The underlying `TStateCore` (a `StateCore` implementing `IFrameState`) — the declared values / samplers / options of this segment. |
+| `Execute(target, values, CanMutualTask)` | Runs each builder in the batch on `target`. Non-mutual by default: they run concurrently and do **not** cancel each other — deliberately the opposite of the single-builder `Execute(target)` instance method. |
+
+**Notes:**
+- There is **one arity only**: the host's dispatcher priority is a type parameter for every adapter, and a priority-free host passes `NonPriority`. The former 6-generic, priority-free copy of this family no longer exists.
+- Each adapter exposes non-generic `Transition : TransitionCore` and `Transition<T> : TransitionCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter, TPriorityCore>` — you normally call `Transition<T>.Create()`, `Transition.Exit(...)`, and the inherited instance `Execute(target, CanMutualTask)` (see [03_adapter-provided](../03_adapter-provided/index.md)). `AddNoMutual` / `RemoveNoMutual` / `RejectUnsampleablePaths` are `internal`. *Verified by:* WPF demo `MainWindow.xaml.cs`.
+
+### Classes: `StateSnapshotCore` / `StateSnapshotCore<T>`
+
+```csharp
+public abstract class StateSnapshotCore<T> : StateSnapshotCore where T : class
+{
+    public void Execute(T target, bool CanMutualTask = true);
+    public void Exit(T target, bool IncludeMutual = true, bool IncludeNoMutual = false);
 }
 
-public abstract class StateSnapshotCore<T> : StateSnapshotCore { }
-public abstract class StateSnapshotCore { }
+public abstract class StateSnapshotCore
+{
+    // internal: AsRoot / CoreExecute / CoreValidate / CoreThen / CoreAwait / CoreAwaitThen /
+    // CoreInterpolator / CoreEffect / CoreRecordState
+}
 ```
 
 **Notes:**
-- The two concrete generic classes differ only on the priority axis: the 6-generic variant is used by adapters without a dispatcher priority (MAUI, WinForms, Razor); the 7-generic one — adding `TPriorityCore` — by WPF, Avalonia, Jalium and WinUI.
-- The only public member is `GetState()` (returns the underlying `TStateCore`, a `StateCore` implementing `IFrameState`). Everything else is `internal`/`protected` machinery: `CoreExecute` walks the linked segments (`next`) and hands each segment's interpolator / delay / cloned effect / state to the scheduler one by one; `CoreThen`/`CoreAwaitThen`/`CoreEffect`/`CoreInterpolator` are the hooks the public extensions and adapter overloads call.
-- Because most members are protected, the builder's *public* vocabulary comes from `TransitionCoreEx` (below) and from each adapter's nested `StateSnapshot` overloads (`Property`, `Effect`).
-- *Verified by:* WPF demo chains `.Property(...)`, `.Effect(...)`, `.Await(...)`, `.AwaitThen(...)` on `Transition<Rectangle>.StateSnapshot`, and iterates `snapshot.GetState().Values`.
+- The abstract root of the concrete builder (`TransitionCore<...>`, above). `Execute` is the public one-shot entry: the target type is fixed by `T`, so it is checked at compile time; it validates the declared paths (a path that can never animate throws `TransitionPathUnsampleableException`) and then runs the chain. Validation happens here rather than inside `CoreExecute`, because that one is `async void` — a throw from it would escape to the synchronization context instead of reaching the caller.
+- `Exit(target, ...)` is the instance form of `TransitionCore.Exit`.
+- Everything else is `internal`/`protected` machinery: `CoreExecute` walks the linked segments (`next`) and hands each segment's interpolator / delay / cloned effect / state to the scheduler one by one; `CoreThen` / `CoreAwaitThen` / `CoreEffect` / `CoreInterpolator` are the hooks the public extensions and adapter overloads call.
+- There is no separate `StateSnapshotCore<...>` builder class, and no top-level `StateSnapshot` or `Transition<T>.StateSnapshot` type: the concrete builder is `TransitionCore<...>`. The builder's *public* vocabulary comes from `TransitionCoreEx` (below) and from each adapter's `Property` / `Effect` overloads.
+- *Verified by:* WPF demo chains `.Property(...)`, `.Effect(...)`, `.Await(...)`, `.AwaitThen(...)` on `Transition<Rectangle>` and iterates `GetState().Values`.
 
 ### Static Class: `TransitionCoreEx` (extensions, namespace `VeloxDev.TransitionSystem`)
 
@@ -73,10 +79,8 @@ public abstract class StateSnapshotCore { }
 | `Then` | `T Then<T>(this T snapshot) where T : StateSnapshotCore, new()` | Start a new linked segment after this one. |
 | `AwaitThen` | `T AwaitThen<T>(this T snapshot, TimeSpan timeSpan) where T : StateSnapshotCore, new()` | Wait `timeSpan`, then start a new linked segment. |
 | `Interpolator` | `TSnapshot Interpolator<TSnapshot, TTarget, TValue>(this TSnapshot snapshot, Expression<Func<TTarget, TValue>> propertyLambda, ISampler interpolator) where TSnapshot : StateSnapshotCore, new()` | Override the per-property sampler for `propertyLambda`. |
-| `Execute` | `void Execute<T>(this T snapshot, object target, bool CanMutualTask = true) where T : StateSnapshotCore` | Run the snapshot on `target`. |
-| `Execute` | `void Execute<T>(this T snapshot, bool CanMutualTask = true) where T : StateSnapshotCore` | Run the snapshot on its recorded target. |
 
-**Notes:** `Await` / `Then` / `AwaitThen` record their delay / link by mutating the snapshot chain (the delay is honored by `CoreExecute` as a `Task.Delay` before the segment runs). *Verified by:* WPF demo (`Animation0`/`Animation1`/`Animation2`).
+**Notes:** these four are the **entire** public surface of `TransitionCoreEx` — there is no `Execute` extension (running is the inherited instance method `Execute(target, CanMutualTask)`). `Await` / `Then` / `AwaitThen` record their delay / link by mutating the builder chain (the delay is honored by `CoreExecute` as a `Task.Delay` before the segment runs). *Verified by:* WPF demo (`Animation0`/`Animation1`/`Animation2`).
 
 ### Class: `StateCore : IFrameState`
 
@@ -108,7 +112,7 @@ public abstract class InterpolatorCore
     public static bool RegisterInterpolator(Type type, ISampler sampler);
     public static bool UnregisterInterpolator(Type type, out ISampler? sampler);
 
-    public virtual SamplerSet Prepare(object target, IFrameState state, ITransitionEffectCore effect, IUIThreadInspectorCore inspector);
+    public virtual SamplerSet<TPriorityCore> Prepare<TPriorityCore>(object target, IFrameState state, ITransitionEffectCore effect, IUIThreadInspector<TPriorityCore> inspector);
 }
 ```
 
@@ -118,22 +122,22 @@ public abstract class InterpolatorCore
 | `RegisterInterpolator` | Installs a sampler with **last-writer-wins** semantics (`AddOrUpdate`) — unconditional, atomic. Returns `true`. |
 | `UnregisterInterpolator` | Removes the entry; reports it via `sampler`. |
 | `TryGetInterpolator` | Looks up a type in the registry. |
-| `Prepare` | Normalizes a recorded state into a runnable `SamplerSet`. |
+| `Prepare<TPriorityCore>` | Normalizes a declared state into a runnable `SamplerSet<TPriorityCore>`. |
 
-**Notes on `Prepare`:** For every recorded value it reads the current value through `inspector.ProtectedGetValue`; an invalid path (`TransitionProperty.UnreadablePath`) is skipped. Sampler resolution order: (1) a per-property custom sampler from `state.Interpolators`; (2) the registry by `PropertyType`; (3) a *struct* value type implementing `ISampleable` → an internal struct-assembling sampler (member samplers must all resolve, otherwise skipped). It then calls `sampler.NormalizeStart(current, newValue, options)` / `NormalizeEnd(...)` once and stores `(property, sampler, normalizedStart, normalizedEnd, options)` per entry. Adapters derive `Interpolator : InterpolatorCore` and register platform types in their static constructor. *Verified by:* `InterpolatorCoreTests`.
+**Notes on `Prepare<TPriorityCore>`:** For every declared value it reads the current value through `inspector.ProtectedGetValue`; an invalid path (`TransitionProperty.UnreadablePath`) is skipped. Sampler resolution order: (1) a per-property custom sampler from `state.Interpolators`; (2) the registry by `PropertyType`; (3) a *struct* value type implementing `ISampleable` → an internal struct-assembling sampler (member samplers must all resolve, otherwise skipped). **Reference types are never expanded** here — they must be expressed as explicit member paths or handled by a dedicated sampler. It then calls `sampler.NormalizeStart(current, newValue, options)` / `NormalizeEnd(...)` once and stores `(property, sampler, normalizedStart, normalizedEnd, options)` per entry. Adapters derive `Interpolator : InterpolatorCore` and register platform types in their static constructor. *Verified by:* `InterpolatorCoreTests`.
 
-### Class: `SamplerSet`
+### Class: `SamplerSet<TPriorityCore>`
 
 ```csharp
-public sealed class SamplerSet
+public sealed class SamplerSet<TPriorityCore>
 {
-    public SamplerSet(IUIThreadInspectorCore inspector);
+    public SamplerSet(IUIThreadInspector<TPriorityCore> inspector);
     public bool CanSetValue();
-    public void Apply(object target, double t, object? priority = default);
+    public void Apply(object target, double t, TPriorityCore priority = default!);
 }
 ```
 
-**Notes:** The constructor throws `ArgumentNullException` on a null inspector. `CanSetValue()` returns `inspector.IsAppAlive()`. `Apply` marshals per-property updates to the UI thread — it stores `t` in a field and reuses one cached UI-thread delegate per target (zero closure allocation per sample), then calls `inspector.ProtectedInvoke`; on the UI thread it runs each entry's `sampler.InsertFrame(target, property, ref working, start, end, options, t)`. `SetCancellation(cts)` (internal, called by the interpreter) lets the set carry the animation's `CancellationTokenSource`: once cancelled — or the app is dead — `Apply` returns immediately, so stale queued frames never overwrite a reset result. *Verified by:* `SamplerSetTests`.
+**Notes:** The type parameter is the host's dispatcher priority (or `NonPriority`), carried as a type parameter rather than as `object?` so `Apply` hands the priority to the inspector **unboxed** — the previous `object?` parameter boxed a `DispatcherPriority` on every frame of every animation. The constructor throws `ArgumentNullException` on a null inspector. `CanSetValue()` returns `inspector.IsAppAlive()`. `Apply` marshals per-property updates to the UI thread — it stores `t` in a field and reuses one cached UI-thread delegate per target (zero closure allocation per sample), then calls `inspector.ProtectedInvoke`; on the UI thread it runs each entry's `sampler.InsertFrame(target, property, ref working, start, end, options, t)`. `SetCancellation(cts)` (internal, called by the interpreter) lets the set carry the animation's `CancellationTokenSource`: once cancelled — or the app is dead — `Apply` returns immediately (the check is repeated inside the queued write too, so a frame already queued to the UI thread cannot overwrite a reset). *Verified by:* `SamplerSetTests`.
 
 ### Class: `TransitionEffectCore : ITransitionEffectCore`
 
@@ -146,7 +150,7 @@ Default descriptor implementation. Defaults: `FPS = 60`, `Duration = 0`, `IsAuto
 | Invokers | `virtual void InvokeAwake/InvokeStart/InvokeUpdate/InvokeLateUpdate/InvokeCompleted/InvokeCancled/InvokeFinally(object sender, TransitionEventArgs e)` |
 | `Clone` | `ITransitionEffectCore Clone()` |
 
-**Notes:** Events are backed by `WeakDelegate` (`VeloxDev.WeakTypes`), so short-lived handler owners do not leak; `Clone` deep-clones the event backing stores and copies all properties. `InvokeCancled` (sic) is the real member name. The subclass `TransitionEffectCore<TPriorityCore> : TransitionEffectCore, ITransitionEffect<TPriorityCore>` adds `virtual TPriorityCore Priority { get; set; }` and `new ITransitionEffect<TPriorityCore> Clone()`. Adapter effects derive from the priority variant where the platform marshals at a priority, else from the plain base. *Verified by:* `TransitionEffectCoreTests`.
+**Notes:** Events are backed by `WeakDelegate` (`VeloxDev.WeakTypes`), so short-lived handler owners do not leak; `Clone` deep-clones the event backing stores and copies all properties. `InvokeCancled` (sic) is the real member name. The plain base itself implements `ITransitionEffect<NonPriority>` (with an explicit `NonPriority` priority that is always `default`), so a priority-free adapter can use it directly; the subclass `TransitionEffectCore<TPriorityCore> : TransitionEffectCore, ITransitionEffect<TPriorityCore>` adds `virtual TPriorityCore Priority { get; set; }` and `new ITransitionEffect<TPriorityCore> Clone()`. Adapter effects derive from the priority variant where the platform marshals at a priority, else from the plain base. *Verified by:* `TransitionEffectCoreTests`.
 
 ### Abstract Class: `TransitionSchedulerCore : ITransitionSchedulerCore`
 
@@ -154,7 +158,7 @@ Default descriptor implementation. Defaults: `FPS = 60`, `Duration = 0`, `IsAuto
 public abstract class TransitionSchedulerCore : ITransitionSchedulerCore
 {
     public static ConditionalWeakTable<object, ITransitionSchedulerCore> MutualSchedulers { get; protected set; }
-    public static ConditionalWeakTable<object, List<ITransitionSchedulerCore>> NoMutualSchedulers { get; internal set; }
+    public static ConditionalWeakTable<object, ConcurrentDictionary<ITransitionSchedulerCore, byte>> NoMutualSchedulers { get; internal set; }
 
     public static bool TryGetMutualScheduler(object source, out ITransitionSchedulerCore? scheduler);
     public static bool RemoveMutualScheduler(object source);
@@ -164,40 +168,37 @@ public abstract class TransitionSchedulerCore : ITransitionSchedulerCore
     protected readonly SemaphoreSlim _gate = new(1, 1);
     internal WeakReference<object>? targetref;
     public virtual WeakReference<object>? TargetRef { get; protected set; }
-    internal CancellationTokenSource? cts { get; set; }
 
-    protected void CancelCurrent();
     public abstract Task Execute(InterpolatorCore producer, IFrameState state, ITransitionEffectCore effect, CancellationTokenSource? externCts = default);
     public abstract void Exit();
 }
 ```
 
-**Notes:** `MutualSchedulers` caches one *mutual* scheduler per target (a `ConditionalWeakTable`, collected with the target); `NoMutualSchedulers` holds the active one-off *non-mutual* schedulers per target. Two generic subclasses parameterize the concrete inspector / interpreter:
-- `TransitionSchedulerCore<TUIThreadInspectorCore, TTransitionInterpreterCore, TPriorityCore> : TransitionSchedulerCore, ITransitionScheduler<TPriorityCore>`
-- `TransitionSchedulerCore<TUIThreadInspectorCore, TTransitionInterpreterCore> : TransitionSchedulerCore, ITransitionScheduler`
+**Notes:** `MutualSchedulers` caches one *mutual* scheduler per target (a `ConditionalWeakTable`, collected with the target); `NoMutualSchedulers` holds the active one-off *non-mutual* schedulers per target as a concurrent **set** (animations register/unregister themselves from several threads at once, so a plain `List` would lose entries and `Exit` would miss a live run). One generic subclass parameterizes the concrete inspector / interpreter:
 
-Their `Execute` resolves the target from the weak `TargetRef`, fires `effect.InvokeAwake` on the UI thread (at the effect's priority when priority-typed), calls `producer.Prepare(...)`, then hands the prepared set to a fresh interpreter. A `_gate` serializes executions; `Exit()` → `CancelCurrent()` cancels the running `cts`. Static `FindOrCreate<T>(T source, bool CanMutualTask = true)` returns the cached mutual scheduler (creating it if absent) or a fresh non-mutual one. *Verified by:* WPF demo `RepeatMutual` / `ExitAll`.
+- `TransitionSchedulerCore<TUIThreadInspectorCore, TTransitionInterpreterCore, TPriorityCore> : TransitionSchedulerCore, ITransitionScheduler<TPriorityCore>` (constraints `TUIThreadInspectorCore : IUIThreadInspector<TPriorityCore>, new()` and `TTransitionInterpreterCore : ITransitionInterpreter<TPriorityCore>, new()`)
 
-### Abstract Class: `TransitionInterpreterCore : ITransitionInterpreterCore, IDisposable`
+Its `Execute` resolves the target from the weak `TargetRef`, **awaits** `ProtectedInvokeAsync` of `effect.InvokeAwake` on the UI thread (awaited, not fire-and-forget, so `Awake` finishes before `Prepare` reads the target — it may veto the animation through `Args.Handled` and may put the target into the state the animation starts from), calls `producer.Prepare<TPriorityCore>(...)`, then hands the prepared set to a fresh interpreter. A `_gate` serializes executions, and each animation registers its `CancellationTokenSource` for its **whole lifetime** (including the `Await` gaps between segments) so `Exit()` can cancel a run that is not currently executing a segment; a generation counter lets a run still queued on the gate give up when an `Exit` lands first. Static `FindOrCreate<T>(T source, bool CanMutualTask = true)` returns the cached mutual scheduler (atomically via `GetValue`) or a fresh non-mutual one. *Verified by:* WPF demo `RepeatMutual` / `ExitAll`, `TransitionSchedulerExitTests`, `NoMutualSchedulerRegistryTests`.
+
+### Abstract Class: `TransitionInterpreterCore : IDisposable`
 
 ```csharp
-public abstract class TransitionInterpreterCore : ITransitionInterpreterCore, IDisposable
+public abstract class TransitionInterpreterCore : IDisposable
 {
     protected CancellationTokenSource? cts;
     public virtual TransitionEventArgs Args { get; set; }
 
-    public abstract Task Execute(object target, SamplerSet frameSet, ITransitionEffectCore effect, CancellationTokenSource cts);
     public virtual void Exit();
     public virtual void Dispose();   // cancels the active CancellationTokenSource
 
-    protected Task ExecuteSamplingLoopAsync(object target, SamplerSet frameSet, ITransitionEffectCore effect,
-        CancellationTokenSource cts, Action<double> apply);
+    protected Task ExecuteSamplingLoopAsync<TPriorityCore>(object target, SamplerSet<TPriorityCore> frameSet,
+        ITransitionEffectCore effect, CancellationTokenSource cts, Action<double> apply);
 }
 ```
 
 **Notes:** Two generic subclasses wire the loop to the sampler set's `Apply`:
-- `TransitionInterpreterCore<TTransitionEffectCore> : TransitionInterpreterCore, ITransitionInterpreter` (constraint `TTransitionEffectCore : ITransitionEffectCore`) — applies `easedT => frameSet.Apply(target, easedT)`.
 - `TransitionInterpreterCore<TTransitionEffectCore, TPriorityCore> : TransitionInterpreterCore, ITransitionInterpreter<TPriorityCore>` (constraint `TTransitionEffectCore : ITransitionEffect<TPriorityCore>`) — applies `easedT => frameSet.Apply(target, easedT, effect.Priority)`.
+- `TransitionInterpreterCore<TTransitionEffectCore> : TransitionInterpreterCore, ITransitionInterpreter<NonPriority>` (constraint `TTransitionEffectCore : ITransitionEffectCore`) — applies `easedT => frameSet.Apply(target, easedT)`; a priority-free host keeps sampling on the priority-free path, so `NonPriority` costs nothing per frame.
 
 **Sampling-loop semantics** (`ExecuteSamplingLoopAsync`): Stopwatch-driven continuous sampling, not a frame pump. Normalized time derives from elapsed wall-clock time each iteration (`t = elapsed / Duration`), so `Task.Delay` is never a timing source; the yield interval is capped at `1000 / FPS` ms (`FPS` is a maximum sample rate, not a frame grid). Each pass clamps raw time, applies easing (clamped back into `[0, 1]` for `Back`/`Elastic` overshoot), then `InvokeUpdate` → `apply(easedT)` → `InvokeLateUpdate`; the final frame of each pass is the **exact endpoint** (`t >= 1` → eased `1` forward / `0` reverse), independent of whether `Ease(1)` is exactly `1`. `Start` fires once before the loop; `IsAutoReverse` adds a reverse pass; `LoopTime` repeats (`int.MaxValue` = forever). Normal completion fires `Completed`; cancellation — a cancelled `cts` **or** `Args.Handled = true` → `OperationCanceledException` — fires `Canceled`; `Finally` fires on every end path. *Verified by:* `SamplingLoopTests`, `TransitionEffectCoreTests`.
 
@@ -209,25 +210,27 @@ public abstract class UIThreadInspectorBase : IUIThreadInspectorCore
     public abstract bool IsAppAlive();
     public abstract bool IsUIThread();
     public abstract object? ProtectedGetValue(object target, ITransitionProperty property);
-    public abstract void ProtectedInvoke(object target, Action action, object? priority = default);
+
+    protected static Task<bool> DispatchAsync(Func<Action, bool> enqueue, bool onUIThread, Action action);
 }
 
-public abstract class UIThreadInspectorCore : UIThreadInspectorBase, IUIThreadInspector
+public abstract class UIThreadInspectorCore : UIThreadInspectorBase, IUIThreadInspector<NonPriority>
 {
-    public abstract void ProtectedInvoke(object target, Action action);
-    public override void ProtectedInvoke(object target, Action action, object? priority = default);
+    public abstract bool ProtectedInvoke(object target, Action action);
+    public virtual bool ProtectedInvoke(object target, Action action, NonPriority priority) => ProtectedInvoke(target, action);
+    public virtual Task<bool> ProtectedInvokeAsync(object target, Action action, NonPriority priority);
 }
 
 public abstract class UIThreadInspectorCore<TPriorityCore> : UIThreadInspectorBase, IUIThreadInspector<TPriorityCore>
 {
-    public abstract void ProtectedInvoke(object target, Action action, TPriorityCore priority);
-    public override void ProtectedInvoke(object target, Action action, object? priority = default); // no-op unless priority is TPriorityCore
+    public abstract bool ProtectedInvoke(object target, Action action, TPriorityCore priority);
+    public virtual Task<bool> ProtectedInvokeAsync(object target, Action action, TPriorityCore priority);
 }
 ```
 
-**Notes:** These are skeleton classes — every abstract member (thread identity, marshaling, read marshaling, aliveness) is filled by each adapter's `UIThreadInspector` (see [03_adapter-provided](../03_adapter-provided/index.md)). Priority-typed inspectors accept the adapter's dispatcher priority; non-priority inspectors marshal at the framework default.
+**Notes:** These are skeleton classes — every abstract member (thread identity, marshaling, read marshaling, aliveness) is filled by each adapter's `UIThreadInspector` (see [03_adapter-provided](../03_adapter-provided/index.md)). The base declares no `ProtectedInvoke` at all: it only provides `DispatchAsync`, which queues the action and — unless the call already runs on the UI thread — waits for it to have run, giving up (`false`) when the queue rejected the action. `UIThreadInspectorCore` (the priority-free variant) takes the single-argument `ProtectedInvoke` and implements `IUIThreadInspector<NonPriority>` by forwarding the marker away; `UIThreadInspectorCore<TPriorityCore>` takes the priority-typed one. There is no priority-free inspector *interface* — a host without a priority still implements `IUIThreadInspector<NonPriority>`.
 
-## Property path & capture
+## Property path & validation
 
 ### Class: `TransitionProperty : ITransitionProperty, IEquatable<TransitionProperty>`
 
@@ -266,17 +269,13 @@ public sealed class TransitionProperty : ITransitionProperty, IEquatable<Transit
 | `TryCreate` | Parses a lambda (unwrapping `Convert`/`ConvertChecked`) into a `TransitionProperty`; returns `false` for non-member / indexed expressions. |
 | `UnreadablePath` | Sentinel returned by `GetValue` when an intermediate object's runtime type does not match the path. Callers skip such properties rather than interpolating them as `null`. |
 
-**Notes:** Getter and setter are compiled into single delegates on first use (`CompileGetter` / `CompileSetter`), eliminating per-frame reflection — the hot path of `SamplerSet.Apply` / `ProtectedGetValue`. `GetValue` distinguishes a genuinely-null intermediate (`null`, interpolation starts from identity/default) from a type-mismatch intermediate (`UnreadablePath`). `SetValue` returns `false` (no `TargetException`) when an intermediate type mismatches or is null or the leaf has no setter; writing `null` to a reference-type leaf is allowed. Equality compares segment chains; `ToString()` returns `Path`. *Verified by:* `TransitionPropertyTests`.
+**Notes:** Getter and setter are compiled into single delegates on first use (`CompileGetter` / `CompileSetter`), eliminating per-frame reflection — the hot path of `SamplerSet.Apply` / `ProtectedGetValue`. `GetValue` distinguishes a genuinely-null intermediate (`null`, interpolation starts from identity/default) from a type-mismatch intermediate (`UnreadablePath`). `SetValue` returns `false` (no `TargetException`) when an intermediate type mismatches or is null or the leaf has no setter; writing `null` to a reference-type leaf is allowed. Equality compares segment chains — `SameSegment` compares **name + declaring type** rather than `PropertyInfo` reference (reflection does not keep that reference stable), and `GetHashCode` follows the same rule; `IsDescendantOf` uses it to detect a parent/child path pair. `ToString()` returns `Path`. *Verified by:* `TransitionPropertyTests`.
 
-### Static Class: `TransitionSnapshotHelper`
+### Path validation
 
-| Member | Signature | Description |
-|---|---|---|
-| `CaptureSpecific` | `void CaptureSpecific<T>(T target, IFrameState state, IEnumerable<Expression<Func<T, object?>>>? expressions) where T : class` | Records exactly the explicit expression paths (readable & writable). |
-| `CaptureAll` | `void CaptureAll<T>(T target, IFrameState state, Func<Type, bool> canAnimateType, IEnumerable<Expression<Func<T, object?>>>? extraExpressions = null) where T : class` | Records every discovered animatable path plus any extra explicit expressions. |
-| `CaptureAllExcept` | `void CaptureAllExcept<T>(T target, IFrameState state, Func<Type, bool> canAnimateType, IEnumerable<Expression<Func<T, object?>>>? excludedExpressions = null) where T : class` | Records discovery minus the excluded paths **and their child paths**. |
-| `DiscoverAnimatableProperties` | `IReadOnlyCollection<ITransitionProperty> DiscoverAnimatableProperties(object target, Func<Type, bool> canAnimateType)` | Walks the object graph and returns the set of animatable leaf paths. |
-| `TryGetPropertyFromExpression` | `bool TryGetPropertyFromExpression<T>(Expression<Func<T, object?>> expression, out ITransitionProperty? property) where T : class` | Parses a single expression (must be readable & writable, non-indexed). |
-| `CaptureProperties` | `void CaptureProperties(object target, IFrameState state, IEnumerable<ITransitionProperty> properties)` | Records each readable & writable property's current value into the state. |
+There is no capture / discovery API left in the engine: animated state is declared path by path, and the only path machinery is the two guards below. `TransitionProperty.IsDescendantOf` implements the first, and `TransitionCore.RejectUnsampleablePaths` (internal, called from `CoreValidate`) the second.
 
-**Notes on discovery (`DiscoverAnimatableProperties`):** Recursive, cycle-guarded walk (an object back-reference or a member type already on the path stops recursion — there is **no depth limit**; indexed properties are skipped). For each public readable + writable instance property: the type is animatable (`canAnimateType(type)` **or** `typeof(ISampler).IsAssignableFrom(type)`) → the whole path is a leaf; otherwise the value implements `ISampleable` → a *struct* is recorded as a whole path (rebuilt via `CreateFrameValue`) and a reference type has its declared members expanded recursively; otherwise the type is descendable (`string`, `object`, primitives, enums, value types, `IEnumerable`, `Delegate` are not, after nullable unwrapping) and the value is non-null → recurse into its sub-leaves. `CaptureAll` / `CaptureAllExcept` are the engine behind `TransitionEx.SnapshotAll` / `SnapshotExcept`. *Verified by:* `TransitionSnapshotHelperTests`.
+- **`TransitionPathConflictException`** — thrown from `StateCore.SetValue` while the transition is built, when an incoming path sits above or below one already on it (one object must be expressed by exactly one path; re-adding the identical path is a plain overwrite). Covers one transition's value paths only. *Verified by:* `TransitionPathConflictTests`.
+- **`TransitionPathUnsampleableException`** — thrown synchronously by `Transition<T>.Execute`, when a declared path can never animate (a reference-type leaf with neither a custom interpolator nor a registered sampler). Value types are exempt. *Verified by:* `TransitionPathValidationTests`.
+
+Both are documented in full with the contracts in [00_transitionsystem/00_sampling-capture](../00_transitionsystem/00_sampling-capture/index.md).

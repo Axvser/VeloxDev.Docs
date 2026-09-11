@@ -9,7 +9,7 @@
 - **启动（非互斥）** —— 三个动画以 `CanMutualTask: false` 并发运行。
 - **重复** —— 每次点击都在同一矩形上再次启动 `Animation0`；上一轮被取消，矩形重新开始。
 - **退出 / 全部停止** —— `Transition.Exit(...)` 让矩形就地冻结。
-- **重置** —— `snapshot.Effect(TransitionEffects.Empty).Execute(...)` 让矩形瞬时恢复到捕获的初始状态。
+- **重置** —— `CreateReset().Effect(TransitionEffects.Empty).Execute(rect)` 用一个零时长效果把各初始值逐条写回。
 
 **预期结果：** 矩形在 2 秒内右移并淡出、填充转橙，然后自动往返两次；重置与退出按钮的行为如上所述。
 
@@ -62,7 +62,7 @@ namespace TransitionQuickStart;
 
 public static class Program
 {
-    private static readonly Transition<Rectangle>.StateSnapshot Animation0 =
+    private static readonly Transition<Rectangle> Animation0 =
         Transition<Rectangle>.Create()
             .Property(r => r.Opacity, 0)
             .Property(r => ((TranslateTransform)r.RenderTransform).X, 800)
@@ -98,7 +98,7 @@ public static class Program
 }
 ```
 
-上文每个标识符都已定义：快照记录 `Opacity → 0`、`RenderTransform.X → 800` 与 `Fill → 橙色`；效果为 2 秒、自动往返、`Eases.Sine.InOut` 三个来回。矩形初始为青色，窗口加载后横穿画布。窗口关闭（`app.Run` 返回）后，`Main` 返回、进程退出。
+上文每个标识符都已定义：animation 声明 `Opacity → 0`、`RenderTransform.X → 800` 与 `Fill → 橙色`；效果为 2 秒、自动往返、`Eases.Sine.InOut` 三个来回。矩形初始为青色，窗口加载后横穿画布。窗口关闭（`app.Run` 返回）后，`Main` 返回、进程退出。
 
 ## 4. 运行声明
 

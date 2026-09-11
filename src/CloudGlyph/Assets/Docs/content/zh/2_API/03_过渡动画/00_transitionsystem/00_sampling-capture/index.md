@@ -1,6 +1,6 @@
-# Transition — 契约：采样与属性捕获
+# Transition — 契约：采样与属性路径
 
-命名空间 `VeloxDev.TransitionSystem`。这四个契约描述「值如何被采样」以及「目标属性如何被寻址与记录」。
+命名空间 `VeloxDev.TransitionSystem`。这四个契约描述「值如何被采样」以及「目标属性如何被声明与寻址」。
 
 ### 接口：`ISampler`
 
@@ -37,12 +37,13 @@ public interface ISampleable
 ```
 
 **说明：**
-- 声明该类型的哪些成员可动画——**单层、不递归**。当某属性的类型没有注册采样器时，发现/捕获会调用 `GetAnimatableMembers()` 并把声明的成员展开成成员路径（如 `target.Foo.Bar`），让每个叶子解析各自的采样器。
-- `GetAnimatableMembers` 返回相对本类型的路径。推荐用 `TransitionProperty.Members<Foo>(f => f.Bar, ...)` 声明（见 [01_abstractions](../../01_abstractions/index.md)）。
-- `CreateFrameValue` 按 `GetAnimatableMembers` 的顺序、用已插值的成员重建一个值。**结构体**实现它以便在编译期经构造函数重建（零反射）。引用类型按成员分解动画，此处返回 `null`（不使用）。
-- 仅当该类型没有注册采样器时才需要它。复杂的组合类型（变换矩阵、画刷……）应自带专用 `ISampler` 在内部完成分解/归一化/插值——它们无需实现本接口。
-- 在 `Prepare`（见 [01_abstractions](../../01_abstractions/index.md)）期间，实现了 `ISampleable` 的**结构体**值类型会被重组：每个声明成员由各自注册的采样器插值，再经 `CreateFrameValue` 重建整个结构体。
-- *验证依据：* `TransitionSnapshotHelperTests`（`Discover_ExpandsDeclaredMembers_IntoMemberPaths`、`Discover_ExpandsNestedSampleableMembers_Recursively`）、`NativeSamplersExtendedTests`（测试用结构体）。
+- **只服务值类型。** 复合*值类型*（结构体）用 `GetAnimatableMembers()` 声明它哪些成员可动画、用 `CreateFrameValue` 声明如何由插值后的成员重建该值。**引用类型不走这条路**：引用类型持有的复合值必须用**逐成员显式路径**（`Property(x => x.Foo.Bar, end)`）表达，或交给一个专用 `ISampler` 在内部完成分解。
+- `GetAnimatableMembers` 返回相对本类型的路径（**单层、不递归**）。推荐用 `TransitionProperty.Members<Foo>(f => f.Bar, ...)` 声明（见 [01_abstractions](../../01_abstractions/index.md)）。
+- `CreateFrameValue` 按 `GetAnimatableMembers` 的顺序、用已插值的成员重建一个值。**结构体**实现它以便在编译期经构造函数重建（零反射）。
+- 仅当该类型没有注册采样器时才需要它：`Prepare` 的采样器解析顺序是「逐属性自定义覆盖 → 按 `PropertyType` 查注册表 → 值类型 `ISampleable`」，前两者都落空后才会走本接口。复杂的组合类型（变换矩阵、画刷……）应自带专用 `ISampler` 在内部完成分解/归一化/插值——它们无需实现本接口。
+- 在 `Prepare`（见 [01_abstractions](../../01_abstractions/index.md)）期间，实现了 `ISampleable` 的**结构体**值类型会被重组：每个声明成员由各自注册的采样器插值，再经 `CreateFrameValue` 重建整个结构体。WorkflowSystem 的 `Viewport`（结构体）是工作流域内的实例；`Offset` / `Anchor` / `Size` / `Scale` 是引用类型，**不再**实现本接口。
+- 若某结构体的成员采样器解析不全，`StructAssembler.Create` 返回 `null`，该属性在动画中被跳过。
+- *验证依据：* `NativeSamplersExtendedTests`（测试用结构体）、`StructAssemblerTests`、`ISampleableAnimationTests`。
 
 ### 接口：`ITransitionProperty`
 
@@ -113,4 +114,4 @@ public interface IFrameState
 - 表达式重载只记录可读**且**可写路径（具体实现 `StateCore` 会拒绝记录只读或不可写路径）。
 - `Clone()` 返回三个字典的独立副本（快照分段入队时被 `CoreRecordState` 使用）。
 - `InterpolatorCore.Prepare` 消费状态：读取 `state.Values`、从 `state.Interpolators` 查询逐属性采样器覆盖、从 `state.Options` 取 options 参数。
-- *验证依据：* `StateCoreTests`（`SetValue_Expression_CanRetrieve`、`SetInterpolator_Expression_CanRetrieve`、`Clone_ReturnsIndependentCopy`）。
+- *验证依据：* `StateCoreTests`（`SetValue_Expression_CanRetrieve`、`SetInterpolator_Expression_CanRetrieve`、`Clone_ReturnsIndependentCopy`）、`TransitionPathConflictTests`。

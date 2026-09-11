@@ -29,7 +29,7 @@
 
 ## 各适配器过渡接线（摘要）
 
-每个适配器在 `VeloxDev.TransitionSystem` 中提供完整适配器表面：`Transition`、`Transition<T>`、`Transition<T>.StateSnapshot`、`TransitionEx`、`Interpolator`、`TransitionEffect`、`TransitionEffects`、`State`、`UIThreadInspector`、`TransitionScheduler`、`TransitionInterpreter`，外加 `VeloxDev.Adapters.NativeSamplers` 里的平台采样器。成员记录于过渡动画特性（`2_API/03_transition` 的 `03_adapter-provided` 一节）。
+每个适配器在 `VeloxDev.TransitionSystem` 中提供完整适配器表面：`Transition`（承载静态 `Exit`）、`Transition<T>`（`Create` / `Property` / `Effect`）、`Interpolator`、`TransitionEffect`、`TransitionEffects`、`State`、`UIThreadInspector`、`TransitionScheduler`、`TransitionInterpreter`，外加 `VeloxDev.Adapters.NativeSamplers` 里的平台采样器；流程扩展 `TransitionCoreEx` 由 Core 提供、在各平台共用。成员记录于过渡动画特性（`2_API/03_transition` 的 `03_adapter-provided` 一节）。
 
 | 适配器 | 是否带优先级 | 注册的采样器（`Interpolator` 静态构造） |
 |---|---|---|

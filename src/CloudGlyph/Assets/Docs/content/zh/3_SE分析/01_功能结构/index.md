@@ -56,7 +56,7 @@ flowchart TD
 | 场景 | 入口类型 | 位置 |
 |---|---|---|
 | 构建工作流编辑器 | `tree.AsAgentScope()` / `[WorkflowBuilder.Tree<T>]` | `Examples/Workflow/Common/Lib` |
-| 为属性做动画 | `target.Snapshot(...)` / `Transition.Execute(...)` | `Examples/Transition/*` |
+| 为属性做动画 | `Transition<T>.Create().Property(...)` / `.Execute(target)` | `Examples/Transition/*` |
 | 切换主题 | `ThemeManager.Transition<Light>(...)` | `Examples/Theme/*` |
 | 运行异步命令 | 分部方法上的 `[VeloxCommand]` | `Examples/MVVM/*` |
 | 拦截节点执行 | `ProxyEx.CreateProxy(...)` + `SetProxy(...)` | `Examples/AOP/*` |

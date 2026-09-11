@@ -29,7 +29,7 @@ The **same public names** map to different framework base types; see the linked 
 
 ## Transition wiring per adapter (summary)
 
-Every adapter provides, in `VeloxDev.TransitionSystem`, the full adapter surface: `Transition`, `Transition<T>`, `Transition<T>.StateSnapshot`, `TransitionEx`, `Interpolator`, `TransitionEffect`, `TransitionEffects`, `State`, `UIThreadInspector`, `TransitionScheduler`, `TransitionInterpreter`, plus the platform samplers in `VeloxDev.Adapters.NativeSamplers`. Members are documented in the transition feature (`2_API/03_transition`, section `03_adapter-provided`).
+Every adapter provides, in `VeloxDev.TransitionSystem`, the full adapter surface: `Transition`, `Transition<T>`, `Interpolator`, `TransitionEffect`, `TransitionEffects`, `State`, `UIThreadInspector`, `TransitionScheduler`, `TransitionInterpreter`, plus the platform samplers in `VeloxDev.Adapters.NativeSamplers`. Members are documented in the transition feature (`2_API/03_transition`, section `03_adapter-provided`).
 
 | Adapter | Priority-typed? | Samplers registered (`Interpolator` static ctor) |
 |---|---|---|

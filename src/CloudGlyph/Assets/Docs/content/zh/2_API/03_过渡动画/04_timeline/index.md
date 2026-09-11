@@ -13,7 +13,7 @@ public abstract class TimeLineEventArgs
 }
 ```
 
-**说明：** `Handled` 是时间线的总开关——默认 `false`，设为 `true` 结束正在运行的时间线。它被 `TransitionEventArgs` 继承，后者实例以 `ITransitionInterpreterCore.Args` 暴露。
+**说明：** `Handled` 是时间线的总开关——默认 `false`，设为 `true` 结束正在运行的时间线。它被 `TransitionEventArgs` 继承，后者实例以 `ITransitionInterpreter<TPriorityCore>.Args` 暴露。
 
 ### 类：`TransitionEventArgs : TimeLineEventArgs`
 

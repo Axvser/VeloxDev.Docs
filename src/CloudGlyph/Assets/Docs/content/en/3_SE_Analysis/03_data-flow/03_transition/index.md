@@ -4,14 +4,14 @@ The engine is executed through the same core pipeline on every platform adapter.
 
 ## (a) Segment run lifecycle
 
-`Execute(target)` walks the fluent `StateSnapshot` chain (`root`…`next`), queues each segment's `(state, effect-clone, interpolator, delay)`, then plays them one at a time on a per-target scheduler. Cancellation is carried by one `CancellationTokenSource` shared across all segments of the run.
+`Execute(target)` walks the fluent builder chain (`root`…`next`), queues each segment's `(state, effect-clone, interpolator, delay)`, then plays them one at a time on a per-target scheduler. Cancellation is carried by one `CancellationTokenSource` shared across all segments of the run (registered with the scheduler for the whole run, including the `Await` gaps).
 
 ```plantuml
 @startuml
 !theme plain
 
 actor "Caller" as Caller
-participant "StateSnapshot" as SS
+participant "Transition<T> (builder)" as SS
 participant "TransitionScheduler" as Sch
 participant "UIThreadInspector" as UI
 participant "InterpolatorCore" as IC
@@ -42,9 +42,9 @@ loop one iteration per chained segment
     SS -> Sch: Execute(interpolator, state, effect, cts)
     activate Sch
     Sch -> Sch: _gate.WaitAsync()  (serialize executions on this scheduler)
-    Sch -> UI: ProtectedInvoke(target, () => effect.InvokeAwake(target, args))
+    Sch -> UI: ProtectedInvokeAsync(target, () => effect.InvokeAwake(target, args))
     activate UI
-    UI -> EF: Awaked event (raised on the UI thread)
+    UI -> EF: Awaked event (raised on the UI thread; the scheduler awaits it)
     UI --> Sch
     deactivate UI
 
@@ -79,7 +79,7 @@ deactivate SS
 @enduml
 ```
 
-Sources: `TransitionSystem/StateSnapshot.cs` (`CoreExecute`, segment queueing and play loop), `TransitionScheduler.cs` (`FindOrCreate`, `Execute`, `_gate`, weak target reference), `Interpolator.cs` (`Prepare`, sampler resolution), `SamplerSet.cs`.
+Sources: `TransitionSystem/Transition.cs` (`CoreExecute`, segment queueing and play loop), `TransitionScheduler.cs` (`FindOrCreate`, `Execute`, `_gate`, weak target reference), `Interpolator.cs` (`Prepare`, sampler resolution), `SamplerSet.cs`.
 
 ## (b) Effect scheduling and the sampling loop
 
@@ -178,25 +178,29 @@ One target holds **at most one** shared mutual scheduler (serialized by a `Semap
 
 ```mermaid
 flowchart TD
-    A[Call snapshot.Execute target, CanMutualTask] --> B{CanMutualTask?}
+    A[Call transition.Execute target, CanMutualTask] --> B{CanMutualTask?}
     B -->|true| C[FindOrCreate returns the shared scheduler from MutualSchedulers CWT]
-    C --> D[Exit current run - cancel the scheduler's active cts]
-    D --> E[New cts; queue all chained segments]
+    C --> D[Exit current run - cancel every tracked cts, bump the generation]
+    D --> E[New cts; track it for the whole run; queue all chained segments]
     B -->|false| F[Allocate a fresh scheduler; AddNoMutual registers it under NoMutualSchedulers]
     F --> E
     E --> G[For each segment: await delay, then scheduler.Execute]
-    G --> H{Acquire _gate?}
+    G --> G2{Generation changed while queued?}
+    G2 -->|yes - an Exit landed| Z[Give up without running]
+    G2 -->|no| H{Acquire _gate?}
     H -->|no - previous Execute still running| G
-    H -->|yes| I[Awake on UI thread, Prepare SamplerSet]
+    H -->|yes| I[Await Awake on UI thread, Prepare SamplerSet]
     I --> J[Interpreter sampling loop]
     J --> K{End of segment?}
     K -->|cancelled / Handled| L[InvokeCancled + InvokeFinally; release gate]
     K -->|loop exhausted| M[InvokeCompleted + InvokeFinally; release gate]
-    L --> N[Non-mutual: Finally handler unregisters from NoMutualSchedulers]
+    L --> N[After the last segment: untrack cts; non-mutual unregister from NoMutualSchedulers]
     M --> N
 ```
 
 `Transition.Exit(target, IncludeMutual, IncludeNoMutual)` cancels the target's mutual scheduler and, optionally, every running non-mutual scheduler; those schedulers then unwind through the `Canceled`/`Finally` path above.
+
+Scheduler selection is *not* part of the builder's type arguments: `Transition<T>` is `TransitionCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter, TPriorityCore>`, and `CoreExecute` resolves the scheduler internally through `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, TPriorityCore>.FindOrCreate`. (Avalonia and WinUI additionally declare their adapter scheduler as the generic `TransitionScheduler<TTarget>`; its type parameter is unused.)
 
 ## Flow Summary
 
@@ -206,13 +210,13 @@ flowchart TD
 | `IsAutoReverse` | After the forward pass the interpreter runs a backward pass (same samplers; pass end `easedT = 0`). |
 | `LoopTime` / `int.MaxValue` | The whole forward (+ reverse) pair repeats `LoopTime + 1` times (`cycle <= LoopTime`, `cycle` from 0), or forever. |
 | Segment `Await` delay | A pre-delay per segment (`CoreAwait`/`CoreAwaitThen`); skipped on cancellation (`OperationCanceledException`). |
-| New mutual run on the same target | `CoreExecute` calls `scheduler.Exit()` first; the previous scheduler cancels its current `cts`, so queued frames are skipped. |
+| New mutual run on the same target | `CoreExecute` drains and cancels the previous run's tokens first (bumping the generation); the previous run gives up at its next check, so queued frames are skipped. |
 | `TransitionEventArgs.Handled = true` | An event handler throws `OperationCanceledException` → `Canceled` + `Finally`; the timeline stops. |
-| `Transition.Exit(target, …)` | Cancels the target's mutual (and optionally non-mutual) schedulers; each unregisters via `Finally`. |
+| `Transition.Exit(target, …)` | Cancels the target's mutual (and optionally non-mutual) schedulers; each tracked token of a run is cancelled at once, and the run unregisters itself in its own `finally`. |
 | Started on a background thread | `UIThreadInspector` marshals reads (`ProtectedGetValue`) and frame writes (`ProtectedInvoke`) to the target's UI thread; lifecycle events still run on the interpreter's execution thread (only `Awake` and frame writes are always on the UI thread). |
-| Property without a sampler / invalid path | Skipped in `Prepare` (`UnreadablePath` sentinel from the compiled getter, or no resolved `ISampler`); other properties keep animating. |
+| Property without a sampler / invalid path | A path that does not match the target's runtime type is skipped in `Prepare` (`UnreadablePath` sentinel from the compiled getter); a declared **reference-type** path with no sampler at all is rejected by `Execute` (`TransitionPathUnsampleableException`) instead of animating nothing. Other properties keep animating. |
 | App shutting down | `SamplerSet.CanSetValue()` returns false → `Apply` skips the write and fires no further events. |
 
-> Sources: `Src/Core/VeloxDev.Core/TransitionSystem/TransitionScheduler.cs` (gate, CWT tables, weak target), `TransitionInterpreter.cs` (`ExecuteSamplingLoopAsync`/`RunPassAsync`), `SamplerSet.cs` (`Apply` + cancellation/app-alive guard), `Interpolator.cs` (`Prepare`), `StateSnapshot.cs` (`CoreExecute`), `TransitionEx.cs`, `Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`.
+> Sources: `Src/Core/VeloxDev.Core/TransitionSystem/TransitionScheduler.cs` (gate, CWT tables, weak target, generation/drain), `TransitionInterpreter.cs` (`ExecuteSamplingLoopAsync`/`RunPassAsync`), `SamplerSet.cs` (`Apply` + cancellation/app-alive guard), `Interpolator.cs` (`Prepare`), `Transition.cs` (`CoreExecute`), `Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`.
 
 Related analysis: [Design patterns — Transition](../../02_design-patterns/03_transition/index.md) · [Complexity — Transition](../../04_complexity/03_transition/index.md)

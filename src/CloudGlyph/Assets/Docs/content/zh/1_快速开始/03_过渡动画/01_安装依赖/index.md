@@ -8,13 +8,13 @@
 dotnet add package VeloxDev.Core
 ```
 
-`VeloxDev.Core` 包含与框架无关的引擎：`Eases` 与 `Ease*` 类、采样器注册表（`InterpolatorCore` + `NativeSamplers/*`）、`TransitionEffectCore`、调度器/解释器与快照机制。这里没有任何东西依赖 GUI 框架。
+`VeloxDev.Core` 包含与框架无关的引擎：`Eases` 与 `Ease*` 类、采样器注册表（`InterpolatorCore` + `NativeSamplers/*`）、`TransitionEffectCore`、调度器/解释器与状态描述机制。这里没有任何东西依赖 GUI 框架。
 
 **预期结果：** 包写入 `.csproj`；还原后 `using VeloxDev.TransitionSystem;` 可解析，`Eases.Cubic.InOut.Ease(0.5)` 在纯控制台即可运行。
 
 ## 2. 为 UI 绑定属性添加平台适配器
 
-**动画 UI 绑定的属性**需要你 GUI 框架对应的适配器。适配器在相同命名空间下重新导出封闭的便捷类型（`Transition<T>`、`Transition<T>.StateSnapshot`、`TransitionEffect`、`TransitionEffects`、`Interpolator`、`UIThreadInspector`、`TransitionEx`），注册框架专属值采样器，并把每一帧写入编组到 UI 线程：
+**动画 UI 绑定的属性**需要你 GUI 框架对应的适配器。适配器在相同命名空间下重新导出封闭的便捷类型（`Transition`、`Transition<T>`、`State`、`TransitionEffect`、`TransitionEffects`、`Interpolator`、`UIThreadInspector`、`TransitionScheduler`、`TransitionInterpreter`），注册框架专属值采样器，并把每一帧写入编组到 UI 线程：
 
 ```bash
 dotnet add package VeloxDev.WPF      # WPF

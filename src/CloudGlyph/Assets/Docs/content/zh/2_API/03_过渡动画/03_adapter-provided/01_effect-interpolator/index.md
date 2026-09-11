@@ -1,6 +1,6 @@
 # Transition — 适配器：`Interpolator`、`TransitionEffect`、`TransitionEffects`、`State`
 
-每个适配器提供一个 `Interpolator` 注册表子类、带平台默认值的效果描述符、一组预设效果，以及快照 `State`。全部位于适配器程序集的 `VeloxDev.TransitionSystem` 命名空间。
+每个适配器提供一个 `Interpolator` 注册表子类、带平台默认值的效果描述符、一组预设效果，以及分段状态 `State`。全部位于适配器程序集的 `VeloxDev.TransitionSystem` 命名空间。
 
 ### 类：`Interpolator : InterpolatorCore`
 
@@ -53,4 +53,4 @@ public static class TransitionEffects       // WinUI 上为实例类，但静态
 
 ### 类：`State : StateCore`
 
-`StateCore` 的空子类；它是适配器 `StateSnapshot` 所用的 `TStateCore` 类型参数，因此 `snapshot.GetState()` 返回这个具体 `State`（一个 `IFrameState`）。全部行为继承自 `StateCore`（见 [01_abstractions](../../01_abstractions/index.md)）。
+`StateCore` 的空子类；它是适配器 `Transition<T>` 所用的 `TStateCore` 类型参数，因此 `transition.GetState()` 返回这个具体 `State`（一个 `IFrameState`）。全部行为继承自 `StateCore`（见 [01_abstractions](../../01_abstractions/index.md)）。

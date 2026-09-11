@@ -7,11 +7,9 @@ Each platform adapter (`Src/Adapters/VeloxDev.WPF|Avalonia|WinUI|MAUI|WinForms|R
 | Type | Role | Derives from |
 |---|---|---|
 | `Transition` | Non-generic static entry (cancel / exit helpers) | `TransitionCore` |
-| `Transition<T>` | Generic static entry (`Create`, ...) | `TransitionCore<T, Transition<T>.StateSnapshot>` |
-| `Transition<T>.StateSnapshot` | Fluent snapshot builder (nested class) | 6- or 7-generic `StateSnapshotCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter[, TPriorityCore]>` |
-| `TransitionEx` | `Snapshot` / `SnapshotAll` / `SnapshotExcept` capture extensions on `T` | static class |
+| `Transition<T>` | Generic entry point, fluent builder and executor in one type (`Create` / `Property` / `Effect`, plus the inherited `Execute` / `Exit` / `GetState`) | `TransitionCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter, TPriorityCore>` |
 | `Interpolator` | Platform sampler registry (subclasses `InterpolatorCore` and registers platform types in its static ctor) | `InterpolatorCore` |
-| `State` | Snapshot state bag | `StateCore` |
+| `State` | Declared-state bag | `StateCore` |
 | `TransitionEffect` | Timing descriptor with a default priority where applicable | `TransitionEffectCore` or `TransitionEffectCore<TPriorityCore>` |
 | `TransitionEffects` | `Empty` / `Theme` / `Hover` presets | static class (instance class on WinUI) |
 | `UIThreadInspector` | Platform UI-thread marshaling | `UIThreadInspectorCore` or `UIThreadInspectorCore<TPriorityCore>` |
@@ -33,6 +31,6 @@ Priority-typed adapters (WPF, Avalonia, Jalium, WinUI) marshal writes at a dispa
 
 ## Sub-pages
 
-- [00_transition](00_transition/index.md) — `Transition`, `Transition<T>`, `Transition<T>.StateSnapshot` (including the `Property` / `Effect` overload sets) and `TransitionEx`.
+- [00_transition](00_transition/index.md) — `Transition`, `Transition<T>` (the `Property` / `Effect` overload sets, and the inherited `Execute` / `Exit` / `GetState`).
 - [01_effect-interpolator](01_effect-interpolator/index.md) — `Interpolator` and its per-adapter sampler registrations, `TransitionEffect`, `TransitionEffects`, and `State`.
 - [02_ui-inspector](02_ui-inspector/index.md) — `UIThreadInspector` per adapter, plus the `TransitionScheduler` / `TransitionInterpreter` adapter subclasses.

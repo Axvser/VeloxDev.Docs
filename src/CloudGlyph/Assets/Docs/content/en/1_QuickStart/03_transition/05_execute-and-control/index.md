@@ -1,16 +1,17 @@
 # Transition — Execute & Control
 
-## 1. Start a snapshot (one-shot)
+## 1. Start a transition (one-shot)
 
-Call the snapshot's `Execute` extension (namespace `VeloxDev.TransitionSystem`). Execution returns immediately and drives the frame loop in the background:
+Call the transition's `Execute(target, CanMutualTask)` instance method (inherited from `StateSnapshotCore<T>`, namespace `VeloxDev.TransitionSystem`). Execution returns immediately and drives the frame loop in the background:
 
 ```csharp
 using VeloxDev.TransitionSystem;
 
-Animation0.Execute(rect);                  // mutual-exclusive (default): CanMutualTask: true
+Animation0.Execute(rect);                       // mutual-exclusive (default): CanMutualTask: true
 Animation0.Execute(rect, CanMutualTask: false); // run concurrently with other animations
-Transition<Rectangle>.Execute(rect, Animation0); // static alternative
 ```
+
+A static batch entry also exists — `Transition<T>.Execute(T target, IEnumerable<Transition<T>> values, bool CanMutualTask = false)` — and runs each transition in the batch; it is source-verified in `Transition.cs` but not exercised by the demos.
 
 `Execute` on a *UI-bound* target can be called from the UI thread **or** from a background thread — the per-framework `UIThreadInspector` derives the owning UI thread from the target and marshals each frame write (see [UI Thread & Marshaling](../06_ui-thread-marshaling/index.md)). The demos exercise both entry points, e.g. the WPF demo starts the exact same animation with `Animation0.Execute(Rec0)` on the UI thread and inside `Task.Run(...)`.
 
@@ -31,7 +32,7 @@ Animation1.Execute(rect, CanMutualTask: false);   // both run concurrently
 
 ## 3. Stop in place — `Transition.Exit`
 
-`Transition.Exit(target)` cancels the target's running animations and leaves the property where it currently is (it does *not* jump to the snapshot's end value). The two flags select which schedulers to stop:
+`Transition.Exit(target)` cancels the target's running animations and leaves the property where it currently is (it does *not* jump to the transition's end value). The two flags select which schedulers to stop:
 
 - `IncludeMutual: true` — the single mutual scheduler (the default).
 - `IncludeNoMutual: true` — all parallel (`CanMutualTask: false`) schedulers.
@@ -45,7 +46,7 @@ Transition.Exit(rect, IncludeMutual: true, IncludeNoMutual: true); // stop every
 
 ## 4. The per-target scheduler
 
-Every `Execute` resolves a scheduler for the target via `TransitionSchedulerCore<...>.FindOrCreate(target, CanMutualTask)`. Mutual schedulers are cached per target in a `ConditionalWeakTable` (so they vanish with the target); no-mutual schedulers are created per run and released when the effect's `Finally` fires. The scheduler serializes access through a `SemaphoreSlim`, holds the animation's `CancellationTokenSource`, and hands the interpolator/interpreter the prepared `SamplerSet`. You normally never touch it, but you can address it directly with the static lookup helpers if needed:
+Every `Execute` resolves a scheduler for the target via `TransitionSchedulerCore<...>.FindOrCreate(target, CanMutualTask)`. Mutual schedulers are cached per target in a `ConditionalWeakTable` (so they vanish with the target); no-mutual schedulers are created per run and registered/unregistered over the **whole** animation — including the `Await` gaps between segments — so an `Exit` during a gap still finds and cancels them. The scheduler serializes access through a `SemaphoreSlim`, tracks every live `CancellationTokenSource` of the run, and hands the interpreter the prepared `SamplerSet<TPriorityCore>`. You normally never touch it, but you can address it directly with the static lookup helpers if needed:
 
 ```csharp
 using VeloxDev.TransitionSystem.Abstractions;   // TransitionSchedulerCore

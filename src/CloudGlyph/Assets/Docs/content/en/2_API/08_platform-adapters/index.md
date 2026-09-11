@@ -5,7 +5,7 @@ A platform adapter is the thin layer that turns the UI-framework-agnostic VeloxD
 | Namespace | Purpose |
 |---|---|
 | `VeloxDev.WorkflowSystem.AttachedBehaviors` | Workflow attached behaviors and view containers: `WorkflowSurfaceBehavior`, `WorkflowCanvasTransformBehavior`, `ViewPool`, `ViewManager`, `WorkflowNodeDragBehavior`, `WorkflowSlotConnectionBehavior`, `WorkflowSlotLayoutBehavior`, `WorkflowMinimapOverlay`, and adapter-specific extras (`WorkflowLinkOverlay`, `WorkflowGridDecorator`, `WorkflowTreeView`, `IWorkflowTemplateSelector`) |
-| `VeloxDev.TransitionSystem` | The adapter-provided transition surface — `Transition`, `Transition<T>`, `Transition<T>.StateSnapshot`, `TransitionEx`, `Interpolator`, `TransitionEffect`, `TransitionEffects`, `State`, `UIThreadInspector`, `TransitionScheduler`, `TransitionInterpreter` (per-adapter members are documented in the `2_API/03_transition` feature) |
+| `VeloxDev.TransitionSystem` | The adapter-provided transition surface — `Transition`, `Transition<T>`, `Interpolator`, `TransitionEffect`, `TransitionEffects`, `State`, `UIThreadInspector`, `TransitionScheduler`, `TransitionInterpreter` (per-adapter members are documented in the `2_API/03_transition` feature) |
 | `VeloxDev.DynamicTheme` | Theme value converters (`BrushConverter`, `DoubleConverter`, `PointConverter`, …). Not shipped by `VeloxDev.Jalium` (per-adapter converter sets are documented in the `2_API/04_dynamic-theme` feature) |
 | `VeloxDev.Adapters.NativeSamplers` | One sampler class per framework value type (e.g. `BrushSampler`, `ThicknessSampler`, `PaddingSampler`) registered by that adapter's `Interpolator` |
 

@@ -2,7 +2,7 @@
 
 ## 1. 时序、FPS 与循环语义
 
-一个 `TransitionEffect` 驱动一个快照分段。其时序成员（来自 `TransitionEffectCore`）：
+一个 `TransitionEffect` 驱动一个分段。其时序成员（来自 `TransitionEffectCore`）：
 
 - `Duration` —— 单程的墙钟时长。`Duration = TimeSpan.Zero` 会直接跳到终点（这正是 `TransitionEffects.Empty` 让对象瞬时重置的方式）。
 - `FPS` —— *最大*采样率（默认 `60`）。解释器的让步间隔是 `1000 / FPS` 毫秒，但流逝时间来自 `Stopwatch`，所以 `FPS` 是上限而非帧网格。
@@ -14,9 +14,9 @@
 
 ## 2. 把分段链成时间线
 
-用三个流式调用串联更多快照分段（每段有自己的状态 + 效果）：
+用三个流式调用串联更多分段（每段有自己的状态 + 效果）：
 
-- `.Await(timeSpan)` —— 先等待，再播放**当前**快照（作为首调用可让整个动画延迟开始）。
+- `.Await(timeSpan)` —— 先等待，再播放**当前**段（作为首调用可让整个动画延迟开始）。
 - `.Then()` —— 本段结束后立即开始下一段。
 - `.AwaitThen(timeSpan)` —— 等待 `timeSpan` 后开始下一段。
 
@@ -47,12 +47,19 @@ Transition<Rectangle>.Create()
 
 ## 3. 预设与效果事件
 
-`TransitionEffects` 提供三个可变的适配器 `TransitionEffect` 预设：`Empty`（零时长 —— 瞬时跳变）、`Theme`（0.46 秒）、`Hover`（0.32 秒）。执行前可在副本上覆盖任意属性 —— 示例用换上 `Empty` 来重置对象：
+`TransitionEffects` 提供三个可变的适配器 `TransitionEffect` 预设：`Empty`（零时长 —— 瞬时跳变）、`Theme`（0.46 秒）、`Hover`（0.32 秒）。执行前可在副本上覆盖任意属性 —— 示例用一个零时长效果把各初始值逐条写回来重置对象：
 
 ```csharp
-var reset = rect.SnapshotAll();                 // 先捕获一次初始状态
-// ...稍后恢复它（瞬时）：
-reset.Effect(TransitionEffects.Empty).Execute(rect);
+private static Transition<Rectangle> CreateReset()
+{
+    return Transition<Rectangle>.Create()
+        .Property(r => r.Opacity, 1d)
+        .Property(r => r.Fill, new SolidColorBrush(Colors.Cyan))
+        .Effect(TransitionEffects.Empty);   // Duration = 0 → 瞬时写回
+}
+
+// 需要时执行：
+CreateReset().Execute(rect);
 ```
 
 效果会触发生命周期事件（都是 `EventHandler<TransitionEventArgs>`；`TransitionEventArgs` 带 `Handled` —— 置为 `true` 即可停止当前程）：
@@ -78,4 +85,4 @@ effect.Finally += (_, _) => Console.WriteLine("finally");
 
 **预期结果：** 正常运行时打印 `start`、`completed`、`finally`；打断时打印 `start`、`canceled`、`finally`。事件处理器由 `WeakDelegate` 支撑，因此持有效果不会泄漏目标。
 
-下一步：[执行与控制](../05_执行与控制/index.md) 说明如何真正启动、取消与并行运行一个快照（或链）。
+下一步：[执行与控制](../05_执行与控制/index.md) 说明如何真正启动、取消与并行运行一个 `Transition<T>`（或链）。

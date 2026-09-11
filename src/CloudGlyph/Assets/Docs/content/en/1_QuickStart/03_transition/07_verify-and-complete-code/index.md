@@ -9,7 +9,7 @@ Seven GUI demos ship under `Examples/Transition/` (WPF, Avalonia, WinUI, WinForm
 - **Start (non-mutual)** — the three animations run concurrently with `CanMutualTask: false`.
 - **Repeat** — each click starts `Animation0` again on the same rectangle; the previous run is cancelled and the rectangle restarts.
 - **Exit / Stop all** — `Transition.Exit(...)` freezes the rectangles in place.
-- **Reset** — `snapshot.Effect(TransitionEffects.Empty).Execute(...)` restores the rectangle to its captured initial state instantly.
+- **Reset** — a `CreateReset*` builder (the initial values declared path by path) played under `.Effect(TransitionEffects.Empty).Execute(...)` restores the rectangle instantly.
 
 **Expected result:** the rectangle slides right and fades while its fill turns orange over 2 s, then auto-reverses twice; the reset and exit buttons behave as described above.
 
@@ -21,6 +21,7 @@ The engine contract is pinned by `Src/Core/VeloxDev.Core.Test/TransitionSystem/`
 - `InterpolatorCoreTests` — register / try-get / overwrite / unregister on the `NativeInterpolators` registry.
 - `SamplingLoopTests` — a headless run of a `double` property with `Duration = 0`, auto-reverse and `LoopTime`; asserts `Completed`/`Canceled`/`Finally` firing.
 - `NativeSamplersTests`, `TransitionEffectCoreTests`, `StateCoreTests`, `TransitionPropertyTests`, `SamplerSetTests` — sampler endpoints, effect clone/events, state dictionaries and path parsing.
+- `TransitionPathConflictTests` / `TransitionPathValidationTests` — the parent/child path conflict and the unsampleable-path rejection.
 
 ```bash
 dotnet test Src/Core/VeloxDev.Core.Test/VeloxDev.Core.Test.csproj --filter "FullyQualifiedName~TransitionSystem"
@@ -44,7 +45,7 @@ A single-file, self-contained WPF program (no XAML) that builds the `Animation0`
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="VeloxDev.WPF" Version="8.0.0" />
+        <PackageReference Include="VeloxDev.WPF" Version="9.0.0" />
     </ItemGroup>
 
 </Project>
@@ -62,7 +63,7 @@ namespace TransitionQuickStart;
 
 public static class Program
 {
-    private static readonly Transition<Rectangle>.StateSnapshot Animation0 =
+    private static readonly Transition<Rectangle> Animation0 =
         Transition<Rectangle>.Create()
             .Property(r => r.Opacity, 0)
             .Property(r => ((TranslateTransform)r.RenderTransform).X, 800)
@@ -98,7 +99,7 @@ public static class Program
 }
 ```
 
-Every identifier is defined above: the snapshot records `Opacity → 0`, `RenderTransform.X → 800` and `Fill → orange`; the effect plays 2 s, auto-reverse, three forth-and-back passes with `Eases.Sine.InOut`. The rectangle starts cyan and, once the window loads, animates across the canvas. When the window closes (`app.Run` returns), `Main` returns and the process exits.
+Every identifier is defined above: the transition declares `Opacity → 0`, `RenderTransform.X → 800` and `Fill → orange`; the effect plays 2 s, auto-reverse, three forth-and-back passes with `Eases.Sine.InOut`. The rectangle starts cyan and, once the window loads, animates across the canvas. When the window closes (`app.Run` returns), `Main` returns and the process exits.
 
 ## 4. Run declaration
 

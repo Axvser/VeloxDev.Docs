@@ -1,6 +1,6 @@
-# Transition — Contracts: Sampling & Property Capture
+# Transition — Contracts: Sampling & Property Addressing
 
-Namespace `VeloxDev.TransitionSystem`. These four contracts describe how a value is sampled and how a target property is addressed and recorded.
+Namespace `VeloxDev.TransitionSystem`. These four contracts describe how a value is sampled and how a target property is addressed and declared; the two exceptions at the end reject a declared path that is invalid for the transition or can never animate.
 
 ### Interface: `ISampler`
 
@@ -23,7 +23,7 @@ public interface ISampler
 **Notes:**
 - Implementations are stateless, thread-safe shared singletons registered in `Abstractions.InterpolatorCore.NativeInterpolators` (or supplied as a per-property override in `IFrameState.Interpolators`).
 - Endpoints are handled *inside* `InsertFrame`: `t <= 0` writes the exact (normalized) start, `t >= 1` writes the exact end. No `Update`/`Sample` method exists — this three-method shape replaces the older `IValueInterpolator`/`IInPlaceSampler` designs.
-- Implementations **must not mutate** the `start` / `end` arguments: they are shared with the snapshot that recorded them, so mutating them pollutes it.
+- Implementations **must not mutate** the `start` / `end` arguments: they are shared with the transition declaration that recorded them, so mutating them pollutes it.
 - `options` still carries the `RotationDirection` for angular samplers (see [02_eases](../02_eases/index.md)).
 - *Verified by:* `NativeSamplersTests` (`DoubleSampler_Endpoints_AreExact`, `DoubleSampler_NullStart_TreatsAsZero`), `NativeSamplersExtendedTests` (per-sampler `_BasicLinear`), `SamplerSetTests`.
 
@@ -38,12 +38,12 @@ public interface ISampleable
 ```
 
 **Notes:**
-- Declares which members of a type are animatable — *one level, not recursive*. When a property's type has no registered sampler, discovery / capture calls `GetAnimatableMembers()` and expands the declared members into member paths (e.g. `target.Foo.Bar`) so each leaf resolves its own sampler.
-- `GetAnimatableMembers` returns paths relative to this type. Prefer declaring them with `TransitionProperty.Members<Foo>(f => f.Bar, ...)` (see [01_abstractions](../../01_abstractions/index.md)).
-- `CreateFrameValue` reconstructs a value from its interpolated members, in `GetAnimatableMembers` order. **Structs** implement this to rebuild the struct through its constructor at compile time (zero reflection). Reference types are animated by member decomposition and return `null` here (unused).
-- Only needed when no sampler is registered for the type. Complex composite types (transform matrices, brushes, ...) should instead ship a dedicated `ISampler` that performs decomposition / normalization / interpolation internally — they do not need this interface.
-- During `Prepare` (see [01_abstractions](../../01_abstractions/index.md)) a *struct* value type that implements `ISampleable` is assembled: each declared member is interpolated by its own registered sampler and the whole struct is rebuilt through `CreateFrameValue`.
-- *Verified by:* `TransitionSnapshotHelperTests` (`Discover_ExpandsDeclaredMembers_IntoMemberPaths`, `Discover_ExpandsNestedSampleableMembers_Recursively`), `NativeSamplersExtendedTests` (test structs).
+- Declares how a composite **value type** is animated as a whole — *one level, not recursive*. Only value types take this path: a struct's members cannot be written back in place, so the whole value has to be rebuilt every frame.
+- `GetAnimatableMembers` returns the animatable members (paths relative to this type, in `CreateFrameValue` order). Prefer declaring them with `TransitionProperty.Members<Foo>(f => f.Bar, ...)` (see [01_abstractions](../../01_abstractions/index.md)).
+- `CreateFrameValue` reconstructs the value from its interpolated members, in `GetAnimatableMembers` order — implementations build it through their constructor (compile-time, zero reflection).
+- `InterpolatorCore.Prepare` reaches for this interface **last**: a *struct* value type that implements `ISampleable` and has no registered sampler is handed to the internal `StructAssembler`, which interpolates each declared member with its own registered sampler and reassembles the struct through `CreateFrameValue`. If any member sampler does not resolve, the property is skipped.
+- Reference types do **not** use this interface. `Offset` / `Anchor` / `Size` / `Scale` (WorkflowSystem) no longer implement it; only `Viewport` (a struct) does. A property holding a reference type is animated through explicit member paths (`Property(x => x.Foo.Bar, end)`) or by a dedicated `ISampler` that performs decomposition / normalization / interpolation internally — otherwise `Transition<T>.Execute` rejects the path (see below).
+- *Verified by:* `StructAssemblerTests`, `NativeSamplersExtendedTests` (test structs).
 
 ### Interface: `ITransitionProperty`
 
@@ -112,6 +112,35 @@ public interface IFrameState
 - A bag of three `ConcurrentDictionary`s keyed by `ITransitionProperty`: recorded target `Values`, per-property `ISampler` overrides, and per-property `Options` (e.g. a `RotationDirection`).
 - Every `Set*/TryGet*` operation has three overload families — expression lambda, `ITransitionProperty`, and `PropertyInfo`. Expression / `PropertyInfo` overloads address the same path as the key-based forms.
 - The expression overloads record only paths that are readable **and** writable (the concrete `StateCore` refuses to store a read-only or non-writable path).
-- `Clone()` returns an independent copy of all three dictionaries (used by `CoreRecordState` when a snapshot segment is queued).
+- `Clone()` returns an independent copy of all three dictionaries.
 - `InterpolatorCore.Prepare` consumes a state: it reads `state.Values`, consults `state.Interpolators` for a per-property sampler override, and `state.Options` for the options argument.
 - *Verified by:* `StateCoreTests` (`SetValue_Expression_CanRetrieve`, `SetInterpolator_Expression_CanRetrieve`, `Clone_ReturnsIndependentCopy`).
+
+### Exception: `TransitionPathConflictException`
+
+Thrown by the concrete `StateCore.SetValue` while a transition is being **built**, when the incoming path sits above or below a path already on the same transition. One object must be expressed by exactly one path: with both a whole-object path and one of its sub-leaf paths present, a whole-object sampler and a sub-leaf sampler would write the same object every frame and the result would depend on the order they happened to run in. Re-declaring the very same path is a plain overwrite and is allowed.
+
+```csharp
+public sealed class TransitionPathConflictException : Exception
+{
+    public TransitionPathConflictException(ITransitionProperty existing, ITransitionProperty conflicting);
+    public ITransitionProperty Existing { get; }
+    public ITransitionProperty Conflicting { get; }
+}
+```
+
+**Notes:** the check covers the value paths of **one** transition (the funnel every value path passes through). Two transitions targeting the same object each keep their own state, so a conflict between them is not detected — nor are paths registered through `SetInterpolator` / `SetOptions`. *Verified by:* `TransitionPathConflictTests`.
+
+### Exception: `TransitionPathUnsampleableException`
+
+Thrown **synchronously by `Transition<T>.Execute(...)`** when a declared path can never animate: its leaf is a reference type with no custom interpolator and no registered sampler, so there is nothing to interpolate with. A value type is exempt — one can still be assembled member by member.
+
+```csharp
+public sealed class TransitionPathUnsampleableException : Exception
+{
+    public TransitionPathUnsampleableException(ITransitionProperty property);
+    public ITransitionProperty Property { get; }
+}
+```
+
+**Notes:** it is raised when the transition runs rather than while it is built — the first moment every path, every interpolator and every sampler registered by the adapter is known, so a path that only looks unsampleable until its interpolator is declared is not rejected by mistake. It is unrelated to `TransitionProperty.UnreadablePath`, where a path is valid but does not match the current target's runtime type: that stays a per-frame skip. Express the value member by member instead, or register a dedicated `ISampler` for the type. *Verified by:* `TransitionPathValidationTests`.

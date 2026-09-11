@@ -6,12 +6,11 @@
 
 | 类型 | 角色 | 派生自 |
 |---|---|---|
-| `Transition` | 非泛型静态入口（取消 / 退出辅助） | `TransitionCore` |
-| `Transition<T>` | 泛型静态入口（`Create`、……） | `TransitionCore<T, Transition<T>.StateSnapshot>` |
-| `Transition<T>.StateSnapshot` | 流式快照构建器（嵌套类） | 6 或 7 泛型元数 `StateSnapshotCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter[, TPriorityCore]>` |
-| `TransitionEx` | 目标上的 `Snapshot` / `SnapshotAll` / `SnapshotExcept` 捕获扩展 | 静态类 |
+| `Transition` | 非泛型入口（承载静态 `Exit`） | `TransitionCore` |
+| `Transition<T>` | 流式构建器 + 泛型入口（`Create` / `Property` / `Effect`） | 7 元数 `TransitionCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter, TPriorityCore>` |
+| `TransitionCoreEx`（Core 提供） | 流程扩展：`Await` / `Then` / `AwaitThen` / `Interpolator` | 静态类 |
 | `Interpolator` | 平台采样器注册表（子类 `InterpolatorCore` 并在静态构造注册平台类型） | `InterpolatorCore` |
-| `State` | 快照状态集合 | `StateCore` |
+| `State` | 分段的状态集合 | `StateCore` |
 | `TransitionEffect` | 时序描述符，适用时带默认优先级 | `TransitionEffectCore` 或 `TransitionEffectCore<TPriorityCore>` |
 | `TransitionEffects` | `Empty` / `Theme` / `Hover` 预设 | 静态类（WinUI 上为实例类） |
 | `UIThreadInspector` | 平台 UI 线程编组 | `UIThreadInspectorCore` 或 `UIThreadInspectorCore<TPriorityCore>` |
@@ -33,6 +32,6 @@
 
 ## 子页
 
-- [00_transition](00_transition/index.md) — `Transition`、`Transition<T>`、`Transition<T>.StateSnapshot`（含 `Property` / `Effect` 重载集）与 `TransitionEx`。
+- [00_transition](00_transition/index.md) — `Transition` 与 `Transition<T>`（含 `Property` / `Effect` 重载集）。
 - [01_effect-interpolator](01_effect-interpolator/index.md) — `Interpolator` 及其各适配器采样器注册、`TransitionEffect`、`TransitionEffects` 与 `State`。
 - [02_ui-inspector](02_ui-inspector/index.md) — 各适配器的 `UIThreadInspector`，以及 `TransitionScheduler` / `TransitionInterpreter` 适配器子类。

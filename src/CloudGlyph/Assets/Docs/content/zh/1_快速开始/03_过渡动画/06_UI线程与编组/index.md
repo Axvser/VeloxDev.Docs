@@ -4,7 +4,7 @@
 
 GUI 框架只允许在元素的 **UI 线程**上写属性。因此引擎独立运行其计时/采样循环，把每一帧交给适配器的 `UIThreadInspector`，由它把真正的 `SetValue` 写入分发到所属线程。结果是：**你可以从任意线程启动动画**（包括在 `Task.Run` 内），写入仍落在 UI 线程 —— 编组目标由被动画对象本身推导得出。
 
-具体检查器在各适配器中同名 `UIThreadInspector`（命名空间 `VeloxDev.TransitionSystem`），并自动接进该适配器的 `Transition<T>` 快照类型。WPF/Avalonia 与 WinUI 的检查器带分发*优先级*（`DispatcherPriority` / `DispatcherQueuePriority`）；MAUI、WinForms 与 Razor 使用普通无优先级管线。
+具体检查器在各适配器中同名 `UIThreadInspector`（命名空间 `VeloxDev.TransitionSystem`），并自动接进该适配器的 `Transition<T>` 构建器。WPF/Avalonia 与 WinUI 的检查器带分发*优先级*（`DispatcherPriority` / `DispatcherQueuePriority`）；MAUI、WinForms 与 Razor 用 `NonPriority` 填优先级类型参数，走普通无优先级管线。
 
 ## 2. 各适配器行为
 
@@ -57,6 +57,6 @@ protected override void OnInitialized()
 
 Blazor 示例是 POCO 目标的参照：它动画一个普通 `BoxModel`（double/`string` 属性），并订阅 `INotifyPropertyChanged` → `InvokeAsync(StateHasChanged)` 来重渲染。
 
-**预期结果：** 从后台线程启动的动画更新 UI 属性时不会抛出跨线程/跨调度器异常，因为每帧写入都由适配器的 `UIThreadInspector` 编组。来自 WinUI 示例的一个告诫：请在 UI 线程构建 `Transition<>` 快照（后台线程使用静态字段可能触发类型初始化问题），或按上面先捕获。
+**预期结果：** 从后台线程启动的动画更新 UI 属性时不会抛出跨线程/跨调度器异常，因为每帧写入都由适配器的 `UIThreadInspector` 编组。来自 WinUI 示例的一个告诫：请在 UI 线程构建 `Transition<>` 实例（后台线程使用静态字段可能触发类型初始化问题），或按上面先捕获。
 
 下一步：[验证与完整代码](../07_验证与完整代码/index.md)。

@@ -8,13 +8,13 @@ Every Transition app references `VeloxDev.Core`. Add it to any .NET project:
 dotnet add package VeloxDev.Core
 ```
 
-`VeloxDev.Core` contains the framework-agnostic engine: `Eases` and the `Ease*` classes, the sampler registry (`InterpolatorCore` + `NativeSamplers/*`), `TransitionEffectCore`, the scheduler/interpreter and the snapshot machinery. Nothing here depends on a GUI framework.
+`VeloxDev.Core` contains the framework-agnostic engine: `Eases` and the `Ease*` classes, the sampler registry (`InterpolatorCore` + `NativeSamplers/*`), `TransitionEffectCore`, the scheduler/interpreter, the open-generic builder base `TransitionCore<...>` / `StateSnapshotCore<...>`, and the `TransitionCoreEx` chaining extensions. Nothing here depends on a GUI framework.
 
 **Expected result:** the package appears in the `.csproj`; after restore, `using VeloxDev.TransitionSystem;` resolves and `Eases.Cubic.InOut.Ease(0.5)` runs in a plain console.
 
 ## 2. Add the platform adapter for UI-bound properties
 
-Animating **UI-bound properties** needs the adapter for your GUI framework. The adapter re-exports the closed, friendly types under the same namespace (`Transition<T>`, `Transition<T>.StateSnapshot`, `TransitionEffect`, `TransitionEffects`, `Interpolator`, `UIThreadInspector`, `TransitionEx`), registers the per-framework value samplers, and marshals each frame write to the UI thread:
+Animating **UI-bound properties** needs the adapter for your GUI framework. The adapter re-exports the closed, friendly types under the same namespace (`Transition`, `Transition<T>`, `State`, `TransitionEffect`, `TransitionEffects`, `Interpolator`, `UIThreadInspector`, `TransitionScheduler`, `TransitionInterpreter`), registers the per-framework value samplers, and marshals each frame write to the UI thread:
 
 ```bash
 dotnet add package VeloxDev.WPF      # WPF

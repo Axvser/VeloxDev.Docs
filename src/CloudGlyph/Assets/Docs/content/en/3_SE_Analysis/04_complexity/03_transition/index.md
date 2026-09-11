@@ -1,14 +1,14 @@
 # Complexity Analysis — Transition
 
-Let $P$ = the number of properties recorded in a snapshot and $k$ = the depth of a property path (number of expression segments). Sampling is continuous (Stopwatch-driven), so there is no pre-computed frame array: `ITransitionEffectCore.FPS` caps the maximum sample rate (yield interval = `1000 / FPS` ms), and no per-property frame list is ever materialized.
+Let $P$ = the number of properties declared in a transition and $k$ = the depth of a property path (number of expression segments). Sampling is continuous (Stopwatch-driven), so there is no pre-computed frame array: `ITransitionEffectCore.FPS` caps the maximum sample rate (yield interval = `1000 / FPS` ms), and no per-property frame list is ever materialized.
 
-## Building a snapshot (`.Property(...)` calls)
+## Building a transition (`.Property(...)` calls)
 
 $$
 O(P \cdot \bar{k})
 $$
 
-Each `.Property(lambda, value, options)` parses the lambda into a `TransitionProperty` ($O(k)$ on the path segments — `TransitionProperty.TryCreate` unwraps and walks the member chain once), stores the value (and optional interpolation options) in a `ConcurrentDictionary` (amortized $O(1)$), and, if options were given, stores the options entry. The compiled getter/setter delegate is built lazily on first read/write ($O(k)$ compile, once) and reused. For the usual single-segment property this is effectively $O(1)$ per call, i.e. $O(P)$ for a whole snapshot.
+Each `.Property(lambda, value, options)` parses the lambda into a `TransitionProperty` ($O(k)$ on the path segments — `TransitionProperty.TryCreate` unwraps and walks the member chain once), stores the value (and optional interpolation options) in a `ConcurrentDictionary` (amortized $O(1)$), and, if options were given, stores the options entry. A value path additionally runs the parent/child conflict check, which compares the incoming path against every already-declared key — $O(P)$ per call, i.e. $O(P^2)$ for a whole transition (negligible in practice, $P$ being a handful of paths). The compiled getter/setter delegate is built lazily on first read/write ($O(k)$ compile, once) and reused. For the usual single-segment property this is effectively $O(1)$ per call, i.e. $O(P)$ for a whole transition.
 
 ## Sampler resolution
 
@@ -43,7 +43,7 @@ Each sample iteration evaluates one eased/clamped time and applies it through `S
 | `QuaternionSampler` (`Slerp`, optional directional negate) | $O(1)$ | constant trig |
 | `DoubleSampler` with `RotationDirection` | $O(1)$ | one mod-360 delta per call, then one lerp |
 
-**Endpoints are $O(1)$ replacements:** `t <= 0` writes the exact normalized start, `t >= 1` the exact normalized end (no sampling). Middle frames call `InsertFrame`, which for reference types mutates a per-animation `working` scratch (lazily created on the first middle-frame call and reused) — the shared `start`/`end` captured in the snapshot are never mutated. Value types compute-and-assign. Complex adapter fallbacks (e.g. WPF blending a non-solid `Brush`) allocate per frame, but the common solid/transform paths are zero-allocation.
+**Endpoints are $O(1)$ replacements:** `t <= 0` writes the exact normalized start, `t >= 1` the exact normalized end (no sampling). Middle frames call `InsertFrame`, which for reference types mutates a per-animation `working` scratch (lazily created on the first middle-frame call and reused) — the shared `start`/`end` taken from the transition declaration are never mutated. Value types compute-and-assign. Complex adapter fallbacks (e.g. WPF blending a non-solid `Brush`) allocate per frame, but the common solid/transform paths are zero-allocation.
 
 The number of samples is **not** dictated by `FPS` — it is the Stopwatch-derived `elapsed / duration`, paced by the `1000 / FPS` ms yield (a throttle, not a timing source). A duration-$D$ pass therefore issues up to $D \cdot \text{FPS}/1000$ samples, each $O(P)$. Auto-reverse doubles the pass count; `LoopTime` adds repeats (`cycle ≤ LoopTime`). The wall-clock time for a finite run is
 
@@ -61,15 +61,19 @@ $$
 
 `TransitionSchedulerCore.FindOrCreate(target, CanMutualTask)` performs a `ConditionalWeakTable` lookup (`MutualSchedulers`) or allocates a fresh non-mutual scheduler. A `SemaphoreSlim.WaitAsync()` gate serializes executions on a scheduler; per-target `NoMutualSchedulers` list operations are $O(M)$ where $M$ = concurrent non-mutual animations.
 
-## State capture (`TransitionSnapshotHelper`)
+## Path validation
 
-Snapshot discovery (`DiscoverAnimatableProperties`) is a recursive DFS over the object graph guarded by an object-revisit set and an ancestor-**type** guard (no fixed depth cap):
+There is no capture / discovery walk to cost: animated state is declared path by path, and the only per-path overhead beyond the dictionary insert is the conflict check.
 
 $$
-O(V \cdot d)
+O(P)\ \text{per declared value path} \;\Rightarrow\; O(P^2)\ \text{per transition}
 $$
 
-where $V$ = number of reachable composite objects/properties enumerated and $d$ = the path depth (bounded in practice by the ancestor-type guard — a member whose type is already on the current path stops the recursion). The search refuses to descend into primitives, enums, value types, `string`, `object`, `IEnumerable`, and `Delegate`, and is `ISampleable`-aware: it expands a reference-type `ISampleable` into declared member paths and captures a value-type `ISampleable` as a whole path (later assembled by `StructAssembler`). `CaptureAll`/`CaptureAllExcept` use `Interpolator.TryGetInterpolator(type, out _)` (or `ISampler` implementors) as the "can animate" predicate. Each captured property is then read once through the compiled getter: $O(P)$ read cost.
+`StateCore.SetValue` compares the incoming `TransitionProperty` against every key already in `Values`, asking `IsDescendantOf` in both directions (a parent/child pair on one transition is `TransitionPathConflictException`). Each comparison is $O(k)$ on the segment chains, so declaring all $P$ paths of one transition costs $O(P^2 \cdot k)$ in total — negligible for the handful of paths a transition carries. `TransitionCore.RejectUnsampleablePaths` (called once by `Execute`/`CoreValidate`) walks the same $P$ keys and asks the registry once per path: $O(P)$.
+
+## Execution scale
+
+The scheduler work around a run is $O(1)$ per segment plus $O(M)$ for the per-target non-mutual scheduler set ($M$ = concurrent non-mutual animations on that target): `FindOrCreate` is a `ConditionalWeakTable` lookup, entering/leaving a run drains and tracks the token set under the target lock, and `Exit` cancels every tracked token of the run.
 
 ## Memory usage
 
@@ -95,16 +99,18 @@ where $V$ = number of reachable composite objects/properties enumerated and $d$ 
 | Easing + clamping one sample | $O(1)$ |
 | Endpoint write (`t <= 0` / `t >= 1`) | $O(1)$ replacement, no sampling |
 | Scheduler `FindOrCreate` (CWT lookup) | $O(1)$ |
-| `SnapshotAll` discovery (`DiscoverAnimatableProperties`) | $O(V \cdot d)$ DFS over the object graph |
+| Path conflict check (`StateCore.SetValue` → `RejectPathConflict`) | $O(k)$ per already-declared path ($O(P \cdot k)$ per declared value) |
+| Unsampleable-path scan (`RejectUnsampleablePaths`, once per run) | $O(P)$ registry lookups |
+| Scheduler enter/leave (`Track`/`Untrack`/`DrainActive`) | $O(1)$ amortized per run (plus $O(M)$ for non-mutual registration) |
 
 ## Notes
 
-- Samplers are **prepared once**; each sample re-evaluates only the eased time against the captured start/end/options — there is no frame list to build, store, or re-index.
+- Samplers are **prepared once**; each sample re-evaluates only the eased time against the normalized start/end/options — there is no frame list to build, store, or re-index.
 - Reference types are interpolated through a per-animation `working` scratch, so the common fast paths allocate nothing per sample (even for `LoopTime = int.MaxValue`, per-iteration memory is constant).
 - `SamplerSet.Apply` reuses one cached closure per target and passes the eased time via an `Interlocked`-read field, so per-sample marshaling does not allocate a closure.
 - A property path that is invalid for the current target returns the `UnreadablePath` sentinel in $O(1)$ (compiled getter), and `Prepare` skips it rather than sampling from a bogus `null`.
 - `TransitionProperty` getter/setter delegates are compiled lazily once per property and shared across samples, so the sampling loop avoids reflection entirely.
 
-> Sources: `Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`, `TransitionInterpreter.cs`, `TransitionSnapshotHelper.cs`, `SamplerSet.cs`, `TransitionScheduler.cs`, `TransitionProperty.cs`, `StructAssembler.cs`, `NativeSamplers/*.cs`.
+> Sources: `Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`, `TransitionInterpreter.cs`, `Transition.cs`, `State.cs`, `SamplerSet.cs`, `TransitionScheduler.cs`, `TransitionProperty.cs`, `StructAssembler.cs`, `NonPriority.cs`, `NativeSamplers/*.cs`.
 
 Related analysis: [Design patterns — Transition](../../02_design-patterns/03_transition/index.md) · [Data flow — Transition](../../03_data-flow/03_transition/index.md)

@@ -18,7 +18,7 @@ using VeloxDev.TransitionSystem;
 
 public static class QuickStart
 {
-    public static readonly Transition<Rectangle>.StateSnapshot SlideAndFade =
+    public static readonly Transition<Rectangle> SlideAndFade =
         Transition<Rectangle>.Create()
             .Property(r => r.Opacity, 0)
             .Property(r => ((TranslateTransform)r.RenderTransform).X, 800)
@@ -95,6 +95,6 @@ InterpolatorCore.RegisterInterpolator(typeof(double), new SmoothStepDoubleSample
 // InterpolatorCore.UnregisterInterpolator(typeof(double), out _);  // 恢复默认
 ```
 
-旋转方向是不必编写采样器即可经 `Property` 传入的**逐属性选项**：表示角度的数值路径会尊重 `RotationDirection`（如 `RotationDirection.CounterClockWise`），因为 `DoubleSampler.InsertFrame` 会读取 `options` 参数并处理环绕（见 [定义状态快照](../03_定义状态快照/index.md)）。
+旋转方向是不必编写采样器即可经 `Property` 传入的**逐属性选项**：表示角度的数值路径会尊重 `RotationDirection`（如 `RotationDirection.CounterClockWise`），因为 `DoubleSampler.InsertFrame` 会读取 `options` 参数并处理环绕（见 [定义状态快照](../03_声明状态/index.md)）。
 
-**预期结果：** 注册后 `NativeInterpolators[typeof(double)]` 返回该采样器（后写者胜），因此下一次动画 `double` 类型属性即使用 smoothstep，直到你注销它。逐属性覆盖优先于注册表 —— 若只需某个属性以不同方式动画，先用 `.Property(...)` 再用快照的 `.Interpolator(propertyLambda, sampler)` 扩展附加。
+**预期结果：** 注册后 `NativeInterpolators[typeof(double)]` 返回该采样器（后写者胜），因此下一次动画 `double` 类型属性即使用 smoothstep，直到你注销它。逐属性覆盖优先于注册表 —— 若只需某个属性以不同方式动画，先用 `.Property(...)` 再用 `TransitionCoreEx.Interpolator(propertyLambda, sampler)` 扩展附加。

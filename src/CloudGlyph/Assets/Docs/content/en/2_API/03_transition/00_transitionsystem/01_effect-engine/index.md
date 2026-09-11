@@ -1,6 +1,6 @@
 # Transition — Contracts: Effect, Scheduler, Interpreter, UI Thread
 
-Namespace `VeloxDev.TransitionSystem`. These interfaces describe the timing descriptor, the per-target execution coordinator, the sampling-loop runner, and UI-thread marshaling. Each has a priority-typed variant used by adapters that marshal at a dispatcher priority (WPF, Avalonia, Jalium, WinUI) and a non-typed variant used by the others.
+Namespace `VeloxDev.TransitionSystem`. These interfaces describe the timing descriptor, the per-target execution coordinator, the sampling-loop runner, and UI-thread marshaling. Every generic interface carries the host's dispatcher priority as a **type parameter**; an adapter whose host has no priority (MAUI, WinForms, Razor) fills it with `NonPriority`. There are no priority-free interface variants.
 
 ### Interface: `ITransitionEffectCore`
 
@@ -44,43 +44,47 @@ public interface ITransitionSchedulerCore
 ```
 
 **Notes:**
-- `Execute` runs one prepared animation on the scheduler's target: it prepares the `SamplerSet`, fires `Awaked`, then delegates to the interpreter. A `SemaphoreSlim` gate serializes executions on a *mutual* scheduler (a second animation cancels the first); `externCts` lets the caller supply its own cancellation source.
-- `Exit()` cancels the currently running animation of that scheduler.
+- `Execute` runs one prepared animation on the scheduler's target: it awaits the `Awaked` dispatch (so `Awake` finishes before anything reads the target), prepares the `SamplerSet<TPriorityCore>`, then delegates to the interpreter. A `SemaphoreSlim` gate serializes executions on a *mutual* scheduler (a second animation cancels the first); `externCts` lets the caller supply its own cancellation source.
+- `Exit()` cancels every animation currently tracked by that scheduler.
 - Typed variants narrow the effect parameter:
   - `ITransitionScheduler<TPriorityCore> : ITransitionSchedulerCore` — `Execute(InterpolatorCore, IFrameState, ITransitionEffect<TPriorityCore>, CancellationTokenSource? externCts = default)`.
   - `ITransitionScheduler : ITransitionSchedulerCore` — marker (no new members).
 - The concrete scheduler base `Abstractions.TransitionSchedulerCore` supplies the per-target registry tables and `FindOrCreate` (see [01_abstractions](../../01_abstractions/index.md)).
 - *Verified by:* `SamplingLoopTests`; WPF demo `RepeatMutual` (a new mutual animation cancels the previous one).
 
-### Interface: `ITransitionInterpreterCore`
+### Interface: `ITransitionInterpreter<TPriorityCore>`
 
 ```csharp
-public interface ITransitionInterpreterCore : IDisposable
+public interface ITransitionInterpreter<TPriorityCore> : IDisposable
 {
     TransitionEventArgs Args { get; set; }
-    Task Execute(object target, SamplerSet samplerSet, ITransitionEffectCore effect, CancellationTokenSource cts);
+    Task Execute(object target, SamplerSet<TPriorityCore> samplerSet,
+        ITransitionEffect<TPriorityCore> effect, CancellationTokenSource cts);
     void Exit();
 }
 ```
 
 **Notes:**
 - `Args` is the event-arguments instance the interpreter drives; setting `Args.Handled = true` short-circuits the timeline (the loop throws `OperationCanceledException` → `Canceled` + `Finally`).
-- `Execute` runs the Stopwatch-driven sampling loop against the prepared `SamplerSet`. `Exit()` (alias of `Dispose`) cancels the active `CancellationTokenSource`.
-- Typed variants:
-  - `ITransitionInterpreter<TPriorityCore> : ITransitionInterpreterCore` — `Execute(object target, SamplerSet samplerSet, ITransitionEffect<TPriorityCore> effect, CancellationTokenSource cts)`.
-  - `ITransitionInterpreter : ITransitionInterpreterCore` — marker.
+- `Execute` runs the Stopwatch-driven sampling loop against the prepared `SamplerSet<TPriorityCore>`. `Exit()` (alias of `Dispose`) cancels the active `CancellationTokenSource`.
+- The interpreter is a **single, priority-typed** interface: an adapter with no dispatcher priority instantiates `ITransitionInterpreter<NonPriority>` (its `SamplerSet<NonPriority>` applies frames without a priority). There is no non-generic variant.
 - The concrete loop behavior lives in `Abstractions.TransitionInterpreterCore` (see [01_abstractions](../../01_abstractions/index.md)).
 - *Verified by:* `SamplingLoopTests` (`DurationZero_JumpsToEnd_AndCompletes`, `HandledBeforeStart_CancelsAndFiresFinally`).
 
-### Interfaces: `IUIThreadInspectorCore`, `IUIThreadInspector`, `IUIThreadInspector<TPriorityCore>`
+### Interfaces: `IUIThreadInspectorCore`, `IUIThreadInspector<TPriorityCore>`
 
 ```csharp
 public interface IUIThreadInspectorCore
 {
     bool IsAppAlive();
     bool IsUIThread();
-    void ProtectedInvoke(object target, Action action, object? priority = default);
     object? ProtectedGetValue(object target, ITransitionProperty property);
+}
+
+public interface IUIThreadInspector<TPriorityCore> : IUIThreadInspectorCore
+{
+    bool ProtectedInvoke(object target, Action action, TPriorityCore priority);
+    Task<bool> ProtectedInvokeAsync(object target, Action action, TPriorityCore priority);
 }
 ```
 
@@ -88,12 +92,11 @@ public interface IUIThreadInspectorCore
 |---|---|
 | `IsAppAlive` | Whether the host application is still alive (stale-frame guard: `SamplerSet.Apply` returns early when false). |
 | `IsUIThread` | Whether the caller already runs on the UI thread. |
-| `ProtectedInvoke` | Marshals `action` to the UI thread (uses the target's owning dispatcher / control when available). `priority` is opaque unless the concrete inspector understands the type. |
 | `ProtectedGetValue` | Reads the property through the chain, marshaling to the UI thread when needed. |
+| `ProtectedInvoke` | Marshals `action` to the UI thread, fire-and-forget. Returns `false` when the action could not be queued at all (the dispatcher is gone, or the target has no queue yet) — the only way a caller can tell a dropped action from a queued one. |
+| `ProtectedInvokeAsync` | Same as `ProtectedInvoke`, but completes only once `action` has actually run. Used for the one call per animation that must happen before the frames start — the effect's `Awake`. A `false` result means the action was never queued. |
 
 **Notes:**
-- Two typed specializations add a no-priority convenience overload and a priority-taking overload:
-  - `IUIThreadInspector : IUIThreadInspectorCore` — `void ProtectedInvoke(object target, Action action);`
-  - `IUIThreadInspector<TPriorityCore> : IUIThreadInspectorCore` — `void ProtectedInvoke(object target, Action action, TPriorityCore priority);`
-- The `abstract` keyword on `ProtectedInvoke` (see the interface source) is an implementation detail of the concrete core classes.
+- All three members are declared on the interfaces themselves; the `Abstractions` base classes only implement them. There is no priority-free inspector interface — a host without a dispatcher priority uses `IUIThreadInspector<NonPriority>`.
 - Per-platform behavior is documented in [03_adapter-provided/02_ui-inspector](../../03_adapter-provided/02_ui-inspector/index.md).
+- *Verified by:* `TransitionSchedulerAwakeTests`.

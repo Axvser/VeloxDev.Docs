@@ -2,7 +2,7 @@
 
 ## 1. Timing, FPS and loop semantics
 
-One `TransitionEffect` drives one snapshot segment. Its timing members (from `TransitionEffectCore`):
+One `TransitionEffect` drives one segment. Its timing members (from `TransitionEffectCore`):
 
 - `Duration` — wall-clock length of one pass. `Duration = TimeSpan.Zero` jumps straight to the end (how `TransitionEffects.Empty` resets an object instantly).
 - `FPS` — the *maximum* sample rate (default `60`). The interpreter's yield interval is `1000 / FPS` ms, but elapsed time comes from a `Stopwatch`, so `FPS` is a cap, not a frame grid.
@@ -14,9 +14,9 @@ One `TransitionEffect` drives one snapshot segment. Its timing members (from `Tr
 
 ## 2. Chain segments into a timeline
 
-Chain additional snapshot segments with three fluent calls (each segment has its own state + effect):
+Chain additional segments with three fluent calls (each segment has its own state + effect):
 
-- `.Await(timeSpan)` — wait before playing **this** snapshot (used as the first call to delay the whole animation).
+- `.Await(timeSpan)` — wait before playing **this** segment (used as the first call to delay the whole animation).
 - `.Then()` — start the next segment immediately after this one.
 - `.AwaitThen(timeSpan)` — wait `timeSpan`, then start the next segment.
 
@@ -47,13 +47,20 @@ This is `Animation2` from the WPF demo. When executed, the interpreter walks the
 
 ## 3. Presets and effect events
 
-`TransitionEffects` ships three mutable presets of the adapter's `TransitionEffect`: `Empty` (zero duration — instant jump), `Theme` (0.46 s) and `Hover` (0.32 s). Override any property on a copy before executing — the demos reset an object by swapping in `Empty`:
+`TransitionEffects` ships three mutable presets of the adapter's `TransitionEffect`: `Empty` (zero duration — instant jump), `Theme` (0.46 s) and `Hover` (0.32 s). Override any property on a copy before executing — the demos reset an object by playing a declared state list under `Empty`:
 
 ```csharp
-var reset = rect.SnapshotAll();                 // capture the initial state once
+// The initial state, declared explicitly (see "Declare State Explicitly"):
+private static readonly Transition<Rectangle> Reset =
+    Transition<Rectangle>.Create()
+        .Property(r => r.Opacity, 1d)
+        .Property(r => r.Fill, new SolidColorBrush(Colors.Cyan));
+
 // ... later, restore it instantly:
-reset.Effect(TransitionEffects.Empty).Execute(rect);
+Reset.Effect(TransitionEffects.Empty).Execute(rect);
 ```
+
+There is no capture step, so the reset list is part of the source and must be kept in step with the animation's own declared targets.
 
 An effect raises lifecycle events (all `EventHandler<TransitionEventArgs>`, where `TransitionEventArgs` carries `Handled` — set it to `true` to stop the current pass):
 
@@ -62,7 +69,7 @@ An effect raises lifecycle events (all `EventHandler<TransitionEventArgs>`, wher
 - `Update` — before each frame's value write; `LateUpdate` — right after it.
 - `Completed` — after the last pass finishes normally.
 - `Canceled` — when interrupted (new mutual animation, `Transition.Exit`, or `Handled = true`).
-- `Finally` — always fires on *any* end path, after `Completed` or `Canceled` (the engine relies on it to release no-mutual scheduler bookkeeping).
+- `Finally` — always fires on *any* end path, after `Completed` or `Canceled`. (No-mutual scheduler bookkeeping is released by the run itself, not by this event.)
 
 ```csharp
 var effect = new TransitionEffect
@@ -78,4 +85,4 @@ effect.Finally += (_, _) => Console.WriteLine("finally");
 
 **Expected result:** running the animation prints `start`, then `completed` then `finally` on a clean run; interrupting it prints `start`, `canceled`, `finally`. The event handlers are backed by `WeakDelegate`, so holding an effect does not leak the target.
 
-Next: [Execute & Control](../05_execute-and-control/index.md) shows how a snapshot (or chain) is actually started, cancelled and run in parallel.
+Next: [Execute & Control](../05_execute-and-control/index.md) shows how a transition (or chain) is actually started, cancelled and run in parallel.

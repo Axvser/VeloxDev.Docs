@@ -56,7 +56,7 @@ flowchart TD
 | Scenario | Entry type | Where |
 |---|---|---|
 | Build a workflow editor | `tree.AsAgentScope()` / `[WorkflowBuilder.Tree<T>]` | `Examples/Workflow/Common/Lib` |
-| Animate a property | `target.Snapshot(...)` / `Transition.Execute(...)` | `Examples/Transition/*` |
+| Animate a property | `Transition<T>.Create().Property(...)` / `target` builder `.Execute(target)` | `Examples/Transition/*` |
 | Switch a theme | `ThemeManager.Transition<Light>(...)` | `Examples/Theme/*` |
 | Run an async command | `[VeloxCommand]` on a partial method | `Examples/MVVM/*` |
 | Intercept node execution | `ProxyEx.CreateProxy(...)` + `SetProxy(...)` | `Examples/AOP/*` |

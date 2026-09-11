@@ -1,20 +1,20 @@
 # Transition — 执行与控制
 
-## 1. 启动一个快照（一次性）
+## 1. 启动一次动画（一次性）
 
-调用快照的 `Execute` 扩展（命名空间 `VeloxDev.TransitionSystem`）。执行立即返回，并在后台驱动帧循环：
+调用 `Transition<T>` 上的 `Execute(target, CanMutualTask)` **实例方法**（继承自 `StateSnapshotCore<T>`；命名空间 `VeloxDev.TransitionSystem`）。执行立即返回，并在后台驱动帧循环：
 
 ```csharp
 using VeloxDev.TransitionSystem;
 
 Animation0.Execute(rect);                  // 互斥（默认）：CanMutualTask: true
-Animation0.Execute(rect, CanMutualTask: false); // 与其它动画并发运行
-Transition<Rectangle>.Execute(rect, Animation0); // 静态替代写法
+Animation0.Execute(rect, CanMutualTask: false);         // 与其它动画并发运行
+Transition<Rectangle>.Execute(rect, [Animation0]);      // 批量静态入口，默认 CanMutualTask: false
 ```
 
 `Execute` 作用于 *UI 绑定*目标时，既可在 UI 线程调用，也可在后台线程调用 —— 各框架的 `UIThreadInspector` 会从目标推导其所属 UI 线程，并编组每一帧写入（见 [UI线程与编组](../06_UI线程与编组/index.md)）。示例两种入口都演练了，例如 WPF 示例分别在 UI 线程直接调用 `Animation0.Execute(Rec0)`，以及在 `Task.Run(...)` 内调用同一动画。
 
-**预期结果：** 记录的属性按效果的时长/缓动从当前值插值到目标值。调用在动画完成前就返回了。
+**预期结果：** 声明的属性按效果的时长/缓动从当前值插值到目标值。调用在动画完成前就返回了。
 
 ## 2. 互斥 vs 并行
 
@@ -31,7 +31,7 @@ Animation1.Execute(rect, CanMutualTask: false);   // 两者并发
 
 ## 3. 就地停止 —— `Transition.Exit`
 
-`Transition.Exit(target)` 取消目标正在运行的动画，让属性停留在当前位置（*不会*跳到快照终点）。两个标志决定停哪些调度器：
+`Transition.Exit(target)` 取消目标正在运行的动画，让属性停留在当前位置（*不会*跳到声明的终点）。两个标志决定停哪些调度器：
 
 - `IncludeMutual: true` —— 唯一的互斥调度器（默认行为）。
 - `IncludeNoMutual: true` —— 所有并行（`CanMutualTask: false`）调度器。

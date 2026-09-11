@@ -83,5 +83,5 @@ public static class Eases
 
 另有两个 public 类型与本命名空间共享，但按其所属的构建器 / 适配器表面另行记录：
 
-- `TransitionCoreEx` —— 构建与运行 `StateSnapshotCore` 链的静态扩展（`Await`、`Then`、`AwaitThen`、`Interpolator`、`Execute`）→ [01_abstractions](../../01_abstractions/index.md)。
-- 各适配器的 `TransitionEx`、`Transition`、`Transition<T>`、`Transition<T>.StateSnapshot` → [03_adapter-provided](../../03_adapter-provided/index.md)。
+- `TransitionCoreEx` —— 构建与运行 `StateSnapshotCore` 链的静态流程扩展（`Await`、`Then`、`AwaitThen`、`Interpolator`）→ [01_abstractions](../../01_abstractions/index.md)。
+- 各适配器的 `Transition`、`Transition<T>` → [03_adapter-provided](../../03_adapter-provided/index.md)。

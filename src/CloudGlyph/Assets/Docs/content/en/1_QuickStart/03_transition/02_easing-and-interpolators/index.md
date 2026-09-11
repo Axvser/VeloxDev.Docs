@@ -18,7 +18,7 @@ using VeloxDev.TransitionSystem;
 
 public static class QuickStart
 {
-    public static readonly Transition<Rectangle>.StateSnapshot SlideAndFade =
+    public static readonly Transition<Rectangle> SlideAndFade =
         Transition<Rectangle>.Create()
             .Property(r => r.Opacity, 0)
             .Property(r => ((TranslateTransform)r.RenderTransform).X, 800)
@@ -63,7 +63,7 @@ While `Ease` reshapes *time*, a sampler (`ISampler`) reshapes the *value* betwee
 
 - `NormalizeStart(start, end, options)` — value written at `t <= 0` (default: `start` as-is).
 - `NormalizeEnd(start, end, options)` — value written at `t >= 1` (default: `end` as-is).
-- `InsertFrame(target, property, ref working, start, end, options, t)` — interpolate `start → end` at eased time `t` and write it. Implementations must never mutate `start` / `end` (they are shared with the snapshot).
+- `InsertFrame(target, property, ref working, start, end, options, t)` — interpolate `start → end` at eased time `t` and write it. Implementations must never mutate `start` / `end` (they are shared with the transition declaration that recorded them).
 
 The engine-core registrations live in `InterpolatorCore` (the `NativeInterpolators` dictionary) and cover `double`, `float`, `int`, `long`, `Point`, `PointF`, `Size`, `SizeF`, `Color`, `Rectangle`, `RectangleF` and — off `netstandard2.0` — `Vector2/3/4`, `Quaternion`. Each GUI adapter registers its own framework samplers (e.g. WPF adds `Brush`, `Thickness`, `CornerRadius`, `Transform`, `DropShadowEffect`, `Point3D`, `Vector3D`). A custom sampler is registered or removed with the static registry API:
 
@@ -95,6 +95,6 @@ InterpolatorCore.RegisterInterpolator(typeof(double), new SmoothStepDoubleSample
 // InterpolatorCore.UnregisterInterpolator(typeof(double), out _);  // restore the default
 ```
 
-Rotation direction is the one per-property *option* you can pass through `Property` without writing a sampler: numeric paths that represent an angle honor `RotationDirection` (e.g. `RotationDirection.CounterClockWise`), because `DoubleSampler.InsertFrame` reads the `options` argument and steers the wrap-around (see [Define a Snapshot](../03_define-a-snapshot/index.md)).
+Rotation direction is the one per-property *option* you can pass through `Property` without writing a sampler: numeric paths that represent an angle honor `RotationDirection` (e.g. `RotationDirection.CounterClockWise`), because `DoubleSampler.InsertFrame` reads the `options` argument and steers the wrap-around (see [Declare State Explicitly](../03_declare-state/index.md)).
 
-**Expected result:** registering the sampler makes `NativeInterpolators[typeof(double)]` return it (last-writer-wins), so the next animation of a `double`-typed property uses smoothstep until you unregister it. Per-property overrides take precedence over the registry — attach one with `.Property(...)` followed by the snapshot's `.Interpolator(propertyLambda, sampler)` extension if you need a single property to animate differently.
+**Expected result:** registering the sampler makes `NativeInterpolators[typeof(double)]` return it (last-writer-wins), so the next animation of a `double`-typed property uses smoothstep until you unregister it. Per-property overrides take precedence over the registry — attach one with the `TransitionCoreEx.Interpolator(propertyLambda, sampler)` extension (`namespace VeloxDev.TransitionSystem`) if you need a single property to animate differently.

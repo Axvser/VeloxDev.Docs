@@ -20,7 +20,7 @@
 | `TryGetInterpolator` | `public static bool TryGetInterpolator(Type type, out ISampler? sampler)` | 查找某类型已注册的采样器。 |
 | `RegisterInterpolator` | `public static bool RegisterInterpolator(Type type, ISampler sampler)` | 注册采样器（原子的「后写者胜」）。 |
 | `UnregisterInterpolator` | `public static bool UnregisterInterpolator(Type type, out ISampler? sampler)` | 移除已注册的采样器。 |
-| `Prepare`（实例、`virtual`） | `public virtual SamplerSet Prepare(object target, IFrameState state, ITransitionEffectCore effect, IUIThreadInspectorCore inspector)` | 把状态快照中的每个属性归一化进一个 `SamplerSet`。供过渡动画功能使用，`ThemeManager` 不使用。 |
+| `Prepare`（实例、`virtual`，带优先级类型参数） | `public virtual SamplerSet<TPriorityCore> Prepare<TPriorityCore>(object target, IFrameState state, ITransitionEffectCore effect, IUIThreadInspector<TPriorityCore> inspector)` | 把状态中的每个属性归一化进一个 `SamplerSet<TPriorityCore>`。供过渡动画功能使用，`ThemeManager` 不使用。 |
 
 **说明：**
 - `ThemeManager.PrepareSamplers` 通过 `InterpolatorCore.TryGetInterpolator` 按 `PropertyInfo.PropertyType` 解析属性的采样器。当该类型没有注册采样器时，该属性退化为简单的「保持到结束再切换」。
@@ -93,8 +93,8 @@
 源码：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ISampleable.cs`。
 
 **说明：**
-- 声明某个类型的哪些成员可动画（一层）以及如何从插值后的成员重建一个值。供过渡动画功能的捕获/`Prepare` 阶段用于没有注册采样器的属性类型。
-- `ThemeManager` 只从注册表解析采样器，因此 `ISampleable` 的成员展开不参与主题切换。
+- **只服务值类型（结构体）**：声明某个结构体的哪些成员可动画（一层）以及如何从插值后的成员重建一个值。供过渡动画功能的 `Prepare` 阶段用于没有注册采样器的结构体；引用类型不走这条路（用逐成员显式路径或专用 `ISampler`）。
+- `ThemeManager` 只从注册表解析采样器，因此 `ISampleable` 的结构体装配不参与主题切换。
 
 ### 接口：`ITransitionEffectCore`
 

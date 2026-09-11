@@ -44,7 +44,7 @@ public interface ITransitionSchedulerCore
 ```
 
 **说明：**
-- `Execute` 在调度器的目标上运行一次准备好的动画：准备 `SamplerSet`、触发 `Awaked`、再交给解释器。`SemaphoreSlim` 门控在**互斥**调度器上串行化执行（第二个动画会取消第一个）；`externCts` 允许调用方提供自己的取消源。
+- `Execute` 在调度器的目标上运行一次准备好的动画：先在 UI 线程上 **await** 触发 `Awaked`（Awake 可否决动画、也可把目标置为动画起点），再 `Prepare` 出 `SamplerSet`，最后交给解释器。`SemaphoreSlim` 门控在**互斥**调度器上串行化执行（第二个动画会取消第一个）；`externCts` 允许调用方提供自己的取消源。
 - `Exit()` 取消该调度器当前正在运行的动画。
 - 类型化变体收窄效果参数：
   - `ITransitionScheduler<TPriorityCore> : ITransitionSchedulerCore` — `Execute(InterpolatorCore, IFrameState, ITransitionEffect<TPriorityCore>, CancellationTokenSource? externCts = default)`。
@@ -52,35 +52,38 @@ public interface ITransitionSchedulerCore
 - 具体调度器基类 `Abstractions.TransitionSchedulerCore` 提供按目标的注册表与 `FindOrCreate`（见 [01_abstractions](../../01_abstractions/index.md)）。
 - *验证依据：* `SamplingLoopTests`；WPF 示例 `RepeatMutual`（新的互斥动画取消上一次）。
 
-### 接口：`ITransitionInterpreterCore`
+### 接口：`ITransitionInterpreter<TPriorityCore>`
 
 ```csharp
-public interface ITransitionInterpreterCore : IDisposable
+public interface ITransitionInterpreter<TPriorityCore> : IDisposable
 {
     TransitionEventArgs Args { get; set; }
-    Task Execute(object target, SamplerSet samplerSet, ITransitionEffectCore effect, CancellationTokenSource cts);
+    Task Execute(object target, SamplerSet<TPriorityCore> samplerSet, ITransitionEffect<TPriorityCore> effect, CancellationTokenSource cts);
     void Exit();
 }
 ```
 
 **说明：**
+- 非泛型的 `ITransitionInterpreter` / `ITransitionInterpreterCore` 接口**已删除**；现在只有带优先级的这一支。
 - `Args` 是解释器驱动的事件参数实例；把 `Args.Handled` 设为 `true` 会短路时间线（循环抛 `OperationCanceledException` → `Canceled` + `Finally`）。
-- `Execute` 针对准备好的 `SamplerSet` 运行 Stopwatch 驱动采样循环。`Exit()`（即 `Dispose` 的别名）取消当前 `CancellationTokenSource`。
-- 类型化变体：
-  - `ITransitionInterpreter<TPriorityCore> : ITransitionInterpreterCore` — `Execute(object target, SamplerSet samplerSet, ITransitionEffect<TPriorityCore> effect, CancellationTokenSource cts)`。
-  - `ITransitionInterpreter : ITransitionInterpreterCore` — 标记。
-- 具体循环行为在 `Abstractions.TransitionInterpreterCore`（见 [01_abstractions](../../01_abstractions/index.md)）。
+- `Execute` 针对准备好的 `SamplerSet<TPriorityCore>` 运行 Stopwatch 驱动采样循环。`Exit()`（即 `Dispose` 的别名）取消当前 `CancellationTokenSource`。
+- 具体循环行为在 `Abstractions.TransitionInterpreterCore` 及其两个泛型子类（见 [01_abstractions](../../01_abstractions/index.md)）。
 - *验证依据：* `SamplingLoopTests`（`DurationZero_JumpsToEnd_AndCompletes`、`HandledBeforeStart_CancelsAndFiresFinally`）。
 
-### 接口：`IUIThreadInspectorCore`、`IUIThreadInspector`、`IUIThreadInspector<TPriorityCore>`
+### 接口：`IUIThreadInspectorCore`、`IUIThreadInspector<TPriorityCore>`
 
 ```csharp
 public interface IUIThreadInspectorCore
 {
     bool IsAppAlive();
     bool IsUIThread();
-    void ProtectedInvoke(object target, Action action, object? priority = default);
     object? ProtectedGetValue(object target, ITransitionProperty property);
+}
+
+public interface IUIThreadInspector<TPriorityCore> : IUIThreadInspectorCore
+{
+    bool ProtectedInvoke(object target, Action action, TPriorityCore priority);
+    Task<bool> ProtectedInvokeAsync(object target, Action action, TPriorityCore priority);
 }
 ```
 
@@ -88,12 +91,11 @@ public interface IUIThreadInspectorCore
 |---|---|
 | `IsAppAlive` | 宿主应用是否仍存活（过期帧守卫：`SamplerSet.Apply` 在它为 false 时提前返回）。 |
 | `IsUIThread` | 调用方是否已在 UI 线程上。 |
-| `ProtectedInvoke` | 把 `action` 编组到 UI 线程（可用时使用目标自带的 dispatcher / control）。`priority` 是不透明对象，除非具体检查器理解其类型。 |
+| `ProtectedInvoke` | 把 `action` 编组到 UI 线程（可用时使用目标自带的 dispatcher / control）。**返回 `bool`**——该 action 是否真的入队；宿主 dispatcher 已消失或目标还没有队列时为 `false`。 |
+| `ProtectedInvokeAsync` | 与 `ProtectedInvoke` 相同，但只在 `action` **真的执行完**后才完成；专供每次动画一次、必须发生在帧开始之前的调用（效果的 Awake）。返回 `false` 表示从未入队。 |
 | `ProtectedGetValue` | 沿链读取属性，必要时编组到 UI 线程。 |
 
 **说明：**
-- 两个类型化特化增加「无优先级」与「带优先级」的便捷重载：
-  - `IUIThreadInspector : IUIThreadInspectorCore` — `void ProtectedInvoke(object target, Action action);`
-  - `IUIThreadInspector<TPriorityCore> : IUIThreadInspectorCore` — `void ProtectedInvoke(object target, Action action, TPriorityCore priority);`
-- `ProtectedInvoke` 声明上的 `abstract` 关键字（见接口源码）是具体核心类的实现细节。
+- 非泛型接口 `IUIThreadInspector` **已删除**；无优先级的适配器（MAUI / WinForms / Razor）用 `NonPriority` 作为 `TPriorityCore`（见 [01_abstractions](../../01_abstractions/index.md)）。
+- `IsAppAlive` / `IsUIThread` / `ProtectedGetValue` 由共享基接口 `IUIThreadInspectorCore` 声明；`ProtectedInvoke*` 在带优先级的接口上，且优先级以类型参数而非 `object?` 传递（热路径不装箱）。
 - 各平台行为见 [03_adapter-provided/02_ui-inspector](../../03_adapter-provided/02_ui-inspector/index.md)。

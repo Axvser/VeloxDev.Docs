@@ -5,7 +5,7 @@
 | 命名空间 | 用途 |
 |---|---|
 | `VeloxDev.WorkflowSystem.AttachedBehaviors` | 工作流附加行为与视图容器：`WorkflowSurfaceBehavior`、`WorkflowCanvasTransformBehavior`、`ViewPool`、`ViewManager`、`WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`、`WorkflowMinimapOverlay`，以及适配器特有类型（`WorkflowLinkOverlay`、`WorkflowGridDecorator`、`WorkflowTreeView`、`IWorkflowTemplateSelector`） |
-| `VeloxDev.TransitionSystem` | 适配器提供的过渡动画表面 —— `Transition`、`Transition<T>`、`Transition<T>.StateSnapshot`、`TransitionEx`、`Interpolator`、`TransitionEffect`、`TransitionEffects`、`State`、`UIThreadInspector`、`TransitionScheduler`、`TransitionInterpreter`（各适配器成员在 `2_API/03_transition` 特性中记录） |
+| `VeloxDev.TransitionSystem` | 适配器提供的过渡动画表面 —— `Transition`（承载静态 `Exit`）、`Transition<T>`（`Create` / `Property` / `Effect`）、`Interpolator`、`TransitionEffect`、`TransitionEffects`、`State`、`UIThreadInspector`、`TransitionScheduler`、`TransitionInterpreter`，外加各平台共用的 Core 流程扩展 `TransitionCoreEx`（各适配器成员在 `2_API/03_transition` 特性中记录） |
 | `VeloxDev.DynamicTheme` | 主题值转换器（`BrushConverter`、`DoubleConverter`、`PointConverter`、……）。`VeloxDev.Jalium` 不提供（各适配器转换器集合在 `2_API/04_dynamic-theme` 特性中记录） |
 | `VeloxDev.Adapters.NativeSamplers` | 每种框架值类型对应一个采样器类（如 `BrushSampler`、`ThicknessSampler`、`PaddingSampler`），由该适配器的 `Interpolator` 注册 |
 

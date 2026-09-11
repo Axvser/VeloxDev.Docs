@@ -4,7 +4,7 @@
 
 A GUI framework only allows property writes on the element's **UI thread**. The engine therefore runs its timing/sampling loop independently and hands every frame to the adapter's `UIThreadInspector`, which dispatches the actual `SetValue` writes on the owning thread. The result is that **you may start an animation from any thread** (including inside `Task.Run`) and the writes still land on the UI thread — the marshaling target is derived from the animated object itself.
 
-The concrete inspector lives with each adapter under the name `UIThreadInspector` (namespace `VeloxDev.TransitionSystem`) and is wired automatically into that adapter's `Transition<T>` snapshot type. WPF/Avalonia and WinUI inspectors carry a dispatch *priority* (`DispatcherPriority` / `DispatcherQueuePriority`); MAUI, WinForms and Razor use the plain non-priority pipeline.
+The concrete inspector lives with each adapter under the name `UIThreadInspector` (namespace `VeloxDev.TransitionSystem`) and is wired automatically into that adapter's `Transition<T>`. WPF/Avalonia/Jalium and WinUI inspectors carry a dispatch *priority* (`DispatcherPriority` / `DispatcherQueuePriority`); MAUI, WinForms and Razor have no dispatcher priority and fill that type parameter with `NonPriority`.
 
 ## 2. Per-adapter behavior
 
@@ -57,6 +57,6 @@ protected override void OnInitialized()
 
 The Blazor demo is the reference for POCO targets: it animates a plain `BoxModel` (double/`string` properties) and re-renders by subscribing `INotifyPropertyChanged` → `InvokeAsync(StateHasChanged)`.
 
-**Expected result:** an animation started from a background thread updates the UI property without a `CrossThreadAccess` / cross-dispatcher exception, because every frame write is marshaled by the adapter's `UIThreadInspector`. One caveat from the WinUI demo: build a `Transition<>` snapshot on the UI thread (a static field used from a background thread may hit a type-initializer issue), or capture first as above.
+**Expected result:** an animation started from a background thread updates the UI property without a `CrossThreadAccess` / cross-dispatcher exception, because every frame write is marshaled by the adapter's `UIThreadInspector`. One caveat from the WinUI demo: build the `Transition<>` instance on the UI thread (a static field used from a background thread may hit a type-initializer issue), or capture first as above.
 
 Next: [Verify & Complete Code](../07_verify-and-complete-code/index.md).

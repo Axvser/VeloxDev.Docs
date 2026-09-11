@@ -1,6 +1,6 @@
 # Transition — Adapter: `Interpolator`, `TransitionEffect`, `TransitionEffects`, `State`
 
-Each adapter provides an `Interpolator` registry subclass, an `Effect` descriptor with a platform default, a set of preset effects, and a snapshot `State`. All live in the `VeloxDev.TransitionSystem` namespace of the adapter assembly.
+Each adapter provides an `Interpolator` registry subclass, an `Effect` descriptor with a platform default, a set of preset effects, and a `State` declared-state bag. All live in the `VeloxDev.TransitionSystem` namespace of the adapter assembly.
 
 ### Class: `Interpolator : InterpolatorCore`
 
@@ -17,7 +17,7 @@ The adapter registry subclass. It inherits the engine defaults (see [01_abstract
 | Jalium | `Point`, `Rect`, `Thickness`, `CornerRadius`, `Size`, `Color`, `Brush`, `SolidColorBrush`, `Transform`, `Jalium.UI.Media.Media3D.Transform3D` |
 
 **Notes:**
-- The registered samplers implement `ISampler` and are shipped by the same adapter under `PlatformAdapters/Samplers/*.cs` (namespace `VeloxDev.Adapters.NativeSamplers` inside each adapter assembly). Brush/transform-like reference targets are interpolated without mutating the snapshot's shared start/end instances (see `ISampler` contract in [00_transitionsystem/00_sampling-capture](../../00_transitionsystem/00_sampling-capture/index.md)).
+- The registered samplers implement `ISampler` and are shipped by the same adapter under `PlatformAdapters/Samplers/*.cs` (namespace `VeloxDev.Adapters.NativeSamplers` inside each adapter assembly). Brush/transform-like reference targets are interpolated without mutating the transition declaration's shared start/end instances (see `ISampler` contract in [00_transitionsystem/00_sampling-capture](../../00_transitionsystem/00_sampling-capture/index.md)).
 - Registration is *in addition to* the engine default samplers seeded by the `InterpolatorCore` static constructor, so numeric, `System.Drawing` and (non-`netstandard2.0`) `System.Numerics` types always interpolate.
 
 ### Class: `TransitionEffect` — priority default
@@ -53,4 +53,4 @@ public static class TransitionEffects       // (an instance class, but identical
 
 ### Class: `State : StateCore`
 
-An empty subclass of `StateCore`; it is the `TStateCore` type parameter the adapter's `StateSnapshot` uses, so `snapshot.GetState()` returns this concrete `State` (an `IFrameState`). All behavior is inherited from `StateCore` (see [01_abstractions](../../01_abstractions/index.md)).
+An empty subclass of `StateCore`; it is the `TStateCore` type parameter the adapter's `Transition<T>` uses, so `GetState()` returns this concrete `State` (an `IFrameState`). All behavior is inherited from `StateCore` (see [01_abstractions](../../01_abstractions/index.md)).

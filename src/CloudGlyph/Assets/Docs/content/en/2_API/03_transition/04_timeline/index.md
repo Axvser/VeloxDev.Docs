@@ -13,7 +13,7 @@ public abstract class TimeLineEventArgs
 }
 ```
 
-**Notes:** `Handled` is the timeline kill switch — `false` by default, `true` ends the running timeline. It is inherited by `TransitionEventArgs`, whose instance is surfaced as `ITransitionInterpreterCore.Args`.
+**Notes:** `Handled` is the timeline kill switch — `false` by default, `true` ends the running timeline. It is inherited by `TransitionEventArgs`, whose instance is surfaced as `ITransitionInterpreter<TPriorityCore>.Args`.
 
 ### Class: `TransitionEventArgs : TimeLineEventArgs`
 
