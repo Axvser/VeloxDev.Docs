@@ -1,9 +1,10 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
 			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 			 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 			 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 			 xmlns:vm="using:CloudGlyph.ViewModels"
 			 xmlns:models="using:CloudGlyph.Models"
+			 xmlns:services="using:CloudGlyph.Services"
 			 xmlns:md="clr-namespace:AvalonMarkdown.Views;assembly=AvalonMarkdown"
 			 mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
 			 x:Class="CloudGlyph.Views.MainView"
@@ -41,26 +42,82 @@
 		</Border>
 
 
-		<Grid Grid.Row="1" ColumnDefinitions="240,4,*">
-			<!-- 左侧目录树 -->
+		<Grid Grid.Row="1" ColumnDefinitions="260,4,*">
+			<!-- 左侧：搜索 + 目录树 -->
 			<Grid Grid.Column="0" RowDefinitions="Auto,*">
-				<TextBlock Grid.Row="0"
-						   Text="Navigation"
-						   Margin="10,8,8,4"
-						   Opacity="0.6"
-						   FontSize="11" />
-				<TreeView Grid.Row="1"
-						  ItemsSource="{Binding Document.Nodes}"
-						  SelectedItem="{Binding Document.SelectedNode}"
-						  Margin="4,0">
-					<TreeView.ItemTemplate>
-						<TreeDataTemplate ItemsSource="{Binding Children}"
-										  x:DataType="models:PageNode">
-							<TextBlock Text="{Binding Title}"
-									   x:DataType="models:PageNode" />
-						</TreeDataTemplate>
-					</TreeView.ItemTemplate>
-				</TreeView>
+				<TextBox Grid.Row="0"
+						 Margin="8,8,8,6"
+						 PlaceholderText="Search pages…"
+						 Text="{Binding Document.Query, Mode=TwoWay}" />
+
+				<Grid Grid.Row="1">
+
+					<!-- 搜索结果：有查询时替换目录树 -->
+					<Grid IsVisible="{Binding Document.ShowResults}" RowDefinitions="Auto,Auto,*">
+						<TextBlock Grid.Row="0"
+								   Text="{Binding Document.ResultsHeader}"
+								   Margin="10,2,8,4"
+								   Opacity="0.6"
+								   FontSize="11" />
+						<TextBlock Grid.Row="1"
+								   Text="Building index…"
+								   IsVisible="{Binding Document.IsIndexing}"
+								   Margin="10,0,8,6"
+								   Opacity="0.45"
+								   FontSize="11" />
+						<ListBox Grid.Row="2"
+								 ItemsSource="{Binding Document.Results}"
+								 SelectedItem="{Binding Document.SelectedResult}"
+								 Margin="4,0">
+							<ListBox.ItemTemplate>
+								<DataTemplate x:DataType="services:SearchHit">
+									<StackPanel Margin="0,2">
+										<TextBlock Text="{Binding Title}"
+												   FontWeight="SemiBold"
+												   TextTrimming="CharacterEllipsis" />
+										<TextBlock Text="{Binding Snippet}"
+												   FontSize="11"
+												   Opacity="0.6"
+												   MaxLines="2"
+												   TextWrapping="Wrap" />
+									</StackPanel>
+								</DataTemplate>
+							</ListBox.ItemTemplate>
+						</ListBox>
+					</Grid>
+
+					<!-- 目录树 -->
+					<Grid IsVisible="{Binding !Document.ShowResults}" RowDefinitions="Auto,*">
+						<TextBlock Grid.Row="0"
+								   Text="Navigation"
+								   Margin="10,2,8,4"
+								   Opacity="0.6"
+								   FontSize="11" />
+						<TreeView Grid.Row="1"
+								  ItemsSource="{Binding Document.Nodes}"
+								  SelectedItem="{Binding Document.SelectedNode}"
+								  Margin="4,0">
+							<!-- Expansion state lives on PageNode so the view model can open the branches
+								 leading to a navigated page (a link click, a search result). This is a
+								 ReflectionBinding rather than a compiled one because a Style carries no
+								 DataContext type for the binding compiler to use. -->
+							<TreeView.Styles>
+								<Style Selector="TreeViewItem">
+									<Setter Property="IsExpanded"
+											Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
+								</Style>
+							</TreeView.Styles>
+							<TreeView.ItemTemplate>
+								<TreeDataTemplate ItemsSource="{Binding Children}"
+												  x:DataType="models:PageNode">
+									<TextBlock Text="{Binding Title}"
+											   x:DataType="models:PageNode" />
+								</TreeDataTemplate>
+							</TreeView.ItemTemplate>
+						</TreeView>
+					</Grid>
+
+				</Grid>
 			</Grid>
 
 			<GridSplitter Grid.Column="1" ResizeDirection="Columns" Width="4" />

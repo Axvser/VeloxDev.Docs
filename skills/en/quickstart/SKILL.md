@@ -55,9 +55,7 @@ A feature's Quick Start is normally **split into sub-pages** rather than one lon
 ```
 # {Feature Name}
 
-## Quick Start
-
-### 1. Prerequisites
+## 1. Prerequisites
 
 - **Supported target(s) from the project's declared `TargetFrameworks`** (e.g. `netstandard2.0;net6.0`) — the Demo's runtime is only a *tested* configuration, never the requirement
 - {SDK/runtime}: version required by the supported target (e.g. .NET SDK 6.0+ for `net6.0`)
@@ -65,33 +63,33 @@ A feature's Quick Start is normally **split into sub-pages** rather than one lon
 - {Required services}: (e.g. a running database, API key) — and how to obtain/start them
 - If any prerequisite cannot be verified locally, the Run Declaration below MUST be ⚠️.
 
-### 2. Install / Add Dependency
+## 2. Install / Add Dependency
 
 How to install / add dependencies (using the package manager appropriate to the project's tech stack)
 
 **Expected result:** {observable outcome, e.g. package appears in the manifest / command exits 0}
 
-### 3. Basic Setup / Registration
+## 3. Basic Setup / Registration
 
 Register services, create instances, configure settings, etc.
 
 **Expected result:** {e.g. object constructs, service starts, config loads}
 
-### 4. Core Usage (Step by Step)
+## 4. Core Usage (Step by Step)
 
 Combine top-level APIs step by step, from simple to complete, each with runnable code
 
 **Expected result:** {e.g. output value, UI state, HTTP status}
 
-### 5. Verification
+## 5. Verification
 
 How to run and verify the feature works (expected output, UI effect, etc.)
 
-### 6. Complete Code
+## 6. Complete Code
 
 A single minimal complete runnable block. NO `...` / ellipses. Symbol self-consistency: every identifier used is defined in this sample, in a prior step, or traced to a real file (with path).
 
-### 7. Run Declaration
+## 7. Run Declaration
 
 - ✅ Actually built and ran on {date}; recorded output: {paste actual output}
 - OR ⚠️ Not actually run — statically verified only. Keep this declaration honest; it is the reproducibility contract.

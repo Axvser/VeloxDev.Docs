@@ -80,6 +80,13 @@ Ultimately, the directory will present the following structure. These are five f
 
 ⚙ **A feature name is a feature name, not a class name.** Feature directories are named for the capability the reader looks for (`user-registration`, `data-export`), taken from the「Feature Inventory」. Type, class and namespace names belong in the page body, never in a directory name.
 
+⚙ **A heading never restates the heading above it.** The page opens with one H1 — its title — and the next heading must introduce something the H1 did not already say. Two shapes are defects:
+
+- **The restatement chain.** `# Workflow System — Quick Start` followed by `## Workflow System` followed by `### Quick Start` shows the reader the same words three times before any content. The page title is the title; delete the headings that repeat it and promote what they contained.
+- **The dimension echo.** A heading straight after the H1 whose whole text is the name of the parent dimension (`## Quick Start` on a page under `1_QuickStart`, `## API` under `2_API`) tells the reader only what the sidebar already shows. Start with the first real section instead.
+
+Either way, content must not be lost: deleting such a heading means promoting its sub-headings one level, not deleting the section. `validate-titles.py` fails on both shapes, and the sidebar is the authority on whether a name has already been said.
+
 ⚙ **Page-focus limit & leaf budget (default-split):** a feature page is NOT a single monolithic document — splitting is the default, not the exception. A page WITHOUT sub-pages is a **leaf**; keep it at or under **~300 lines** and at most **3 distinct topics**. When a leaf would exceed that, split it along capability/operation/endpoint/type boundaries into **2+ child page directories** (e.g. `00_{Feature}/00_{Operation}/index.md`), and recurse if a child leaf also grows too large. Each parent `index.md` is then only a **short overview** (well under ~200 lines) that links **every** direct child using the same-language cross-page link syntax from 【Links & Navigation】.
 
 ⚙ **Outline-first (mandatory order):** when a page needs splitting, DO NOT write the long page first and split afterwards. FIRST create the planned child-page directories — each with an (initially empty) `index.md`, and every ancestor `index.md` in place — then run `gen_tree.py` so the skeleton appears in the navigation, and ONLY THEN fill each leaf within its budget. Write toward an existing outline, never toward one page that silently grows.

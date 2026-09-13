@@ -62,6 +62,16 @@ _PREFIX_TOKEN = re.compile(r"(?<![0-9A-Za-z_])\d{1,2}_(?=[A-Za-z_一-鿿])")
 
 _FENCE_RE = re.compile(r"^([ \t]*)(`{3,}|~{3,})")
 _HEADING_RE = re.compile(r"^[ \t]{0,3}(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$")
+
+
+def _fold_title(text: str) -> str:
+    """Comparable form of a heading: lower-cased, separators collapsed."""
+    return re.sub(r"[\s—–\-:：]+", " ", text).strip().lower()
+
+
+def _squash(text: str) -> str:
+    """Comparable form ignoring every separator: `Quick Start` == `QuickStart`."""
+    return re.sub(r"[^0-9a-z一-鿿]+", "", text.lower())
 _LINK_RE = re.compile(r"\[([^\]\n]*)\]\(([^)\n]*)\)")
 _ANCHOR_RE = re.compile(r"<a\b[^>]*>(.*?)</a>", re.S | re.I)
 _TAG_RE = re.compile(r"<[^>]*>")
@@ -168,6 +178,59 @@ def scan_prefix_leaks(path: Path):
              "prose (wrap it in `code` if you are discussing the directory itself)", tok)
 
     return errors, warnings
+
+
+def scan_heading_repetition(path: Path):
+    """A heading that restates the heading above it, with no content in between.
+
+    This is the "triple title" shape — `# Workflow System — Quick Start` followed by
+    `## Workflow System` followed by `### Quick Start` — where a reader meets the same
+    words three times before any content. A heading may restate a *parent* dimension it
+    sits under (the sidebar already says where you are), and it may not restate the
+    heading it directly follows.
+    """
+    errors: list[tuple[int, str]] = []
+    try:
+        lines = path.read_text(encoding="utf-8-sig", errors="replace").split("\n")
+    except OSError:
+        return errors
+
+    heads = []
+    fence = None
+    for i, line in enumerate(lines):
+        m = _FENCE_RE.match(line)
+        if fence is not None:
+            if m and m.group(2)[0] == fence[0] and len(m.group(2)) >= len(fence):
+                fence = None
+            continue
+        if m:
+            fence = m.group(2)
+            continue
+        h = _HEADING_RE.match(line)
+        if h:
+            heads.append((len(h.group(1)), h.group(2), i))
+
+    if not heads:
+        return errors
+
+    # The dimension this page lives under, e.g. `1_QuickStart` -> "quickstart".
+    grand = path.parent.parent
+    dim = _squash(_strip_prefix(grand.name)) if grand != path.parent else ""
+
+    for above, below in zip(heads, heads[1:]):
+        if any(x.strip() for x in lines[above[2] + 1:below[2]]):
+            continue                       # real content separates them
+        a, b = _fold_title(above[1]), _fold_title(below[1])
+        restates = bool(b) and (a == b or a.startswith(b + " ") or b.startswith(a + " "))
+        names_dimension = bool(dim) and _squash(below[1]) == dim
+        if restates or names_dimension:
+            why = "restates the heading above it" if restates else "only names the parent dimension"
+            errors.append((
+                below[2] + 1,
+                f'heading "#{below[0]} {below[1]}" {why} and has no content between them — '
+                f'the page title already says this. Delete it and promote what it contains.',
+            ))
+    return errors
 
 
 def _tokens(text: str) -> list[str]:
@@ -312,10 +375,12 @@ def main():
     total_errors = total_warns = 0
     warnings: list[str] = []
 
-    # 1. Numeric prefixes leaking into reader-facing text.
+    # 1. Numeric prefixes leaking into reader-facing text, and headings that
+    #    restate the heading above them.
     files = sorted({p for r in roots for p in ([r] if r.is_file() else r.rglob("*.md"))})
     for f in files:
         errors, warns = scan_prefix_leaks(f)
+        errors += scan_heading_repetition(f)
         for lineno, msg in errors:
             total_errors += 1
             print(f"{f}:{lineno}: ERROR {msg}")

@@ -5,10 +5,12 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CloudGlyph.Models;
+using CloudGlyph.Services;
 
 namespace CloudGlyph.ViewModels;
 
@@ -21,9 +23,16 @@ public partial class DocumentViewModel : ObservableObject
         PropertyNameCaseInsensitive = true
     };
 
+    /// <summary>How long the query must sit still before a search runs, while the reader types.</summary>
+    private static readonly TimeSpan SearchDebounce = TimeSpan.FromMilliseconds(120);
+
     public const string DefaultLanguage = "en";
 
     private List<LanguageOption> _loadedLanguages = [];
+
+    private WikiSearchIndex? _index;
+    private CancellationTokenSource? _indexCts;
+    private CancellationTokenSource? _searchCts;
 
     /// <summary>Full language list loaded from the auto-generated languages_index.json.</summary>
     public IReadOnlyList<LanguageOption> AllLanguages => _loadedLanguages;
@@ -54,10 +63,44 @@ public partial class DocumentViewModel : ObservableObject
     [ObservableProperty]
     private bool _isLoading;
 
+    /// <summary>Text of the sidebar search box. Changing it schedules a debounced search.</summary>
+    [ObservableProperty]
+    private string _query = string.Empty;
+
+    /// <summary>Raised while the search index for the current language is being built.</summary>
+    [ObservableProperty]
+    private bool _isIndexing;
+
+    /// <summary>Ranked matches for <see cref="Query"/>, best first.</summary>
+    public ObservableCollection<SearchHit> Results { get; } = [];
+
+    /// <summary>Picked result. Selecting one navigates and clears the query, so it resets to null.</summary>
+    [ObservableProperty]
+    private SearchHit? _selectedResult;
+
+    /// <summary>True once a query is typed — the sidebar swaps the tree for the result list.</summary>
+    public bool ShowResults => !string.IsNullOrWhiteSpace(Query);
+
+    /// <summary>True when the current query matched nothing, so the sidebar can say so.</summary>
+    public bool HasNoResults => ShowResults && !IsIndexing && Results.Count == 0;
+
     public DocumentViewModel()
     {
+        Results.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasNoResults));
+            OnPropertyChanged(nameof(ResultsHeader));
+        };
         _ = InitializeAsync();
     }
+
+    /// <summary>Result-count line above the list, e.g. "12 matches".</summary>
+    public string ResultsHeader => Results.Count switch
+    {
+        0 => "No matches",
+        1 => "1 match",
+        var n => $"{n} matches",
+    };
 
     private async Task InitializeAsync()
     {
@@ -107,6 +150,23 @@ public partial class DocumentViewModel : ObservableObject
     {
         if (value is not null)
             _ = LoadContentAsync(value);
+    }
+
+    partial void OnQueryChanged(string value)
+    {
+        OnPropertyChanged(nameof(ShowResults));
+        OnPropertyChanged(nameof(HasNoResults));
+        QueueSearch(value);
+    }
+
+    partial void OnIsIndexingChanged(bool value) => OnPropertyChanged(nameof(HasNoResults));
+
+    partial void OnSelectedResultChanged(SearchHit? value)
+    {
+        if (value is null)
+            return;
+        NavigateTo(value);
+        SelectedResult = null;
     }
 
     /// <summary>
@@ -186,12 +246,16 @@ public partial class DocumentViewModel : ObservableObject
         // Auto-select first node
         if (Nodes.Count > 0)
             SelectedNode = Nodes[0];
+
+        StartIndexBuild();
     }
 
     private async Task ReloadAsync()
     {
         Content = string.Empty;
         SelectedNode = null;
+        Query = string.Empty;
+        Results.Clear();
         await LoadTreeAsync();
     }
 
@@ -200,27 +264,15 @@ public partial class DocumentViewModel : ObservableObject
         IsLoading = true;
         try
         {
-            var code = string.IsNullOrWhiteSpace(Language) ? DefaultLanguage : Language.ToLowerInvariant();
-            var mdPath = $"{node.Path}/index.md";
-            var uri = new Uri($"avares://CloudGlyph/Assets/Docs/content/{code}/{mdPath.Replace('\\', '/')}");
-
-            string? markdown;
-            try
-            {
-                using var stream = AssetLoader.Open(uri);
-                using var reader = new StreamReader(stream, Encoding.UTF8);
-                markdown = await reader.ReadToEndAsync();
-            }
-            catch (FileNotFoundException)
-            {
-                markdown = null;
-            }
+            var markdown = await ReadPageAsync(node.Path);
 
             // If the page has no real content and has children,
             // auto-redirect to the first child page.
             if (string.IsNullOrWhiteSpace(markdown) && node.Children.Count > 0)
             {
-                SelectedNode = node.Children[0];
+                var child = node.Children[0];
+                child.ExpandAncestors();
+                SelectedNode = child;
                 return;
             }
 
@@ -236,7 +288,24 @@ public partial class DocumentViewModel : ObservableObject
         }
     }
 
-    private static ObservableCollection<PageNode> BuildTree(List<TreePage>? pages)
+    /// <summary>Reads a page's Markdown from the bundled assets, or <see langword="null"/> when absent.</summary>
+    private async Task<string?> ReadPageAsync(string pagePath)
+    {
+        var code = string.IsNullOrWhiteSpace(Language) ? DefaultLanguage : Language.ToLowerInvariant();
+        var uri = new Uri($"avares://CloudGlyph/Assets/Docs/content/{code}/{pagePath.Replace('\\', '/')}/index.md");
+        try
+        {
+            using var stream = AssetLoader.Open(uri);
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            return await reader.ReadToEndAsync();
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    private static ObservableCollection<PageNode> BuildTree(List<TreePage>? pages, PageNode? parent = null)
     {
         var result = new ObservableCollection<PageNode>();
         if (pages is null) return result;
@@ -247,11 +316,116 @@ public partial class DocumentViewModel : ObservableObject
             {
                 Title = page.Title,
                 Path = page.Path,
-                Children = BuildTree(page.Children)
+                Parent = parent
             };
+            node.Children = BuildTree(page.Children, node);
             result.Add(node);
         }
         return result;
+    }
+
+    // ── Search ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Builds the search index for the current language in the background, so the viewer is
+    /// interactive while the pages are read and tokenised. A previous build is cancelled: only
+    /// the language that is actually displayed should be indexed.
+    /// </summary>
+    private void StartIndexBuild()
+    {
+        _indexCts?.Cancel();
+        _indexCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _indexCts = cts;
+        _index = null;
+        _ = BuildIndexAsync(cts.Token);
+    }
+
+    private async Task BuildIndexAsync(CancellationToken ct)
+    {
+        IsIndexing = true;
+        try
+        {
+            var sources = new List<SearchSource>();
+            foreach (var node in Nodes.SelectMany(n => n.DescendantsAndSelf()))
+            {
+                ct.ThrowIfCancellationRequested();
+                var markdown = await ReadPageAsync(node.Path);
+                if (!string.IsNullOrWhiteSpace(markdown))
+                    sources.Add(new SearchSource(node.Title, node.Path, markdown));
+            }
+
+            var index = await Task.Run(() => new WikiSearchIndex(sources), ct);
+            ct.ThrowIfCancellationRequested();
+            _index = index;
+
+            // A query typed while the index was still building has no results yet.
+            if (!string.IsNullOrWhiteSpace(Query))
+                QueueSearch(Query);
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer build (language switch); drop it.
+        }
+        finally
+        {
+            IsIndexing = false;
+        }
+    }
+
+    /// <summary>Debounces a query change, then runs the search off the UI thread.</summary>
+    private void QueueSearch(string query)
+    {
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        _searchCts = null;
+
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            Results.Clear();
+            return;
+        }
+
+        var index = _index;
+        if (index is null)
+            return;                     // index still building; BuildIndexAsync re-runs this
+
+        var cts = new CancellationTokenSource();
+        _searchCts = cts;
+        _ = SearchAsync(index, query, cts.Token);
+    }
+
+    private async Task SearchAsync(WikiSearchIndex index, string query, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(SearchDebounce, ct);
+            var hits = await Task.Run(() => index.Search(query), ct);
+            ct.ThrowIfCancellationRequested();
+
+            Results.Clear();
+            foreach (var hit in hits)
+                Results.Add(hit);
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer keystroke superseded this query.
+        }
+    }
+
+    /// <summary>
+    /// Navigates to a search hit: opens the branches that lead to it, selects it, and clears the
+    /// query so the sidebar returns to the tree.
+    /// </summary>
+    public void NavigateTo(SearchHit hit)
+    {
+        var node = FindNodeByPath(Nodes, hit.Path);
+        if (node is null)
+            return;
+
+        node.ExpandAncestors();
+        SelectedNode = node;
+        Query = string.Empty;
     }
 
     /// <summary>
@@ -294,6 +468,9 @@ public partial class DocumentViewModel : ObservableObject
             return true;
         }
 
+        // Open the branches above the target, or the highlighted item would be hidden inside a
+        // collapsed parent and the navigation would look like it did nothing.
+        node.ExpandAncestors();
         SelectedNode = node; // two-way TreeView binding highlights it; LoadContentAsync runs
         return true;
     }

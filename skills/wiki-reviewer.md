@@ -57,7 +57,8 @@ WARN as advisory unless it violates a stated rule.
 6. **Diagrams & formulas** — PlantUML/Mermaid/KaTeX and `plot` blocks valid under the
    real engines above.
 7. **Titles & localisation** — no numeric prefix reaches visible text (link labels,
-   headings, `<a>` labels); in a translated tree every directory title is either
+   headings, `<a>` labels); no heading restates the heading above it or merely names
+   the parent dimension; in a translated tree every directory title is either
    translated or a source-verified code identifier declared in
    `config/title-allowlist.json`. Challenge each declared identifier against the
    source — "it looks technical" is not evidence that it is a type name.

@@ -68,6 +68,9 @@ PARITY_PAIRS = [
     ("Welcome Page Audit", "欢迎页审计"),
     ("Rendered Content Members", "渲染成员"),
     ("Function plot rules", "函数图像书写规范"),
+    # heading-repetition rules
+    ("restates the heading above it", "重复其上方标题"),
+    ("dimension echo", "维度回声"),
 ]
 
 
