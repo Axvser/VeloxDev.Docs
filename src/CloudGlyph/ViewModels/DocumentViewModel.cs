@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Platform;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CloudGlyph.Models;
@@ -31,6 +32,7 @@ public partial class DocumentViewModel : ObservableObject
 
     private List<LanguageOption> _loadedLanguages = [];
 
+    private string _previousQuery = string.Empty;
     private WikiSearchIndex? _index;
     private CancellationTokenSource? _indexCts;
     private CancellationTokenSource? _searchCts;
@@ -163,6 +165,14 @@ public partial class DocumentViewModel : ObservableObject
 
     partial void OnQueryChanged(string value)
     {
+        // Reopening after a dismissal: the popup still holds the previous search's rows, which
+        // would otherwise flash until the debounced search replaces them. Clearing on this
+        // transition — not on every keystroke — keeps the list from blinking empty as you type.
+        var reopening = string.IsNullOrWhiteSpace(_previousQuery) && !string.IsNullOrWhiteSpace(value);
+        _previousQuery = value;
+        if (reopening)
+            Results.Clear();
+
         OnPropertyChanged(nameof(ShowResults));
         OnPropertyChanged(nameof(HasNoResults));
         IsSearchOpen = !string.IsNullOrWhiteSpace(value);
@@ -183,8 +193,20 @@ public partial class DocumentViewModel : ObservableObject
     {
         if (value is null)
             return;
-        NavigateTo(value);
-        SelectedResult = null;
+
+        // Clicking a row lands here from inside the ListBox's own selection commit
+        // (`OnPointerPressed` → `UpdateSelection` → `SelectionChanged`), and navigating closes the
+        // popup — a separate window — while that commit is open. Deferring keeps that teardown off
+        // the control's input path. (The crash this was first written for was the collection reset
+        // in QueueSearch, which is gone; what remains is the defence against closing the popup
+        // from inside its own item's input handling, which headless cannot exercise.)
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!ReferenceEquals(SelectedResult, value))
+                return;                  // a later click superseded this one
+            NavigateTo(value);
+            SelectedResult = null;
+        });
     }
 
     /// <summary>
@@ -351,16 +373,17 @@ public partial class DocumentViewModel : ObservableObject
     /// </summary>
     private void StartIndexBuild()
     {
-        _indexCts?.Cancel();
-        _indexCts?.Dispose();
+        _indexCts?.Cancel();           // disposed by the build that owns it, see BuildIndexAsync
+        _indexCts = null;
         var cts = new CancellationTokenSource();
         _indexCts = cts;
         _index = null;
-        _ = BuildIndexAsync(cts.Token);
+        _ = BuildIndexAsync(cts);
     }
 
-    private async Task BuildIndexAsync(CancellationToken ct)
+    private async Task BuildIndexAsync(CancellationTokenSource cts)
     {
+        var ct = cts.Token;
         IsIndexing = true;
         try
         {
@@ -387,6 +410,9 @@ public partial class DocumentViewModel : ObservableObject
         }
         finally
         {
+            if (ReferenceEquals(_indexCts, cts))
+                _indexCts = null;
+            cts.Dispose();
             IsIndexing = false;
         }
     }
@@ -394,13 +420,17 @@ public partial class DocumentViewModel : ObservableObject
     /// <summary>Debounces a query change, then runs the search off the UI thread.</summary>
     private void QueueSearch(string query)
     {
-        _searchCts?.Cancel();
-        _searchCts?.Dispose();
+        _searchCts?.Cancel();          // disposed by the task that owns it, see SearchAsync
         _searchCts = null;
 
         if (string.IsNullOrWhiteSpace(query))
         {
-            Results.Clear();
+            // Deliberately NOT clearing Results here. Emptying the query is what navigation does,
+            // and navigation is triggered from inside the ListBox's selection commit; clearing the
+            // very collection that commit is walking makes the control re-fix its selection
+            // re-entrantly and read past the end of the (now shorter) source. The stale rows are
+            // never shown — the popup is closed whenever the query is empty — and the next search
+            // replaces them: SearchAsync clears and refills.
             return;
         }
 
@@ -410,16 +440,16 @@ public partial class DocumentViewModel : ObservableObject
 
         var cts = new CancellationTokenSource();
         _searchCts = cts;
-        _ = SearchAsync(index, query, cts.Token);
+        _ = SearchAsync(index, query, cts);
     }
 
-    private async Task SearchAsync(WikiSearchIndex index, string query, CancellationToken ct)
+    private async Task SearchAsync(WikiSearchIndex index, string query, CancellationTokenSource cts)
     {
         try
         {
-            await Task.Delay(SearchDebounce, ct);
-            var hits = await Task.Run(() => index.Search(query), ct);
-            ct.ThrowIfCancellationRequested();
+            await Task.Delay(SearchDebounce, cts.Token);
+            var hits = await Task.Run(() => index.Search(query), cts.Token);
+            cts.Token.ThrowIfCancellationRequested();
 
             Results.Clear();
             foreach (var hit in hits)
@@ -428,6 +458,16 @@ public partial class DocumentViewModel : ObservableObject
         catch (OperationCanceledException)
         {
             // A newer keystroke superseded this query.
+        }
+        finally
+        {
+            // Each run disposes its own source. Disposing it from the canceller instead races the
+            // cancelled run: a source disposed while `Task.Delay` is still registering its callback
+            // throws ObjectDisposedException, which nothing here catches. Clearing the field only
+            // if we still own it keeps a later `Cancel()` off a disposed source.
+            if (ReferenceEquals(_searchCts, cts))
+                _searchCts = null;
+            cts.Dispose();
         }
     }
 
