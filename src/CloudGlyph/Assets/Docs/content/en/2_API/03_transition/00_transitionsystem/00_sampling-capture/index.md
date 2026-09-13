@@ -52,26 +52,23 @@ public interface ITransitionProperty
 {
     string Path { get; }
     Type PropertyType { get; }
-    PropertyInfo PropertyInfo { get; }
-    IReadOnlyList<PropertyInfo> Segments { get; }
     bool CanRead { get; }
     bool CanWrite { get; }
-    object? GetValue(object target);
+    object? GetValue(object? target);
     bool SetValue(object target, object? value);
 }
 ```
 
 | Member | Type | Description |
 |---|---|---|
-| `Path` | `string` | Dot-separated nested property path (e.g. `"RenderTransform.X"`). |
+| `Path` | `string` | Text of the path (e.g. `"RenderTransform.X"`, `"Items[0].Width"`), for diagnostics only — it is not the identity, which is the object's equality. |
 | `PropertyType` | `Type` | Type of the leaf property. |
-| `PropertyInfo` | `PropertyInfo` | Metadata of the leaf property. |
-| `Segments` | `IReadOnlyList<PropertyInfo>` | The full property chain (read-only). |
 | `CanRead` / `CanWrite` | `bool` | Whether the whole chain supports reading / the leaf supports writing. |
-| `GetValue` | `object? GetValue(object target)` | Reads through the chain. Returns `Abstractions.TransitionProperty.UnreadablePath` when an intermediate object's *type* does not match the path (invalid path) and `null` when an intermediate is genuinely null. |
+| `GetValue` | `object? GetValue(object? target)` | Reads through the chain. Returns `Abstractions.TransitionProperty.UnreadablePath` when an intermediate object's *type* does not match the path (invalid path) and `null` when an intermediate is genuinely null. |
 | `SetValue` | `bool SetValue(object target, object? value)` | Writes through the chain. Returns `false` (no `TargetException`) when an intermediate type mismatches or is null; a `null` value on a reference-type leaf is allowed and returns `true`. |
 
 **Notes:**
+- Deliberately narrow: the interface exposes no `PropertyInfo` and no `Segments`, because a path may end in an array element or an indexer and neither can be described by them — an array element has no `PropertyInfo` at all, and every indexer on a type reports the same `Item` member, so it could not tell `Items[0]` from `Items[1]`. What a consumer is given is what it can do with the value, not how the path was spelled. Index paths and the `PathIndex.Frozen` marker are documented in [01_abstractions](../../01_abstractions/index.md).
 - The concrete type `TransitionProperty` (namespace `VeloxDev.TransitionSystem.Abstractions`) compiles the getter / setter into single delegates on first use — no per-frame reflection (see [01_abstractions](../../01_abstractions/index.md)).
 - *Verified by:* `TransitionPropertyTests` (`GetValue_ReadsFromTarget`, `SetValue_WritesToTarget`, `GetValue_IntermediateTypeMismatch_ReturnsUnreadablePath_NotTargetException`, `SetValue_IntermediateTypeMismatch_ReturnsFalse_NotTargetException`, `GetValue_NullIntermediate_ReturnsNull_NotUnreadable`).
 

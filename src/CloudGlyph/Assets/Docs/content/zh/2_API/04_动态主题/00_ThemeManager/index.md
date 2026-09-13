@@ -4,7 +4,7 @@
 
 ### 类：`ThemeManager`
 
-主题状态与切换的静态入口。所有成员均为静态。活跃实例通过 `ConditionalWeakTable<IThemeObject, ...>` 加上 `List<WeakReference<IThemeObject>>` 跟踪，因此注册不会产生泄漏。管理器驱动自己的 Stopwatch 采样循环，并在每次切换前后对每个已注册对象触发生命周期回调。
+主题状态与切换的静态入口。所有成员均为静态。活跃实例通过 `ConditionalWeakTable<IThemeObject, ...>` 加上 `List<WeakReference<IThemeObject>>` 跟踪，因此注册不会产生泄漏。管理器自己不负责计时：带动画的切换由平台的 `TransitionSchedulerCore` 运行，它按目标经 `InterpolatorCore.CreateScheduler` 解析，而一场切换的所有目标都锚定在同一个 `TransitionTimeline` 上。每次切换前后仍会对每个已注册对象触发生命周期回调。
 
 源码：`Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`。
 
@@ -28,13 +28,14 @@
 
 **示例：**
 ```csharp
-// 来源：Demo（Examples/Theme/WPF/Demo/MainWindow.xaml.cs，LoadTheme）
+// 来源：Demo（Examples/Theme/WPF/Demo/App.xaml.cs）
 ThemeManager.SetPlatformInterpolator(new Interpolator());
 ```
 
 **说明：**
 - 在任何带动画的过渡之前必须调用一次，以便主题属性类型能解析到平台采样器。`InterpolatorCore` 声明于 `VeloxDev.TransitionSystem.Abstractions`；具体适配器类型是位于 `VeloxDev.TransitionSystem` 的平台 `Interpolator`（见 [04 PlatformAdapters](../04_PlatformAdapters/index.md)）。
-- 若某属性类型没有已注册的采样器，`Transition` 仍会运行，但该属性退化为简单的「保持到结束再切换」。
+- 除了强制适配器执行采样器注册，它还是不带动画就无法成立的那一环：`Transition` 通过 `InterpolatorCore.CreateScheduler` 向该实例索取调度器（`ThemeManager.cs`，`RunSwitch`）。未设置时切换依然发生——只是瞬时完成、没有动画。
+- 若某属性类型没有已注册的采样器，带动画的切换仍会运行，但该属性全程保持旧值，直到切换结束时才被写入目标值（`ThemeManager.cs`，`ApplyHeldValues`）。
 
 #### ThemeManager.SetCurrent
 
@@ -94,7 +95,7 @@ ThemeManager.SetCurrent<Light>();
 
 **示例：**
 ```csharp
-// 来源：Demo（Examples/Theme/WPF/Demo/MainWindow.xaml.cs）
+// 来源：Demo（Examples/Theme/WPF Trimmed/Demo/MainWindow.xaml.cs，ReverseThemeWithAnimation）
 ThemeManager.Transition<Light>(TransitionEffects.Theme);
 ```
 
@@ -109,15 +110,17 @@ ThemeManager.Transition<Light>(TransitionEffects.Theme);
 | 参数 | 类型 | 描述 |
 |---|---|---|
 | `themeType` | `Type` | 目标主题类型。 |
-| `effect` | `ITransitionEffectCore` | 以 `Ease` 与 `Duration` 驱动动画的过渡效果。 |
+| `effect` | `ITransitionEffectCore` | 驱动这场切换的过渡效果。它必须是平台自己的效果类型，`InterpolatorCore.CreateScheduler` 才会接受它。 |
 
-**返回：** `void`（异步）
+**返回：** `void`（异步——方法本身是 `async void`）
 
-**异常：** 未声明 —— 无效的 `themeType`（`themeType == Current`，或不可赋值为 `ITheme`）会被忽略，并输出 `Debug.WriteLine("[ThemeManager] Invalid theme type, jumping to current theme.")`。
+**异常：** 未声明 —— 无效的 `themeType`（`themeType == Current`，或不可赋值为 `ITheme`）会被忽略，并输出 `Debug.WriteLine("[ThemeManager] Invalid theme type, jumping to current theme.")`。切换内部抛出的异常由 `Transition` 自己捕获并输出 `Debug.WriteLine("[ThemeManager] Error during theme transition: ...")`；`async void` 的调用方接不到它。
 
 **说明：**
-- 取消正在运行的过渡，清理失效的 `WeakReference`，然后对每个已注册对象调用 `ExecuteThemeChanging(oldValue, newValue)`。
-- 按 `StartModel` 解析每个属性的起始/目标值，通过各属性的 `ISampler` 归一化端点，并驱动 Stopwatch 采样循环——在每个动画帧以缓动后时间调用 `ISampler.InsertFrame`，直到 `effect.Duration` 耗尽（约每帧 `1 ms` yield）。
+- 先取消在飞的切换（`CancelActiveSwitch`），清理失效的 `WeakReference`，然后对每个已注册对象调用 `ExecuteThemeChanging(oldValue, newValue)`。
+- 等待私有的 `async Task<bool> RunSwitch`：它用 `PrepareSamplers` 构建每个目标的条目，经 `InterpolatorCore.CreateScheduler` 解析每个目标的调度器，并让它们全部跑在同一个共享的 `TransitionTimeline` 上。当切换被取消或被后续切换顶替时 `RunSwitch` 返回 `false`，此时 `Transition` 不宣布任何变更，也不改动 `Current`。
+- 未设置平台插值器、没有任何目标含有可动画属性，或平台调度器拒绝该效果时，退化为瞬时切换（`ApplyImmediately`），而不是启动一场画不出东西的动画。
+- `RunSwitch` 之所以是私有的 `async Task<bool>`，正是因为 `Transition` 是 `async void`：适配器的采样器与调度器抛出的异常会在它内部被捕获（`Debug.WriteLine("[ThemeManager] Error during transition execution: ...")`），而不是逃逸到进程里。
 - 完成后设置 `Current = themeType`，并对每个已注册对象调用 `ExecuteThemeChanged(oldValue, newValue)`。
 
 #### ThemeManager.Jump<T>
@@ -134,23 +137,25 @@ ThemeManager.Jump<Dark>();
 ```
 
 **说明：**
-- 委托给 `Jump(typeof(T))`。无动画立即切换。
+- 委托给 `Jump(typeof(T))`。无动画立即切换，并取消在飞的动画切换。
 
 #### ThemeManager.Jump(Type)
 
 **签名：**
-`public static async void Jump(Type themeType)`
+`public static void Jump(Type themeType)`
 
 | 参数 | 类型 | 描述 |
 |---|---|---|
 | `themeType` | `Type` | 目标主题类型。 |
 
-**返回：** `void`（异步）
+**返回：** `void`（同步）
 
 **异常：** 未声明 —— 无效的 `themeType` 会像 `Transition` 一样被忽略并输出调试信息。
 
 **说明：**
-- 运行零时长程（`durationMs = 0`，使用 `Eases.Default`），因此首次采样即为 `t = 1`，每个属性都直接写入目标主题值，无插值。切换前触发 `ExecuteThemeChanging`，切换后触发 `ExecuteThemeChanged`，并更新 `Current`。
+- 应用之前先取消在飞的切换（`CancelActiveSwitch`），因此跳跃是顶替正在运行的 `Transition`，而不是与它竞速。
+- 通过 `ApplyImmediately` 直接写终值：没有时间轴、没有效果、没有采样。因此它既不依赖 `SetPlatformInterpolator`，也不受平台 `ITransitionEffect<TPriority>` 类型的约束。
+- 切换前触发 `ExecuteThemeChanging`，切换后触发 `ExecuteThemeChanged`，并更新 `Current`。
 
 ---
 

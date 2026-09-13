@@ -87,7 +87,9 @@ Notes:
 During `PrepareSamplers`, for **both** the start value (current theme) and the target value (destination theme) the generated cache lookups consult the active cache first and fall back to static defaults only when the property has no override for that theme:
 
 ```csharp
-// Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs, lines 215-228 and 246-256
+// Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs — PrepareSamplers: the current value
+// (StartModel.Cache branch, lines 497-509); the target lookup below repeats the same
+// active-first order for targetThemeType (lines 529-539)
 if (activeCache.TryGetValue(propEntry.Key, out var activePropCache) &&
     activePropCache.TryGetValue(propertyInfo, out var activeTypeCache) &&
     activeTypeCache.TryGetValue(Current, out currentValue))
@@ -103,4 +105,6 @@ else if (typeValues.TryGetValue(Current, out currentValue))
 
 So a runtime override (from `SetThemeValue<T>`) beats a static `[ThemeConfig]` value whenever the destination theme matches `T`.
 
-> Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs` (`GetOrCreateActiveEntry` lines 131-134, `TryGetActiveEntry` lines 139-143), `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` (`PrepareSamplers` current/target lookup lines 192-267), generated members in `Src/Generators/VeloxDev.Core.Generator/Theme.cs` (`SetThemeValue` lines 302-318, `RestoreThemeValue` lines 322-327, `UpdatePropertyToCurrentTheme` lines 345-374).
+Both demos wire this from a button: the scale demo through `OnEditThemeValue` / `OnRestoreThemeValue` (`Examples/Theme/WPF/Demo/MainWindow.xaml.cs`), the trimmed demo through `ThemeValueEx` (`Examples/Theme/WPF Trimmed/Demo/MainWindow.xaml.cs`), which also reads both caches back with `GetStaticThemeCache()` / `GetActiveThemeCache()`.
+
+> Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs` (`GetOrCreateActiveEntry` lines 131-134, `TryGetActiveEntry` lines 139-143), `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` (`PrepareSamplers` current/target lookup lines 474-549), generated members in `Src/Generators/VeloxDev.Core.Generator/Theme.cs` (`SetThemeValue` lines 302-318, `RestoreThemeValue` lines 322-327, `UpdatePropertyToCurrentTheme` lines 345-373).

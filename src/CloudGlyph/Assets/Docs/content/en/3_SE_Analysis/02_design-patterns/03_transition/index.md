@@ -42,6 +42,7 @@ classDiagram
         +NativeInterpolators ConcurrentDictionary~Type, ISampler~
         +TryGetInterpolator(type) bool
         +RegisterInterpolator(type, sampler) bool
+        +CreateScheduler(target, effect) TransitionSchedulerCore?
         +Prepare~TPriorityCore~(target, state, effect, inspector) SamplerSet~TPriorityCore~
     }
     class ISampler {
@@ -74,6 +75,7 @@ classDiagram
         <<abstract>>
         +Args TransitionEventArgs
         +Execute(target, samplerSet, effect, cts) Task
+        +ArmNextFrame(continuation, interval, token) void
         +Exit() / Dispose()
     }
     class ITransitionSchedulerCore {
@@ -121,6 +123,7 @@ classDiagram
     InterpolatorCore ..> ISampler : registry & per-property override
     InterpolatorCore ..> SamplerSet : Prepare builds
     InterpolatorCore ..> StructAssembler : value-type ISampleable
+    InterpolatorCore ..> TransitionSchedulerCore : CreateScheduler (platform seam)
     StructAssembler ..> ISampleable : expands members
     StructAssembler ..> ISampler : produces StructAssemblerSampler
     SamplerSet~TPriorityCore~ --> ISampler : drives InsertFrame per frame
@@ -193,11 +196,11 @@ Sources: `Src/Core/VeloxDev.Core/TransitionSystem/Transition.cs`, `StateSnapshot
 `Transition<T>.Create()` returns the adapter's `Transition<T>` — one type that is the static entry point, the builder and the executor at once (there is no nested `StateSnapshot` class). Its typed `.Property(expr, value, options)` overloads and `.Effect(...)` methods each return the same builder. `.Await(span)`, `.Then()` and `.AwaitThen(span)` (the `TransitionCoreEx` extensions on `StateSnapshotCore`) create the **next** segment and link it through the `next` pointer, so one builder expression actually describes an ordered **list of segments** — each carrying its own `State`, `Effect`, `Interpolator` and pre-delay. `Execute(target, CanMutualTask)` (inherited from `StateSnapshotCore<T>`) consumes the whole chain. Nothing is captured from the target: the declared values *are* the state.
 
 ```csharp
-// Examples/Transition/WPF/Demo/MainWindow.xaml.cs (Animation0)
+// Examples/Transition/WPF/Demo/MainWindow.xaml.cs (Animation0, LoadTravel = 200d)
 private static readonly Transition<Rectangle> Animation0 =
     Transition<Rectangle>.Create()
         .Property(r => r.Opacity, 0)
-        .Property(r => ((TranslateTransform)r.RenderTransform).X, 800)
+        .Property(r => ((TranslateTransform)r.RenderTransform).X, LoadTravel)
         .Property(r => r.Fill, new SolidColorBrush(Colors.Orange))
         .Effect(new TransitionEffect()
         {
@@ -210,6 +213,8 @@ private static readonly Transition<Rectangle> Animation0 =
 ### 2. Registry (`InterpolatorCore.NativeInterpolators`)
 
 `NativeInterpolators` is a static `ConcurrentDictionary<Type, ISampler>` — samplers, not "sampleables", are registered **by property type**. `InterpolatorCore`'s static constructor seeds cross-platform types (numeric, `System.Drawing` geometry, `System.Numerics`), and each adapter's `Interpolator` static constructor adds framework types (e.g. WPF `Brush`, `Thickness`, `Transform`, `Color`, `Point3D`, `DropShadowEffect`). `RegisterInterpolator` uses atomic `AddOrUpdate` (last-writer-wins, no lost updates).
+
+`TryGetInterpolator` does not stop at an exact match: it resolves **exact type → base classes nearest-first → interfaces**, the interfaces ordered by full name (ordinal) because reflection's own order is not specified. The reason is that a framework property is very often declared as a subclass of the type the adapter registered — a `LinearGradientBrush` property against WPF's registered `Brush` — so an exact match alone would leave such a path unanimated and report it unsampleable. Avalonia is the interface case: it registers `IBrush` and `ITransform`, which a concrete-brush property only reaches through the interface leg. The walk runs once per property per animation, never per frame. `InterpolatorCoreTests` pins each leg (`TryGetInterpolator_FallsBackToABaseClass`, `_PrefersTheNearestBaseClass`, `_FallsBackToAnInterface`, `_PrefersABaseClassOverAnInterface`, `_WithTwoMatchingInterfaces_IsDeterministic`).
 
 `Prepare<TPriorityCore>` resolves each declared property in this order: per-property override in `state.Interpolators` → registry lookup by `PropertyType` → for **value-type** properties only, `currentValue is ISampleable` → `StructAssembler.Create`. Properties that resolve to nothing are skipped, so one bad path never distorts the others — except that a **reference-type** path resolving to nothing is rejected before the run starts (`TransitionPathUnsampleableException`).
 
@@ -229,7 +234,7 @@ The core classes fix the algorithm skeleton and leave the framework-specific cho
 |---|---|
 | `TransitionCore<T, TStateCore, TEffectCore, TInterpolatorCore, TInspector, TInterpreter, TPriorityCore>` | `State`, `TransitionEffect`, `Interpolator`, `UIThreadInspector`, `TransitionInterpreter`, and the host's priority type (`NonPriority` when it has none) |
 | `TransitionSchedulerCore<TInspector,TInterpreter,TPriorityCore>` | concrete inspector/interpreter (via `new()`) used per `Execute` |
-| `TransitionInterpreterCore<TEffect[,TPriorityCore]>` | the sampling loop's `apply` callback (frame writes with/without a dispatcher priority); the priority-free arity implements `ITransitionInterpreter<NonPriority>` |
+| `TransitionInterpreterCore<TEffect[,TPriorityCore]>` | the sampling loop's `apply` callback (frame writes with/without a dispatcher priority) and `ArmNextFrame`, the protected pacing seam a host overrides to wake on its own render tick; the priority-free arity implements `ITransitionInterpreter<NonPriority>` |
 | `UIThreadInspectorCore[<TPriorityCore>]` | dispatcher marshaling, `IsAppAlive`/`IsUIThread` (the parameterless arity implements `IUIThreadInspector<NonPriority>`) |
 | `TransitionEffectCore[<TPriorityCore>]` | default `Priority` value, default `FPS` (the plain base itself implements `ITransitionEffect<NonPriority>`) |
 
@@ -249,20 +254,27 @@ Each segment is a small object holding `State + Effect + Interpolator + delay`; 
 
 `TransitionEffectCore` exposes `Awaked/Start/Update/LateUpdate/Canceled/Completed/Finally` events backed by `WeakDelegate` (leak-free). Handlers can set `TransitionEventArgs.Handled = true` to kill the timeline; the interpreter raises `Update`/`LateUpdate` around each sample and `Completed`/`Canceled`/`Finally` around the run's end.
 
+### 10. Template Method / abstract factory with an honest null (`InterpolatorCore.CreateScheduler`)
+
+`CreateScheduler(object target, ITransitionEffectCore effect)` is a public `virtual` on `InterpolatorCore` whose body is `=> null`. It exists because Core cannot name the type argument of `Transition<T>` for a caller that holds only an `object`: the theme system runs **one** switch across targets of many runtime types, so the inspector, interpreter and dispatcher priority that make up a scheduler are the one thing only the platform knows. The platform supplies that composition through the seam — and answers `null`, rather than throwing, both for "this platform has not opted in" and for "this effect is not mine", the second mirroring the cast the scheduler itself performs before running. The caller then switches without animating instead of starting a run that draws nothing.
+
+All seven adapters override it with the priority type they already carry: `DispatcherPriority` for WPF/Avalonia/Jalium, `DispatcherQueuePriority` for WinUI, `NonPriority` for MAUI/WinForms/Razor. Each goes through `TransitionSchedulerCore<…>.FindOrCreate` rather than constructing a scheduler — only that path files the scheduler under its target, and that registration is what lets a later `Transition.Pause`, `Seek` or `Exit` find the animation.
+
 ## Pattern Summary
 
 | Pattern | Where it appears | Role |
 |---|---|---|
 | Fluent Builder + chain | `Transition<T>` / `StateSnapshotCore.next` | Describe a target state + segment timing without mutable config objects |
-| Registry | `InterpolatorCore.NativeInterpolators` | Map a property type to an `ISampler` at runtime |
+| Registry | `InterpolatorCore.NativeInterpolators` + `TryGetInterpolator` | Map a property type to an `ISampler` at runtime; the lookup walks base classes nearest-first, then name-ordered interfaces |
 | Struct assembly | `ISampleable` + `StructAssembler` | Animate a value type the registry has no sampler for |
 | Strategy | `IEaseCalculator`/`Eases`, `ISampler` | Swap easing curves and per-type interpolation without changing the engine |
 | Template Method / policy | `StateSnapshotCore`, `InterpolatorCore`, scheduler/interpreter/inspector/effect cores | Fix the skeleton; adapters supply platform specifics via generics |
+| Template Method / abstract factory, honest null | `InterpolatorCore.CreateScheduler` + each adapter's `Interpolator` | Hand a caller that holds only `object` the platform's scheduler composition; `null` means "not mine" |
 | Adapter | per-platform `PlatformAdapters/*` | Bridge the engine to one UI framework's types and dispatcher |
 | Scheduler + CWT cache | `TransitionSchedulerCore` mutual/non-mutual tables | One serialized animation per target; no leaks |
 | Composite | `StateSnapshotCore.next` chain | Compose multi-segment timelines |
 | Observer | `TransitionEffectCore` events + `WeakDelegate` | Observe lifecycle without polling |
 
-Sources: `Src/Core/VeloxDev.Core/TransitionSystem/*.cs`, `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs`, `Src/Core/VeloxDev.Core/TransitionSystem/NativeSamplers/*.cs`, `Src/Adapters/VeloxDev.{WPF,Avalonia,WinUI,MAUI,WinForms,Razor,Jalium}/PlatformAdapters/*.cs`, `Examples/Transition/WPF/Demo/MainWindow.xaml.cs`.
+Sources: `Src/Core/VeloxDev.Core/TransitionSystem/*.cs`, `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs`, `Src/Core/VeloxDev.Core/TransitionSystem/NativeSamplers/*.cs`, `Src/Core/VeloxDev.Core.Test/TransitionSystem/InterpolatorCoreTests.cs`, `Src/Adapters/VeloxDev.{WPF,Avalonia,WinUI,MAUI,WinForms,Razor,Jalium}/PlatformAdapters/*.cs`, `Examples/Transition/WPF/Demo/MainWindow.xaml.cs`.
 
 Related analysis: [Data flow — Transition](../../03_data-flow/03_transition/index.md) · [Complexity — Transition](../../04_complexity/03_transition/index.md)

@@ -18,7 +18,7 @@
 引擎契约由 `Src/Core/VeloxDev.Core.Test/TransitionSystem/` 锁定：
 
 - `EasesTests` —— 每种标准缓动的边界值（`Ease(0) = 0`、`Ease(1) = 1`），及 `Eases.Quad.In` 的单调性。
-- `InterpolatorCoreTests` —— 在 `NativeInterpolators` 注册表上执行注册 / 读取 / 覆盖 / 注销。
+- `InterpolatorCoreTests` —— 在 `NativeInterpolators` 注册表上执行注册 / 读取 / 覆盖 / 注销，以及查找的解析顺序：先基类（由近及远）再接口、基类胜过接口、两个接口都匹配时胜者确定。
 - `SamplingLoopTests` —— `Duration = 0`、自动往返与 `LoopTime` 下对 `double` 属性的无界面运行；断言 `Completed`/`Canceled`/`Finally` 触发。
 - `NativeSamplersTests`、`TransitionEffectCoreTests`、`StateCoreTests`、`TransitionPropertyTests`、`SamplerSetTests` —— 采样器端点、效果克隆/事件、状态字典与路径解析。
 
@@ -44,7 +44,7 @@ dotnet test Src/Core/VeloxDev.Core.Test/VeloxDev.Core.Test.csproj --filter "Full
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="VeloxDev.WPF" Version="8.0.0" />
+        <PackageReference Include="VeloxDev.WPF" Version="9.0.0" />
     </ItemGroup>
 
 </Project>

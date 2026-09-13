@@ -65,4 +65,6 @@ private void LoadTheme()
 
 实例以弱引用跟踪，因此已回收的对象会自动停止接收切换。要显式停止跟踪某对象，用 `ThemeManager.Unregister(target)`；`Register`/`Unregister` 都接收 `IThemeObject` 实例。
 
+由于注册发生在生成的 `InitializeTheme()` 里，一个参与主题的控件只要被构造出来就完成了自注册。规模示例正是靠这一点：`Examples/Theme/WPF/Demo/ThemeTile.cs`（以及 Avalonia 版）是一个 26×26 的 `Border`，映射 `Background` 与 `BorderBrush`，在构造函数中调用 `InitializeTheme()`；除此之外没有任何接线，一千个这样的元素就能一起加入下一次切换。对这些声明值的运行时覆盖见[运行时覆盖与线程](../03_运行时切换/03_运行时覆盖与线程/index.md)。
+
 **预期结果：** `InitializeTheme()` 之后，默认 `ThemeManager.Current == typeof(Dark)`，且已映射属性已持有 `Dark` 主题值（由 `ThemeBasicsTests.ThemeManager_DefaultCurrent_IsDark` 锁定）。

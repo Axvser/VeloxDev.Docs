@@ -136,6 +136,8 @@ public abstract class InterpolatorCore
     public static bool RegisterInterpolator(Type type, ISampler sampler);
     public static bool UnregisterInterpolator(Type type, out ISampler? sampler);
 
+    public virtual TransitionSchedulerCore? CreateScheduler(object target, ITransitionEffectCore effect);   // 基类返回 null
+
     public virtual SamplerSet<TPriorityCore> Prepare<TPriorityCore>(
         object target, IFrameState state, ITransitionEffectCore effect,
         IUIThreadInspector<TPriorityCore> inspector);
@@ -147,10 +149,15 @@ public abstract class InterpolatorCore
 | `NativeInterpolators` | 以 `Type` 为键的全局注册表。静态构造函数预置：`double`、`float`、`int`、`long`、`System.Drawing.Point/PointF/Size/SizeF/Color/Rectangle/RectangleF`，以及（仅当不以 `netstandard2.0` 为目标编译时）`System.Numerics.Vector2/Vector3/Vector4/Quaternion`。 |
 | `RegisterInterpolator` | 以**后写者胜**语义（`AddOrUpdate`）安装采样器——无条件、原子。返回 `true`。 |
 | `UnregisterInterpolator` | 移除条目；经 `sampler` 报告被移除者。 |
-| `TryGetInterpolator` | 在注册表查找类型。 |
+| `TryGetInterpolator` | 为一个*属性*类型解析采样器：先精确类型，再就近的基类，最后接口。 |
+| `CreateScheduler` | 本平台为 `target` 动画所用的调度器——供只把目标当作 `object` 认识的调用方使用；本平台无法承载 `effect` 时返回 `null`。 |
 | `Prepare<TPriorityCore>` | 把已记录状态归一化为可运行的 `SamplerSet<TPriorityCore>`；优先级经**类型参数**传入（而非 `object?`），因此热路径不装箱。 |
 
-**`Prepare` 说明：** 对每个记录值经 `inspector.ProtectedGetValue` 读取当前值；无效路径（`TransitionProperty.UnreadablePath`）被跳过。采样器解析顺序：(1) `state.Interpolators` 中的逐属性自定义采样器；(2) 按 `PropertyType` 查注册表；(3) 仅当 `PropertyType.IsValueType` 且 `currentValue is ISampleable` → `StructAssembler.Create`（各成员采样器须全部可解析，否则返回 `null` 并被跳过）。**引用类型永远不会在此展开**。随后各调用一次 `sampler.NormalizeStart(current, newValue, options)` / `NormalizeEnd(...)`，逐条存入 `(property, sampler, normalizedStart, normalizedEnd, options)`。适配器派生 `Interpolator : InterpolatorCore` 并在静态构造函数注册平台类型。*验证依据：* `InterpolatorCoreTests`。
+**`TryGetInterpolator` 解析顺序：** 这不是一次精确匹配。先试精确类型；再沿基类链由近及远；最后扫类型的接口，多个接口命中时取全名序（序数）最小者——接口排最后、且以显式规则打破平局，因为反射给出的接口顺序未作任何规定。之所以要这一趟走查：框架属性常常声明为适配器所注册类型的**子类**（WPF 注册的是 `Brush`，而属性声明为 `LinearGradientBrush`），只做精确匹配会让它不动，并被判为不可采样。这对注册方的含义：注册**一般**类型（一旦注册了基类或接口，再注册具体类型就是冗余）；一般注册必须能处理整个家族，因为走查会把子类交给它；查表按*属性类型*进行，所以声明为 `LinearGradientBrush` 的路径会命中的 `Brush` 采样器。走查每个属性每次动画只跑一次（在 `Prepare` 内），绝不逐帧。*验证依据：* `InterpolatorCoreTests`（`TryGetInterpolator_FallsBackToABaseClass`、`TryGetInterpolator_PrefersTheNearestBaseClass`、`TryGetInterpolator_FallsBackToAnInterface`、`TryGetInterpolator_PrefersABaseClassOverAnInterface`、`TryGetInterpolator_WithTwoMatchingInterfaces_IsDeterministic`）。
+
+**`CreateScheduler` 说明：** 主题系统所跑的那道平台接缝。一次主题切换横跨许多运行时类型的目标，Core 因此无法写出 `Transition<T>` 的类型实参；而调度器由哪个检查器、解释器与分发器优先级组成，恰恰是只有平台知道的事。基类返回 `null`；七个适配器全部重写它，交回自己参数化的调度器（见 [03_adapter-provided/01_effect-interpolator](../03_adapter-provided/01_effect-interpolator/index.md)）。`null` 对两种情形都是诚实的回答——「本平台没有接入」与「该 effect 不属于本平台」，后者正对应调度器在开跑前自己会做的那次强制转换；调用方于是退化为不做动画的切换，而不是启动一场画不出东西的动画。重写必须返回 `TransitionSchedulerCore<...>.FindOrCreate` 交回的那个实例，绝不能自己 `new` 一个：只有这条路径会把调度器登记到目标名下，而正是这条登记让之后的 `Transition.Pause` / `Transition.Seek` / `Transition.Exit(target)` 能找到它。*验证依据：* 七个适配器的 `PlatformAdapters/Interpolator.cs`；`ThemeManager.SetPlatformInterpolator` / `RunSwitch`。
+
+**`Prepare` 说明：** 对每个记录值经 `inspector.ProtectedGetValue` 读取当前值；无效路径（`TransitionProperty.UnreadablePath`）被跳过。采样器解析顺序：(1) `state.Interpolators` 中的逐属性自定义采样器；(2) 按 `PropertyType` 查注册表；(3) 仅当 `PropertyType.IsValueType` 且 `currentValue is ISampleable` → `StructAssembler.Create`（各成员采样器须全部可解析，否则返回 `null` 并被跳过）。**引用类型永远不会在此展开**。随后各调用一次 `sampler.NormalizeStart(current, newValue, options)` / `NormalizeEnd(...)`，逐条存入 `(property, sampler, normalizedStart, normalizedEnd, options)`。适配器派生 `Interpolator : InterpolatorCore`，在静态构造函数注册平台类型，并重写 `CreateScheduler`。*验证依据：* `InterpolatorCoreTests`。
 
 ### 类：`SamplerSet<TPriorityCore>`
 
@@ -273,10 +280,8 @@ public sealed class TransitionProperty : ITransitionProperty, IEquatable<Transit
 
     public string Path { get; }
     public Type PropertyType { get; }
-    public PropertyInfo PropertyInfo { get; }
     public bool CanRead { get; }
     public bool CanWrite { get; }
-    public IReadOnlyList<PropertyInfo> Segments { get; }
 
     public static readonly object UnreadablePath;
 
@@ -290,15 +295,26 @@ public sealed class TransitionProperty : ITransitionProperty, IEquatable<Transit
 | 成员 | 说明 |
 |---|---|
 | 构造函数 | 由分段链构建；`segments` 为空或含带索引的属性时抛 `ArgumentException`。 |
-| `FromProperty` | 单分段属性；null 时抛 `ArgumentNullException`。 |
+| `FromProperty` | 把一个 `PropertyInfo` 包成单分段路径；null 时抛 `ArgumentNullException`。**带记忆化**：同一个 `PropertyInfo` 永远返回同一个共享实例。 |
 | `Members` | 由表达式声明可动画成员路径（供 `ISampleable.GetAnimatableMembers`）；只保留可读**且**可写成员。 |
 | `ReadableMembers` | 只声明可读成员路径（用于结构体 `ISampleable` 组装——成员只读再经构造函数重建）。 |
 | `Combine` | 拼接两条路径——`prefix = target.Foo`、`suffix = Foo.Bar` → `target.Foo.Bar`。 |
-| `TryCreate` | 把 lambda（展开 `Convert`/`ConvertChecked`）解析为 `TransitionProperty`；非成员 / 带索引表达式返回 `false`。 |
+| `TryCreate` | 把 lambda（展开 `Convert`/`ConvertChecked`）解析为 `TransitionProperty`——属性段、数组元素与索引段皆可；对本次走查描述不了的表达式（中间的普通方法调用、没有稳定身份的索引实参）返回 `false`，而不是把路径截短。 |
 | `UnreadablePath` | 中间对象运行时类型不匹配路径时 `GetValue` 返回的哨兵。调用方应跳过此类属性而非按 `null` 插值。 |
 | `IsDescendantOf` | 本条路径是否位于 `other` 之下。`StateCore` 的父子冲突检查用它（两个方向各判一次）。 |
 
-**说明：** getter 与 setter 在首次使用时编译为单个委托（`CompileGetter` / `CompileSetter`），消除逐帧反射——`SamplerSet.Apply` / `ProtectedGetValue` 的热路径。`GetValue` 区分确实为 null 的中间对象（`null`，插值从 identity/默认开始）与类型不匹配的中间对象（`UnreadablePath`）。`SetValue` 在中间类型不匹配或为 null、或叶子无 setter 时返回 `false`（不抛 `TargetException`）；向引用类型叶子写 `null` 被允许。相等性按段链比较；`ToString()` 返回 `Path`。*验证依据：* `TransitionPropertyTests`。
+**说明：** getter 与 setter 在首次使用时编译为单个委托（`CompileGetter` / `CompileSetter`），消除逐帧反射——`SamplerSet.Apply` / `ProtectedGetValue` 的热路径。`GetValue` 区分确实为 null 的中间对象（`null`，插值从 identity/默认开始）与类型不匹配的中间对象（`UnreadablePath`）。`SetValue` 在中间类型不匹配或为 null、或叶子无 setter 时返回 `false`（不抛 `TargetException`）；向引用类型叶子写 `null` 被允许。路径是属性段与索引段组成的链，两者都参与身份：`PathSegment.SameAs` 对属性段按**名字 + 声明类型**比较（而非其 `PropertyInfo` 实例——反射不会把那个引用保持稳定），对索引段则比较其索引实参；`GetHashCode` 遵循同一规则，`IsDescendantOf` 靠它判定父子路径对。`FromProperty` 的记忆化正是让这条反射入口保持廉价的原因：主题系统在**每一次**切换时为每个已注册目标的每个主题属性重建路径，而每个新实例都会各自编译 getter/setter（实测一千个双属性元素在首帧之前造成约两秒的 UI 线程停顿）。共享是安全的：路径不可变，且没有需要冻结的索引实参时 `BindTo` 返回自身——`FromProperty` 的路径总是如此——惰性编译本身幂等。`ToString()` 返回 `Path`。*验证依据：* `TransitionPropertyTests`。
+
+### 静态类：`PathIndex`（命名空间 `VeloxDev.TransitionSystem`）
+
+```csharp
+public static class PathIndex
+{
+    public static T Frozen<T>(T value);   // 从不执行——解析器按结构识别该调用并拆封其实参
+}
+```
+
+**说明：** 路径可以带索引实参（`x.Items[0].Width`、`x.Map["player"].Color`），它们有两档。默认是**跟随档**：会变化的实参——捕获的局部变量，或目标自身的属性如 `x.SelectedIndex`——**每帧**重新求值，于是路径跟着它走。`Frozen` 则把实参钉死在同一个槽位，在 `Prepare` 里解析一次。当终点值必须落在它被读取的那个槽位时就该冻结：终点值只在动画开始时读一次，因此中途移动的路径会把「按起始槽位算出的终点值」写下去。标记属于路径身份的一部分，`Items[i]` 与 `Items[Frozen(i)]` 是两条不同的路径——而常量实参根本不需要标记：`[0]` 与 `[Frozen(0)]` 是同一条路径，无论怎么写它都是钉死的。只有冻结档才会被包一层，且只对该次运行生效，因此无索引的路径不付任何代价。*验证依据：* `TransitionPropertyIndexerTests`（`APlainIndexFollowsTheTarget`、`AFrozenIndexStaysWhereItStarted`、`AFrozenIndexIsNotTheSamePathAsALiveOne`、`PrepareFreezesTheIndexBeforeAnyFrameIsWritten`、`PrepareLeavesAPlainIndexFollowing`）。
 
 ## 路径校验与两个异常
 

@@ -80,7 +80,7 @@ public abstract class StateSnapshotCore
 | `AwaitThen` | `T AwaitThen<T>(this T snapshot, TimeSpan timeSpan) where T : StateSnapshotCore, new()` | Wait `timeSpan`, then start a new linked segment. |
 | `Interpolator` | `TSnapshot Interpolator<TSnapshot, TTarget, TValue>(this TSnapshot snapshot, Expression<Func<TTarget, TValue>> propertyLambda, ISampler interpolator) where TSnapshot : StateSnapshotCore, new()` | Override the per-property sampler for `propertyLambda`. |
 
-**Notes:** these four are the **entire** public surface of `TransitionCoreEx` — there is no `Execute` extension (running is the inherited instance method `Execute(target, CanMutualTask)`). `Await` / `Then` / `AwaitThen` record their delay / link by mutating the builder chain (the delay is honored by `CoreExecute` as a `Task.Delay` before the segment runs). *Verified by:* WPF demo (`Animation0`/`Animation1`/`Animation2`).
+**Notes:** these four are the **entire** public surface of `TransitionCoreEx` — there is no `Execute` extension (running is the inherited instance method `Execute(target, CanMutualTask)`). `Await` / `Then` / `AwaitThen` record their delay / link by mutating the builder chain (the delay is honored by `CoreExecute` as a wait before the segment runs, and a `Pause` on the target does not consume it). *Verified by:* WPF demo (`Animation0`/`Animation1`/`Animation2`).
 
 ### Class: `StateCore : IFrameState`
 
@@ -112,6 +112,8 @@ public abstract class InterpolatorCore
     public static bool RegisterInterpolator(Type type, ISampler sampler);
     public static bool UnregisterInterpolator(Type type, out ISampler? sampler);
 
+    public virtual TransitionSchedulerCore? CreateScheduler(object target, ITransitionEffectCore effect);   // base returns null
+
     public virtual SamplerSet<TPriorityCore> Prepare<TPriorityCore>(object target, IFrameState state, ITransitionEffectCore effect, IUIThreadInspector<TPriorityCore> inspector);
 }
 ```
@@ -121,10 +123,15 @@ public abstract class InterpolatorCore
 | `NativeInterpolators` | The global registry keyed by `Type`. Its static constructor seeds: `double`, `float`, `int`, `long`, `System.Drawing.Point/PointF/Size/SizeF/Color/Rectangle/RectangleF`, and (only when not compiled for `netstandard2.0`) `System.Numerics.Vector2/Vector3/Vector4/Quaternion`. |
 | `RegisterInterpolator` | Installs a sampler with **last-writer-wins** semantics (`AddOrUpdate`) — unconditional, atomic. Returns `true`. |
 | `UnregisterInterpolator` | Removes the entry; reports it via `sampler`. |
-| `TryGetInterpolator` | Looks up a type in the registry. |
+| `TryGetInterpolator` | Resolves the sampler for a *property* type: the exact type, then base classes nearest-first, then interfaces. |
+| `CreateScheduler` | The scheduler this platform animates `target` with, for a caller that knows the target only as an `object`; `null` when this platform cannot carry `effect`. |
 | `Prepare<TPriorityCore>` | Normalizes a declared state into a runnable `SamplerSet<TPriorityCore>`. |
 
-**Notes on `Prepare<TPriorityCore>`:** For every declared value it reads the current value through `inspector.ProtectedGetValue`; an invalid path (`TransitionProperty.UnreadablePath`) is skipped. Sampler resolution order: (1) a per-property custom sampler from `state.Interpolators`; (2) the registry by `PropertyType`; (3) a *struct* value type implementing `ISampleable` → an internal struct-assembling sampler (member samplers must all resolve, otherwise skipped). **Reference types are never expanded** here — they must be expressed as explicit member paths or handled by a dedicated sampler. It then calls `sampler.NormalizeStart(current, newValue, options)` / `NormalizeEnd(...)` once and stores `(property, sampler, normalizedStart, normalizedEnd, options)` per entry. Adapters derive `Interpolator : InterpolatorCore` and register platform types in their static constructor. *Verified by:* `InterpolatorCoreTests`.
+**Notes on `TryGetInterpolator` (resolution order):** the lookup is not an exact match. The exact type is tried first; then the base-class chain, nearest first; then the type's interfaces, and when several interfaces match, the one whose full name sorts first (ordinal). Interfaces come last and their tie-break is explicit because reflection's own order is not specified. The reason for the walk is that a framework property is very often declared as a subclass of what the adapter registered — a `LinearGradientBrush` property against WPF's registered `Brush` — so an exact match alone would leave it unanimated and report it unsampleable. What that means for a registration: register the **general** type (a concrete-type registration is redundant once a base class or an interface is registered); a general registration must handle its whole family, because the walk will hand it subclasses; and the lookup is per *property type*, so a path declared as `LinearGradientBrush` finds a `Brush` sampler. The walk runs once per property per animation, inside `Prepare` — never per frame. *Verified by:* `InterpolatorCoreTests` (`TryGetInterpolator_FallsBackToABaseClass`, `TryGetInterpolator_PrefersTheNearestBaseClass`, `TryGetInterpolator_FallsBackToAnInterface`, `TryGetInterpolator_PrefersABaseClassOverAnInterface`, `TryGetInterpolator_WithTwoMatchingInterfaces_IsDeterministic`).
+
+**Notes on `CreateScheduler`:** the seam the theme system runs on. A theme switch spans targets of many runtime types, so Core cannot name the type argument of `Transition<T>`, and which inspector, interpreter and dispatcher priority make up a scheduler is the one thing only the platform knows. The base returns `null`; every adapter overrides it and hands out the scheduler it parameterizes (see [03_adapter-provided/01_effect-interpolator](../03_adapter-provided/01_effect-interpolator/index.md)). `null` is the honest answer both for "this platform has not opted in" and for "this effect does not belong to this platform" — the second mirroring the cast the scheduler itself performs before running — and the caller then falls back to switching without animating rather than starting a run that draws nothing. An override must return the instance `TransitionSchedulerCore<...>.FindOrCreate` gives it, never a scheduler it constructed itself: only that path files the scheduler under the target, and that registration is what a later `Transition.Pause` / `Transition.Seek` / `Transition.Exit(target)` reads. *Verified by:* all seven adapters' `PlatformAdapters/Interpolator.cs`; `ThemeManager.SetPlatformInterpolator` / `RunSwitch`.
+
+**Notes on `Prepare<TPriorityCore>`:** For every declared value it reads the current value through `inspector.ProtectedGetValue`; an invalid path (`TransitionProperty.UnreadablePath`) is skipped. Sampler resolution order: (1) a per-property custom sampler from `state.Interpolators`; (2) the registry by `PropertyType`; (3) a *struct* value type implementing `ISampleable` → an internal struct-assembling sampler (member samplers must all resolve, otherwise skipped). **Reference types are never expanded** here — they must be expressed as explicit member paths or handled by a dedicated sampler. It then calls `sampler.NormalizeStart(current, newValue, options)` / `NormalizeEnd(...)` once and stores `(property, sampler, normalizedStart, normalizedEnd, options)` per entry. Adapters derive `Interpolator : InterpolatorCore`, register platform types in their static constructor, and override `CreateScheduler`. *Verified by:* `InterpolatorCoreTests`.
 
 ### Class: `SamplerSet<TPriorityCore>`
 
@@ -246,15 +253,14 @@ public sealed class TransitionProperty : ITransitionProperty, IEquatable<Transit
 
     public string Path { get; }
     public Type PropertyType { get; }
-    public PropertyInfo PropertyInfo { get; }
     public bool CanRead { get; }
     public bool CanWrite { get; }
-    public IReadOnlyList<PropertyInfo> Segments { get; }
 
     public static readonly object UnreadablePath;
 
-    public object? GetValue(object target);
+    public object? GetValue(object? target);
     public bool SetValue(object target, object? value);
+    public bool IsDescendantOf(TransitionProperty other);
     // + IEquatable<TransitionProperty>: Equals / GetHashCode / ToString() == Path
 }
 ```
@@ -262,14 +268,25 @@ public sealed class TransitionProperty : ITransitionProperty, IEquatable<Transit
 | Member | Description |
 |---|---|
 | Constructor | Builds from the segment chain; throws `ArgumentException` when `segments` is empty or contains an indexed property. |
-| `FromProperty` | Single-segment property; throws `ArgumentNullException` on null. |
+| `FromProperty` | Wraps one `PropertyInfo` as a single-segment path; throws `ArgumentNullException` on null. **Memoized**: the same `PropertyInfo` always yields the same shared instance. |
 | `Members` | Declares animatable member paths from expressions (for `ISampleable.GetAnimatableMembers`); keeps only readable **and** writable members. |
 | `ReadableMembers` | Declares readable member paths only (for struct `ISampleable` assembly — members are read and rebuilt through the constructor). |
 | `Combine` | Concatenates two paths — `prefix = target.Foo`, `suffix = Foo.Bar` → `target.Foo.Bar`. |
-| `TryCreate` | Parses a lambda (unwrapping `Convert`/`ConvertChecked`) into a `TransitionProperty`; returns `false` for non-member / indexed expressions. |
+| `TryCreate` | Parses a lambda (unwrapping `Convert`/`ConvertChecked`) into a `TransitionProperty` — property segments, array elements and indexers alike; returns `false` for an expression the walk cannot describe (an intermediate method call, an index argument with no stable identity) rather than truncating the path. |
 | `UnreadablePath` | Sentinel returned by `GetValue` when an intermediate object's runtime type does not match the path. Callers skip such properties rather than interpolating them as `null`. |
 
-**Notes:** Getter and setter are compiled into single delegates on first use (`CompileGetter` / `CompileSetter`), eliminating per-frame reflection — the hot path of `SamplerSet.Apply` / `ProtectedGetValue`. `GetValue` distinguishes a genuinely-null intermediate (`null`, interpolation starts from identity/default) from a type-mismatch intermediate (`UnreadablePath`). `SetValue` returns `false` (no `TargetException`) when an intermediate type mismatches or is null or the leaf has no setter; writing `null` to a reference-type leaf is allowed. Equality compares segment chains — `SameSegment` compares **name + declaring type** rather than `PropertyInfo` reference (reflection does not keep that reference stable), and `GetHashCode` follows the same rule; `IsDescendantOf` uses it to detect a parent/child path pair. `ToString()` returns `Path`. *Verified by:* `TransitionPropertyTests`.
+**Notes:** Getter and setter are compiled into single delegates on first use (`CompileGetter` / `CompileSetter`), eliminating per-frame reflection — the hot path of `SamplerSet.Apply` / `ProtectedGetValue`. `GetValue` distinguishes a genuinely-null intermediate (`null`, interpolation starts from identity/default) from a type-mismatch intermediate (`UnreadablePath`). `SetValue` returns `false` (no `TargetException`) when an intermediate type mismatches or is null or the leaf has no setter; writing `null` to a reference-type leaf is allowed. A path is a chain of property segments and index segments, and both take part in the identity: `PathSegment.SameAs` compares a property segment by **name + declaring type** rather than by its `PropertyInfo` instance (reflection does not keep that reference stable), and an index segment by its index arguments, with `GetHashCode` following the same rule; `IsDescendantOf` uses it to detect a parent/child path pair. `FromProperty`'s memoization is what keeps the reflection-driven entry point cheap: the theme system rebuilds a path for every themed property of every registered target on **every** switch, and a fresh instance would compile its own getter and setter each time (measured at roughly two seconds of UI-thread stall for a thousand two-property elements, before the first frame). Sharing is safe because a path is immutable and `BindTo` returns the instance itself when there are no index arguments to freeze — always the case for a `FromProperty` path — and the lazy compile is idempotent. `ToString()` returns `Path`. *Verified by:* `TransitionPropertyTests`.
+
+### Static Class: `PathIndex` (namespace `VeloxDev.TransitionSystem`)
+
+```csharp
+public static class PathIndex
+{
+    public static T Frozen<T>(T value);   // never executes — the parser recognises the call structurally and unwraps it
+}
+```
+
+**Notes:** a path may carry index arguments (`x.Items[0].Width`, `x.Map["player"].Color`), and they come in two gears. By default the argument is **live**: one that can change while the animation runs — a captured local, or a property of the target such as `x.SelectedIndex` — is re-evaluated on every frame, so the path follows it. `Frozen` pins the argument to one slot instead, resolved once in `Prepare`. Freeze whenever the end value must land where it was read from: the end value is read once, when the animation starts, so a live path that moves mid-flight writes an end value computed against the slot it started on. The marker is part of the path's identity, so `Items[i]` and `Items[Frozen(i)]` are two different paths — while a constant argument needs no marker at all: `[0]` and `[Frozen(0)]` are one path, pinned whichever way it is written. Only a frozen argument is wrapped, and only for the run that uses it, so an unindexed path pays nothing. *Verified by:* `TransitionPropertyIndexerTests` (`APlainIndexFollowsTheTarget`, `AFrozenIndexStaysWhereItStarted`, `AFrozenIndexIsNotTheSamePathAsALiveOne`, `PrepareFreezesTheIndexBeforeAnyFrameIsWritten`, `PrepareLeavesAPlainIndexFollowing`).
 
 ### Path validation
 

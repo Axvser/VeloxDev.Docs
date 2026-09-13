@@ -6,12 +6,15 @@
     - `VeloxDev.Avalonia`：`netstandard2.0` / `net6.0`
 - **SDK / 运行时：** 能构建所选目标的 .NET SDK；WPF 需要在 Windows TFM 上开启 `<UseWPF>true</UseWPF>`。仓库内示例以 `net9.0-windows`（WPF）与 `net9.0`（Avalonia）构建 —— *被验证过*的配置，并非要求。
 - **包管理器：** 通过 `dotnet` CLI 或 Visual Studio 使用 NuGet（`dotnet add package ...`）。
-- **必需服务：** 无数据库、密钥或外部服务。要*看到*主题切换，需要一个正在运行的 GUI 宿主（WPF/Avalonia 窗口）。带动画的切换还需通过 `ThemeManager.SetPlatformInterpolator` 一次性安装平台 `Interpolator`（见[运行时切换](../03_运行时切换/index.md)）；即时 `Jump<T>` 切换则不需要。
+- **必需服务：** 无数据库、密钥或外部服务。要*看到*主题切换，需要一个正在运行的 GUI 宿主（WPF/Avalonia 窗口）。带动画的切换还需通过 `ThemeManager.SetPlatformInterpolator` 一次性安装平台 `Interpolator`（见[准备一场带动画的切换](../03_运行时切换/00_准备/index.md)）；即时 `Jump<T>` 切换则不需要。
 
 **示例证据。** 本快速入门对照下列官方示例与单元测试：
 
 | 来源 | 目标框架 | 展示内容 |
 |---|---|---|
-| `Examples/Theme/WPF/Demo` | `net9.0-windows` | 用 `[ThemeConfig<BrushConverter, Light, Dark>]` 映射 `Background`/`Foreground` 的 `Window`，通过 `Transition<Light/Dark>(TransitionEffects.Theme)` 切换 |
-| `Examples/Theme/Avalonia/Demo` | `net9.0` | 同样的场景，用 `[ThemeConfig<ObjectConverter, Dark, Light>]`（主题顺序 `Dark, Light`） |
+| `Examples/Theme/WPF Trimmed/Demo` | `net9.0-windows` | 最小形态：用 `[ThemeConfig<BrushConverter, Light, Dark>]` 映射 `Background`/`Foreground` 的 `Window`，通过 `Transition<Light/Dark>(TransitionEffects.Theme)` 或 `Jump<Light/Dark>()` 切换 |
+| `Examples/Theme/Avalonia Trimmed/Demo` | `net9.0` | 同样的最小形态，用 `[ThemeConfig<ObjectConverter, Dark, Light>]`（主题顺序 `Dark, Light`） |
+| `Examples/Theme/WPF/Demo` | `net9.0-windows` | 规模示例：约 1000 个自注册的 `ThemeTile` 元素加窗口自身，接在 `Transition.Pause` / `Seek` / `SetRate` / `Exit` 上的工具条，以及无头 `bench` 模式 |
+| `Examples/Theme/Avalonia/Demo` | `net9.0` | 同样的规模示例（Avalonia 版），用 `[ThemeConfig<ObjectConverter, Dark, Light>]` |
 | `Src/Core/VeloxDev.Core.Test/DynamicTheme/ThemeBasicsTests.cs` | `net10.0`（测试工程） | `ThemeManager.Current` 默认是 `Dark`；`StartModel` 默认是 `Cache`；2 主题 `[ThemeConfig]` 可构造 |
+| `Src/Core/VeloxDev.Core.Test/DynamicTheme/ThemeTransitionTests.cs` | `net10.0`（测试工程） | 切换运行在过渡动画之上：共享时间轴、seek、effect 标志、无平台接缝时的瞬变降级、`Jump` |

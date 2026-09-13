@@ -6,12 +6,15 @@
     - `VeloxDev.Avalonia`: `netstandard2.0` / `net6.0`
 - **SDK / runtime:** a .NET SDK able to build the target you pick; WPF needs `<UseWPF>true</UseWPF>` on a Windows TFM. The in-repo demos build against `net9.0-windows` (WPF) and `net9.0` (Avalonia) — *tested* configurations, not requirements.
 - **Package manager:** NuGet via the `dotnet` CLI or Visual Studio (`dotnet add package ...`).
-- **Required services:** no database, key or external service. To *see* a theme switch you need a running GUI host (a WPF/Avalonia window). Animated switching additionally needs the platform `Interpolator` installed once through `ThemeManager.SetPlatformInterpolator` (see [Switch at Runtime](../03_switch-at-runtime/index.md)); instant `Jump<T>` switching does not need it.
+- **Required services:** no database, key or external service. To *see* a theme switch you need a running GUI host (a WPF/Avalonia window). Animated switching additionally needs the platform `Interpolator` installed once through `ThemeManager.SetPlatformInterpolator` (see [Prepare an Animated Switch](../03_switch-at-runtime/00_prepare/index.md)); instant `Jump<T>` switching does not need it.
 
-**Evidence for the examples.** This Quick Start mirrors the shipped demos and the unit test:
+**Evidence for the examples.** This Quick Start mirrors the shipped demos and the unit tests:
 
 | Source | Target framework | What it shows |
 |---|---|---|
-| `Examples/Theme/WPF/Demo` | `net9.0-windows` | a `Window` mapped with `[ThemeConfig<BrushConverter, Light, Dark>]` on `Background`/`Foreground`, toggled with `Transition<Light/Dark>(TransitionEffects.Theme)` |
-| `Examples/Theme/Avalonia/Demo` | `net9.0` | the same scenario with `[ThemeConfig<ObjectConverter, Dark, Light>]` (theme order `Dark, Light`) |
+| `Examples/Theme/WPF Trimmed/Demo` | `net9.0-windows` | the minimal shape: a `Window` mapped with `[ThemeConfig<BrushConverter, Light, Dark>]` on `Background`/`Foreground`, toggled with `Transition<Light/Dark>(TransitionEffects.Theme)` or `Jump<Light/Dark>()` |
+| `Examples/Theme/Avalonia Trimmed/Demo` | `net9.0` | the same minimal shape with `[ThemeConfig<ObjectConverter, Dark, Light>]` (theme order `Dark, Light`) |
+| `Examples/Theme/WPF/Demo` | `net9.0-windows` | the scale demo: ~1000 self-registering `ThemeTile` elements plus the window itself, a toolbar wired to `Transition.Pause` / `Seek` / `SetRate` / `Exit`, and a headless `bench` mode |
+| `Examples/Theme/Avalonia/Demo` | `net9.0` | the same scale demo on Avalonia, with `[ThemeConfig<ObjectConverter, Dark, Light>]` |
 | `Src/Core/VeloxDev.Core.Test/DynamicTheme/ThemeBasicsTests.cs` | `net10.0` (test project) | default `ThemeManager.Current` is `Dark`; `StartModel` defaults to `Cache`; 2-theme `[ThemeConfig]` construction |
+| `Src/Core/VeloxDev.Core.Test/DynamicTheme/ThemeTransitionTests.cs` | `net10.0` (test project) | a switch runs on the transition system: shared timeline, seek, effect flags, instant fallback with no platform seam, `Jump` |

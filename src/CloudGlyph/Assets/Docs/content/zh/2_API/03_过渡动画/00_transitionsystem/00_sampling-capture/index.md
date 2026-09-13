@@ -52,26 +52,23 @@ public interface ITransitionProperty
 {
     string Path { get; }
     Type PropertyType { get; }
-    PropertyInfo PropertyInfo { get; }
-    IReadOnlyList<PropertyInfo> Segments { get; }
     bool CanRead { get; }
     bool CanWrite { get; }
-    object? GetValue(object target);
+    object? GetValue(object? target);
     bool SetValue(object target, object? value);
 }
 ```
 
 | 成员 | 类型 | 说明 |
 |---|---|---|
-| `Path` | `string` | 点分隔的嵌套属性路径（如 `"RenderTransform.X"`）。 |
+| `Path` | `string` | 路径的文本（如 `"RenderTransform.X"`、`"Items[0].Width"`），仅供诊断——它不是身份，身份是对象相等性。 |
 | `PropertyType` | `Type` | 叶子属性的类型。 |
-| `PropertyInfo` | `PropertyInfo` | 叶子属性的元数据。 |
-| `Segments` | `IReadOnlyList<PropertyInfo>` | 完整属性链（只读）。 |
 | `CanRead` / `CanWrite` | `bool` | 整条链是否可读 / 叶子是否可写。 |
-| `GetValue` | `object? GetValue(object target)` | 沿链读取。中间对象*运行时类型*不匹配路径（路径无效）时返回 `Abstractions.TransitionProperty.UnreadablePath`；中间对象确实为 null 时返回 `null`。 |
+| `GetValue` | `object? GetValue(object? target)` | 沿链读取。中间对象*运行时类型*不匹配路径（路径无效）时返回 `Abstractions.TransitionProperty.UnreadablePath`；中间对象确实为 null 时返回 `null`。 |
 | `SetValue` | `bool SetValue(object target, object? value)` | 沿链写入。中间类型不匹配或为 null 时返回 `false`（不抛 `TargetException`）；引用类型叶子写入 `null` 被允许并返回 `true`。 |
 
 **说明：**
+- 刻意收窄：接口不暴露 `PropertyInfo`，也不暴露 `Segments`——路径可以终止于数组元素或索引器，而这两者都无法用它们描述：数组元素根本没有 `PropertyInfo`，而一个类型上的所有索引器都报同一个 `Item` 成员，连 `Items[0]` 与 `Items[1]` 都分不开。给消费方的是「能对这个值做什么」，而不是路径被写成什么样。索引路径与 `PathIndex.Frozen` 标记见 [01_abstractions](../../01_abstractions/index.md)。
 - 具体类型 `TransitionProperty`（命名空间 `VeloxDev.TransitionSystem.Abstractions`）在首次使用时把 getter/setter **编译为单个委托**——无逐帧反射（见 [01_abstractions](../../01_abstractions/index.md)）。
 - *验证依据：* `TransitionPropertyTests`（`GetValue_ReadsFromTarget`、`SetValue_WritesToTarget`、`GetValue_IntermediateTypeMismatch_ReturnsUnreadablePath_NotTargetException`、`SetValue_IntermediateTypeMismatch_ReturnsFalse_NotTargetException`、`GetValue_NullIntermediate_ReturnsNull_NotUnreadable`）。
 

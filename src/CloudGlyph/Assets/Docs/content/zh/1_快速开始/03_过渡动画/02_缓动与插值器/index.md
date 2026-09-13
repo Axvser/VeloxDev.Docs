@@ -95,6 +95,13 @@ InterpolatorCore.RegisterInterpolator(typeof(double), new SmoothStepDoubleSample
 // InterpolatorCore.UnregisterInterpolator(typeof(double), out _);  // 恢复默认
 ```
 
+注册是按你写入的键「后写者胜」，但**查找并不是精确类型匹配**。`InterpolatorCore.TryGetInterpolator`（源码：`Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`）分三步解析属性类型：先**精确类型**，再**由近及远的基类**，最后**按全名（序数）排序的接口**。这条回退路径的存在理由：框架属性常常声明为适配器所注册类型的子类 —— WPF 注册的是 `Brush`，而属性可能声明为 `LinearGradientBrush` —— 只认精确匹配会让该属性悄悄不动（叶子是引用类型时，还会因此抛出 `TransitionPathUnsampleableException`）。由此有两条对自定义注册的结论：
+
+- **注册通用类型。** 一旦注册了通用类型，它就必须处理整个家族，因为其下每个子类现在都会解析到它；而在已有基类或接口注册的前提下，再注册具体类型是多余的。
+- **接口顺序只是决胜规则，不是偏好。** 接口排在最后并按键名排序，仅仅因为反射自身的顺序是未定义的：两个都匹配的接口谁胜出是任意的，但每次都胜出同一个则不是。
+
+这次遍历**每个属性只在动画启动时走一次**（`InterpolatorCore.Prepare`），绝不逐帧执行。
+
 旋转方向是不必编写采样器即可经 `Property` 传入的**逐属性选项**：表示角度的数值路径会尊重 `RotationDirection`（如 `RotationDirection.CounterClockWise`），因为 `DoubleSampler.InsertFrame` 会读取 `options` 参数并处理环绕（见 [定义状态快照](../03_声明状态/index.md)）。
 
-**预期结果：** 注册后 `NativeInterpolators[typeof(double)]` 返回该采样器（后写者胜），因此下一次动画 `double` 类型属性即使用 smoothstep，直到你注销它。逐属性覆盖优先于注册表 —— 若只需某个属性以不同方式动画，先用 `.Property(...)` 再用 `TransitionCoreEx.Interpolator(propertyLambda, sampler)` 扩展附加。
+**预期结果：** 注册后对 `typeof(double)` 的精确查找返回该采样器（后写者胜），因此下一次动画 `double` 类型属性即使用 smoothstep，直到你注销它 —— 反过来说，注册在基类或接口上的采样器现在也会服务其下每个属性类型。逐属性覆盖优先于注册表 —— 若只需某个属性以不同方式动画，先用 `.Property(...)` 再用 `TransitionCoreEx.Interpolator(propertyLambda, sampler)` 扩展附加。

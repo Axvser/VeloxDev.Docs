@@ -13,7 +13,7 @@ The platform adapters supply the runtime pieces a theme switch needs on a concre
 The adapter subclass of `InterpolatorCore` whose static constructor registers the framework's samplers (each mapped to an `ISampler` implementation, e.g. `BrushSampler`). This is the instance passed to `ThemeManager.SetPlatformInterpolator`:
 
 ```csharp
-// Source: Demo (Examples/Theme/WPF/Demo/MainWindow.xaml.cs)
+// Source: Demo (Examples/Theme/WPF/Demo/App.xaml.cs)
 ThemeManager.SetPlatformInterpolator(new Interpolator());
 ```
 
@@ -21,6 +21,31 @@ ThemeManager.SetPlatformInterpolator(new Interpolator());
 |---|---|
 | WPF (`VeloxDev.WPF`) | `Brush`, `Thickness`, `Point`, `CornerRadius`, `Transform`, `Size`, `Rect`, `Vector`, `Color`, `DropShadowEffect`, `Point3D`, `Vector3D` |
 | Avalonia (`VeloxDev.Avalonia`) | `IBrush`, `ITransform`, `Thickness`, `Point`, `CornerRadius`, `Size`, `PixelPoint`, `PixelSize`, `PixelRect`, `RelativePoint`, `RelativeRect`, `Color`, `BoxShadows`, `GridLength` |
+
+#### Interpolator.CreateScheduler
+
+**Signature:**
+`public override TransitionSchedulerCore? CreateScheduler(object target, ITransitionEffectCore effect)`
+
+This is the seam an animated theme switch runs through: `ThemeManager` asks the adapter's interpolator for a scheduler per target. The override must return a scheduler built with `TransitionSchedulerCore<...>.FindOrCreate(target)` — only that path files it under the target, which is what lets `Transition.Pause` / `Seek` / `Exit` find the animation — and must return `null` for an effect of another platform's priority type.
+
+```csharp
+// Source: Src/Adapters/VeloxDev.WPF/PlatformAdapters/Interpolator.cs
+public override TransitionSchedulerCore? CreateScheduler(object target, ITransitionEffectCore effect)
+    => effect is ITransitionEffect<DispatcherPriority>
+        ? (TransitionSchedulerCore)TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, DispatcherPriority>.FindOrCreate(target)
+        : null;
+```
+
+| Adapter | Priority the override accepts | Scheduler built |
+|---|---|---|
+| WPF, Avalonia, Jalium | `DispatcherPriority` | `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, DispatcherPriority>` |
+| WinUI | `DispatcherQueuePriority` | `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, DispatcherQueuePriority>` |
+| MAUI, WinForms, Razor | `NonPriority` | `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, NonPriority>` |
+
+**Notes:**
+- Every adapter ships this override; each declares its own `UIThreadInspector` and `TransitionInterpreter`.
+- The base `InterpolatorCore.CreateScheduler` returns `null`, so an adapter that did not override it would make every theme switch immediate rather than animated.
 
 ### Class: `TransitionEffect`
 
@@ -37,8 +62,9 @@ Adapter effect that overrides `Priority` to `DispatcherPriority.Render`. Inherit
 | `Hover` | `TransitionEffect` with `Duration = TimeSpan.FromSeconds(0.32)` |
 
 **Notes:**
-- `TransitionEffects.Theme` is the effect both theme demos pass to `ThemeManager.Transition<T>` for an animated switch.
-- `ThemeManager.Jump<T>` performs an instantaneous switch and needs no effect.
+- `TransitionEffects.Theme` is the effect the Trimmed theme demos pass to `ThemeManager.Transition<T>` for an animated switch (`Examples/Theme/WPF Trimmed/Demo/MainWindow.xaml.cs`, `ReverseThemeWithAnimation`). The full demos build their own `new TransitionEffect { Duration = TimeSpan.FromSeconds(3), FPS = 60 }` instead.
+- `ThemeManager.Jump<T>` performs an instantaneous switch and needs neither an effect nor a registered interpolator.
+- The members are `{ get; set; }` properties, not `readonly` fields, so a caller can replace a preset.
 
 ## Namespace: `VeloxDev.DynamicTheme` — theme value converters
 

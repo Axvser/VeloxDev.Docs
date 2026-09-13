@@ -33,7 +33,7 @@ An empty subclass that parameterizes the scheduler base with the adapter's concr
 | WinUI | `TransitionScheduler<TTarget> : TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, DispatcherQueuePriority>` |
 | MAUI / WinForms / Razor | `TransitionScheduler : TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, NonPriority>` |
 
-All scheduling behavior — the `MutualSchedulers` / `NoMutualSchedulers` tables, `FindOrCreate`, gating, and `Exit` — is inherited (see [01_abstractions](../../01_abstractions/index.md)).
+All scheduling behavior — the `MutualSchedulers` / `NoMutualSchedulers` tables, `FindOrCreate`, gating, and `Exit` — is inherited (see [01_abstractions](../../01_abstractions/index.md)). This is the type the adapter's `Interpolator.CreateScheduler` hands out — the override returns `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, TPriorityCore>.FindOrCreate(target)`, so the parameterization above is exactly the one a theme switch runs on (see [01_effect-interpolator](../01_effect-interpolator/index.md)).
 
 ### Class: `TransitionInterpreter` (per adapter)
 

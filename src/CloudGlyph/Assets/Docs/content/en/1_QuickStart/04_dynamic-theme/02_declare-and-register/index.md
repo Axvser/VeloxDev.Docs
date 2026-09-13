@@ -65,4 +65,6 @@ private void LoadTheme()
 
 Instances are tracked with weak references, so a collected object stops receiving switches automatically. To stop tracking an object explicitly, use `ThemeManager.Unregister(target)`; `Register`/`Unregister` both take the `IThemeObject` instance.
 
+Because the registration lives in the generated `InitializeTheme()`, a themed control registers itself simply by being constructed. The scale demo leans on exactly that — `Examples/Theme/WPF/Demo/ThemeTile.cs` (and the Avalonia twin) is a 26×26 `Border` that maps `Background` and `BorderBrush`, calls `InitializeTheme()` from its constructor, and needs no other wiring for a thousand of them to join the next switch. Runtime overrides of those declared values are covered in [Runtime Overrides & Threading](../03_switch-at-runtime/03_overrides-and-threading/index.md).
+
 **Expected result:** after `InitializeTheme()`, `ThemeManager.Current == typeof(Dark)` by default and the mapped properties already hold the `Dark` values (pinned by `ThemeBasicsTests.ThemeManager_DefaultCurrent_IsDark`).

@@ -1,6 +1,8 @@
 # 数据流 — 主题切换
 
-`Transition<T>`（带动画）与 `Jump<T>`（即时）遵循同一管线：守卫目标主题、通知 `ExecuteThemeChanging`、为每个属性准备一条采样器条目、运行 `ExecuteTransition`、更新 `Current`、再通知 `ExecuteThemeChanged`。唯一的差别是动画时长 —— `Jump` 传入 `durationMs = 0`。
+`Transition<T>` 与 `Jump<T>` 不再共用同一条管线。带动画的切换先准备出一组按目标分组的条目，再交给每个目标一个平台 `TransitionSchedulerCore`，全部锚定在同一条 `TransitionTimeline` 上，于是时钟、帧节拍和效果自身的标志都归过渡系统所有。即时切换完全不碰过渡系统：`Jump` 经 `ApplyImmediately` 直接写入全部终值并推进 `Current`，因此它既不依赖 `SetPlatformInterpolator`，也不受平台 `ITransitionEffect<TPriority>` 的类型约束。
+
+两个入口共用同一段前奏 —— 守卫、取消、清理、通知 `ExecuteThemeChanging` —— 也都以通知 `ExecuteThemeChanged` 收尾，但只有真正落地的切换才走到那一步。
 
 ## 带动画切换（`Transition<T>`）
 
@@ -11,22 +13,24 @@
 actor User as User
 participant "ThemeManager" as TM
 participant "IThemeObject\n(registered view)" as TO
-participant "InterpolatorCore\n(static registry)" as IK
+participant "InterpolatorCore\n(platform adapter)" as IK
+participant "TransitionSchedulerCore\n(one per target)" as SC
+participant "TransitionTimeline\n(one per switch)" as TL
 participant "ISampler" as SMP
 
-User -> TM: Transition<Light>(TransitionEffects.Theme)
+User -> TM: Transition<Light>(effect)
 activate TM
-
-note right of TM
-  effect.Duration = 460 ms (TransitionEffects.Theme)
-  effect.Ease drives easing of normalized time
-end note
 
 alt guard fails (themeType == Current\nor not assignable to ITheme)
     TM -> TM: Debug.WriteLine(...) and return (no-op)
 else passes
-    TM -> TM: CancleTransition()  // cancel a running pass
-    TM -> TM: prune dead WeakReferences\nactives = alive IThemeObject[]
+    TM -> TM: CancelActiveSwitch()
+    note right of TM
+      Interlocked.Exchange(ref _activeSwitch, null), then per run:
+      Run.Cts.Cancel() and Run.Timeline.Wake(). The wake is required -
+      a loop parked on the timeline's pause gate cannot see the token.
+    end note
+    TM -> TM: activeThemes.RemoveAll(dead)\nactives = alive IThemeObject[]
 
     loop each active
         TM -> TO: ExecuteThemeChanging(current = Dark, new = Light)
@@ -36,47 +40,88 @@ else passes
     end
 
     note right of TM
-      PrepareSamplers(actives, typeof(Light))
+      groups = PrepareSamplers(actives, typeof(Light))
+      one TargetEntries per target, one TransitionEntry per property.
+      No endpoint is normalized here and no sampler is resolved here.
     end note
     loop each active, each themed property
         TM -> TO: GetStaticThemeCache() / GetActiveThemeCache()
         activate TO
-        TO --> TM: static values + runtime overrides
+        TO --> TM: static defaults + runtime overrides
         deactivate TO
         alt StartModel.Cache
             TM -> TM: start = override[Current] ?? static[Current]
         else StartModel.Reflect
             TM -> TM: start = propertyInfo.GetValue(target)
         end
-        TM -> TM: target = override[Light] ?? static[Light]
-        TM -> IK: TryGetInterpolator(propertyType, out sampler)
+        TM -> TM: end = override[Light] ?? static[Light]
+        TM -> IK: TryGetInterpolator(propertyType, out _)  // hasSampler probe
         activate IK
-        IK --> TM: ISampler or null
+        IK --> TM: true or false
         deactivate IK
-        TM -> TM: TransitionEntry(target, prop, sampler,\nnormStart, normEnd) via NormalizeStart/End
+    end
+
+    alt _interpolator is null, or groups is empty
+        TM -> TM: ApplyImmediately(groups, typeof(Light))
+    else some group has no scheduler
+        loop each group
+            TM -> IK: CreateScheduler(group.Target, effect)
+            activate IK
+            IK --> TM: TransitionSchedulerCore? (null = "not mine")
+            deactivate IK
+        end
+        TM -> TM: ApplyImmediately(groups, typeof(Light))
+    else every group got a scheduler
+        TM -> TL: new TransitionTimeline()
+        loop each (scheduler, group)
+            TM -> TO: WriteStartValues(group)
+            note right of TM
+              The prepared start is written back first, so the default
+              StartModel.Cache means "from the current theme's value",
+              not "from whatever the target happens to hold".
+            end note
+            TM -> SC: Track(new TransitionRun(timeline))
+            TM -> TM: BuildState(group) - end values only
+        end
+        TM -> TM: Interlocked.Exchange(ref _activeSwitch, runs)
+
+        loop each run
+            TM -> SC: Execute(interpolator, state, effect, run.Cts)
+            activate SC
+            SC -> IK: Prepare(target, state, effect, inspector)
+            activate IK
+            IK -> SMP: NormalizeStart / NormalizeEnd
+            activate SMP
+            SMP --> IK: normalized endpoints
+            deactivate SMP
+            deactivate IK
+            loop until the run ends
+                SC -> SMP: InsertFrame(target, property, ref working,\nstart, end, options, t)
+                activate SMP
+                SMP -> TO: TransitionProperty.SetValue (compiled write)
+                deactivate SMP
+                SC -> TL: sample the clock / await the pause gate
+            end
+            deactivate SC
+        end
+
+        note right of TM
+          await Task.WhenAll(tasks) - the first await in Transition<T>,
+          so the call's own duration is the synchronous preparation.
+        end note
+        loop each run (finally)
+            TM -> SC: Untrack(run)
+        end
+        TM -> TM: Interlocked.CompareExchange(ref _activeSwitch, null, runs)
+        TM -> TM: ApplyHeldValues(groups)\nCurrent = typeof(Light)
     end
 
     note right of TM
-      ExecuteTransition(entries, effect.Ease, durationMs, themeType)
+      RunSwitch returns false when the pass faulted or any run was
+      cancelled. Nothing here runs in that case: no Current, no
+      ExecuteThemeChanged.
     end note
-    TM -> TM: await _asyncLock_transition (serialize passes)\ncancel previous pass, new CancellationTokenSource
 
-    loop until rawT >= 1
-        TM -> TM: rawT = elapsed / durationMs (clamp [0,1])\napplyT = rawT >= 1 ? 1 : clamp(ease(rawT), 0, 1)
-        loop each TransitionEntry
-            alt sampler == null
-                TM -> TM: hold current value;\nat end SetValue(target, targetValue)
-            else
-                TM -> SMP: InsertFrame(target, prop, ref working,\nstart, end, null, applyT)
-                activate SMP
-                SMP -> SMP: TransitionProperty.SetValue (compiled write)
-                deactivate SMP
-            end
-        end
-        TM -> TM: await Task.Delay(1)   // coarse ~1 ms yield
-    end
-
-    TM -> TM: Current = typeof(Light)   (only if not cancelled)
     loop each active
         TM -> TO: ExecuteThemeChanged(current = Dark, new = Light)
         activate TO
@@ -91,9 +136,12 @@ deactivate TM
 
 说明：
 
-- 条目列表预先构建，每个属性一条 `TransitionEntry`：目标对象、编译后的 `TransitionProperty`、解析到的 `ISampler`（或 null）、归一化后的起始/结束值。
-- 不构建帧列表 —— 采样由 Stopwatch 驱动；每次循环经 `Task.Delay(1)` 让出，当 `elapsed >= durationMs` 时结束。此循环不读取效果上的 `FPS`。
-- 若已有切换正在运行又发起第二次 `Transition`/`Jump`，前者会被 `CancellationTokenSource`（`CancleTransition`）取消，只有「胜出」的那一趟会更新 `Current`。`ExecuteTransition` 先等待静态 `SemaphoreSlim`，各趟不会重叠。
+- `PrepareSamplers` 产出 `TargetEntries`（私有，每个目标一组），组内是 `TransitionEntry`（私有，每个属性一条）。条目携带 `Target`、`PropertyInfo`、编译后的 `TransitionProperty`、`StartValue`、`EndValue`、`HasSampler`。一个目标若没有任何可用属性就不建组 —— 空动画和空采样集合都没有意义。
+- 只有**终值**被声明给 scheduler（`BuildState`），且仅限 `EndValue` 非 null 的条目；终值为 null 表示「这个主题不管这个属性」。起点由 `InterpolatorCore.Prepare` 重新从目标上读回，因此在 `PrepareSamplers` 里归一化端点会归一化两次。
+- 整场共用一条时间轴。每个目标都锚在它上面，这正是对**任意单个**目标调用 `Transition.Pause` / `Resume` / `Seek` / `SetRate` / `Exit` 会作用于全部目标的原因，也是切换的墙钟耗时不随元素数增长的原因。帧节拍与效果的 `FPS`、`IsAutoReverse`、`LoopTime` 都归过渡系统所有（`ThemeTransitionTests.Switch_HonoursAutoReverseAndLoopTime`）。
+- 平台接缝在**调度任何东西之前**解析完毕：若 `_interpolator` 为 null、若没有任何组含可动属性、或任一组的 `CreateScheduler` 返回 null，整场切换退化为 `ApplyImmediately`，而不是只动一部分。`CreateScheduler` 每个目标每场只问一次。
+- `Track` 必须先于 `Execute`：scheduler 正是靠它在即将构建的采样集合里找回 run —— 也就是找回令牌。
+- `RunSwitch` 是私有的 `async Task<bool>`：对被取消或被顶替的切换返回 `false`；而 `Transition` 是 `async void`，其调用方接不住异常 —— 所以围绕 scheduler 的每个 `await` 都被包住并记录日志。
 
 ## 即时切换（`Jump<T>`）
 
@@ -111,19 +159,23 @@ activate TM
 alt guard fails
     TM -> TM: Debug.WriteLine(...) and return (no-op)
 else passes
-    TM -> TM: CancleTransition(); prune dead WeakReferences\nactives = alive IThemeObject[]
+    TM -> TM: CancelActiveSwitch(); prune dead WeakReferences\nactives = alive IThemeObject[]
     loop each active
         TM -> TO: ExecuteThemeChanging(current = Dark, new = Light)
         activate TO
         TO -> TO: base chain + OnThemeChanging (user hook)
         deactivate TO
     end
-    TM -> TM: entries = PrepareSamplers(actives, typeof(Light))
     note right of TM
-      ExecuteTransition(entries, Eases.Default, 0d, themeType)
-      durationMs = 0 => rawT = 1 on the first sample,
-      so every property is written directly to its target.
+      ApplyImmediately(PrepareSamplers(actives, typeof(Light)), typeof(Light))
+      - no timeline, no scheduler, no effect, no platform interpolator.
     end note
+    loop each group, each entry with a non-null EndValue
+        TM -> TO: TransitionProperty.SetValue(target, EndValue)
+        activate TO
+        TO --> TM: (compiled write, ignores a false return)
+        deactivate TO
+    end
     TM -> TM: Current = typeof(Light)
     loop each active
         TM -> TO: ExecuteThemeChanged(current = Dark, new = Light)
@@ -137,7 +189,7 @@ deactivate TM
 @enduml
 ```
 
-`Eases.Default` 是线性缓动（`Ease(t) => t`），但因为时长为零，首次采样即 `applyT = 1`，它永远不会被观测到。
+`Jump` 不做任何归一化，也不查询任何采样器：`TransitionProperty.SetValue` 把声明的值原样写入，有采样器的属性与没有采样器的属性写法完全相同。由此带来一处不对称 —— `Jump` 会先取消正在进行的带动画切换（`CancelActiveSwitch`），但正在进行的 `Jump` 无法被取消，因为它内部根本没有 await 点。
 
 ## 守卫条件与边界路径
 
@@ -145,11 +197,15 @@ deactivate TM
 |---|---|
 | `themeType == Current` | 守卫提前返回并输出调试信息 `[ThemeManager] Invalid theme type, jumping to current theme.`（no-op，不会重放）。 |
 | `themeType` 不可赋值给 `ITheme` | 同一守卫，同样 no-op 返回。 |
-| 属性类型有已注册采样器 | 端点由 `NormalizeStart`/`NormalizeEnd` 产生；中间帧由 `ISampler.InsertFrame` 写入。 |
-| 属性类型没有采样器 | 简单切换：整趟持有当前值，最后一次采样写入目标值。 |
-| 属性没有找到值（起始或目标） | `PrepareSamplers` 记录 `... skipping` 并从该趟跳过该属性。 |
-| 已有切换运行中又发起新切换 | 前一趟被取消（`CancleTransition`）；采样由静态 `SemaphoreSlim` 串行化。 |
-| 零时长效果 / `Jump` | 首次采样即 `rawT = 1` → 每个属性直接写为目标值。 |
-| 已死亡的注册对象 | 在该趟开始时清理（弱引用），随后忽略。 |
+| 没有平台插值器（`_interpolator is null`） | `RunSwitch` 退化为 `ApplyImmediately`：一次性写入全部终值并推进 `Current` —— 不动画，但 `ExecuteThemeChanged` 仍会触发。 |
+| 某个目标的 scheduler 为 null | 整场切换退化为 `ApplyImmediately`，而不是只让那一个目标瞬切。 |
+| `RunSwitch` 逸出异常 | 由 `Transition` 的 catch 记录（`async void` 的调用方接不住），该场切换不推进 `Current`，也不触发 `ExecuteThemeChanged`。 |
+| 已有切换运行中又发起新切换 | `CancelActiveSwitch` 取消各 run 的令牌并唤醒其时间轴；被顶替的那场返回 `false`，因此既不推进也不发通知。 |
+| 属性类型有已注册采样器 | `InterpolatorCore.Prepare` 解析它并归一化端点；中间帧由 `ISampler.InsertFrame` 产生。 |
+| 属性类型没有采样器 | 整趟保持准备好的起始值；`ApplyHeldValues` 在 `Task.WhenAll` 之后写入终值。 |
+| 某属性的 `EndValue` 为 null | 被 `BuildState`（不采样）与 `ApplyHeldValues`（不写入）跳过 —— 该主题不管这个属性。 |
+| 属性没有找到值（起始或目标） | `PrepareSamplers` 记录 `... skipping` 并从该场切换中跳过该属性。 |
+| 零时长效果 / `Jump` | `Jump` 同步写入终值；零时长的 `Transition` 在下一帧跑完它那一趟。 |
+| 已死亡的注册对象 | 在该场切换开始时清理（弱引用），随后忽略。 |
 
-> 源码：`Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` —— `Transition` 83-112 行、`Jump` 118-146 行、`PrepareSamplers` 148-303 行、`ExecuteTransition` 332-400 行。
+> 源码：`Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` —— `Transition`（109-146 行）、`Transition<T>`（152-155 行）、`Jump`（161-185 行）、`Jump<T>`（190-193 行）、`RunSwitch`（199-291 行）、`WasCancelled`（297-307 行）、`CancelActiveSwitch`（312-332 行）、`WriteStartValues`（334-347 行）、`BuildState`（353-376 行）、`ApplyHeldValues`（381-399 行）、`ApplyImmediately`（404-425 行）、`PrepareSamplers`（427-577 行），以及私有嵌套类 `TargetEntries`（584-588 行）、`TransitionEntry`（590-610 行）、`SwitchTarget`（613-618 行）。行为由 `Src/Core/VeloxDev.Core.Test/DynamicTheme/ThemeTransitionTests.cs` 验证。

@@ -52,6 +52,8 @@ foreach (var kvp in QuickStart.Animation0.GetState().Values)
 
 **预期结果：** 写错路径的 transition 在定义（冲突）或执行（永不可动画）时立刻失败，而不是悄悄不动。
 
+**索引实参。** 路径除属性段外还可带索引段 / 数组段 —— `x.Items[i].Width`、`x.Map["player"].Color`、`x.Cells[1, 2]`。它们的实参属于路径的**身份**，而不属于路径的值：`x => x.Items[idx].Width` 无论 `idx` 当时是多少都解析为同一条路径，因此循环里从五个不同闭包局部量声明会得到五条条目。未冻结的实参默认每帧重新求值，所以路径会**跟随**移动的索引（闭包局部量，或目标自身的属性如 `x.SelectedIndex`）—— 但**终点值只在启动时读过一次**，因此中途移动的索引会写入一个按它起步时那个槽位算出的终点值。把实参包进 `PathIndex.Frozen(...)` 即可把它钉在启动时解析出的槽位上；凡终点值必须落在它被读取的那个位置时，都该这样做。常量实参不需要标记，无论怎么写它都是冻结的；并且 `Items[i]` 与 `Items[Frozen(i)]` 是两条不同的路径。（源码：`Src/Core/VeloxDev.Core/TransitionSystem/PathIndex.cs`；解析与身份由 `Src/Core/VeloxDev.Core.Test/TransitionSystem/TransitionPropertyIndexerTests.cs` 锁定。）
+
 ## 4. 重置
 
 重置不是一个独立 API，而是**用同一个声明式构建器把各初始值逐条写回**，并把时长压到零（`TransitionEffects.Empty`）：

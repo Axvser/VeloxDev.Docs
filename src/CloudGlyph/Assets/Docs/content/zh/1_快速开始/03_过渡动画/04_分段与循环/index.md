@@ -69,7 +69,7 @@ CreateReset().Execute(rect);
 - `Update` —— 每次写帧前；`LateUpdate` —— 紧随其后。
 - `Completed` —— 最后一程正常结束后触发。
 - `Canceled` —— 被打断时触发（新的互斥动画、`Transition.Exit` 或 `Handled = true`）。
-- `Finally` —— 无论成功或取消，在**任何**结束路径上都会触发（引擎依赖它释放非互斥调度器的簿记）。
+- `Finally` —— 无论成功或取消，在**任何**结束路径上都会触发。（非互斥调度器的簿记由这次运行自身释放，不由该事件释放。）
 
 ```csharp
 var effect = new TransitionEffect

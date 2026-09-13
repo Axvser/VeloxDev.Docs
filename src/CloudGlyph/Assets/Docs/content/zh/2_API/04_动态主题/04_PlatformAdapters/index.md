@@ -13,7 +13,7 @@
 适配器对 `InterpolatorCore` 的子类，其静态构造函数注册框架的采样器（每个都映射到一个 `ISampler` 实现，如 `BrushSampler`）。它就是要传给 `ThemeManager.SetPlatformInterpolator` 的实例：
 
 ```csharp
-// 来源：Demo（Examples/Theme/WPF/Demo/MainWindow.xaml.cs）
+// 来源：Demo（Examples/Theme/WPF/Demo/App.xaml.cs）
 ThemeManager.SetPlatformInterpolator(new Interpolator());
 ```
 
@@ -21,6 +21,31 @@ ThemeManager.SetPlatformInterpolator(new Interpolator());
 |---|---|
 | WPF（`VeloxDev.WPF`） | `Brush`、`Thickness`、`Point`、`CornerRadius`、`Transform`、`Size`、`Rect`、`Vector`、`Color`、`DropShadowEffect`、`Point3D`、`Vector3D` |
 | Avalonia（`VeloxDev.Avalonia`） | `IBrush`、`ITransform`、`Thickness`、`Point`、`CornerRadius`、`Size`、`PixelPoint`、`PixelSize`、`PixelRect`、`RelativePoint`、`RelativeRect`、`Color`、`BoxShadows`、`GridLength` |
+
+#### Interpolator.CreateScheduler
+
+**签名：**
+`public override TransitionSchedulerCore? CreateScheduler(object target, ITransitionEffectCore effect)`
+
+这就是带动画的主题切换所要经过的接缝：`ThemeManager` 按目标向适配器的插值器索取调度器。重写必须返回用 `TransitionSchedulerCore<...>.FindOrCreate(target)` 构建的调度器——只有那条路径会把它登记到目标名下，而后续的 `Transition.Pause` / `Seek` / `Exit` 正是靠它找到这个动画——并且必须对其它平台优先级类型的效果返回 `null`。
+
+```csharp
+// 来源：Src/Adapters/VeloxDev.WPF/PlatformAdapters/Interpolator.cs
+public override TransitionSchedulerCore? CreateScheduler(object target, ITransitionEffectCore effect)
+    => effect is ITransitionEffect<DispatcherPriority>
+        ? (TransitionSchedulerCore)TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, DispatcherPriority>.FindOrCreate(target)
+        : null;
+```
+
+| 适配器 | 重写接受的优先级 | 构建的调度器 |
+|---|---|---|
+| WPF、Avalonia、Jalium | `DispatcherPriority` | `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, DispatcherPriority>` |
+| WinUI | `DispatcherQueuePriority` | `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, DispatcherQueuePriority>` |
+| MAUI、WinForms、Razor | `NonPriority` | `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, NonPriority>` |
+
+**说明：**
+- 每个适配器都提供该重写；各自声明自己的 `UIThreadInspector` 与 `TransitionInterpreter`。
+- 基类 `InterpolatorCore.CreateScheduler` 返回 `null`，所以一个不重写它的适配器会让每次主题切换都成为瞬时切换，而不是带动画。
 
 ### 类：`TransitionEffect`
 
@@ -37,8 +62,9 @@ ThemeManager.SetPlatformInterpolator(new Interpolator());
 | `Hover` | `TransitionEffect`，`Duration = TimeSpan.FromSeconds(0.32)` |
 
 **说明：**
-- `TransitionEffects.Theme` 是两个主题示例传给 `ThemeManager.Transition<T>` 做带动画切换的效果。
-- `ThemeManager.Jump<T>` 做瞬时切换，无需效果。
+- `TransitionEffects.Theme` 是 Trimmed 主题示例传给 `ThemeManager.Transition<T>` 做带动画切换的效果（`Examples/Theme/WPF Trimmed/Demo/MainWindow.xaml.cs`，`ReverseThemeWithAnimation`）。完整示例则自建 `new TransitionEffect { Duration = TimeSpan.FromSeconds(3), FPS = 60 }`。
+- `ThemeManager.Jump<T>` 做瞬时切换，既不需要效果，也不需要已注册的插值器。
+- 这些成员是 `{ get; set; }` 属性而非 `readonly` 字段，因此调用方可以替换预设。
 
 ## 命名空间：`VeloxDev.DynamicTheme` — 主题值转换器
 

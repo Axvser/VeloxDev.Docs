@@ -20,6 +20,19 @@
 - 被注册的采样器实现 `ISampler`，由同一适配器在 `PlatformAdapters/Samplers/*.cs` 下发布（各适配器程序集内命名空间 `VeloxDev.Adapters.NativeSamplers`）。画刷 / 变换类引用类型目标的插值不会修改快照共享的 start/end 实例（见 [00_transitionsystem/00_sampling-capture](../../00_transitionsystem/00_sampling-capture/index.md) 的 `ISampler` 契约）。
 - 注册是*叠加于* `InterpolatorCore` 静态构造函数预置的引擎默认采样器之上——因此数值、`System.Drawing` 与（非 `netstandard2.0`）`System.Numerics` 类型总能插值。
 
+### 重写：`Interpolator.CreateScheduler`
+
+每个适配器还重写 `InterpolatorCore.CreateScheduler`（见 [01_abstractions](../../01_abstractions/index.md)）。WPF、Avalonia、Jalium 逐字如下：
+
+```csharp
+public override TransitionSchedulerCore? CreateScheduler(object target, ITransitionEffectCore effect)
+    => effect is ITransitionEffect<DispatcherPriority>
+        ? (TransitionSchedulerCore)TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, DispatcherPriority>.FindOrCreate(target)
+        : null;
+```
+
+WinUI 换成 `DispatcherQueuePriority`；MAUI、WinForms、Razor 换成 `NonPriority`。这是主题系统所跑的那道接缝——一次主题切换横跨许多运行时类型的目标，Core 因此无法写出 `Transition<T>` 的类型实参，而调度器由哪个检查器、解释器与优先级组成，恰恰是只有平台知道的事。`null` 分支对「该 effect 不属于本平台」（交给 WinUI 插值器的 `DispatcherPriority` effect）是诚实的回答，它正对应调度器在开跑前自己做的那次强制转换；调用方于是退化为不做动画的切换，而不是启动一场画不出东西的动画。必须经 `FindOrCreate`——绝不能 `new`——因为只有这条路径会把调度器登记到目标名下，之后的 `Transition.Pause` / `Transition.Seek` / `Transition.Exit(target)` 才能找到它（见 [02_ui-inspector](../02_ui-inspector/index.md)）。*验证依据：* 各适配器的 `PlatformAdapters/Interpolator.cs`。
+
 ### 类：`TransitionEffect` — 优先级默认值
 
 各适配器的效果子类 `TransitionEffectCore`（MAUI、WinForms、Razor）或 `TransitionEffectCore<TPriorityCore>`（WPF、Avalonia、Jalium、WinUI）。存在优先级时设置覆盖基类零值的默认值：

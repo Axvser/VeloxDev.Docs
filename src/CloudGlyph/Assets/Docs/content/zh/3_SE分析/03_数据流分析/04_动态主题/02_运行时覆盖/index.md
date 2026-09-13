@@ -87,7 +87,9 @@ deactivate Obj
 在 `PrepareSamplers` 中，对**起始值**（当前主题）与**目标值**（目标主题）都先查活跃缓存、仅当该属性没有该主题的覆盖时才回退到静态默认值：
 
 ```csharp
-// Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs, lines 215-228 and 246-256
+// Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs — PrepareSamplers: the current value
+// (StartModel.Cache branch, lines 497-509); the target lookup below repeats the same
+// active-first order for targetThemeType (lines 529-539)
 if (activeCache.TryGetValue(propEntry.Key, out var activePropCache) &&
     activePropCache.TryGetValue(propertyInfo, out var activeTypeCache) &&
     activeTypeCache.TryGetValue(Current, out currentValue))
@@ -103,4 +105,6 @@ else if (typeValues.TryGetValue(Current, out currentValue))
 
 因此只要目标主题等于 `T`，来自 `SetThemeValue<T>` 的运行时覆盖就优先于静态 `[ThemeConfig]` 值。
 
-> 源码：`Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`（`GetOrCreateActiveEntry` 131-134 行、`TryGetActiveEntry` 139-143 行）、`Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`（`PrepareSamplers` 起始/目标查找 192-267 行）、生成成员见 `Src/Generators/VeloxDev.Core.Generator/Theme.cs`（`SetThemeValue` 302-318 行、`RestoreThemeValue` 322-327 行、`UpdatePropertyToCurrentTheme` 345-374 行）。
+两个 Demo 都用按钮接线：规模 Demo 走 `OnEditThemeValue` / `OnRestoreThemeValue`（`Examples/Theme/WPF/Demo/MainWindow.xaml.cs`），精简 Demo 走 `ThemeValueEx`（`Examples/Theme/WPF Trimmed/Demo/MainWindow.xaml.cs`），后者还用 `GetStaticThemeCache()` / `GetActiveThemeCache()` 把两个缓存读回来。
+
+> 源码：`Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`（`GetOrCreateActiveEntry` 131-134 行、`TryGetActiveEntry` 139-143 行）、`Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`（`PrepareSamplers` 起始/目标查找 474-549 行）、生成成员见 `Src/Generators/VeloxDev.Core.Generator/Theme.cs`（`SetThemeValue` 302-318 行、`RestoreThemeValue` 322-327 行、`UpdatePropertyToCurrentTheme` 345-373 行）。

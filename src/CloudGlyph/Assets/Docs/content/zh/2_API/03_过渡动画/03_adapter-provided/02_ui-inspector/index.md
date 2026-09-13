@@ -31,7 +31,7 @@
 | WinUI | `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, DispatcherQueuePriority>` |
 | MAUI / WinForms / Razor | `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, NonPriority>` |
 
-全部调度行为——`MutualSchedulers` / `NoMutualSchedulers` 表、`FindOrCreate`、门控、`Exit`——均继承（见 [01_abstractions](../../01_abstractions/index.md)）。
+全部调度行为——`MutualSchedulers` / `NoMutualSchedulers` 表、`FindOrCreate`、门控、`Exit`——均继承（见 [01_abstractions](../../01_abstractions/index.md)）。这也是适配器 `Interpolator.CreateScheduler` 交回的类型——该重写返回 `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, TPriorityCore>.FindOrCreate(target)`，所以上表的参数化正是主题切换所跑的那一套（见 [01_effect-interpolator](../01_effect-interpolator/index.md)）。
 
 ### 类：`TransitionInterpreter`（各适配器）
 

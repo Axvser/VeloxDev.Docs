@@ -18,7 +18,7 @@ Seven GUI demos ship under `Examples/Transition/` (WPF, Avalonia, WinUI, WinForm
 The engine contract is pinned by `Src/Core/VeloxDev.Core.Test/TransitionSystem/`:
 
 - `EasesTests` — boundary values (`Ease(0) = 0`, `Ease(1) = 1`) for every standard ease and monotonicity for `Eases.Quad.In`.
-- `InterpolatorCoreTests` — register / try-get / overwrite / unregister on the `NativeInterpolators` registry.
+- `InterpolatorCoreTests` — register / try-get / overwrite / unregister on the `NativeInterpolators` registry, plus the lookup's resolution order: a base class (nearest-first) then an interface, a base class beating an interface, and a deterministic winner when two interfaces match.
 - `SamplingLoopTests` — a headless run of a `double` property with `Duration = 0`, auto-reverse and `LoopTime`; asserts `Completed`/`Canceled`/`Finally` firing.
 - `NativeSamplersTests`, `TransitionEffectCoreTests`, `StateCoreTests`, `TransitionPropertyTests`, `SamplerSetTests` — sampler endpoints, effect clone/events, state dictionaries and path parsing.
 - `TransitionPathConflictTests` / `TransitionPathValidationTests` — the parent/child path conflict and the unsampleable-path rejection.

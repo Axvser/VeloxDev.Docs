@@ -4,7 +4,7 @@
 
 ### Class: `ThemeManager`
 
-Static entry point for theme state and switching. All members are static. Live instances are tracked through a `ConditionalWeakTable<IThemeObject, ...>` plus a `List<WeakReference<IThemeObject>>`, so registration never leaks. The manager drives its own Stopwatch-based sampling loop and raises lifecycle callbacks on every registered object around each switch.
+Static entry point for theme state and switching. All members are static. Live instances are tracked through a `ConditionalWeakTable<IThemeObject, ...>` plus a `List<WeakReference<IThemeObject>>`, so registration never leaks. The manager does not time a switch itself: an animated switch is run by the platform's `TransitionSchedulerCore`, resolved per target through `InterpolatorCore.CreateScheduler`, and every target of one switch is anchored to a single `TransitionTimeline`. Lifecycle callbacks are raised on every registered object around each switch.
 
 Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`.
 
@@ -28,13 +28,14 @@ Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`.
 
 **Example:**
 ```csharp
-// Source: Demo (Examples/Theme/WPF/Demo/MainWindow.xaml.cs, LoadTheme)
+// Source: Demo (Examples/Theme/WPF/Demo/App.xaml.cs)
 ThemeManager.SetPlatformInterpolator(new Interpolator());
 ```
 
 **Notes:**
 - Must be called once before any animated transition so that themed property types resolve to platform samplers. `InterpolatorCore` is declared in `VeloxDev.TransitionSystem.Abstractions`; the concrete adapter type is the platform `Interpolator` in `VeloxDev.TransitionSystem` (see [04 PlatformAdapters](../04_PlatformAdapters/index.md)).
-- Without a registered sampler for a property type, `Transition` still runs but that property is applied as a simple hold-until-end switch.
+- Beyond forcing the adapter's sampler registrations to run, this is what makes an animated switch possible at all: `Transition` asks this instance for a scheduler through `InterpolatorCore.CreateScheduler` (`ThemeManager.cs`, `RunSwitch`). Without it, the switch still happens — immediately, with no animation.
+- Without a registered sampler for a property type, an animated switch still runs, but that property holds its old value for the whole switch and is written to its target value once the switch ends (`ThemeManager.cs`, `ApplyHeldValues`).
 
 #### ThemeManager.SetCurrent
 
@@ -94,7 +95,7 @@ ThemeManager.SetCurrent<Light>();
 
 **Example:**
 ```csharp
-// Source: Demo (Examples/Theme/WPF/Demo/MainWindow.xaml.cs)
+// Source: Demo (Examples/Theme/WPF Trimmed/Demo/MainWindow.xaml.cs, ReverseThemeWithAnimation)
 ThemeManager.Transition<Light>(TransitionEffects.Theme);
 ```
 
@@ -109,15 +110,17 @@ ThemeManager.Transition<Light>(TransitionEffects.Theme);
 | Parameter | Type | Description |
 |---|---|---|
 | `themeType` | `Type` | Target theme type. |
-| `effect` | `ITransitionEffectCore` | Transition effect whose `Ease` and `Duration` drive the animation. |
+| `effect` | `ITransitionEffectCore` | The transition effect that drives the switch. It must be the platform's own effect type so that `InterpolatorCore.CreateScheduler` accepts it. |
 
-**Returns:** `void` (asynchronous)
+**Returns:** `void` (asynchronous — the method is `async void`)
 
-**Exceptions:** none declared — an invalid `themeType` (`themeType == Current`, or not assignable to `ITheme`) is ignored with `Debug.WriteLine("[ThemeManager] Invalid theme type, jumping to current theme.")`.
+**Exceptions:** none declared — an invalid `themeType` (`themeType == Current`, or not assignable to `ITheme`) is ignored with `Debug.WriteLine("[ThemeManager] Invalid theme type, jumping to current theme.")`. An exception raised inside the switch is caught by `Transition` itself and written as `Debug.WriteLine("[ThemeManager] Error during theme transition: ...")`; an `async void` caller cannot receive it.
 
 **Notes:**
-- Cancels any running transition, prunes dead `WeakReference`s, then calls `ExecuteThemeChanging(oldValue, newValue)` on every registered object.
-- Resolves the per-property start/target values (per `StartModel`), normalizes endpoints through each property's `ISampler`, and drives a Stopwatch-based sampling loop that calls `ISampler.InsertFrame` with the eased time until `effect.Duration` elapses (≈1 ms yield per frame).
+- Cancels any switch in flight (`CancelActiveSwitch`), prunes dead `WeakReference`s, then calls `ExecuteThemeChanging(oldValue, newValue)` on every registered object.
+- Awaits the private `async Task<bool> RunSwitch`, which builds the per-target entries with `PrepareSamplers`, resolves each target's scheduler through `InterpolatorCore.CreateScheduler`, and runs them all on one shared `TransitionTimeline`. `RunSwitch` returns `false` when the switch was cancelled or superseded, and `Transition` then announces nothing and leaves `Current` unchanged.
+- Falls back to an immediate, un-animated switch (`ApplyImmediately`) when no platform interpolator is set, when no target has an animatable property, or when the platform's scheduler declines the effect.
+- `RunSwitch` is a private `async Task<bool>` precisely because `Transition` is `async void`: exceptions thrown by the adapters' samplers and schedulers are caught inside it (`Debug.WriteLine("[ThemeManager] Error during transition execution: ...")`) instead of escaping into the process.
 - On completion sets `Current = themeType` and calls `ExecuteThemeChanged(oldValue, newValue)` on every registered object.
 
 #### ThemeManager.Jump<T>
@@ -134,23 +137,25 @@ ThemeManager.Jump<Dark>();
 ```
 
 **Notes:**
-- Delegates to `Jump(typeof(T))`. Switches instantly without animation.
+- Delegates to `Jump(typeof(T))`. Switches instantly without animation and cancels any animated switch in flight.
 
 #### ThemeManager.Jump(Type)
 
 **Signature:**
-`public static async void Jump(Type themeType)`
+`public static void Jump(Type themeType)`
 
 | Parameter | Type | Description |
 |---|---|---|
 | `themeType` | `Type` | Target theme type. |
 
-**Returns:** `void` (asynchronous)
+**Returns:** `void` (synchronous)
 
 **Exceptions:** none declared — an invalid `themeType` is ignored with the same debug message as `Transition`.
 
 **Notes:**
-- Runs a zero-duration pass (`durationMs = 0`, `Eases.Default`), so the first sample already has `t = 1` and every property is written directly to its target-theme value with no interpolation. Raises `ExecuteThemeChanging` before and `ExecuteThemeChanged` after, and updates `Current`.
+- Cancels any switch in flight (`CancelActiveSwitch`) before applying, so a jump supersedes a running `Transition` rather than racing it.
+- Applies end values directly through `ApplyImmediately`: no timeline, no effect, no sampling. It therefore does not depend on `SetPlatformInterpolator` and is not constrained by the platform's `ITransitionEffect<TPriority>` type.
+- Raises `ExecuteThemeChanging` before and `ExecuteThemeChanged` after, and updates `Current`.
 
 ---
 
