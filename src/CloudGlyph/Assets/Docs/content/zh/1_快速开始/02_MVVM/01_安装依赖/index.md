@@ -8,7 +8,7 @@ MVVM 运行时与两个源生成器住在同两个包里：`VeloxDev.Core`（命
 dotnet add package VeloxDev.Core
 ```
 
-`VeloxDev.Core`（当前为 `8.0.0`）把 `VeloxDev.Core.Generator` `8.0.0` 声明为包依赖（`Src/Core/VeloxDev.Core/VeloxDev.Core.csproj`），于是生成器程序集作为*你项目*的分析器被还原 —— 无需手动接线分析器。
+`VeloxDev.Core`（当前为 `9.0.0`）把 `VeloxDev.Core.Generator` `9.0.0` 声明为包依赖（`Src/Core/VeloxDev.Core/VeloxDev.Core.csproj`），于是生成器程序集作为*你项目*的分析器被还原 —— 无需手动接线分析器。
 
 **预期结果：** 还原输出列出 `VeloxDev.Core.Generator`；`dotnet build` 成功。
 

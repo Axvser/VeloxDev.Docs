@@ -13,7 +13,7 @@ public class Command : IIncrementalGenerator
 }
 ```
 
-The generator ships in the analyzer package `VeloxDev.Core.Generator` (version `8.0.0`, `netstandard2.0`), referenced transitively by `VeloxDev.Core` — the same package that carries the MVVM generator (see [MVVM](../08_MVVM/index.md)).
+The generator ships in the analyzer package `VeloxDev.Core.Generator` (version `9.0.0`, `netstandard2.0`), referenced transitively by `VeloxDev.Core` — the same package that carries the MVVM generator (see [MVVM](../08_MVVM/index.md)).
 
 ## Pipeline
 

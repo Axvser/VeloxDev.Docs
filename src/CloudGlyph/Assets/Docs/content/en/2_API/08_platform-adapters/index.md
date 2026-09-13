@@ -25,7 +25,7 @@ A `dotnet new` item-template suite (`VeloxDev.{Platform}.Templates`, `Src/Templa
 | `VeloxDev.Razor` | `net6.0` | Blazor / Razor (`Microsoft.NET.Sdk.Razor`, ASP.NET Core) |
 | `VeloxDev.Jalium` | `net10.0` (platform-neutral) | Jalium.UI.Controls (cross-platform core only) |
 
-All seven packages are `Version 8.0.0`, depend on `VeloxDev.Core` (project reference in `Debug`, package reference `8.0.0` otherwise), and expose the workflow engine, the transition engine, and the theme layer transitively.
+All seven packages are `Version 9.0.0`, depend on `VeloxDev.Core` (project reference in `Debug`, package reference `9.0.0` otherwise), and expose the workflow engine, the transition engine, and the theme layer transitively.
 
 > Cross-feature ownership: the **adapter-provided transition types** belong to the transition feature (`2_API/03_transition`, section `03_adapter-provided`), and the **adapter theme converters** belong to the dynamic-theme feature (`2_API/04_dynamic-theme`, page `04_PlatformAdapters`). This feature documents the adapters themselves, the workflow attached-behavior surface they all host, and the `dotnet new` view templates.
 

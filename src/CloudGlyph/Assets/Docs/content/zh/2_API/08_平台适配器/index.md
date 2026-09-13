@@ -25,7 +25,7 @@
 | `VeloxDev.Razor` | `net6.0` | Blazor / Razor（`Microsoft.NET.Sdk.Razor`、ASP.NET Core） |
 | `VeloxDev.Jalium` | `net10.0`（平台中立） | Jalium.UI.Controls（仅跨平台核心） |
 
-七个包版本均为 `8.0.0`，依赖 `VeloxDev.Core`（`Debug` 为项目引用，其余为 `8.0.0` 包引用），并由此传递性地暴露工作流引擎、过渡动画引擎与主题层。
+七个包版本均为 `9.0.0`，依赖 `VeloxDev.Core`（`Debug` 为项目引用，其余为 `9.0.0` 包引用），并由此传递性地暴露工作流引擎、过渡动画引擎与主题层。
 
 > 跨特性归属：**适配器提供的过渡动画类型**属于过渡动画特性（`2_API/03_transition` 的 `03_adapter-provided` 一节），**适配器主题转换器**属于动态主题特性（`2_API/04_dynamic-theme` 的 `04_PlatformAdapters` 一页）。本特性记录的是：适配器本身、它们承载的工作流附加行为表面，以及 `dotnet new` 视图模板。
 

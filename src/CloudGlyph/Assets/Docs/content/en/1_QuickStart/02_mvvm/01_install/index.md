@@ -8,7 +8,7 @@ The MVVM runtime and both source generators live in the same two packages: `Velo
 dotnet add package VeloxDev.Core
 ```
 
-`VeloxDev.Core` (currently `8.0.0`) declares `VeloxDev.Core.Generator` `8.0.0` as a package dependency (`Src/Core/VeloxDev.Core/VeloxDev.Core.csproj`), so the generator assembly is restored as an analyzer of *your* project — no manual analyzer wiring.
+`VeloxDev.Core` (currently `9.0.0`) declares `VeloxDev.Core.Generator` `9.0.0` as a package dependency (`Src/Core/VeloxDev.Core/VeloxDev.Core.csproj`), so the generator assembly is restored as an analyzer of *your* project — no manual analyzer wiring.
 
 **Expected result:** the restore output lists `VeloxDev.Core.Generator`; `dotnet build` succeeds.
 

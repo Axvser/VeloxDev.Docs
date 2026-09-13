@@ -13,7 +13,7 @@ public class Command : IIncrementalGenerator
 }
 ```
 
-该生成器随分析器包 `VeloxDev.Core.Generator`（版本 `8.0.0`、`netstandard2.0`）发布，由 `VeloxDev.Core` 传递引用——与 MVVM 生成器在同一个包里（见 [MVVM](../08_MVVM/index.md)）。
+该生成器随分析器包 `VeloxDev.Core.Generator`（版本 `9.0.0`、`netstandard2.0`）发布，由 `VeloxDev.Core` 传递引用——与 MVVM 生成器在同一个包里（见 [MVVM](../08_MVVM/index.md)）。
 
 ## 管线
 

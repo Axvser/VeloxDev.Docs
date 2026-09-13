@@ -13,7 +13,7 @@ public class MVVM : IIncrementalGenerator
 }
 ```
 
-The generator ships in the analyzer package `VeloxDev.Core.Generator` (version `8.0.0`, `netstandard2.0`, Roslyn `Microsoft.CodeAnalysis.CSharp` 4.3.1), referenced transitively by `VeloxDev.Core`.
+The generator ships in the analyzer package `VeloxDev.Core.Generator` (version `9.0.0`, `netstandard2.0`, Roslyn `Microsoft.CodeAnalysis.CSharp` 4.3.1), referenced transitively by `VeloxDev.Core`.
 
 ## Pipeline
 

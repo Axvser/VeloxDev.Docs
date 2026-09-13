@@ -85,7 +85,7 @@ dotnet test Src/Core/VeloxDev.Core.Test/VeloxDev.Core.Test.csproj --filter "Full
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="VeloxDev.WPF" Version="8.0.0" />
+        <PackageReference Include="VeloxDev.WPF" Version="9.0.0" />
     </ItemGroup>
 
 </Project>

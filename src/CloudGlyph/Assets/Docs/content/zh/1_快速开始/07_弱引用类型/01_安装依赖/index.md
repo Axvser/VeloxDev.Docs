@@ -1,6 +1,6 @@
 # 弱引用类型 — 安装依赖
 
-四个弱类型都在 `VeloxDev.Core` 包（当前版本 `8.0.0`）里的同一个命名空间 `VeloxDev.WeakTypes` 中。本特性没有单独的适配器包、没有源生成器、也不需要任何服务注册 —— 添加 Core（或项目引用它）后命名空间即可用。
+四个弱类型都在 `VeloxDev.Core` 包（当前版本 `9.0.0`）里的同一个命名空间 `VeloxDev.WeakTypes` 中。本特性没有单独的适配器包、没有源生成器、也不需要任何服务注册 —— 添加 Core（或项目引用它）后命名空间即可用。
 
 ## 1. 从 NuGet（消费已发布包）
 
@@ -8,7 +8,7 @@
 dotnet add package VeloxDev.Core
 ```
 
-**预期结果：** 命令以 `0` 退出，`.csproj` 中出现 `<PackageReference Include="VeloxDev.Core" Version="8.0.0" />`。因为四个类型多目标 `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0`，任何能引用 `netstandard2.0` 的项目（例如 `net10.0` 控制台）都会自动获得它们。
+**预期结果：** 命令以 `0` 退出，`.csproj` 中出现 `<PackageReference Include="VeloxDev.Core" Version="9.0.0" />`。因为四个类型多目标 `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0`，任何能引用 `netstandard2.0` 的项目（例如 `net10.0` 控制台）都会自动获得它们。
 
 ## 2. 在本仓库中（项目引用）
 

@@ -16,7 +16,7 @@ The suite lives in a WPF project with `UseWPF` enabled and a package reference t
         <UseWPF>true</UseWPF>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="VeloxDev.WPF" Version="8.0.0" />
+        <PackageReference Include="VeloxDev.WPF" Version="9.0.0" />
     </ItemGroup>
 </Project>
 ```

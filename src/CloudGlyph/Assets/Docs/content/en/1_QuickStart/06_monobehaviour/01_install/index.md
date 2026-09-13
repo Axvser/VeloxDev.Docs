@@ -1,6 +1,6 @@
 # MonoBehaviour — Install & Add a Reference
 
-The runtime types and the source generator live in two packages. `VeloxDev.Core` (version `8.0.0` today) declares the runtime in namespaces `VeloxDev.TimeLine` and `VeloxDev.MonoBehaviour`; its `VeloxDev.Core.csproj` references the analyzer package `VeloxDev.Core.Generator` at the same version, so adding Core brings the `[MonoBehaviour]` generator with it. There is nothing else to configure — no UI adapter and no service registration for the loop.
+The runtime types and the source generator live in two packages. `VeloxDev.Core` (version `9.0.0` today) declares the runtime in namespaces `VeloxDev.TimeLine` and `VeloxDev.MonoBehaviour`; its `VeloxDev.Core.csproj` references the analyzer package `VeloxDev.Core.Generator` at the same version, so adding Core brings the `[MonoBehaviour]` generator with it. There is nothing else to configure — no UI adapter and no service registration for the loop.
 
 ## 1. From NuGet (consuming a released package)
 
@@ -8,7 +8,7 @@ The runtime types and the source generator live in two packages. `VeloxDev.Core`
 dotnet add package VeloxDev.Core
 ```
 
-Because `VeloxDev.Core` (current version `8.0.0`) lists `VeloxDev.Core.Generator` `8.0.0` as a package dependency, the generator assembly is restored as an analyzer of *your* project automatically. The checked-in WPF demo adds only a project reference to `VeloxDev.Core` yet its `[MonoBehaviour]` classes still compile, which confirms no separate analyzer reference or manual wiring is needed.
+Because `VeloxDev.Core` (current version `9.0.0`) lists `VeloxDev.Core.Generator` `9.0.0` as a package dependency, the generator assembly is restored as an analyzer of *your* project automatically. The checked-in WPF demo adds only a project reference to `VeloxDev.Core` yet its `[MonoBehaviour]` classes still compile, which confirms no separate analyzer reference or manual wiring is needed.
 
 **Expected result:** the restore output lists `VeloxDev.Core.Generator`; `dotnet build` succeeds, and a `[MonoBehaviour]` class (page [Define a Behaviour](../02_define-a-behaviour/)) compiles into an `IMonoBehaviour` implementation.
 

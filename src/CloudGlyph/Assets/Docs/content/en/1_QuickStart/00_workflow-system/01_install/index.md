@@ -12,7 +12,7 @@ cd WorkflowQuickStart
 
 ## 2. Reference the core engine
 
-The engine lives in `Src/Core/VeloxDev.Core`. Add it as a project reference — the build pulls in the `VeloxDev.Core.Generator` source generator (version `8.0.0`) that emits the component plumbing:
+The engine lives in `Src/Core/VeloxDev.Core`. Add it as a project reference — the build pulls in the `VeloxDev.Core.Generator` source generator (version `9.0.0`) that emits the component plumbing:
 
 ```bash
 dotnet add reference ..\Src\Core\VeloxDev.Core\VeloxDev.Core.csproj

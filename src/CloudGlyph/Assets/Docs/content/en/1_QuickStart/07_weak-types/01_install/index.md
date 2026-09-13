@@ -1,6 +1,6 @@
 # Weak Types — Install
 
-All four weak types live in the `VeloxDev.Core` package (current version `8.0.0`), in the single namespace `VeloxDev.WeakTypes`. There is no separate adapter package, no source generator and no service registration for this feature — you add Core (or reference it) and the namespace is available.
+All four weak types live in the `VeloxDev.Core` package (current version `9.0.0`), in the single namespace `VeloxDev.WeakTypes`. There is no separate adapter package, no source generator and no service registration for this feature — you add Core (or reference it) and the namespace is available.
 
 ## 1. From NuGet (consuming a released package)
 
@@ -8,7 +8,7 @@ All four weak types live in the `VeloxDev.Core` package (current version `8.0.0`
 dotnet add package VeloxDev.Core
 ```
 
-**Expected result:** the command exits `0` and a `<PackageReference Include="VeloxDev.Core" Version="8.0.0" />` appears in your `.csproj`. Because the four types multi-target `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0`, any project that can reference `netstandard2.0` (for example a `net10.0` console) receives them automatically.
+**Expected result:** the command exits `0` and a `<PackageReference Include="VeloxDev.Core" Version="9.0.0" />` appears in your `.csproj`. Because the four types multi-target `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0`, any project that can reference `netstandard2.0` (for example a `net10.0` console) receives them automatically.
 
 ## 2. From this repository (project reference)
 

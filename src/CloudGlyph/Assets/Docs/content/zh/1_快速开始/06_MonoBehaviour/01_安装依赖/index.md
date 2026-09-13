@@ -1,6 +1,6 @@
 # MonoBehaviour — 安装依赖
 
-运行时类型与源生成器住在两个包里。`VeloxDev.Core`（当前为 `8.0.0`）在 `VeloxDev.TimeLine` 与 `VeloxDev.MonoBehaviour` 命名空间中声明运行时；它的 `VeloxDev.Core.csproj` 以同版本引用分析器包 `VeloxDev.Core.Generator`，所以添加 Core 即可把 `[MonoBehaviour]` 生成器带进来。除此之外无需任何配置 —— 循环不需要 UI 适配器，也不需要注册服务。
+运行时类型与源生成器住在两个包里。`VeloxDev.Core`（当前为 `9.0.0`）在 `VeloxDev.TimeLine` 与 `VeloxDev.MonoBehaviour` 命名空间中声明运行时；它的 `VeloxDev.Core.csproj` 以同版本引用分析器包 `VeloxDev.Core.Generator`，所以添加 Core 即可把 `[MonoBehaviour]` 生成器带进来。除此之外无需任何配置 —— 循环不需要 UI 适配器，也不需要注册服务。
 
 ## 1. 从 NuGet（消费已发布的包）
 
@@ -8,7 +8,7 @@
 dotnet add package VeloxDev.Core
 ```
 
-因为 `VeloxDev.Core`（当前版本 `8.0.0`）把 `VeloxDev.Core.Generator` `8.0.0` 声明为包依赖，生成器程序集会作为*你项目*的分析器自动还原。仓库内 WPF 演示只项目引用了 `VeloxDev.Core`，其 `[MonoBehaviour]` 类仍能编译 —— 这说明无需单独引用分析器，也无需手动接线。
+因为 `VeloxDev.Core`（当前版本 `9.0.0`）把 `VeloxDev.Core.Generator` `9.0.0` 声明为包依赖，生成器程序集会作为*你项目*的分析器自动还原。仓库内 WPF 演示只项目引用了 `VeloxDev.Core`，其 `[MonoBehaviour]` 类仍能编译 —— 这说明无需单独引用分析器，也无需手动接线。
 
 **预期结果：** 还原输出列出 `VeloxDev.Core.Generator`；`dotnet build` 成功，且（[定义行为](../02_定义行为/)页中的）`[MonoBehaviour]` 类被编译成 `IMonoBehaviour` 实现。
 

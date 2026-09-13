@@ -13,7 +13,7 @@ public class MVVM : IIncrementalGenerator
 }
 ```
 
-该生成器随分析器包 `VeloxDev.Core.Generator`（版本 `8.0.0`、`netstandard2.0`、Roslyn `Microsoft.CodeAnalysis.CSharp` 4.3.1）发布，由 `VeloxDev.Core` 传递引用。
+该生成器随分析器包 `VeloxDev.Core.Generator`（版本 `9.0.0`、`netstandard2.0`、Roslyn `Microsoft.CodeAnalysis.CSharp` 4.3.1）发布，由 `VeloxDev.Core` 传递引用。
 
 ## 管线
 

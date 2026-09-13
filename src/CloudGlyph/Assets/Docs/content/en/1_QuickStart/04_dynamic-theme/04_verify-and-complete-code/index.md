@@ -85,7 +85,7 @@ A single-file, self-contained WPF program (no XAML): create an empty project (`d
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="VeloxDev.WPF" Version="8.0.0" />
+        <PackageReference Include="VeloxDev.WPF" Version="9.0.0" />
     </ItemGroup>
 
 </Project>

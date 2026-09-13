@@ -12,7 +12,7 @@ dotnet new install VeloxDev.WPF.Templates
 
 ```powershell
 dotnet pack Src/Templates/VeloxDev.WPF.Templates
-dotnet new install Src/Templates/VeloxDev.WPF.Templates/bin/Debug/VeloxDev.WPF.Templates.8.0.0.nupkg
+dotnet new install Src/Templates/VeloxDev.WPF.Templates/bin/Debug/VeloxDev.WPF.Templates.9.0.0.nupkg
 ```
 
 目标框架的模板包是适配器包的同级：`VeloxDev.{Platform}.Templates`，其项模板统一命名成 `{前缀}-v-*`（`wpf-v-*`、`winforms-v-*`、`ava-v-*`、`winui-v-*`、`maui-v-*`、`razor-v-*`、`jalium-v-*`）。网格装饰层项在所有平台都叫 `{前缀}-v-decorator`。
@@ -31,7 +31,7 @@ dotnet add package VeloxDev.WPF
 
 另外六个同级包用同样的方式添加（`VeloxDev.WinForms`、`VeloxDev.Avalonia`、`VeloxDev.WinUI`、`VeloxDev.MAUI`、`VeloxDev.Razor`、`VeloxDev.Jalium`）。它们都包引用 `VeloxDev.Core`，会传递带入工作流引擎。在仓库内开发时改用对适配器的工程引用（仓库内演示就是这么做的，例如 `Examples/Workflow/WPF/Demo/Demo.csproj` 引用了 `Src/Adapters/VeloxDev.WPF/VeloxDev.WPF.csproj`）。
 
-**预期结果：** `.csproj` 增加 `<PackageReference Include="VeloxDev.WPF" Version="8.0.0" />`（或工程引用），`dotnet build` 通过——此时 XAML 与代码都能解析到 `VeloxDev.WorkflowSystem.AttachedBehaviors` 命名空间。
+**预期结果：** `.csproj` 增加 `<PackageReference Include="VeloxDev.WPF" Version="9.0.0" />`（或工程引用），`dotnet build` 通过——此时 XAML 与代码都能解析到 `VeloxDev.WorkflowSystem.AttachedBehaviors` 命名空间。
 
 ## 3. 全部包一览
 
