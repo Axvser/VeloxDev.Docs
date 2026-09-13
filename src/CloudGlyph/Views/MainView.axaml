@@ -129,12 +129,18 @@
 			   HorizontalOffset="-60"
 			   VerticalOffset="4"
 			   IsLightDismissEnabled="True">
+			<!-- 面板底色跟随本视图的 Background，而不是某个 Fluent 资源键：本应用的换肤由
+				 VeloxDev.DynamicTheme 通过 [ThemeConfig] 写控件属性完成，并不切换 Avalonia 的
+				 ThemeVariant，因此 ThemeDictionaries 类资源不会跟着变（实测
+				 SystemControlBackgroundAltHighBrush 在明暗两种主题下都是白色）。绑定到
+				 Background 则会跟着一起变，包括换肤动画的过程。 -->
 			<Border Width="560"
 					MaxHeight="440"
 					CornerRadius="6"
 					BorderThickness="1"
 					BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-					Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+					Background="{Binding $parent[UserControl].Background}"
+					BoxShadow="0 10 28 0 #55000000">
 				<Grid RowDefinitions="Auto,Auto,*">
 
 					<TextBlock Grid.Row="0"
