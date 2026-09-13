@@ -30,7 +30,7 @@ public class Transition<T> : TransitionCore<
 
 **Notes:**
 - `Transition<T>` derives from the single-arity `TransitionCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter, TPriorityCore>`, using the adapter's `State`, `TransitionEffect`, `Interpolator`, `UIThreadInspector` and `TransitionInterpreter`. The 7th type argument is the host's dispatcher priority: `DispatcherPriority` (WPF, Avalonia, Jalium), `DispatcherQueuePriority` (WinUI) or `NonPriority` (MAUI, WinForms, Razor).
-- Building starts with `Transition<T>.Create()`, which marks the builder as the root of a chain. `Execute(target, CanMutualTask)` / `Exit(target, ...)` / `GetState()` come from the `StateSnapshotCore<T>` base, and segment linking uses the Core `TransitionCoreEx` extensions (`Await`, `Then`, `AwaitThen`, `Interpolator`) documented in [01_abstractions](../../01_abstractions/index.md). The non-generic `Transition` carries only the `TransitionCore` static entry `Exit`.
+- Building starts with `Transition<T>.Create()`, which marks the builder as the root of a chain. `Execute(target, CanMutualTask)` / `Exit(target, ...)` / `GetState()` come from the `StateSnapshotCore<T>` base, and segment linking uses the Core `TransitionCoreEx` extensions (`Await`, `Then`, `AwaitThen`, `Interpolator`) documented in [abstractions](../../01_abstractions/index.md). The non-generic `Transition` carries only the `TransitionCore` static entry `Exit`.
 
 #### Effect overloads
 

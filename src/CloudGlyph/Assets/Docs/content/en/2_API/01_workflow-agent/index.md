@@ -13,8 +13,8 @@ Every documented type/member/signature is verified against the current source; s
 
 ## API — Sections
 
-- [00_workflow](00_workflow/index.md) — `VeloxDev.AI.Workflow` core: `WorkflowAgentScope` fluent builder + nested `SelectionResult`, `WorkflowStateTracker` snapshots/diffs, `AgentContextCollector` context blocks.
-- [01_functions](01_functions/index.md) — `VeloxDev.AI.Workflow.Functions`: `WorkflowAgentToolkit`, `WorkflowToolCategory`, the full per-category tool inventory (Query / State / Mutation / Execution / Command / Graph / Analytics / Interaction), and the helpers `CommandInvoker` / `ComponentPatcher` / `TypeIntrospector`.
-- [02_mcp](02_mcp/index.md) — `VeloxDev.AI.MCP`: `McpScope`, `McpServerConfiguration`, `McpServerRunMode`, `McpServerStatus`, status view-models, `McpAgentToolkit`.
-- [03_ai](03_ai/index.md) — `VeloxDev.AI` generic utilities: attributes, `AgentLanguages`, reflection readers/discoverers/invokers, event args + notifier interfaces, `AgentObjectToolkit`, `AgentEmbeddedResources`.
-- [04_agentex](04_agentex/index.md) — `AgentEx.AsAgentScope` entry point and the `chatClient.AsAIAgent(...)` wiring the host uses to run the agent.
+- [workflow](00_workflow/index.md) — `VeloxDev.AI.Workflow` core: `WorkflowAgentScope` fluent builder + nested `SelectionResult`, `WorkflowStateTracker` snapshots/diffs, `AgentContextCollector` context blocks.
+- [functions](01_functions/index.md) — `VeloxDev.AI.Workflow.Functions`: `WorkflowAgentToolkit`, `WorkflowToolCategory`, the full per-category tool inventory (Query / State / Mutation / Execution / Command / Graph / Analytics / Interaction), and the helpers `CommandInvoker` / `ComponentPatcher` / `TypeIntrospector`.
+- [mcp](02_mcp/index.md) — `VeloxDev.AI.MCP`: `McpScope`, `McpServerConfiguration`, `McpServerRunMode`, `McpServerStatus`, status view-models, `McpAgentToolkit`.
+- [ai](03_ai/index.md) — `VeloxDev.AI` generic utilities: attributes, `AgentLanguages`, reflection readers/discoverers/invokers, event args + notifier interfaces, `AgentObjectToolkit`, `AgentEmbeddedResources`.
+- [agentex](04_agentex/index.md) — `AgentEx.AsAgentScope` entry point and the `chatClient.AsAIAgent(...)` wiring the host uses to run the agent.

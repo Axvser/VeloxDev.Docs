@@ -23,7 +23,7 @@ public interface ISampler
 - 实现应为无状态、线程安全、共享单例，注册于 `Abstractions.InterpolatorCore.NativeInterpolators`（或作为 `IFrameState.Interpolators` 中的逐属性覆盖）。
 - 端点在 `InsertFrame` 内部处理：`t <= 0` 写精确（归一化后的）start，`t >= 1` 写精确 end。不存在 `Update`/`Sample` 方法——该三方法形态取代了旧的 `IValueInterpolator`/`IInPlaceSampler` 设计。
 - 实现**不得修改** `start` / `end` 参数：它们与记录它们的快照共享，修改会污染快照。
-- `options` 仍携带 `RotationDirection` 供角度采样器使用（见 [02_eases](../02_eases/index.md)）。
+- `options` 仍携带 `RotationDirection` 供角度采样器使用（见 [eases](../02_eases/index.md)）。
 - *验证依据：* `NativeSamplersTests`（`DoubleSampler_Endpoints_AreExact`、`DoubleSampler_NullStart_TreatsAsZero`）、`NativeSamplersExtendedTests`（各 `_BasicLinear`）、`SamplerSetTests`。
 
 ### 接口：`ISampleable`
@@ -38,10 +38,10 @@ public interface ISampleable
 
 **说明：**
 - **只服务值类型。** 复合*值类型*（结构体）用 `GetAnimatableMembers()` 声明它哪些成员可动画、用 `CreateFrameValue` 声明如何由插值后的成员重建该值。**引用类型不走这条路**：引用类型持有的复合值必须用**逐成员显式路径**（`Property(x => x.Foo.Bar, end)`）表达，或交给一个专用 `ISampler` 在内部完成分解。
-- `GetAnimatableMembers` 返回相对本类型的路径（**单层、不递归**）。推荐用 `TransitionProperty.Members<Foo>(f => f.Bar, ...)` 声明（见 [01_abstractions](../../01_abstractions/index.md)）。
+- `GetAnimatableMembers` 返回相对本类型的路径（**单层、不递归**）。推荐用 `TransitionProperty.Members<Foo>(f => f.Bar, ...)` 声明（见 [abstractions](../../01_abstractions/index.md)）。
 - `CreateFrameValue` 按 `GetAnimatableMembers` 的顺序、用已插值的成员重建一个值。**结构体**实现它以便在编译期经构造函数重建（零反射）。
 - 仅当该类型没有注册采样器时才需要它：`Prepare` 的采样器解析顺序是「逐属性自定义覆盖 → 按 `PropertyType` 查注册表 → 值类型 `ISampleable`」，前两者都落空后才会走本接口。复杂的组合类型（变换矩阵、画刷……）应自带专用 `ISampler` 在内部完成分解/归一化/插值——它们无需实现本接口。
-- 在 `Prepare`（见 [01_abstractions](../../01_abstractions/index.md)）期间，实现了 `ISampleable` 的**结构体**值类型会被重组：每个声明成员由各自注册的采样器插值，再经 `CreateFrameValue` 重建整个结构体。WorkflowSystem 的 `Viewport`（结构体）是工作流域内的实例；`Offset` / `Anchor` / `Size` / `Scale` 是引用类型，**不再**实现本接口。
+- 在 `Prepare`（见 [abstractions](../../01_abstractions/index.md)）期间，实现了 `ISampleable` 的**结构体**值类型会被重组：每个声明成员由各自注册的采样器插值，再经 `CreateFrameValue` 重建整个结构体。WorkflowSystem 的 `Viewport`（结构体）是工作流域内的实例；`Offset` / `Anchor` / `Size` / `Scale` 是引用类型，**不再**实现本接口。
 - 若某结构体的成员采样器解析不全，`StructAssembler.Create` 返回 `null`，该属性在动画中被跳过。
 - *验证依据：* `NativeSamplersExtendedTests`（测试用结构体）、`StructAssemblerTests`、`ISampleableAnimationTests`。
 
@@ -68,8 +68,8 @@ public interface ITransitionProperty
 | `SetValue` | `bool SetValue(object target, object? value)` | 沿链写入。中间类型不匹配或为 null 时返回 `false`（不抛 `TargetException`）；引用类型叶子写入 `null` 被允许并返回 `true`。 |
 
 **说明：**
-- 刻意收窄：接口不暴露 `PropertyInfo`，也不暴露 `Segments`——路径可以终止于数组元素或索引器，而这两者都无法用它们描述：数组元素根本没有 `PropertyInfo`，而一个类型上的所有索引器都报同一个 `Item` 成员，连 `Items[0]` 与 `Items[1]` 都分不开。给消费方的是「能对这个值做什么」，而不是路径被写成什么样。索引路径与 `PathIndex.Frozen` 标记见 [01_abstractions](../../01_abstractions/index.md)。
-- 具体类型 `TransitionProperty`（命名空间 `VeloxDev.TransitionSystem.Abstractions`）在首次使用时把 getter/setter **编译为单个委托**——无逐帧反射（见 [01_abstractions](../../01_abstractions/index.md)）。
+- 刻意收窄：接口不暴露 `PropertyInfo`，也不暴露 `Segments`——路径可以终止于数组元素或索引器，而这两者都无法用它们描述：数组元素根本没有 `PropertyInfo`，而一个类型上的所有索引器都报同一个 `Item` 成员，连 `Items[0]` 与 `Items[1]` 都分不开。给消费方的是「能对这个值做什么」，而不是路径被写成什么样。索引路径与 `PathIndex.Frozen` 标记见 [abstractions](../../01_abstractions/index.md)。
+- 具体类型 `TransitionProperty`（命名空间 `VeloxDev.TransitionSystem.Abstractions`）在首次使用时把 getter/setter **编译为单个委托**——无逐帧反射（见 [abstractions](../../01_abstractions/index.md)）。
 - *验证依据：* `TransitionPropertyTests`（`GetValue_ReadsFromTarget`、`SetValue_WritesToTarget`、`GetValue_IntermediateTypeMismatch_ReturnsUnreadablePath_NotTargetException`、`SetValue_IntermediateTypeMismatch_ReturnsFalse_NotTargetException`、`GetValue_NullIntermediate_ReturnsNull_NotUnreadable`）。
 
 ### 接口：`IFrameState`

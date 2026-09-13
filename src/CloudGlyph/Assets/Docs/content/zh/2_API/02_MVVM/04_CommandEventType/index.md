@@ -31,4 +31,4 @@ public enum CommandEventType : int
 | `Canceled` | 执行被取消。 |
 | `Exited` | 生命周期结束；执行已从活动列表移除。 |
 
-`CommandEventType` 会被打在 `CommandEventArgs` 上（见 [06_CommandEventArgs](../06_CommandEventArgs/index.md)），这正是同一执行由 `VeloxCommand` 在其生命周期中被反复重新触发的方式。该值通过哪个事件送达由 `IVeloxCommand` 定义（见 [02_IVeloxCommand](../02_IVeloxCommand/index.md)）。
+`CommandEventType` 会被打在 `CommandEventArgs` 上（见 [CommandEventArgs](../06_CommandEventArgs/index.md)），这正是同一执行由 `VeloxCommand` 在其生命周期中被反复重新触发的方式。该值通过哪个事件送达由 `IVeloxCommand` 定义（见 [IVeloxCommand](../02_IVeloxCommand/index.md)）。

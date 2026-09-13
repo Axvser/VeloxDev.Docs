@@ -13,7 +13,7 @@ public class VeloxPropertyAttribute : Attribute
 
 - **Targets:** `Field` or `Property`.
 - **Flags:** `AllowMultiple = false`, `Inherited = false`. Not sealed.
-- **Notes:** The attribute carries no parameters; every behavior is decided by the generator (`VeloxDev.Generators.MVVM`, see [08_MVVM](../08_MVVM/index.md)) from the annotated member and its containing class.
+- **Notes:** The attribute carries no parameters; every behavior is decided by the generator (`VeloxDev.Generators.MVVM`, see [MVVM](../08_MVVM/index.md)) from the annotated member and its containing class.
 
 ## Field form (Demo-verified)
 
@@ -46,7 +46,7 @@ For each annotated member the generator emits a property whose setter:
 5. invokes `partial void On{Name}Changed(T oldValue, T newValue)`;
 6. raises the changed notification `OnPropertyChanged(string)`.
 
-When the member type implements `INotifyCollectionChanged` (for example `ObservableCollection<T>`), the getter additionally lazily subscribes through `ObservableCollectionTracker` (see [07_ObservableCollectionTracker](../07_ObservableCollectionTracker/index.md)) and per-action `partial` hooks are emitted (`OnItemAddedTo{Name}`, `OnItemRemovedFrom{Name}`, `OnItemMovedIn{Name}`, `OnItemsResetIn{Name}`, plus a private `On{Name}CollectionChanged` handler forwarding to `OnCollectionChanged<T>`).
+When the member type implements `INotifyCollectionChanged` (for example `ObservableCollection<T>`), the getter additionally lazily subscribes through `ObservableCollectionTracker` (see [ObservableCollectionTracker](../07_ObservableCollectionTracker/index.md)) and per-action `partial` hooks are emitted (`OnItemAddedTo{Name}`, `OnItemRemovedFrom{Name}`, `OnItemMovedIn{Name}`, `OnItemsResetIn{Name}`, plus a private `On{Name}CollectionChanged` handler forwarding to `OnCollectionChanged<T>`).
 
 `Examples/MVVM/WPF/Demo/MainWindowViewModel.cs`, lines 34-37 — a per-property change hook reacting to `Index`:
 
@@ -57,4 +57,4 @@ partial void OnIndexChanged(int oldValue, int newValue)
 }
 ```
 
-`MinusCommand` is the command property the Command generator derives from the `[VeloxCommand]`-annotated `Minus` method (see [01_VeloxCommandAttribute](../01_VeloxCommandAttribute/index.md)).
+`MinusCommand` is the command property the Command generator derives from the `[VeloxCommand]`-annotated `Minus` method (see [VeloxCommandAttribute](../01_VeloxCommandAttribute/index.md)).

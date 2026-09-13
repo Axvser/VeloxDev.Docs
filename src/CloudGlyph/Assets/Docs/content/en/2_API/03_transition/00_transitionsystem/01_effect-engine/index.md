@@ -49,7 +49,7 @@ public interface ITransitionSchedulerCore
 - Typed variants narrow the effect parameter:
   - `ITransitionScheduler<TPriorityCore> : ITransitionSchedulerCore` — `Execute(InterpolatorCore, IFrameState, ITransitionEffect<TPriorityCore>, CancellationTokenSource? externCts = default)`.
   - `ITransitionScheduler : ITransitionSchedulerCore` — marker (no new members).
-- The concrete scheduler base `Abstractions.TransitionSchedulerCore` supplies the per-target registry tables and `FindOrCreate` (see [01_abstractions](../../01_abstractions/index.md)).
+- The concrete scheduler base `Abstractions.TransitionSchedulerCore` supplies the per-target registry tables and `FindOrCreate` (see [abstractions](../../01_abstractions/index.md)).
 - *Verified by:* `SamplingLoopTests`; WPF demo `RepeatMutual` (a new mutual animation cancels the previous one).
 
 ### Interface: `ITransitionInterpreter<TPriorityCore>`
@@ -68,7 +68,7 @@ public interface ITransitionInterpreter<TPriorityCore> : IDisposable
 - `Args` is the event-arguments instance the interpreter drives; setting `Args.Handled = true` short-circuits the timeline (the loop throws `OperationCanceledException` → `Canceled` + `Finally`).
 - `Execute` runs the Stopwatch-driven sampling loop against the prepared `SamplerSet<TPriorityCore>`. `Exit()` (alias of `Dispose`) cancels the active `CancellationTokenSource`.
 - The interpreter is a **single, priority-typed** interface: an adapter with no dispatcher priority instantiates `ITransitionInterpreter<NonPriority>` (its `SamplerSet<NonPriority>` applies frames without a priority). There is no non-generic variant.
-- The concrete loop behavior lives in `Abstractions.TransitionInterpreterCore` (see [01_abstractions](../../01_abstractions/index.md)).
+- The concrete loop behavior lives in `Abstractions.TransitionInterpreterCore` (see [abstractions](../../01_abstractions/index.md)).
 - *Verified by:* `SamplingLoopTests` (`DurationZero_JumpsToEnd_AndCompletes`, `HandledBeforeStart_CancelsAndFiresFinally`).
 
 ### Interfaces: `IUIThreadInspectorCore`, `IUIThreadInspector<TPriorityCore>`
@@ -98,5 +98,5 @@ public interface IUIThreadInspector<TPriorityCore> : IUIThreadInspectorCore
 
 **Notes:**
 - All three members are declared on the interfaces themselves; the `Abstractions` base classes only implement them. There is no priority-free inspector interface — a host without a dispatcher priority uses `IUIThreadInspector<NonPriority>`.
-- Per-platform behavior is documented in [03_adapter-provided/02_ui-inspector](../../03_adapter-provided/02_ui-inspector/index.md).
+- Per-platform behavior is documented in [adapter-provided/ui-inspector](../../03_adapter-provided/02_ui-inspector/index.md).
 - *Verified by:* `TransitionSchedulerAwakeTests`.

@@ -50,7 +50,7 @@ The shared signature for `start`, `coverage` and `end`.
 
 ### The three-stage pipeline
 
-For one proxied member call, the dispatcher — ProxyInstance.Invoke ([03_proxyinstance](../03_proxyinstance/index.md)) — runs:
+For one proxied member call, the dispatcher — ProxyInstance.Invoke ([proxyinstance](../03_proxyinstance/index.md)) — runs:
 
 ```text
 R0 = start?.Invoke(parameters, null)              // before the member body

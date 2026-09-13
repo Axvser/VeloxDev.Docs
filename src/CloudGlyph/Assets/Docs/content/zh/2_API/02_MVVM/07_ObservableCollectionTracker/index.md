@@ -40,4 +40,4 @@ get
 - 订阅记录在以集合身份为键的 `ConditionalWeakTable<object, Entry>` 中：集合被回收时其条目随之消失，因此没有泄漏。该表对并发的 getter/setter 访问是安全的。
 - 处理器按 `(Method, Target)` 身份去重（`MethodTargetEqualityComparer`），而非按委托引用。生成的 getter 传入方法组（例如 `OnItemsCollectionChanged`），每次访问都会产生全新的委托实例；若按引用比较，就会在每次 getter 读取时重复订阅，让事件调用列表无界增长。
 
-该追踪器所支撑的集合钩子（`OnCollectionChanged<T>`、`OnItemAddedTo{Property}`、`OnItemRemovedFrom{Property}`、`OnItemMovedIn{Property}`、`OnItemsResetIn{Property}`）由 MVVM 生成器产出——见 [00_VeloxPropertyAttribute](../00_VeloxPropertyAttribute/index.md)。
+该追踪器所支撑的集合钩子（`OnCollectionChanged<T>`、`OnItemAddedTo{Property}`、`OnItemRemovedFrom{Property}`、`OnItemMovedIn{Property}`、`OnItemsResetIn{Property}`）由 MVVM 生成器产出——见 [VeloxPropertyAttribute](../00_VeloxPropertyAttribute/index.md)。

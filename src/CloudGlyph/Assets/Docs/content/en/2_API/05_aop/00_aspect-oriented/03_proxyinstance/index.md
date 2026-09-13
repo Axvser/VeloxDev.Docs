@@ -1,6 +1,6 @@
 # AOP runtime — `ProxyInstance`
 
-`Src/Core/VeloxDev.Core/AspectOriented/ProxyInstance.cs`. The single interception point shared by every generated proxy. `ProxyEx.CreateProxy` (see [02_proxyex](../02_proxyex/index.md)) creates it through `DispatchProxy.Create<T, ProxyInstance>()`, then fills in its internal state.
+`Src/Core/VeloxDev.Core/AspectOriented/ProxyInstance.cs`. The single interception point shared by every generated proxy. `ProxyEx.CreateProxy` (see [proxyex](../02_proxyex/index.md)) creates it through `DispatchProxy.Create<T, ProxyInstance>()`, then fills in its internal state.
 
 ## Class shape
 

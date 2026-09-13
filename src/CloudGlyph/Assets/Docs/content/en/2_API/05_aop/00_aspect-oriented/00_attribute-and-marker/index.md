@@ -70,6 +70,6 @@ namespace VeloxDev.AspectOriented
 Empty marker interface with no members. Its roles:
 
 - **Base contract** of every generated AOP interface — the generator writes the base type `global::VeloxDev.AspectOriented.IAspectOriented`.
-- **Generic constraint** shared by `ProxyEx.CreateProxy<T>`, `ProxyEx.SetProxy<T>`, `Aop.GetTarget<TTarget>` and `AopCache.Resolve<TClass, TInterface>` (see [02_proxyex](../02_proxyex/index.md) and [04_proxy-lifecycle](../04_proxy-lifecycle/index.md)).
+- **Generic constraint** shared by `ProxyEx.CreateProxy<T>`, `ProxyEx.SetProxy<T>`, `Aop.GetTarget<TTarget>` and `AopCache.Resolve<TClass, TInterface>` (see [proxyex](../02_proxyex/index.md) and [proxy-lifecycle](../04_proxy-lifecycle/index.md)).
 
 Related pages: [ProxyMembers & ProxyHandler](../01_proxy-members-handler/index.md), [ProxyEx](../02_proxyex/index.md), [ProxyInstance](../03_proxyinstance/index.md).

@@ -45,7 +45,7 @@ From the attribute XML documentation, the annotated method must match one of the
 | `void M(object?)` | `Action<object?>` constructor |
 | `void M()` | `Action` constructor |
 
-The generator selects only the factory; which `VeloxCommand` constructor the remaining method groups bind to is resolved by C# overload resolution. See [03_VeloxCommand](../03_VeloxCommand/index.md) for the full constructor/factory list.
+The generator selects only the factory; which `VeloxCommand` constructor the remaining method groups bind to is resolved by C# overload resolution. See [VeloxCommand](../03_VeloxCommand/index.md) for the full constructor/factory list.
 
 ## `canValidate` naming contract (Demo-verified)
 
@@ -72,4 +72,4 @@ The derived property name is `MinusCommand` (method name `Minus`, no `Async` suf
 
 ## Lifecycle semantics
 
-Each generated command queues excess executions once the `semaphore` capacity is reached and raises the `IVeloxCommand` lifecycle events (`Created`, `Enqueued`, `Dequeued`, `Started`, `Completed`, `Failed`, `Canceled`, `Exited`) — see [02_IVeloxCommand](../02_IVeloxCommand/index.md). Cancelling the running method is only possible for signatures that receive a `CancellationToken` (`Task M(object?, CancellationToken)` / `Task M(CancellationToken)`); see the cancellation note in [03_VeloxCommand](../03_VeloxCommand/index.md).
+Each generated command queues excess executions once the `semaphore` capacity is reached and raises the `IVeloxCommand` lifecycle events (`Created`, `Enqueued`, `Dequeued`, `Started`, `Completed`, `Failed`, `Canceled`, `Exited`) — see [IVeloxCommand](../02_IVeloxCommand/index.md). Cancelling the running method is only possible for signatures that receive a `CancellationToken` (`Task M(object?, CancellationToken)` / `Task M(CancellationToken)`); see the cancellation note in [VeloxCommand](../03_VeloxCommand/index.md).

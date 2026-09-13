@@ -42,4 +42,4 @@ public class MVVM : IIncrementalGenerator
 | ReactiveUI | 实现 `IReactiveObject` | `RaiseAndSetIfChanged<T>(ref T, T, string)` |
 | Caliburn.Micro | 存在 `NotifyOfPropertyChange(string)` | `NotifyOfPropertyChange(string propertyName)` |
 
-面向使用者的契约是特性本身，见 [00_VeloxPropertyAttribute](../00_VeloxPropertyAttribute/index.md)。
+面向使用者的契约是特性本身，见 [VeloxPropertyAttribute](../00_VeloxPropertyAttribute/index.md)。

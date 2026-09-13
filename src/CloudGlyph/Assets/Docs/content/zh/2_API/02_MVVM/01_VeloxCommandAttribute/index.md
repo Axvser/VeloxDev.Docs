@@ -45,7 +45,7 @@ public sealed class VeloxCommandAttribute(
 | `void M(object?)` | `Action<object?>` 构造函数 |
 | `void M()` | `Action` 构造函数 |
 
-生成器只选择工厂；剩余方法组绑定到哪个 `VeloxCommand` 构造函数由 C# 重载解析决定。完整构造函数/工厂列表见 [03_VeloxCommand](../03_VeloxCommand/index.md)。
+生成器只选择工厂；剩余方法组绑定到哪个 `VeloxCommand` 构造函数由 C# 重载解析决定。完整构造函数/工厂列表见 [VeloxCommand](../03_VeloxCommand/index.md)。
 
 ## `canValidate` 命名契约（Demo 验证）
 
@@ -72,4 +72,4 @@ private partial bool CanExecuteMinusCommand(object? parameter)
 
 ## 生命周期语义
 
-生成的每条命令在达到 `semaphore` 容量后会把多余的执行排队，并触发 `IVeloxCommand` 生命周期事件（`Created`、`Enqueued`、`Dequeued`、`Started`、`Completed`、`Failed`、`Canceled`、`Exited`）——见 [02_IVeloxCommand](../02_IVeloxCommand/index.md)。只有接收 `CancellationToken` 的签名（`Task M(object?, CancellationToken)` / `Task M(CancellationToken)`）才能取消正在运行的方法；详见 [03_VeloxCommand](../03_VeloxCommand/index.md) 的取消说明。
+生成的每条命令在达到 `semaphore` 容量后会把多余的执行排队，并触发 `IVeloxCommand` 生命周期事件（`Created`、`Enqueued`、`Dequeued`、`Started`、`Completed`、`Failed`、`Canceled`、`Exited`）——见 [IVeloxCommand](../02_IVeloxCommand/index.md)。只有接收 `CancellationToken` 的签名（`Task M(object?, CancellationToken)` / `Task M(CancellationToken)`）才能取消正在运行的方法；详见 [VeloxCommand](../03_VeloxCommand/index.md) 的取消说明。

@@ -1,6 +1,6 @@
 # MVVM — `IVeloxCommand`
 
-`VeloxDev.MVVM.IVeloxCommand`（`Src/Core/VeloxDev.Core/Interfaces/MVVM/IVeloxCommand.cs`）是命令契约。它继承 `System.Windows.Input.ICommand`，加入异步执行模型、每次执行的生命周期，以及运行时的锁 / 中断 / 队列控制。具体实现是 `VeloxCommand`（见 [03_VeloxCommand](../03_VeloxCommand/index.md)）。
+`VeloxDev.MVVM.IVeloxCommand`（`Src/Core/VeloxDev.Core/Interfaces/MVVM/IVeloxCommand.cs`）是命令契约。它继承 `System.Windows.Input.ICommand`，加入异步执行模型、每次执行的生命周期，以及运行时的锁 / 中断 / 队列控制。具体实现是 `VeloxCommand`（见 [VeloxCommand](../03_VeloxCommand/index.md)）。
 
 **签名**
 
@@ -38,7 +38,7 @@ public interface IVeloxCommand : ICommand
 
 ## 生命周期事件
 
-每个生命周期事件都携带描述一次执行的单个 `CommandEventArgs`（见 [06_CommandEventArgs](../06_CommandEventArgs/index.md)）。正常流程下，一次 `Created` 调用要么立即运行（`Started`），要么在队列中等待（`Enqueued`），随后经过 `Dequeued` → `Started` 到达终态（`Completed`、`Failed` 或 `Canceled`），最后由 `Exited` 收尾。若调用在真正开始前就被取消（处于强制锁定，或仍排着队时执行了 `Clear`），则直接触发 `Canceled`，没有 `Started` / `Exited`。
+每个生命周期事件都携带描述一次执行的单个 `CommandEventArgs`（见 [CommandEventArgs](../06_CommandEventArgs/index.md)）。正常流程下，一次 `Created` 调用要么立即运行（`Started`），要么在队列中等待（`Enqueued`），随后经过 `Dequeued` → `Started` 到达终态（`Completed`、`Failed` 或 `Canceled`），最后由 `Exited` 收尾。若调用在真正开始前就被取消（处于强制锁定，或仍排着队时执行了 `Clear`），则直接触发 `Canceled`，没有 `Started` / `Exited`。
 
 | 事件 | 触发时机 |
 |---|---|
@@ -64,6 +64,6 @@ public interface IVeloxCommand : ICommand
 | `ChangeSemaphore(int)` / `ChangeSemaphoreAsync(int)` | 运行时调整最大并发上限（`< 1` 被忽略）。 |
 | `Notify()` | 触发 `CanExecuteChanged`。 |
 
-同步控制方法是即发即弃的便捷形式；`Async` 变体才是真正的工作并可 `await`。当注册了谓词（见 [01_VeloxCommandAttribute](../01_VeloxCommandAttribute/index.md) 的 `canValidate`）时，请在影响 `CanExecute` 的状态变化后调用 `Notify()`。
+同步控制方法是即发即弃的便捷形式；`Async` 变体才是真正的工作并可 `await`。当注册了谓词（见 [VeloxCommandAttribute](../01_VeloxCommandAttribute/index.md) 的 `canValidate`）时，请在影响 `CanExecute` 的状态变化后调用 `Notify()`。
 
 **示例**（`Examples/MVVM/WPF/Demo/MainWindowViewModel.cs`，第 158-179 行）：`FreeCommand` / `FreeCommandAsync` 对 `MinusCommand` 执行 `Lock`、`Interrupt`、`Clear`、`UnLock` 及其 `await` 版本。

@@ -31,8 +31,8 @@ So a XAML view binds e.g. `behaviors:WorkflowSurfaceBehavior.IsEnabled="True"`, 
 
 ## Pages
 
-- [00_surface](00_surface/index.md) — `WorkflowSurfaceBehavior` and `WorkflowCanvasTransformBehavior`.
-- [01_view-pool](01_view-pool/index.md) — `ViewPool`, `ViewManager`, and the template-selector contract.
-- [02_node-slot](02_node-slot/index.md) — `WorkflowNodeDragBehavior`, `WorkflowSlotConnectionBehavior`, `WorkflowSlotLayoutBehavior`.
-- [03_minimap](03_minimap/index.md) — `WorkflowMinimapOverlay` and the `IWorkflowGridDecorator` / `IWorkflowMinimapOverlay` contracts.
-- [04_adapter-overlays](04_adapter-overlays/index.md) — adapter-specific overlay / host types (`WorkflowLinkOverlay`, Jalium `WorkflowGridDecorator` / `WorkflowTreeView`, Razor component helpers).
+- [surface](00_surface/index.md) — `WorkflowSurfaceBehavior` and `WorkflowCanvasTransformBehavior`.
+- [view-pool](01_view-pool/index.md) — `ViewPool`, `ViewManager`, and the template-selector contract.
+- [node-slot](02_node-slot/index.md) — `WorkflowNodeDragBehavior`, `WorkflowSlotConnectionBehavior`, `WorkflowSlotLayoutBehavior`.
+- [minimap](03_minimap/index.md) — `WorkflowMinimapOverlay` and the `IWorkflowGridDecorator` / `IWorkflowMinimapOverlay` contracts.
+- [adapter-overlays](04_adapter-overlays/index.md) — adapter-specific overlay / host types (`WorkflowLinkOverlay`, Jalium `WorkflowGridDecorator` / `WorkflowTreeView`, Razor component helpers).

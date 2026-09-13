@@ -1,6 +1,6 @@
 # AOP 运行时 — `ProxyInstance`
 
-`Src/Core/VeloxDev.Core/AspectOriented/ProxyInstance.cs`。每个生成代理共享的唯一拦截点。`ProxyEx.CreateProxy`（见 [02_proxyex](../02_proxyex/index.md)）通过 `DispatchProxy.Create<T, ProxyInstance>()` 创建它，再填充其内部状态。
+`Src/Core/VeloxDev.Core/AspectOriented/ProxyInstance.cs`。每个生成代理共享的唯一拦截点。`ProxyEx.CreateProxy`（见 [proxyex](../02_proxyex/index.md)）通过 `DispatchProxy.Create<T, ProxyInstance>()` 创建它，再填充其内部状态。
 
 ## 类形态
 

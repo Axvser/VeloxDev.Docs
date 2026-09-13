@@ -13,8 +13,8 @@
 
 ## API — 栏目
 
-- [00_workflow](00_workflow/index.md) —— `VeloxDev.AI.Workflow` 核心：`WorkflowAgentScope` 流式构建器与内嵌 `SelectionResult`、`WorkflowStateTracker` 快照/差异、`AgentContextCollector` 上下文块。
-- [01_functions](01_functions/index.md) —— `VeloxDev.AI.Workflow.Functions`：`WorkflowAgentToolkit`、`WorkflowToolCategory`、按类别的完整工具清单（Query / State / Mutation / Execution / Command / Graph / Analytics / Interaction），以及辅助类 `CommandInvoker` / `ComponentPatcher` / `TypeIntrospector`。
-- [02_mcp](02_mcp/index.md) —— `VeloxDev.AI.MCP`：`McpScope`、`McpServerConfiguration`、`McpServerRunMode`、`McpServerStatus`、状态视图模型、`McpAgentToolkit`。
-- [03_ai](03_ai/index.md) —— `VeloxDev.AI` 通用工具：特性、`AgentLanguages`、反射读取器/发现器/调用器、事件参数与通知契约、`AgentObjectToolkit`、`AgentEmbeddedResources`。
-- [04_agentex](04_agentex/index.md) —— `AgentEx.AsAgentScope` 入口点，以及宿主运行 Agent 时使用的 `chatClient.AsAIAgent(...)` 装配方式。
+- [workflow](00_workflow/index.md) —— `VeloxDev.AI.Workflow` 核心：`WorkflowAgentScope` 流式构建器与内嵌 `SelectionResult`、`WorkflowStateTracker` 快照/差异、`AgentContextCollector` 上下文块。
+- [functions](01_functions/index.md) —— `VeloxDev.AI.Workflow.Functions`：`WorkflowAgentToolkit`、`WorkflowToolCategory`、按类别的完整工具清单（Query / State / Mutation / Execution / Command / Graph / Analytics / Interaction），以及辅助类 `CommandInvoker` / `ComponentPatcher` / `TypeIntrospector`。
+- [mcp](02_mcp/index.md) —— `VeloxDev.AI.MCP`：`McpScope`、`McpServerConfiguration`、`McpServerRunMode`、`McpServerStatus`、状态视图模型、`McpAgentToolkit`。
+- [ai](03_ai/index.md) —— `VeloxDev.AI` 通用工具：特性、`AgentLanguages`、反射读取器/发现器/调用器、事件参数与通知契约、`AgentObjectToolkit`、`AgentEmbeddedResources`。
+- [agentex](04_agentex/index.md) —— `AgentEx.AsAgentScope` 入口点，以及宿主运行 Agent 时使用的 `chatClient.AsAIAgent(...)` 装配方式。

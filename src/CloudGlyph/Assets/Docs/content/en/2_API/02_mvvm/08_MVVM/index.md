@@ -42,4 +42,4 @@ For each relevant class the writer generates only the members the class does not
 | ReactiveUI | implements `IReactiveObject` | `RaiseAndSetIfChanged<T>(ref T, T, string)` |
 | Caliburn.Micro | `NotifyOfPropertyChange(string)` present | `NotifyOfPropertyChange(string propertyName)` |
 
-The user-facing contract is the attribute, documented in [00_VeloxPropertyAttribute](../00_VeloxPropertyAttribute/index.md).
+The user-facing contract is the attribute, documented in [VeloxPropertyAttribute](../00_VeloxPropertyAttribute/index.md).

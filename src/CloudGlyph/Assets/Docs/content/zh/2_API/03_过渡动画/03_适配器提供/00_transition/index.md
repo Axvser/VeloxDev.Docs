@@ -23,9 +23,9 @@ public class Transition<T> : TransitionCore<T, State, TransitionEffect, Interpol
 
 **说明：**
 - **`Transition<T>` 本身就是构建器**，它没有嵌套的 `StateSnapshot` 类型。`Create()`（转发到 `TransitionCore.Create<Transition<T>>()`）新建一个实例并把它标记为链的根；每个 `Property` / `Effect` 调用返回同一个实例，因此可以流式串联。
-- 泛型父类是**单一元数**：`TransitionCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter, TPriorityCore>`。优先级类型 `TPriorityCore` 为 `DispatcherPriority`（WPF、Avalonia、Jalium）、`DispatcherQueuePriority`（WinUI）或 `NonPriority`（MAUI、WinForms、Razor —— 无 dispatcher 优先级），见 [01_abstractions](../../01_abstractions/index.md)。
+- 泛型父类是**单一元数**：`TransitionCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter, TPriorityCore>`。优先级类型 `TPriorityCore` 为 `DispatcherPriority`（WPF、Avalonia、Jalium）、`DispatcherQueuePriority`（WinUI）或 `NonPriority`（MAUI、WinForms、Razor —— 无 dispatcher 优先级），见 [abstractions](../../01_abstractions/index.md)。
 - 分段链接用 `TransitionCoreEx` 扩展（`Await`、`Then`、`AwaitThen`、`Interpolator`）；运行用**实例方法** `Execute(target, CanMutualTask)`（继承自 `StateSnapshotCore<T>`，单次默认 `CanMutualTask: true`），或静态 `TransitionCore<...>.Execute(target, values, CanMutualTask: false)` 批量入口；取消用静态 `Transition.Exit(target, IncludeMutual: true, IncludeNoMutual: false)`。
-- 运行动画可能同步抛 `TransitionPathConflictException`（父子路径冲突）或 `TransitionPathUnsampleableException`（路径永不可动画），见 [01_abstractions](../../01_abstractions/index.md)。
+- 运行动画可能同步抛 `TransitionPathConflictException`（父子路径冲突）或 `TransitionPathUnsampleableException`（路径永不可动画），见 [abstractions](../../01_abstractions/index.md)。
 
 #### Effect 重载
 

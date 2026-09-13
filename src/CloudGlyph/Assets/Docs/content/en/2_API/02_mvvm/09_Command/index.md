@@ -13,7 +13,7 @@ public class Command : IIncrementalGenerator
 }
 ```
 
-The generator ships in the analyzer package `VeloxDev.Core.Generator` (version `8.0.0`, `netstandard2.0`), referenced transitively by `VeloxDev.Core` — the same package that carries the MVVM generator (see [08_MVVM](../08_MVVM/index.md)).
+The generator ships in the analyzer package `VeloxDev.Core.Generator` (version `8.0.0`, `netstandard2.0`), referenced transitively by `VeloxDev.Core` — the same package that carries the MVVM generator (see [MVVM](../08_MVVM/index.md)).
 
 ## Pipeline
 
@@ -58,4 +58,4 @@ public VeloxDev.MVVM.IVeloxCommand MinusCommand
 private partial bool CanExecuteMinusCommand(object? parameter);
 ```
 
-The example above is the `canValidate: true` template applied to the `Minus` method of `Examples/MVVM/WPF/Demo/MainWindowViewModel.cs`. The user-facing contract is the attribute, documented in [01_VeloxCommandAttribute](../01_VeloxCommandAttribute/index.md); the runtime type is [03_VeloxCommand](../03_VeloxCommand/index.md).
+The example above is the `canValidate: true` template applied to the `Minus` method of `Examples/MVVM/WPF/Demo/MainWindowViewModel.cs`. The user-facing contract is the attribute, documented in [VeloxCommandAttribute](../01_VeloxCommandAttribute/index.md); the runtime type is [VeloxCommand](../03_VeloxCommand/index.md).

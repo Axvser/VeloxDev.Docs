@@ -27,5 +27,5 @@ public sealed class TransitionEventArgs : TimeLineEventArgs
 
 **说明：**
 - 传给每个 `ITransitionEffectCore` 事件处理器（`EventHandler<TransitionEventArgs>`）与调用器（`InvokeAwake` … `InvokeFinally`）的空密封事件参数类型。
-- 在效果事件处理器内把 `e.Handled` 设为 `true` 会短路采样循环：解释器抛 `OperationCanceledException`，触发 `Canceled` 再触发 `Finally`（见 [01_abstractions](../01_abstractions/index.md)）。取消的 `CancellationTokenSource` 效果相同。
+- 在效果事件处理器内把 `e.Handled` 设为 `true` 会短路采样循环：解释器抛 `OperationCanceledException`，触发 `Canceled` 再触发 `Finally`（见 [abstractions](../01_abstractions/index.md)）。取消的 `CancellationTokenSource` 效果相同。
 - *验证依据：* `SamplingLoopTests`（`HandledBeforeStart_CancelsAndFiresFinally`）、`TransitionEffectCoreTests`（`Events_AreInvoked`）。

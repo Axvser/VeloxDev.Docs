@@ -6,9 +6,9 @@ Public surface of the `workflow-system` feature, grouped by namespace, plus cros
 
 This feature's API reference is split into:
 
-- [00_workflowsystem](00_workflowsystem/index.md) — the core `VeloxDev.WorkflowSystem` surface (builder attributes, component interfaces, geometry/value types, default view-models, selectors, spatial map, render-readiness)
-- [01_standardex](01_standardex/index.md) — the `VeloxDev.WorkflowSystem.StandardEx` standard behavior extensions
-- [02_compilerex](02_compilerex/index.md) — the `VeloxDev.Core.WorkflowSystem.CompilerEx` compile pipeline, compiled model, and runtime engine
-- [03_mvvm-serialization](03_mvvm-serialization/index.md) — `VeloxDev.MVVM.Serialization.ComponentModelEx` save/load helpers
-- [04_key-member-contracts](04_key-member-contracts/index.md) — entry-template form of the headline top-level APIs
-- [05_execution-mechanism](05_execution-mechanism/index.md) — how the Compiler (engine-driven) and non-Compiler (broadcast) paths both reach a node's `ReceiveAsync`
+- [workflowsystem](00_workflowsystem/index.md) — the core `VeloxDev.WorkflowSystem` surface (builder attributes, component interfaces, geometry/value types, default view-models, selectors, spatial map, render-readiness)
+- [standardex](01_standardex/index.md) — the `VeloxDev.WorkflowSystem.StandardEx` standard behavior extensions
+- [compilerex](02_compilerex/index.md) — the `VeloxDev.Core.WorkflowSystem.CompilerEx` compile pipeline, compiled model, and runtime engine
+- [mvvm-serialization](03_mvvm-serialization/index.md) — `VeloxDev.MVVM.Serialization.ComponentModelEx` save/load helpers
+- [key-member-contracts](04_key-member-contracts/index.md) — entry-template form of the headline top-level APIs
+- [execution-mechanism](05_execution-mechanism/index.md) — how the Compiler (engine-driven) and non-Compiler (broadcast) paths both reach a node's `ReceiveAsync`

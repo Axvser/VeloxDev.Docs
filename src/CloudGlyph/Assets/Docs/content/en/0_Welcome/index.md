@@ -227,11 +227,11 @@ The Wiki has five dimensions, each present in English and Chinese. From this pag
 
 | Dimension | Contents |
 |---|---|
-| **0_Welcome** | this page — the project pitch and where to go next |
-| [1_QuickStart](../1_QuickStart/index.md) | runnable, end-to-end tutorials — one per feature |
-| [2_API](../2_API/index.md) | full reference of every documented public type and member |
-| [3_SE_Analysis](../3_SE_Analysis/index.md) | file/functional structure, design patterns, data flow, complexity |
-| [4_Copyright](../4_Copyright/index.md) | license information and attribution |
+| **Welcome** | this page — the project pitch and where to go next |
+| [QuickStart](../1_QuickStart/index.md) | runnable, end-to-end tutorials — one per feature |
+| [API](../2_API/index.md) | full reference of every documented public type and member |
+| [SE_Analysis](../3_SE_Analysis/index.md) | file/functional structure, design patterns, data flow, complexity |
+| [Copyright](../4_Copyright/index.md) | license information and attribution |
 
 ## Documented features
 

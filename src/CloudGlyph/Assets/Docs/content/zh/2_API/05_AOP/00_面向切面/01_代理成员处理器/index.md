@@ -50,7 +50,7 @@ public delegate object? ProxyHandler(object?[]? parameters, object? previous);
 
 ### 三段管线
 
-对一次被代理的成员调用，分发器 —— ProxyInstance.Invoke（[03_proxyinstance](../03_proxyinstance/index.md)）—— 会执行：
+对一次被代理的成员调用，分发器 —— ProxyInstance.Invoke（[proxyinstance](../03_proxyinstance/index.md)）—— 会执行：
 
 ```text
 R0 = start?.Invoke(parameters, null)              // 成员体之前

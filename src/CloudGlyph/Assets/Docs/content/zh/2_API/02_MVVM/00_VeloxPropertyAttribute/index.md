@@ -13,7 +13,7 @@ public class VeloxPropertyAttribute : Attribute
 
 - **目标：** `Field` 或 `Property`。
 - **标志：** `AllowMultiple = false`、`Inherited = false`。未密封。
-- **备注：** 该特性本身不带任何参数；所有行为都由生成器（`VeloxDev.Generators.MVVM`，见 [08_MVVM](../08_MVVM/index.md)）根据被标记成员及其所在类决定。
+- **备注：** 该特性本身不带任何参数；所有行为都由生成器（`VeloxDev.Generators.MVVM`，见 [MVVM](../08_MVVM/index.md)）根据被标记成员及其所在类决定。
 
 ## 字段形式（Demo 验证）
 
@@ -46,7 +46,7 @@ public class VeloxPropertyAttribute : Attribute
 5. 调用 `partial void On{Name}Changed(T oldValue, T newValue)`；
 6. 调用变更后通知 `OnPropertyChanged(string)`。
 
-当成员类型实现 `INotifyCollectionChanged`（例如 `ObservableCollection<T>`）时，getter 还会通过 `ObservableCollectionTracker` 进行惰性订阅（见 [07_ObservableCollectionTracker](../07_ObservableCollectionTracker/index.md)），并生成按动作拆分的 `partial` 钩子（`OnItemAddedTo{Name}`、`OnItemRemovedFrom{Name}`、`OnItemMovedIn{Name}`、`OnItemsResetIn{Name}`），以及一个转发到 `OnCollectionChanged<T>` 的私有 `On{Name}CollectionChanged` 处理器。
+当成员类型实现 `INotifyCollectionChanged`（例如 `ObservableCollection<T>`）时，getter 还会通过 `ObservableCollectionTracker` 进行惰性订阅（见 [ObservableCollectionTracker](../07_ObservableCollectionTracker/index.md)），并生成按动作拆分的 `partial` 钩子（`OnItemAddedTo{Name}`、`OnItemRemovedFrom{Name}`、`OnItemMovedIn{Name}`、`OnItemsResetIn{Name}`），以及一个转发到 `OnCollectionChanged<T>` 的私有 `On{Name}CollectionChanged` 处理器。
 
 `Examples/MVVM/WPF/Demo/MainWindowViewModel.cs`，第 34-37 行 — 响应 `Index` 变化的按属性钩子：
 
@@ -57,4 +57,4 @@ partial void OnIndexChanged(int oldValue, int newValue)
 }
 ```
 
-其中的 `MinusCommand` 是 Command 生成器从带 `[VeloxCommand]` 的 `Minus` 方法派生的命令属性（见 [01_VeloxCommandAttribute](../01_VeloxCommandAttribute/index.md)）。
+其中的 `MinusCommand` 是 Command 生成器从带 `[VeloxCommand]` 的 `Minus` 方法派生的命令属性（见 [VeloxCommandAttribute](../01_VeloxCommandAttribute/index.md)）。

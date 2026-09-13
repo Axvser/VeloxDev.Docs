@@ -1,6 +1,6 @@
 # Transition — Core Contracts: `VeloxDev.TransitionSystem`
 
-This section documents the core, UI-agnostic contracts of the animation engine. They are declared in the `VeloxDev.TransitionSystem` namespace of the `VeloxDev.Core` assembly (source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs` and `Src/Core/VeloxDev.Core/TransitionSystem/*.cs`) and never reference any platform type. Platform adapters implement these contracts with concrete types documented in [03_adapter-provided](../03_adapter-provided/index.md).
+This section documents the core, UI-agnostic contracts of the animation engine. They are declared in the `VeloxDev.TransitionSystem` namespace of the `VeloxDev.Core` assembly (source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs` and `Src/Core/VeloxDev.Core/TransitionSystem/*.cs`) and never reference any platform type. Platform adapters implement these contracts with concrete types documented in [adapter-provided](../03_adapter-provided/index.md).
 
 ## Roles
 
@@ -16,6 +16,6 @@ The remaining members of this namespace — the `RotationDirection` enum and the
 
 ## Sub-pages
 
-- [00_sampling-capture](00_sampling-capture/index.md) — `ISampler`, `ISampleable`, `ITransitionProperty`, `IFrameState` (sampling + property addressing contracts), plus the two path exceptions.
-- [01_effect-engine](01_effect-engine/index.md) — `ITransitionEffectCore` / `ITransitionEffect<TPriorityCore>`, the scheduler and interpreter interfaces, and the UI-thread inspector interfaces.
-- [02_eases](02_eases/index.md) — `RotationDirection`, `Eases`, and the 31 concrete ease classes.
+- [sampling-capture](00_sampling-capture/index.md) — `ISampler`, `ISampleable`, `ITransitionProperty`, `IFrameState` (sampling + property addressing contracts), plus the two path exceptions.
+- [effect-engine](01_effect-engine/index.md) — `ITransitionEffectCore` / `ITransitionEffect<TPriorityCore>`, the scheduler and interpreter interfaces, and the UI-thread inspector interfaces.
+- [eases](02_eases/index.md) — `RotationDirection`, `Eases`, and the 31 concrete ease classes.

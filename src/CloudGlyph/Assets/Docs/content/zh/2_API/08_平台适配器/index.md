@@ -31,6 +31,6 @@
 
 ## 页面
 
-- [00_attached-behaviors](00_附加行为/index.md) — `VeloxDev.WorkflowSystem.AttachedBehaviors` 中共享的工作流附加行为表面，统一记录一次并附带各适配器形态（表面与画布变换、视图池、节点/槽行为、小地图、适配器特有覆盖层）。
-- [01_adapter-catalogue](01_适配器目录/index.md) — 按适配器索引：每个包提供哪些行为文件、基类、原生采样器与过渡/主题接线。
-- [02_templates](02_模板/index.md) — `dotnet new` 项模板及其 CLI 选项。
+- [附加行为](00_附加行为/index.md) — `VeloxDev.WorkflowSystem.AttachedBehaviors` 中共享的工作流附加行为表面，统一记录一次并附带各适配器形态（表面与画布变换、视图池、节点/槽行为、小地图、适配器特有覆盖层）。
+- [适配器目录](01_适配器目录/index.md) — 按适配器索引：每个包提供哪些行为文件、基类、原生采样器与过渡/主题接线。
+- [模板](02_模板/index.md) — `dotnet new` 项模板及其 CLI 选项。

@@ -1,6 +1,6 @@
 # Transition — 适配器提供的表面
 
-每个平台适配器（`Src/Adapters/VeloxDev.WPF|Avalonia|WinUI|MAUI|WinForms|Razor|Jalium`）在自己的程序集里、且在**同一个** `VeloxDev.TransitionSystem` 命名空间中提供一组具体类型，子类化 [01_abstractions](../01_abstractions/index.md) 的引擎基础类型。因此 `using VeloxDev.TransitionSystem;` 的程序在每个平台上看到统一 API——只有平台值类型不同。
+每个平台适配器（`Src/Adapters/VeloxDev.WPF|Avalonia|WinUI|MAUI|WinForms|Razor|Jalium`）在自己的程序集里、且在**同一个** `VeloxDev.TransitionSystem` 命名空间中提供一组具体类型，子类化 [abstractions](../01_abstractions/index.md) 的引擎基础类型。因此 `using VeloxDev.TransitionSystem;` 的程序在每个平台上看到统一 API——只有平台值类型不同。
 
 ## 每个适配器提供什么
 
@@ -32,6 +32,6 @@
 
 ## 子页
 
-- [00_transition](00_transition/index.md) — `Transition` 与 `Transition<T>`（含 `Property` / `Effect` 重载集）。
-- [01_effect-interpolator](01_效果插值器/index.md) — `Interpolator` 及其各适配器采样器注册、`TransitionEffect`、`TransitionEffects` 与 `State`。
-- [02_ui-inspector](02_UI线程检查器/index.md) — 各适配器的 `UIThreadInspector`，以及 `TransitionScheduler` / `TransitionInterpreter` 适配器子类。
+- [transition](00_transition/index.md) — `Transition` 与 `Transition<T>`（含 `Property` / `Effect` 重载集）。
+- [效果插值器](01_效果插值器/index.md) — `Interpolator` 及其各适配器采样器注册、`TransitionEffect`、`TransitionEffects` 与 `State`。
+- [UI线程检查器](02_UI线程检查器/index.md) — 各适配器的 `UIThreadInspector`，以及 `TransitionScheduler` / `TransitionInterpreter` 适配器子类。

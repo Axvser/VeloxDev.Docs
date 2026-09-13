@@ -4,7 +4,7 @@ Agent 作用域核心类型。宿主在一块活跃的 `IWorkflowTreeViewModel` 
 
 **证据：** **测试**（`Src/Core/VeloxDev.Core.Extension.Test/Agent/Workflow/Functions/*`）+ **Demo**（`Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`）。
 
-> 入口点是 `AgentEx.AsAgentScope(this IWorkflowTreeViewModel)` 扩展方法——见 [04_agentex](../04_agentex/index.md)。
+> 入口点是 `AgentEx.AsAgentScope(this IWorkflowTreeViewModel)` 扩展方法——见 [agentex](../04_agentex/index.md)。
 
 ## WorkflowAgentScope
 

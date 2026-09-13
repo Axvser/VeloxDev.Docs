@@ -1,6 +1,6 @@
 # MVVM — `IVeloxCommand`
 
-`VeloxDev.MVVM.IVeloxCommand` (`Src/Core/VeloxDev.Core/Interfaces/MVVM/IVeloxCommand.cs`) is the command contract. It extends `System.Windows.Input.ICommand` with an async execution model, a per-execution lifecycle, and runtime lock / interrupt / queue controls. The concrete implementation is `VeloxCommand` (see [03_VeloxCommand](../03_VeloxCommand/index.md)).
+`VeloxDev.MVVM.IVeloxCommand` (`Src/Core/VeloxDev.Core/Interfaces/MVVM/IVeloxCommand.cs`) is the command contract. It extends `System.Windows.Input.ICommand` with an async execution model, a per-execution lifecycle, and runtime lock / interrupt / queue controls. The concrete implementation is `VeloxCommand` (see [VeloxCommand](../03_VeloxCommand/index.md)).
 
 **Signature**
 
@@ -38,7 +38,7 @@ public interface IVeloxCommand : ICommand
 
 ## Lifecycle events
 
-Every lifecycle event carries a single `CommandEventArgs` (see [06_CommandEventArgs](../06_CommandEventArgs/index.md)) describing one execution. In the normal flow a `Created` invocation runs immediately (`Started`) or waits in the queue (`Enqueued`), then — through `Dequeued` → `Started` — reaches a terminal state (`Completed`, `Failed` or `Canceled`), and `Exited` closes the lifecycle. An invocation canceled before it ever started (while force-locked, or still queued when `Clear` runs) raises `Canceled` directly, without `Started` / `Exited`.
+Every lifecycle event carries a single `CommandEventArgs` (see [CommandEventArgs](../06_CommandEventArgs/index.md)) describing one execution. In the normal flow a `Created` invocation runs immediately (`Started`) or waits in the queue (`Enqueued`), then — through `Dequeued` → `Started` — reaches a terminal state (`Completed`, `Failed` or `Canceled`), and `Exited` closes the lifecycle. An invocation canceled before it ever started (while force-locked, or still queued when `Clear` runs) raises `Canceled` directly, without `Started` / `Exited`.
 
 | Event | Raised when |
 |---|---|
@@ -64,6 +64,6 @@ Every lifecycle event carries a single `CommandEventArgs` (see [06_CommandEventA
 | `ChangeSemaphore(int)` / `ChangeSemaphoreAsync(int)` | Adjust the max-concurrency cap at runtime (`< 1` is ignored). |
 | `Notify()` | Raise `CanExecuteChanged`. |
 
-The sync control methods are fire-and-forget conveniences; the `Async` variants are the real work and are `await`-able. When a predicate is registered (see `canValidate` in [01_VeloxCommandAttribute](../01_VeloxCommandAttribute/index.md)), call `Notify()` after state changes that affect `CanExecute`.
+The sync control methods are fire-and-forget conveniences; the `Async` variants are the real work and are `await`-able. When a predicate is registered (see `canValidate` in [VeloxCommandAttribute](../01_VeloxCommandAttribute/index.md)), call `Notify()` after state changes that affect `CanExecute`.
 
 **Example** (`Examples/MVVM/WPF/Demo/MainWindowViewModel.cs`, lines 158-179): `FreeCommand` / `FreeCommandAsync` exercise `Lock`, `Interrupt`, `Clear`, `UnLock` and their `await`-able twins against `MinusCommand`.

@@ -31,6 +31,6 @@ All seven packages are `Version 8.0.0`, depend on `VeloxDev.Core` (project refer
 
 ## Pages
 
-- [00_attached-behaviors](00_attached-behaviors/index.md) — the shared workflow attached-behavior surface in `VeloxDev.WorkflowSystem.AttachedBehaviors`, documented once with per-adapter shapes (surface + canvas transform, view pool, node/slot behaviors, minimap, adapter-specific overlays).
-- [01_adapter-catalogue](01_adapter-catalogue/index.md) — per-adapter reference: which behavior files, base classes, native samplers, and transition/theme wiring each package ships.
-- [02_templates](02_templates/index.md) — the `dotnet new` item templates and their CLI options.
+- [attached-behaviors](00_attached-behaviors/index.md) — the shared workflow attached-behavior surface in `VeloxDev.WorkflowSystem.AttachedBehaviors`, documented once with per-adapter shapes (surface + canvas transform, view pool, node/slot behaviors, minimap, adapter-specific overlays).
+- [adapter-catalogue](01_adapter-catalogue/index.md) — per-adapter reference: which behavior files, base classes, native samplers, and transition/theme wiring each package ships.
+- [templates](02_templates/index.md) — the `dotnet new` item templates and their CLI options.

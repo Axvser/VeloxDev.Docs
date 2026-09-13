@@ -70,6 +70,6 @@ namespace VeloxDev.AspectOriented
 无任何成员的空标记接口。它的作用：
 
 - **作为所有生成 AOP 接口的基契约** —— 生成器写入基类型 `global::VeloxDev.AspectOriented.IAspectOriented`。
-- **作为公共泛型约束** —— 被 `ProxyEx.CreateProxy<T>`、`ProxyEx.SetProxy<T>`、`Aop.GetTarget<TTarget>` 与 `AopCache.Resolve<TClass, TInterface>` 共同使用（见 [02_proxyex](../02_proxyex/index.md) 与 [04_proxy-lifecycle](../04_代理生命周期/index.md)）。
+- **作为公共泛型约束** —— 被 `ProxyEx.CreateProxy<T>`、`ProxyEx.SetProxy<T>`、`Aop.GetTarget<TTarget>` 与 `AopCache.Resolve<TClass, TInterface>` 共同使用（见 [proxyex](../02_proxyex/index.md) 与 [代理生命周期](../04_代理生命周期/index.md)）。
 
 相关页面：[ProxyMembers 与 ProxyHandler](../01_代理成员处理器/index.md)、[ProxyEx](../02_proxyex/index.md)、[ProxyInstance](../03_proxyinstance/index.md)。

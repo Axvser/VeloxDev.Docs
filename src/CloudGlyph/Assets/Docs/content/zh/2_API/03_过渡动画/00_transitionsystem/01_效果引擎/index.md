@@ -49,7 +49,7 @@ public interface ITransitionSchedulerCore
 - 类型化变体收窄效果参数：
   - `ITransitionScheduler<TPriorityCore> : ITransitionSchedulerCore` — `Execute(InterpolatorCore, IFrameState, ITransitionEffect<TPriorityCore>, CancellationTokenSource? externCts = default)`。
   - `ITransitionScheduler : ITransitionSchedulerCore` — 标记（无新成员）。
-- 具体调度器基类 `Abstractions.TransitionSchedulerCore` 提供按目标的注册表与 `FindOrCreate`（见 [01_abstractions](../../01_abstractions/index.md)）。
+- 具体调度器基类 `Abstractions.TransitionSchedulerCore` 提供按目标的注册表与 `FindOrCreate`（见 [abstractions](../../01_abstractions/index.md)）。
 - *验证依据：* `SamplingLoopTests`；WPF 示例 `RepeatMutual`（新的互斥动画取消上一次）。
 
 ### 接口：`ITransitionInterpreter<TPriorityCore>`
@@ -67,7 +67,7 @@ public interface ITransitionInterpreter<TPriorityCore> : IDisposable
 - 非泛型的 `ITransitionInterpreter` / `ITransitionInterpreterCore` 接口**已删除**；现在只有带优先级的这一支。
 - `Args` 是解释器驱动的事件参数实例；把 `Args.Handled` 设为 `true` 会短路时间线（循环抛 `OperationCanceledException` → `Canceled` + `Finally`）。
 - `Execute` 针对准备好的 `SamplerSet<TPriorityCore>` 运行 Stopwatch 驱动采样循环。`Exit()`（即 `Dispose` 的别名）取消当前 `CancellationTokenSource`。
-- 具体循环行为在 `Abstractions.TransitionInterpreterCore` 及其两个泛型子类（见 [01_abstractions](../../01_abstractions/index.md)）。
+- 具体循环行为在 `Abstractions.TransitionInterpreterCore` 及其两个泛型子类（见 [abstractions](../../01_abstractions/index.md)）。
 - *验证依据：* `SamplingLoopTests`（`DurationZero_JumpsToEnd_AndCompletes`、`HandledBeforeStart_CancelsAndFiresFinally`）。
 
 ### 接口：`IUIThreadInspectorCore`、`IUIThreadInspector<TPriorityCore>`
@@ -96,6 +96,6 @@ public interface IUIThreadInspector<TPriorityCore> : IUIThreadInspectorCore
 | `ProtectedGetValue` | 沿链读取属性，必要时编组到 UI 线程。 |
 
 **说明：**
-- 非泛型接口 `IUIThreadInspector` **已删除**；无优先级的适配器（MAUI / WinForms / Razor）用 `NonPriority` 作为 `TPriorityCore`（见 [01_abstractions](../../01_abstractions/index.md)）。
+- 非泛型接口 `IUIThreadInspector` **已删除**；无优先级的适配器（MAUI / WinForms / Razor）用 `NonPriority` 作为 `TPriorityCore`（见 [abstractions](../../01_abstractions/index.md)）。
 - `IsAppAlive` / `IsUIThread` / `ProtectedGetValue` 由共享基接口 `IUIThreadInspectorCore` 声明；`ProtectedInvoke*` 在带优先级的接口上，且优先级以类型参数而非 `object?` 传递（热路径不装箱）。
-- 各平台行为见 [03_adapter-provided/02_ui-inspector](../../03_适配器提供/02_UI线程检查器/index.md)。
+- 各平台行为见 [适配器提供/UI线程检查器](../../03_适配器提供/02_UI线程检查器/index.md)。

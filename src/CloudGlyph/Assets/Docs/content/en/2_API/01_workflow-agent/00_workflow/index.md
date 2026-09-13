@@ -4,7 +4,7 @@ Core agent-scope types. The host builds a `WorkflowAgentScope` on a live `IWorkf
 
 **Evidence:** **Test** (`Src/Core/VeloxDev.Core.Extension.Test/Agent/Workflow/Functions/*`) + **Demo** (`Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`).
 
-> Entry point is the `AgentEx.AsAgentScope(this IWorkflowTreeViewModel)` extension — see [04_agentex](../04_agentex/index.md).
+> Entry point is the `AgentEx.AsAgentScope(this IWorkflowTreeViewModel)` extension — see [agentex](../04_agentex/index.md).
 
 ## WorkflowAgentScope
 

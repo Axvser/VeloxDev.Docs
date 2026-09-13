@@ -13,7 +13,7 @@ public class Command : IIncrementalGenerator
 }
 ```
 
-该生成器随分析器包 `VeloxDev.Core.Generator`（版本 `8.0.0`、`netstandard2.0`）发布，由 `VeloxDev.Core` 传递引用——与 MVVM 生成器在同一个包里（见 [08_MVVM](../08_MVVM/index.md)）。
+该生成器随分析器包 `VeloxDev.Core.Generator`（版本 `8.0.0`、`netstandard2.0`）发布，由 `VeloxDev.Core` 传递引用——与 MVVM 生成器在同一个包里（见 [MVVM](../08_MVVM/index.md)）。
 
 ## 管线
 
@@ -58,4 +58,4 @@ public VeloxDev.MVVM.IVeloxCommand MinusCommand
 private partial bool CanExecuteMinusCommand(object? parameter);
 ```
 
-上面的例子是 `canValidate: true` 模板应用于 `Examples/MVVM/WPF/Demo/MainWindowViewModel.cs` 的 `Minus` 方法。面向使用者的契约是特性本身，见 [01_VeloxCommandAttribute](../01_VeloxCommandAttribute/index.md)；运行时类型见 [03_VeloxCommand](../03_VeloxCommand/index.md)。
+上面的例子是 `canValidate: true` 模板应用于 `Examples/MVVM/WPF/Demo/MainWindowViewModel.cs` 的 `Minus` 方法。面向使用者的契约是特性本身，见 [VeloxCommandAttribute](../01_VeloxCommandAttribute/index.md)；运行时类型见 [VeloxCommand](../03_VeloxCommand/index.md)。

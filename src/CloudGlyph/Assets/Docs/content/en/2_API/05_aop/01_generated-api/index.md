@@ -39,7 +39,7 @@ public interface TeamViewModel_Demo_Aop : global::VeloxDev.AspectOriented.IAspec
 }
 ```
 
-`Name` / `Members` come from the two `[VeloxProperty][AspectOriented]` fields of `TeamViewModel.cs`; `Reset`, `AOP_OnMemberAdded` and `AOP_OnMemberRemoved` from the `[AspectOriented]` public methods. This is the type passed to `DispatchProxy.Create<T, ProxyInstance>()`, which is why the runtime can intercept the `get_*` / `set_*` / method names (`AspectOrientedAttribute` is documented in [00_attribute-and-marker](../00_aspect-oriented/00_attribute-and-marker/index.md)).
+`Name` / `Members` come from the two `[VeloxProperty][AspectOriented]` fields of `TeamViewModel.cs`; `Reset`, `AOP_OnMemberAdded` and `AOP_OnMemberRemoved` from the `[AspectOriented]` public methods. This is the type passed to `DispatchProxy.Create<T, ProxyInstance>()`, which is why the runtime can intercept the `get_*` / `set_*` / method names (`AspectOrientedAttribute` is documented in [attribute-and-marker](../00_aspect-oriented/00_attribute-and-marker/index.md)).
 
 ## Generated partial class (file `{Class}_{Ns}_AOP.g.cs`)
 

@@ -1,6 +1,6 @@
 # MVVM — `VeloxCommand`
 
-`VeloxDev.MVVM.VeloxCommand` (`Src/Core/VeloxDev.Core/MVVM/VeloxCommand.cs`) is the sealed concrete implementation of `IVeloxCommand` (see [02_IVeloxCommand](../02_IVeloxCommand/index.md)).
+`VeloxDev.MVVM.VeloxCommand` (`Src/Core/VeloxDev.Core/MVVM/VeloxCommand.cs`) is the sealed concrete implementation of `IVeloxCommand` (see [IVeloxCommand](../02_IVeloxCommand/index.md)).
 
 **Primary constructor**
 

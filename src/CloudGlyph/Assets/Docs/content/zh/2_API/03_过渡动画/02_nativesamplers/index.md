@@ -1,6 +1,6 @@
 # Transition — 命名空间：`VeloxDev.TransitionSystem.NativeSamplers`
 
-由 `VeloxDev.Core` 提供的内置采样器（源码：`Src/Core/VeloxDev.Core/TransitionSystem/NativeSamplers/*.cs`）。它们在 `InterpolatorCore` 的静态构造函数中注册，并实现 [00_transitionsystem/00_sampling-capture](../00_transitionsystem/00_采样与捕获/index.md) 的 `ISampler` 契约。
+由 `VeloxDev.Core` 提供的内置采样器（源码：`Src/Core/VeloxDev.Core/TransitionSystem/NativeSamplers/*.cs`）。它们在 `InterpolatorCore` 的静态构造函数中注册，并实现 [transitionsystem/采样与捕获](../00_transitionsystem/00_采样与捕获/index.md) 的 `ISampler` 契约。
 
 所有采样器共享同一形态：
 
@@ -50,5 +50,5 @@ public class DoubleSampler : ISampler
 ## 注意
 
 - `System.Numerics` 采样器（`Vector2Sampler`、`Vector3Sampler`、`Vector4Sampler`、`QuaternionSampler`）仅在 `#if !NETSTANDARD2_0` 下编译——**`netstandard2.0` 上没有**它们。
-- 没有逐类型帧计数：端点处理是 `InsertFrame` 的一部分，效果里的 `FPS` 只是解释器循环施加的最大采样率上限（见 [01_abstractions](../01_abstractions/index.md)）。
-- 平台适配器会额外注册各自的平台采样器（画刷、变换、网格、padding……）——见 [03_adapter-provided](../03_适配器提供/index.md)。
+- 没有逐类型帧计数：端点处理是 `InsertFrame` 的一部分，效果里的 `FPS` 只是解释器循环施加的最大采样率上限（见 [abstractions](../01_abstractions/index.md)）。
+- 平台适配器会额外注册各自的平台采样器（画刷、变换、网格、padding……）——见 [适配器提供](../03_适配器提供/index.md)。

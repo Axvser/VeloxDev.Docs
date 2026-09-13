@@ -1,6 +1,6 @@
 # Transition — 适配器：`UIThreadInspector`、`TransitionScheduler`、`TransitionInterpreter`
 
-各适配器填入的平台编组与执行管道。它们都是 [01_abstractions](../../01_abstractions/index.md) 引擎骨架的子类，位于 `VeloxDev.TransitionSystem` 命名空间。
+各适配器填入的平台编组与执行管道。它们都是 [abstractions](../../01_abstractions/index.md) 引擎骨架的子类，位于 `VeloxDev.TransitionSystem` 命名空间。
 
 ### 类：`UIThreadInspector`（各适配器）
 
@@ -31,7 +31,7 @@
 | WinUI | `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, DispatcherQueuePriority>` |
 | MAUI / WinForms / Razor | `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, NonPriority>` |
 
-全部调度行为——`MutualSchedulers` / `NoMutualSchedulers` 表、`FindOrCreate`、门控、`Exit`——均继承（见 [01_abstractions](../../01_abstractions/index.md)）。这也是适配器 `Interpolator.CreateScheduler` 交回的类型——该重写返回 `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, TPriorityCore>.FindOrCreate(target)`，所以上表的参数化正是主题切换所跑的那一套（见 [01_effect-interpolator](../01_效果插值器/index.md)）。
+全部调度行为——`MutualSchedulers` / `NoMutualSchedulers` 表、`FindOrCreate`、门控、`Exit`——均继承（见 [abstractions](../../01_abstractions/index.md)）。这也是适配器 `Interpolator.CreateScheduler` 交回的类型——该重写返回 `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, TPriorityCore>.FindOrCreate(target)`，所以上表的参数化正是主题切换所跑的那一套（见 [效果插值器](../01_效果插值器/index.md)）。
 
 ### 类：`TransitionInterpreter`（各适配器）
 
@@ -43,4 +43,4 @@
 | WinUI | `TransitionInterpreterCore<TransitionEffect, DispatcherQueuePriority>` |
 | MAUI / WinForms / Razor | `TransitionInterpreterCore<TransitionEffect>` |
 
-优先级类型化变体以 `frameSet.Apply(target, t, effect.Priority)` 应用每个缓动帧；非优先级变体不带优先级应用（见 [01_abstractions](../../01_abstractions/index.md)）。
+优先级类型化变体以 `frameSet.Apply(target, t, effect.Priority)` 应用每个缓动帧；非优先级变体不带优先级应用（见 [abstractions](../../01_abstractions/index.md)）。

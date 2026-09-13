@@ -83,6 +83,6 @@ Each concrete class implements `IEaseCalculator` with a single `double Ease(doub
 
 Two more public members of this namespace are documented with the builder / adapter surfaces they belong to:
 
-- `TransitionCoreEx` — static extension methods (`Await`, `Then`, `AwaitThen`, `Interpolator`) that chain `StateSnapshotCore` segments → [01_abstractions](../../01_abstractions/index.md).
-- `NonPriority` — the empty struct a priority-free adapter passes as the priority type argument → [01_abstractions](../../01_abstractions/index.md).
-- Per-adapter `Transition`, `Transition<T>` → [03_adapter-provided](../../03_adapter-provided/index.md).
+- `TransitionCoreEx` — static extension methods (`Await`, `Then`, `AwaitThen`, `Interpolator`) that chain `StateSnapshotCore` segments → [abstractions](../../01_abstractions/index.md).
+- `NonPriority` — the empty struct a priority-free adapter passes as the priority type argument → [abstractions](../../01_abstractions/index.md).
+- Per-adapter `Transition`, `Transition<T>` → [adapter-provided](../../03_adapter-provided/index.md).

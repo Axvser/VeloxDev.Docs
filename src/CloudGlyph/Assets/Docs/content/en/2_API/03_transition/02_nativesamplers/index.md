@@ -1,6 +1,6 @@
 # Transition — Namespace: `VeloxDev.TransitionSystem.NativeSamplers`
 
-Built-in samplers shipped by `VeloxDev.Core` (source: `Src/Core/VeloxDev.Core/TransitionSystem/NativeSamplers/*.cs`). They are registered in `InterpolatorCore`'s static constructor and implement the `ISampler` contract from [00_transitionsystem/00_sampling-capture](../00_transitionsystem/00_sampling-capture/index.md).
+Built-in samplers shipped by `VeloxDev.Core` (source: `Src/Core/VeloxDev.Core/TransitionSystem/NativeSamplers/*.cs`). They are registered in `InterpolatorCore`'s static constructor and implement the `ISampler` contract from [transitionsystem/sampling-capture](../00_transitionsystem/00_sampling-capture/index.md).
 
 All samplers share one shape:
 
@@ -50,5 +50,5 @@ public class DoubleSampler : ISampler
 ## Caveats
 
 - The `System.Numerics` samplers (`Vector2Sampler`, `Vector3Sampler`, `Vector4Sampler`, `QuaternionSampler`) are compiled only under `#if !NETSTANDARD2_0` — they are absent on `netstandard2.0`.
-- There is no per-type frame counter: endpoint handling is part of `InsertFrame`, and `FPS` in the effect is only a maximum sample-rate cap applied by the interpreter loop (see [01_abstractions](../01_abstractions/index.md)).
-- Platform adapters register *additional* platform samplers of their own (brushes, transforms, grids, padding, ...) — see [03_adapter-provided](../03_adapter-provided/index.md).
+- There is no per-type frame counter: endpoint handling is part of `InsertFrame`, and `FPS` in the effect is only a maximum sample-rate cap applied by the interpreter loop (see [abstractions](../01_abstractions/index.md)).
+- Platform adapters register *additional* platform samplers of their own (brushes, transforms, grids, padding, ...) — see [adapter-provided](../03_adapter-provided/index.md).

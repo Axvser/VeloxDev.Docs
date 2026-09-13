@@ -27,5 +27,5 @@ public sealed class TransitionEventArgs : TimeLineEventArgs
 
 **Notes:**
 - The empty sealed event-argument type passed to every `ITransitionEffectCore` event handler (`EventHandler<TransitionEventArgs>`) and invoker (`InvokeAwake` … `InvokeFinally`).
-- Setting `e.Handled = true` inside an effect event handler short-circuits the sampling loop: the interpreter throws `OperationCanceledException`, which fires `Canceled` and then `Finally` (see [01_abstractions](../01_abstractions/index.md)). A cancelled `CancellationTokenSource` has the same effect.
+- Setting `e.Handled = true` inside an effect event handler short-circuits the sampling loop: the interpreter throws `OperationCanceledException`, which fires `Canceled` and then `Finally` (see [abstractions](../01_abstractions/index.md)). A cancelled `CancellationTokenSource` has the same effect.
 - *Verified by:* `SamplingLoopTests` (`HandledBeforeStart_CancelsAndFiresFinally`), `TransitionEffectCoreTests` (`Events_AreInvoked`).

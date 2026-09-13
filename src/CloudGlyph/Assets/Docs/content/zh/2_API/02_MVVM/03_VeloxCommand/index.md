@@ -1,6 +1,6 @@
 # MVVM — `VeloxCommand`
 
-`VeloxDev.MVVM.VeloxCommand`（`Src/Core/VeloxDev.Core/MVVM/VeloxCommand.cs`）是 `IVeloxCommand` 的密封具体实现（见 [02_IVeloxCommand](../02_IVeloxCommand/index.md)）。
+`VeloxDev.MVVM.VeloxCommand`（`Src/Core/VeloxDev.Core/MVVM/VeloxCommand.cs`）是 `IVeloxCommand` 的密封具体实现（见 [IVeloxCommand](../02_IVeloxCommand/index.md)）。
 
 **主构造函数**
 

@@ -1,6 +1,6 @@
 # Transition — Adapter-Provided Surface
 
-Each platform adapter (`Src/Adapters/VeloxDev.WPF|Avalonia|WinUI|MAUI|WinForms|Razor|Jalium`) provides, in its own assembly and in the **same** `VeloxDev.TransitionSystem` namespace, a full set of concrete types that subclass the engine base types from [01_abstractions](../01_abstractions/index.md). Programs `using VeloxDev.TransitionSystem;` therefore see one uniform API on every platform; only the platform value types differ.
+Each platform adapter (`Src/Adapters/VeloxDev.WPF|Avalonia|WinUI|MAUI|WinForms|Razor|Jalium`) provides, in its own assembly and in the **same** `VeloxDev.TransitionSystem` namespace, a full set of concrete types that subclass the engine base types from [abstractions](../01_abstractions/index.md). Programs `using VeloxDev.TransitionSystem;` therefore see one uniform API on every platform; only the platform value types differ.
 
 ## What each adapter ships
 
@@ -31,6 +31,6 @@ Priority-typed adapters (WPF, Avalonia, Jalium, WinUI) marshal writes at a dispa
 
 ## Sub-pages
 
-- [00_transition](00_transition/index.md) — `Transition`, `Transition<T>` (the `Property` / `Effect` overload sets, and the inherited `Execute` / `Exit` / `GetState`).
-- [01_effect-interpolator](01_effect-interpolator/index.md) — `Interpolator` and its per-adapter sampler registrations, `TransitionEffect`, `TransitionEffects`, and `State`.
-- [02_ui-inspector](02_ui-inspector/index.md) — `UIThreadInspector` per adapter, plus the `TransitionScheduler` / `TransitionInterpreter` adapter subclasses.
+- [transition](00_transition/index.md) — `Transition`, `Transition<T>` (the `Property` / `Effect` overload sets, and the inherited `Execute` / `Exit` / `GetState`).
+- [effect-interpolator](01_effect-interpolator/index.md) — `Interpolator` and its per-adapter sampler registrations, `TransitionEffect`, `TransitionEffects`, and `State`.
+- [ui-inspector](02_ui-inspector/index.md) — `UIThreadInspector` per adapter, plus the `TransitionScheduler` / `TransitionInterpreter` adapter subclasses.

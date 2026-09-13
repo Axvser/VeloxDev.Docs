@@ -1,6 +1,6 @@
 # API — Adapter Catalogue
 
-Each adapter package ships the same three core namespaces (four where theme wiring exists). This page is the per-adapter reference; the shared workflow behavior **shapes** live under [00_attached-behaviors](../00_attached-behaviors/index.md), the per-adapter **transition/theme members** are documented in the transition and dynamic-theme features.
+Each adapter package ships the same three core namespaces (four where theme wiring exists). This page is the per-adapter reference; the shared workflow behavior **shapes** live under [attached-behaviors](../00_attached-behaviors/index.md), the per-adapter **transition/theme members** are documented in the transition and dynamic-theme features.
 
 ## Per-adapter surface
 

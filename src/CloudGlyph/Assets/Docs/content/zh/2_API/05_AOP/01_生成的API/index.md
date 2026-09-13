@@ -39,7 +39,7 @@ public interface TeamViewModel_Demo_Aop : global::VeloxDev.AspectOriented.IAspec
 }
 ```
 
-`Name` / `Members` 来自 `TeamViewModel.cs` 的两个 `[VeloxProperty][AspectOriented]` 字段；`Reset`、`AOP_OnMemberAdded`、`AOP_OnMemberRemoved` 来自 `[AspectOriented]` 公有方法。该类型被传给 `DispatchProxy.Create<T, ProxyInstance>()`，这正是运行时能拦截 `get_*` / `set_*` / 方法名的原因（`AspectOrientedAttribute` 见 [00_attribute-and-marker](../00_面向切面/00_特性与标记/index.md)）。
+`Name` / `Members` 来自 `TeamViewModel.cs` 的两个 `[VeloxProperty][AspectOriented]` 字段；`Reset`、`AOP_OnMemberAdded`、`AOP_OnMemberRemoved` 来自 `[AspectOriented]` 公有方法。该类型被传给 `DispatchProxy.Create<T, ProxyInstance>()`，这正是运行时能拦截 `get_*` / `set_*` / 方法名的原因（`AspectOrientedAttribute` 见 [特性与标记](../00_面向切面/00_特性与标记/index.md)）。
 
 ## 生成的 partial 类（文件 `{Class}_{Ns}_AOP.g.cs`）
 

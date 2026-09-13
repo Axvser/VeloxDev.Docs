@@ -1,6 +1,6 @@
 # Transition — Adapter: `UIThreadInspector`, `TransitionScheduler`, `TransitionInterpreter`
 
-The platform marshaling and execution plumbing each adapter fills in. All are subclasses of the engine skeletons from [01_abstractions](../../01_abstractions/index.md) and live in the `VeloxDev.TransitionSystem` namespace.
+The platform marshaling and execution plumbing each adapter fills in. All are subclasses of the engine skeletons from [abstractions](../../01_abstractions/index.md) and live in the `VeloxDev.TransitionSystem` namespace.
 
 ### Class: `UIThreadInspector` (per adapter)
 
@@ -33,7 +33,7 @@ An empty subclass that parameterizes the scheduler base with the adapter's concr
 | WinUI | `TransitionScheduler<TTarget> : TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, DispatcherQueuePriority>` |
 | MAUI / WinForms / Razor | `TransitionScheduler : TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, NonPriority>` |
 
-All scheduling behavior — the `MutualSchedulers` / `NoMutualSchedulers` tables, `FindOrCreate`, gating, and `Exit` — is inherited (see [01_abstractions](../../01_abstractions/index.md)). This is the type the adapter's `Interpolator.CreateScheduler` hands out — the override returns `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, TPriorityCore>.FindOrCreate(target)`, so the parameterization above is exactly the one a theme switch runs on (see [01_effect-interpolator](../01_effect-interpolator/index.md)).
+All scheduling behavior — the `MutualSchedulers` / `NoMutualSchedulers` tables, `FindOrCreate`, gating, and `Exit` — is inherited (see [abstractions](../../01_abstractions/index.md)). This is the type the adapter's `Interpolator.CreateScheduler` hands out — the override returns `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, TPriorityCore>.FindOrCreate(target)`, so the parameterization above is exactly the one a theme switch runs on (see [effect-interpolator](../01_effect-interpolator/index.md)).
 
 ### Class: `TransitionInterpreter` (per adapter)
 
@@ -45,4 +45,4 @@ An empty subclass that parameterizes the sampling-loop interpreter with the adap
 | WinUI | `TransitionInterpreterCore<TransitionEffect, DispatcherQueuePriority>` |
 | MAUI / WinForms / Razor | `TransitionInterpreterCore<TransitionEffect>` (implements `ITransitionInterpreter<NonPriority>`) |
 
-The priority-typed variants apply each eased frame with `frameSet.Apply(target, t, effect.Priority)`; the non-priority variants apply without a priority (see [01_abstractions](../../01_abstractions/index.md)).
+The priority-typed variants apply each eased frame with `frameSet.Apply(target, t, effect.Priority)`; the non-priority variants apply without a priority (see [abstractions](../../01_abstractions/index.md)).

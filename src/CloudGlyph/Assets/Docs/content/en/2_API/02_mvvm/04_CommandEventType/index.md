@@ -31,4 +31,4 @@ public enum CommandEventType : int
 | `Canceled` | The execution was canceled. |
 | `Exited` | Lifecycle ended; the execution was removed from the active list. |
 
-The `CommandEventType` is stamped on a `CommandEventArgs` (see [06_CommandEventArgs](../06_CommandEventArgs/index.md)), which is how the same execution is re-raised across its lifecycle by `VeloxCommand`. Which event the value is delivered through is defined by `IVeloxCommand` (see [02_IVeloxCommand](../02_IVeloxCommand/index.md)).
+The `CommandEventType` is stamped on a `CommandEventArgs` (see [CommandEventArgs](../06_CommandEventArgs/index.md)), which is how the same execution is re-raised across its lifecycle by `VeloxCommand`. Which event the value is delivered through is defined by `IVeloxCommand` (see [IVeloxCommand](../02_IVeloxCommand/index.md)).

@@ -17,8 +17,8 @@ Members below are verified against the source files above. Behavioral claims cit
 
 This feature's API reference is split into five sections:
 
-- [00_transitionsystem](00_transitionsystem/index.md) — the `VeloxDev.TransitionSystem` core contracts: sampling / property contracts, effect-scheduler-interpreter contracts, `RotationDirection`, `Eases`, and the concrete ease classes.
-- [01_abstractions](01_abstractions/index.md) — the engine implementation base types in `VeloxDev.TransitionSystem.Abstractions`.
-- [02_nativesamplers](02_nativesamplers/index.md) — the built-in samplers in `VeloxDev.TransitionSystem.NativeSamplers`.
-- [03_adapter-provided](03_adapter-provided/index.md) — the per-platform surface each adapter ships in `VeloxDev.TransitionSystem`.
-- [04_timeline](04_timeline/index.md) — `VeloxDev.TimeLine.TransitionEventArgs` and `Handled` cancellation.
+- [transitionsystem](00_transitionsystem/index.md) — the `VeloxDev.TransitionSystem` core contracts: sampling / property contracts, effect-scheduler-interpreter contracts, `RotationDirection`, `Eases`, and the concrete ease classes.
+- [abstractions](01_abstractions/index.md) — the engine implementation base types in `VeloxDev.TransitionSystem.Abstractions`.
+- [nativesamplers](02_nativesamplers/index.md) — the built-in samplers in `VeloxDev.TransitionSystem.NativeSamplers`.
+- [adapter-provided](03_adapter-provided/index.md) — the per-platform surface each adapter ships in `VeloxDev.TransitionSystem`.
+- [timeline](04_timeline/index.md) — `VeloxDev.TimeLine.TransitionEventArgs` and `Handled` cancellation.
