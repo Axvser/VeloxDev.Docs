@@ -11,11 +11,6 @@
     0% { opacity: 0; transform: scale(0.85); }
     100% { opacity: 1; transform: scale(1); }
   }
-  @keyframes glow-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-color, #4a9eff) 0%, transparent); }
-    50% { box-shadow: 0 0 18px 2px color-mix(in srgb, var(--accent-color, #4a9eff) 25%, transparent); }
-  }
-
   .cg-wrapper * {
     will-change: transform, opacity;
   }
@@ -76,14 +71,11 @@
     animation: shimmer 4s linear infinite;
   }
 
-  .glow-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin: 0 4px;
-    vertical-align: middle;
-    animation: glow-pulse 1.8s ease-in-out infinite;
+  /* A feature card is a link. Keeps the link invisible as a link. */
+  .feat-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
   }
   .gradient-rule {
     width: clamp(36px, 8vw, 60px);
@@ -179,72 +171,32 @@
   <!-- Feature grid -->
   <div class="cg-feats">
     <div class="feat-card cg-feat" style="animation-delay: 0s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">⛓️</span> Workflow<br><span style="opacity: 0.6;">Tree · Node · Slot · Link · Undo/Redo</span>
+      <a class="feat-link" href="../1_QuickStart/00_workflow-system/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">⛓️</span> Workflow<br><span style="opacity: 0.6;">Tree · Node · Slot · Link · Undo/Redo</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.05s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🤖</span> Workflow Agent<br><span style="opacity: 0.6;">60+ tools · MCP · Compiler</span>
+      <a class="feat-link" href="../1_QuickStart/01_workflow-agent/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🤖</span> Workflow Agent<br><span style="opacity: 0.6;">60+ tools · MCP · Compiler</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.1s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🪶</span> MVVM<br><span style="opacity: 0.6;">Source generators · Async commands</span>
+      <a class="feat-link" href="../1_QuickStart/02_mvvm/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🪶</span> MVVM<br><span style="opacity: 0.6;">Source generators · Async commands</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.15s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎞️</span> Transition<br><span style="opacity: 0.6;">Interpolation · Easing · Fluent API</span>
+      <a class="feat-link" href="../1_QuickStart/03_transition/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎞️</span> Transition<br><span style="opacity: 0.6;">Interpolation · Easing · Fluent API</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.2s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎨</span> Theme<br><span style="opacity: 0.6;">Runtime switching · Animated</span>
+      <a class="feat-link" href="../1_QuickStart/04_dynamic-theme/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎨</span> Theme<br><span style="opacity: 0.6;">Runtime switching · Animated</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.25s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌀</span> AOP<br><span style="opacity: 0.6;">Aspect proxies · Start/Coverage/End</span>
+      <a class="feat-link" href="../1_QuickStart/05_aop/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌀</span> AOP<br><span style="opacity: 0.6;">Aspect proxies · Start/Coverage/End</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.3s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">⚙️</span> MonoBehaviour<br><span style="opacity: 0.6;">Frame-driven loop · Tick-based</span>
+      <a class="feat-link" href="../1_QuickStart/06_monobehaviour/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">⚙️</span> MonoBehaviour<br><span style="opacity: 0.6;">Frame-driven loop · Tick-based</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.35s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📎</span> Weak References<br><span style="opacity: 0.6;">WeakDelegate · WeakQueue · WeakStack · WeakCache</span>
+      <a class="feat-link" href="../1_QuickStart/07_weak-types/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📎</span> Weak References<br><span style="opacity: 0.6;">WeakDelegate · WeakQueue · WeakStack · WeakCache</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.4s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🧩</span> Adapters<br><span style="opacity: 0.6;">7 GUIs — WPF · Avalonia · WinUI · MAUI · WinForms · Razor · Jalium</span>
+      <a class="feat-link" href="../1_QuickStart/08_platform-adapters/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🧩</span> Adapters<br><span style="opacity: 0.6;">7 GUIs — WPF · Avalonia · WinUI · MAUI · WinForms · Razor · Jalium</span></a>
     </div>
   </div>
 
-  <p style="opacity: 0.4; font-size: 0.85em; margin-top: 1em;">
-    <span class="glow-dot" style="background: #4a9eff; animation-delay: 0s;"></span>
-    Agent-friendly
-    <span class="glow-dot" style="background: #a78bfa; animation-delay: 0.3s;"></span>
-    No DB required
-    <span class="glow-dot" style="background: #f472b6; animation-delay: 0.6s;"></span>
-    Open Source · MIT
-  </p>
 </div>
-
-This is the documentation site for **VeloxDev** — a .NET foundation for building **interactive workflow editors**. One model with compile-time identity and a compiled execution engine (`CompilerEx`) lives in `VeloxDev.Core` with zero UI dependencies; platform adapters supply only the views; and a function-calling **Workflow Agent** (+ optional MCP) makes an LLM a first-class graph controller, sharing the GUI's undo/redo, validation and lifecycle.
-
-**Repositories** — source code: [github.com/Axvser/VeloxDev](https://github.com/Axvser/VeloxDev) · online wiki: [axvser.github.io/VeloxDev.Docs](https://axvser.github.io/VeloxDev.Docs/) (a WebAssembly app, so its load speed depends on your network).
-
-## Explore the documentation
-
-The Wiki has five dimensions, each present in English and Chinese. From this page the other four dimensions are one level up:
-
-| Dimension | Contents |
-|---|---|
-| **Welcome** | this page — the project pitch and where to go next |
-| [QuickStart](../1_QuickStart/index.md) | runnable, end-to-end tutorials — one per feature |
-| [API](../2_API/index.md) | full reference of every documented public type and member |
-| [SE_Analysis](../3_SE_Analysis/index.md) | file/functional structure, design patterns, data flow, complexity |
-| [Copyright](../4_Copyright/index.md) | license information and attribution |
-
-## Documented features
-
-Nine features are documented, each covered consistently across the QuickStart, API and SE Analysis trees:
-
-| Feature | What it provides |
-|---|---|
-| [Workflow system](../1_QuickStart/00_workflow-system/index.md) | Tree / Node / Slot / Link model with undo-redo, spatial indexing, deep-zoom canvas math, serialization and a compiled execution engine (forward + reverse) |
-| [Workflow Agent](../1_QuickStart/01_workflow-agent/index.md) | 60+ function-calling tools + MCP — an AI can inspect, build and mutate graphs at runtime |
-| [MVVM](../1_QuickStart/02_mvvm/index.md) | source generators for observable properties and async, cancellable commands |
-| [Transition](../1_QuickStart/03_transition/index.md) | cross-platform interpolation animation with easing and a fluent API |
-| [Dynamic theme](../1_QuickStart/04_dynamic-theme/index.md) | runtime theme switching with animated transitions |
-| [AOP](../1_QuickStart/05_aop/index.md) | compile-time aspect proxies to intercept node execution |
-| [MonoBehaviour](../1_QuickStart/06_monobehaviour/index.md) | frame-driven lifecycle loop for tick-based simulation |
-| [Weak references](../1_QuickStart/07_weak-types/index.md) | `WeakDelegate` · `WeakQueue` · `WeakStack` · `WeakCache` |
-| [Platform adapters](../1_QuickStart/08_platform-adapters/index.md) | seven view layers — WPF · Avalonia · WinUI · MAUI · WinForms · Razor · Jalium |
