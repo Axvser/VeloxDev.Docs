@@ -76,6 +76,10 @@ Ultimately, the directory will present the following structure. These are five f
 
 ⚙ Complex features may nest further sub-capabilities (e.g. `00_user-registration/00_email-verification/`), obeying the same two-digit + kebab-case rule at every level.
 
+⚙ **The numeric prefix is a path device, never a title.** `0_Welcome`, `1_QuickStart`, `00_user-registration` are directory names. The moment text is *rendered to a reader* — a heading, a link label, a breadcrumb, a table cell naming a page — the prefix must be gone: write `QuickStart`, `User registration`. The renderer strips the prefix from navigation titles itself (`gen_tree.py`), so a hand-written `1_QuickStart` in prose is always a defect, never a match for the sidebar. Only two places keep the prefix: the link *destination* (`../1_QuickStart/index.md`) and discussion that is explicitly about the directory layout.
+
+⚙ **A feature name is a feature name, not a class name.** Feature directories are named for the capability the reader looks for (`user-registration`, `data-export`), taken from the「Feature Inventory」. Type, class and namespace names belong in the page body, never in a directory name.
+
 ⚙ **Page-focus limit & leaf budget (default-split):** a feature page is NOT a single monolithic document — splitting is the default, not the exception. A page WITHOUT sub-pages is a **leaf**; keep it at or under **~300 lines** and at most **3 distinct topics**. When a leaf would exceed that, split it along capability/operation/endpoint/type boundaries into **2+ child page directories** (e.g. `00_{Feature}/00_{Operation}/index.md`), and recurse if a child leaf also grows too large. Each parent `index.md` is then only a **short overview** (well under ~200 lines) that links **every** direct child using the same-language cross-page link syntax from 【Links & Navigation】.
 
 ⚙ **Outline-first (mandatory order):** when a page needs splitting, DO NOT write the long page first and split afterwards. FIRST create the planned child-page directories — each with an (initially empty) `index.md`, and every ancestor `index.md` in place — then run `gen_tree.py` so the skeleton appears in the navigation, and ONLY THEN fill each leaf within its budget. Write toward an existing outline, never toward one page that silently grows.
@@ -134,6 +138,14 @@ Wiki_Root/
     └── index.md
 ```
 
+## Localisation
+
+⚙ **Every page title is written in the wiki's own language.** When a language tree is produced, each directory segment and each page heading must be translated — `00_workflow-system` becomes `00_工作流系统`, not a copy of the English folder. This is not optional polish: the sidebar renders the directory name, so an untranslated segment shows up as stray English in an otherwise translated wiki.
+
+⚙ **The one exception is a code identifier.** A segment that *is* a public type, attribute, namespace or API name in the source — `MVVM`, `AOP`, `MonoBehaviour`, `00_VeloxPropertyAttribute`, `00_transitionsystem` — stays verbatim in every language, because translating it would break the reader's ability to grep for it. The test is mechanical, not aesthetic: **does this exact token appear in the source code as a type/namespace/API name?** If yes, keep it. If it is a descriptive English phrase (`prerequisites`, `install`, `complete-code`, `attached-behaviors`, `patterns-overview`), it is a translation gap and MUST be translated.
+
+⚙ The two languages must stay aligned in *structure* (same numeric-prefix topology, machine-checked by `validate-structure.py`) and in *meaning* — a page's title in one language is the translation of its title in the other, at the same position in the tree.
+
 ## Links & Navigation
 
 ⚙ A Wiki page may only contain these kinds of links:
@@ -148,7 +160,38 @@ Wiki_Root/
    A parent `index.md` links its sub-pages exactly this way.
 3. **In-page anchor** — a `#slug` link to a heading on the **same** page. The App auto-assigns every heading an id (slug) derived from its exact final text: lower-case it; keep letters, digits, `_`, `-` (CJK characters are kept as-is); drop every other character (`.`, `:`, `(`, `)`, …); turn spaces and `_` into `-`; collapse runs of `-` and trim leading/trailing `-`; duplicate slugs get a `-1`, `-2`, … suffix. Only hand-write `#…` anchors for headings with plain, punctuation-free text — e.g. heading `## 2. Text Formatting` → `#2-text-formatting`; heading `## Overview` → `#overview`.
 
+⚙ **Link labels never carry the numeric prefix.** The destination is a path and keeps it (`../1_QuickStart/00_user-registration/index.md`); the visible label is prose and must not (`[QuickStart](../1_QuickStart/index.md)`, `[User registration](../1_QuickStart/00_user-registration/index.md)`). `[1_QuickStart](../1_QuickStart/index.md)` is a defect. The label is the page's plain title — the same string the sidebar shows — or a natural phrase that reads correctly in the sentence.
+
 ⚙ **Prohibited:** any other local/absolute/`file:` link, a link to another language's content, a link that escapes the language root, a cross-page target carrying a `#`, or any target you cannot resolve to a real page or heading. When in doubt, do not link.
+
+## Rendered Content Members
+
+⚙ Besides ordinary Markdown, the body may use these fenced blocks. Each is checked by a validator; a malformed block renders as a silent hole, so validate rather than assume.
+
+| Fence | Use it for | Validator |
+|---|---|---|
+| `mermaid` | flow, sequence, class, state, ER, git graphs | `validate-mermaid.js` (real parser) / `validate-mermaid.py` |
+| `plantuml` | API call sequences, component and deployment diagrams | `validate-plantuml.py --engine java` / `validate-plantuml.py` |
+| `plot` | **mathematical curves** — see below | `validate-plot.py` |
+| `video` | Bilibili / YouTube / Vimeo embeds | — |
+
+⚙ **Function plots (`plot`) — use a curve when the subject IS a function.** A page that describes a curve, a response, a decay or an easing family should draw it, not describe it in prose or enumerate it in a table. The body is a **JSON object** (the [function-plot](https://mauriciopoppe.github.io/function-plot/) options), so numbers are JSON numbers — `2*PI` is invalid, `6.283185307179586` is not:
+
+````markdown
+```plot
+{
+  "title": "easeInOutQuad",
+  "grid": true,
+  "xAxis": { "domain": [0, 1] },
+  "yAxis": { "domain": [0, 1] },
+  "data": [
+    { "fn": "x < 0.5 ? 2*x^2 : 1 - (-2*x + 2)^2/2" }
+  ]
+}
+```
+````
+
+⚙ Plot rules that bite: constants are **upper-case** (`PI`, `E` — lower-case `pi` is undefined and the curve silently vanishes); `"data"` is an array of objects with `fn` (or `x`/`y`/`r`); piecewise curves use the ternary `?:`; a non-`y = f(x)` graph type (`fnType` `parametric`/`polar`/`points`/`vector`, or `graphType` `scatter`) additionally needs `"sampler": "builtIn"`, and its parameter is `t` for parametric but **`theta`** for polar. Keep the domain tight around the interesting region — a default zoom shows nothing.
 
 ## Template Conventions
 

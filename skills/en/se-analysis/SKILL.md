@@ -2,12 +2,12 @@
 
 ## Responsibility
 
-Produce rigorous software engineering analysis documentation. Use **PlantUML** for API call sequence diagrams, **Mermaid** for class hierarchies and architecture flowcharts, and **KaTeX** for algorithm complexity.
+Produce rigorous software engineering analysis documentation. Use **PlantUML** for API call sequence diagrams, **Mermaid** for class hierarchies and architecture flowcharts, **KaTeX** for algorithm complexity, and **`plot`** for any behaviour that is a curve rather than a number.
 
 ## Mandatory Rules
 
 - Every code snippet **must come from an actual file**, with file path and line range noted
-- All diagrams must pass syntax validation (Mermaid/PlantUML/KaTeX)
+- All diagrams and plots must pass syntax validation (Mermaid/PlantUML/KaTeX/plot)
 - Do not fabricate method signatures, class names, or execution flows
 - If code is inferred (no example available), it must be explicitly marked as such
 
@@ -36,6 +36,64 @@ formulas so they always render:
   `\text{...}`.
 - After writing, run `python validate-katex.py` **and** `node validate-katex.js` on the
   wiki root; both flag single-line display math as an ERROR and bare CJK-in-math as a WARN.
+
+### Function plot rules (draw the curve, don't describe it)
+
+**When the subject of a paragraph is a function, its shape is the information** — a
+formula or a table of values makes the reader reconstruct what a single curve would
+show at a glance. Use a ```plot fence whenever the source defines a mathematical
+behaviour that varies over a domain:
+
+- an **easing family** (`EaseInOutCubic`, `EaseOutBack`, `EaseOutElastic`, …) — plot
+  the family together so In / Out / InOut are comparable, and mark the linear ramp
+  `y = x` as a baseline;
+- **growth or decay** — complexity curves (`n`, `n*log(n)`, `n^2` on one axis),
+  exponential decay, half-life;
+- **damping and response** — oscillation envelopes, spring settling;
+- **distributions and coverage curves** used by an algorithm.
+
+Rules that bite (all verified against the renderer):
+
+- The body is **JSON**, so numbers are JSON numbers — `2*PI` is invalid JSON, write
+  `6.283185307179586`.
+- Constants are **upper-case**: `PI`, `E`. Lower-case `pi` is undefined and the curve
+  vanishes with no error anywhere.
+- `"data"` is an array of objects; a plain curve is `{ "fn": "sin(x)" }`.
+- Piecewise curves use the ternary operator, which is allowed:
+  `"fn": "x < 0.5 ? 2*x^2 : 1 - (-2*x + 2)^2/2"`.
+- A non-`y = f(x)` graph type (`fnType` `parametric` / `polar` / `points` / `vector`,
+  or `graphType` `scatter`) additionally needs `"sampler": "builtIn"`; the parameter
+  is `t` for parametric and **`theta`** for polar.
+- **Set the domain to the interesting region.** `"xAxis": { "domain": [0, 1] }` and
+  `"yAxis": { "domain": [-0.2, 1.2] }` for an easing curve; a default axis scale
+  usually shows a flat line and one spike.
+- Give each series a `"color"` when it must be distinguishable, and add
+  `"title"` naming the function.
+
+Example — an easing family, the case a formula table gets wrong:
+
+````markdown
+```plot
+{
+  "title": "EaseOut* family",
+  "grid": true,
+  "xAxis": { "domain": [0, 1] },
+  "yAxis": { "domain": [0, 1.2] },
+  "data": [
+    { "fn": "x", "color": "#888888", "skipTip": true },
+    { "fn": "sin(x*PI/2)", "color": "#4a9eff" },
+    { "fn": "1 - (1-x)^3", "color": "#a78bfa" },
+    { "fn": "1 - 2^(-10*x)", "color": "#f472b6" },
+    { "fn": "1 + 2.70158*(x-1)^3 + 1.70158*(x-1)^2", "color": "#e5c07b" }
+  ]
+}
+```
+````
+
+A `plot` never replaces the prose: state what the curve shows and why it matters in
+the sentence above it. Validate with `python validate-plot.py <Wiki_Root>` — it
+catches invalid JSON, a non-array `data`, and expressions containing characters the
+renderer's whitelist rejects (quotes, semicolons, braces, brackets, backslashes).
 
 ## Page Plan
 

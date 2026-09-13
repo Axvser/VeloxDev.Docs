@@ -164,7 +164,7 @@ def main():
     if args.path:
         target = Path(args.path)
     else:
-        content = Path(__file__).resolve().parent.parent.parent / "content"
+        content = Path(__file__).resolve().parent.parent / "content"
         target = content / args.lang if args.lang else content
 
     jar = Path(args.jar) if args.jar else Path(__file__).resolve().parent / "plantuml.jar"

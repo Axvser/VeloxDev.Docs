@@ -29,6 +29,8 @@ Run the machine validators yourself and quote their raw output in your report:
 ```
 python validate-links.py <Wiki_Root>
 python validate-structure.py <content root>
+python validate-titles.py <content root>
+python validate-plot.py <Wiki_Root>
 python validate-plantuml.py <Wiki_Root> --engine java     # or structural fallback if no jar/java
 node validate-mermaid.js <Wiki_Root>
 node validate-katex.js <Wiki_Root>
@@ -52,8 +54,19 @@ WARN as advisory unless it violates a stated rule.
    split respected; cross-language tree shape parity (validate-structure.py).
 5. **Links & navigation** — only the three allowed kinds; `#…` anchors equal real
    heading slugs; cross-page targets resolve inside the same language; nothing escapes.
-6. **Diagrams & formulas** — PlantUML/Mermaid/KaTeX blocks valid under the real
-   engines above.
+6. **Diagrams & formulas** — PlantUML/Mermaid/KaTeX and `plot` blocks valid under the
+   real engines above.
+7. **Titles & localisation** — no numeric prefix reaches visible text (link labels,
+   headings, `<a>` labels); in a translated tree every directory title is either
+   translated or a source-verified code identifier declared in
+   `config/title-allowlist.json`. Challenge each declared identifier against the
+   source — "it looks technical" is not evidence that it is a type name.
+8. **Welcome page** — the page is the template body and nothing else (no prose,
+   tables or "explore the documentation" sections after the hero); every feature
+   card is a link to that feature's QuickStart page; no dot-separated tagline row.
+9. **Curve over prose** — a page describing a mathematical behaviour (an easing
+   family, a decay, a response curve) draws it with `plot` instead of only
+   tabulating it.
 
 ## Output format (read by the writer, not a chat)
 Return:

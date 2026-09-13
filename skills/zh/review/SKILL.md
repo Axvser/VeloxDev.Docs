@@ -14,7 +14,7 @@
 
 - **路径** — Project_Root；各选定语言的 Wiki_Root；功能清单工作文件；校验脚本目录。
 - **权限** — 只读。审核者只报告发现；由**写作者**负责修复。
-- **指令** — 不要相信写作者的任何断言。代码真实性与公开 API 表面必须对照 Demo / 测试文件重新核验，绝不依据写作者的行文。所有机器校验器都要由审核者亲自运行（`validate-links.py`、`validate-structure.py`、`validate-plantuml.py --engine java`、`validate-mermaid.js`、`validate-katex.js`、`gen_tree.py`）并粘贴原始输出。依据功能清单独立产出「覆盖率对账矩阵」。
+- **指令** — 不要相信写作者的任何断言。代码真实性与公开 API 表面必须对照 Demo / 测试文件重新核验，绝不依据写作者的行文。所有机器校验器都要由审核者亲自运行（`validate-links.py`、`validate-structure.py`、`validate-titles.py`、`validate-plot.py`、`validate-plantuml.py --engine java`、`validate-mermaid.js`、`validate-katex.js`、`gen_tree.py`）并粘贴原始输出。依据功能清单独立产出「覆盖率对账矩阵」。
 - **输出** — 带文件路径的、按严重度排序的 不通过/通过 清单，外加覆盖率对账矩阵。
 
 报告返回后，**写作者只负责**分级处理并修复其中的问题——绝不"再自审一遍"然后把自己的发现清零。
@@ -100,8 +100,31 @@
 - [ ] **PlantUML（真实引擎）** — `python validate-plantuml.py <Wiki_Root> --engine java`；真实的 `plantuml.jar -checkonly` 必须无错误
 - [ ] **Mermaid（真实解析器）** — `node validate-mermaid.js <Wiki_Root>`；真实的 `mermaid.parse` 不得抛异常
 - [ ] **KaTeX（真实渲染器）** — `node validate-katex.js <Wiki_Root>`；任何 `$...$` / `$$...$$` 在 `katex.renderToString` 下不得抛异常
+- [ ] **函数图像（结构校验）** — `python validate-plot.py <Wiki_Root>` 报告无 ERROR：每个 ```plot 正文都是 JSON 对象，`data` 是数组，且各表达式（`fn`/`x`/`y`/`r`）只使用渲染器白名单允许的字符
+- [ ] **该画图就别用文字** — 对每个描述数学行为的页面（缓动函数族、衰减、响应曲线、分布），确认它**用 `plot` 画了出来**，而不是只列表或叙述。若一张缓动公式表本可以用一张图呈现形状，记 WARN，并明确写出该结论。
 - [ ] 修复每个报告的 **ERROR** —— 真实引擎报错意味着图表/公式无法渲染，是权威结论
-- [ ] **引擎不可用**（机器无 node/java）时，降级到无依赖的结构预检 `validate-plantuml.py` / `validate-mermaid.py` / `validate-katex.py`（启发式），并明确注明未运行真实渲染校验
+- [ ] **引擎不可用**（机器无 node/java）时，降级到无依赖的结构预检 `validate-plantuml.py` / `validate-mermaid.py` / `validate-katex.py` / `validate-plot.py`（启发式），并明确注明未运行真实渲染校验
+
+---
+
+### 标题与本地化审计（硬性关卡）
+
+侧边栏渲染的是目录名，页面渲染的是标题与链接文字。两者都由人阅读，因此都必须是**标题**而非路径，且都必须**是读者所用语言的**。
+
+- [ ] **可见文字中不得出现数字前缀** — `python validate-titles.py <content 根目录>` 报告无 ERROR。它会揪出流入链接文字、标题或 `<a>` 内层文本的 `NN_` 记号；链接**目标**豁免。任何命中都是缺陷：读者绝不应看到 `1_快速开始`，只能看到 `快速开始`。
+- [ ] **每个页面标题都已翻译** — 在每种非默认语言树中，每个目录名要么是其英文对应项的译文，要么是字面代码标识符（`MVVM`、`AOP`、`MonoBehaviour`、`00_VeloxPropertyAttribute`——即在源码中确实作为类型/命名空间/API 名存在的记号）。未翻译的描述性目录名（`prerequisites`、`install`、`complete-code`、`attached-behaviors`、`patterns-overview`）是 ERROR。
+- [ ] **例外须由源码证明，而非因为省事** — 对翻译树中每个原样保留的目录名，在【Project_Root】中检索该字面量是否确实作为类型、命名空间或 API 名存在。「这是个技术词」不构成理由，「它是 `VeloxDev.MVVM`」才构成理由。
+- [ ] **标题与正文语言与页面所在语言一致** — 已翻译页面内出现未翻译的小节标题，与未翻译目录名是同一类缺陷。
+- [ ] **跨语言语义对等** — 每种语言中处于某一树位置的页面，就是另一种语言中同一位置页面的译文。`validate-structure.py` 校验拓扑，措辞则由本项逐页核对。
+
+---
+
+### 欢迎页审计
+
+- [ ] 整页就是模板正文**加别的什么都没有** —— 收尾 `</div>` 之后不得有说明段落、表格、功能清单、"浏览文档"栏目或仓库链接
+- [ ] **每张功能卡片都是链接**（`<a class="feat-link" href="…">`），指向该功能在「快速开始」中的页面（该功能没有自己的页面时指向快速开始栏目概览），且样式表中存在 `.feat-link`，使链接不带上划线与颜色
+- [ ] 没有圆点分隔的宣传语尾行（`· 无数据库 · 开源 · MIT`，即原先的 `.glow-dot` 行）
+- [ ] 首屏链接文字不含数字前缀（见「标题与本地化审计」）
 
 ---
 
@@ -138,11 +161,12 @@
 
 1. 按检查清单逐项走查，发现问题的**立即修正**再继续下一项
 2. 代码真实性发现问题 → 使用源码搜索确认签名后修正文档
-3. 图表/公式发现问题 → 运行真实引擎校验器（`validate-plantuml.py --engine java`、`validate-mermaid.js`、`validate-katex.js`），修复每个 ERROR 直至干净
+3. 图表/公式/图像发现问题 → 运行真实引擎校验器（`validate-plantuml.py --engine java`、`validate-mermaid.js`、`validate-katex.js`）以及 `validate-plot.py`，修复每个 ERROR 直至干净
 4. 链接发现问题 → 运行 `python validate-links.py <Wiki_Root>`，修复每个 ERROR 直至干净
-5. 结构发现问题 → 运行 `python validate-structure.py <content 根目录>`（每个目录都有 index.md、跨语言树形一致、快速入门/API 功能集合一致）；修复每个 ERROR 直至干净
-6. 对账「覆盖率对账矩阵」：若任一 Demo/Test 功能存在 ❌，或矩阵未产出，质量门不通过
-7. 对快速入门页面执行「可复现性抽检」
-8. 执行 `python gen_tree.py`，确认无遗漏页面（结构干净后不存在缺 index.md 的目录，故此处无需 `--strict`）
-9. 运行项目的构建命令，确认编译通过
-10. 所有项 ✅ 后，标记质量门通过
+5. 标题/本地化发现问题 → 运行 `python validate-titles.py <content 根目录>`（数字前缀泄漏进可见文字、目录标题未翻译）；修复每个 ERROR 直至干净，再走一遍「欢迎页审计」
+6. 结构发现问题 → 运行 `python validate-structure.py <content 根目录>`（每个目录都有 index.md、跨语言树形一致、快速入门/API 功能集合一致）；修复每个 ERROR 直至干净
+7. 对账「覆盖率对账矩阵」：若任一 Demo/Test 功能存在 ❌，或矩阵未产出，质量门不通过
+8. 对快速入门页面执行「可复现性抽检」
+9. 执行 `python gen_tree.py`，确认无遗漏页面（结构干净后不存在缺 index.md 的目录，故此处无需 `--strict`）
+10. 运行项目的构建命令，确认编译通过
+11. 所有项 ✅ 后，标记质量门通过

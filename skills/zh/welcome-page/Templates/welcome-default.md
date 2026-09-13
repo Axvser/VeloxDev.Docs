@@ -12,11 +12,6 @@
     0% { opacity: 0; transform: scale(0.85); }
     100% { opacity: 1; transform: scale(1); }
   }
-  @keyframes glow-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-color, #4a9eff) 0%, transparent); }
-    50% { box-shadow: 0 0 18px 2px color-mix(in srgb, var(--accent-color, #4a9eff) 25%, transparent); }
-  }
-
   .cg-wrapper * {
     will-change: transform, opacity;
   }
@@ -77,14 +72,11 @@
     animation: shimmer 4s linear infinite;
   }
 
-  .glow-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin: 0 4px;
-    vertical-align: middle;
-    animation: glow-pulse 1.8s ease-in-out infinite;
+  /* 功能卡片本身就是一个链接。这条规则让链接不显形——卡片保留自己的颜色，且不带下划线。 */
+  .feat-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
   }
   .gradient-rule {
     width: clamp(36px, 8vw, 60px);
@@ -178,40 +170,41 @@
   </div>
 
   <!-- 可按实际情况增删条目 -->
+  <!--
+    功能卡片网格。每一张卡片都是一个链接，指向它所描述的那项功能在「快速开始」中的页面——
+    把卡片内容用 <a class="feat-link" href="…"> 包住即可。从 0_欢迎/index.md 出发，其余顶层
+    维度都在上层目录，因此目标写作 ../{快速开始目录}/{功能目录}/index.md（当某项功能没有
+    自己的快速开始页面时，../1_快速开始/index.md 这个栏目概览页也是合法目标）。目录名要带
+    数字前缀；卡片文字本身就是标签，链接不再添加任何文本。
+  -->
   <div class="cg-feats">
     <div class="feat-card cg-feat" style="animation-delay: 0s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📝</span> Markdown<br><span style="opacity: 0.6;">脚注 · 表格 · 任务列表</span>
+      <a class="feat-link" href="../1_快速开始/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📝</span> Markdown<br><span style="opacity: 0.6;">脚注 · 表格 · 任务列表</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.05s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🧮</span> KaTeX 公式<br><span style="opacity: 0.6;">行内 $ $ · 独立 $$ $$</span>
+      <a class="feat-link" href="../1_快速开始/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🧮</span> KaTeX 公式<br><span style="opacity: 0.6;">行内与独立公式</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.1s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🔍</span> 代码高亮<br><span style="opacity: 0.6;">highlight.js · VS Code 配色</span>
+      <a class="feat-link" href="../1_快速开始/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🔍</span> 代码高亮<br><span style="opacity: 0.6;">highlight.js · VS Code 配色</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.15s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📊</span> Mermaid 图表<br><span style="opacity: 0.6;">流程图 · 时序 · 类图 · Git</span>
+      <a class="feat-link" href="../1_快速开始/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📊</span> Mermaid 图表<br><span style="opacity: 0.6;">流程图 · 时序 · 类图 · Git</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.2s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌿</span> PlantUML<br><span style="opacity: 0.6;">自动深色/浅色 SVG</span>
+      <a class="feat-link" href="../1_快速开始/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌿</span> PlantUML<br><span style="opacity: 0.6;">自动深色/浅色 SVG</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.25s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎬</span> 视频嵌入<br><span style="opacity: 0.6;">B站 · YouTube · Vimeo</span>
+      <a class="feat-link" href="../1_快速开始/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📈</span> 函数图像<br><span style="opacity: 0.6;">y = f(x) · 参数方程 · 极坐标</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.3s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌐</span> 多语言<br><span style="opacity: 0.6;">每种语言独立目录</span>
+      <a class="feat-link" href="../1_快速开始/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎬</span> 视频嵌入<br><span style="opacity: 0.6;">B站 · YouTube · Vimeo</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.35s;">
-      <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎨</span> 主题编辑器<br><span style="opacity: 0.6;">RGB 滑块 · 实时预览</span>
+      <a class="feat-link" href="../1_快速开始/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌐</span> 多语言<br><span style="opacity: 0.6;">每种语言独立目录</span></a>
+    </div>
+    <div class="feat-card cg-feat" style="animation-delay: 0.4s;">
+      <a class="feat-link" href="../1_快速开始/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎨</span> 主题编辑器<br><span style="opacity: 0.6;">RGB 滑块 · 实时预览</span></a>
     </div>
   </div>
 
-  <!-- 可按实际情况增删条目 -->
-  <p style="opacity: 0.4; font-size: 0.85em; margin-top: 1em;">
-    <span class="glow-dot" style="background: #4a9eff; animation-delay: 0s;"></span>
-    Agent 友好
-    <span class="glow-dot" style="background: #a78bfa; animation-delay: 0.3s;"></span>
-    无需数据库
-    <span class="glow-dot" style="background: #f472b6; animation-delay: 0.6s;"></span>
-    开源 · MIT
-  </p>
 </div>

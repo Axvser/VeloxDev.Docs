@@ -14,7 +14,11 @@ Create a welcome page from a template that fits the current project
 
 ✔ Feature entries may be removed
 
-✔ Feature cards may be made **clickable** so they navigate to the page they describe: wrap a card's inner content in an `<a>` whose `href` follows the same-language cross-page link syntax in 【Links & Navigation】. From `0_Welcome/index.md`, sibling top-level sections live one level up — e.g. `<a href="../2_API/index.md">…</a>`; adapt the folder name (numeric prefix included) to this wiki's real tree. Do not alter layout, colors, or animations.
+⚙ **Feature cards ARE links — not an option.** Wrap each card's content in `<a class="feat-link" href="…">` so the card itself is clickable. The destination is the **QuickStart page of the feature the card names**; when a feature has no QuickStart page of its own, the QuickStart section overview is the correct destination. `href` follows the same-language cross-page link syntax in 【Links & Navigation】 — from `0_Welcome/index.md`, the other top-level dimensions live one level up, e.g. `../1_QuickStart/index.md` or `../1_QuickStart/00_user-registration/index.md`. Directory names carry their numeric prefix; adapt them to this wiki's real tree. The card text is the label — the link carries no additional visible text. Keep the `.feat-link` rule that makes the link invisible as a link.
+
+⚙ **The page is the template body and nothing else.** The hero (title, subtitle, rule, workflow steps, feature cards) is the whole page. Do NOT append prose paragraphs, tables, feature inventories, "Explore the documentation" sections, repository links or any other block after the closing `</div>`. Everything that would go there belongs on a QuickStart, API or SE Analysis page.
+
+⚙ **No tagline row of dot-separated claims.** Do not add a trailing line of the form `· No database · Open source · MIT` (the template's former `.glow-dot` row). Any such claim either belongs in a card or nowhere.
 
 ## Output Location
 

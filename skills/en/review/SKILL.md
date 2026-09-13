@@ -14,7 +14,7 @@ Hand the reviewer a self-contained brief:
 
 - **Paths** — Project_Root; Wiki_Root for each selected language; the Feature Inventory working file; the validator scripts directory.
 - **Access** — read-only. The reviewer reports findings; the WRITER applies fixes.
-- **Instructions** — trust nothing the writer asserted. Re-check code authenticity and the public API surface against Demo / test files, never against the writer's prose. Run every machine validator itself (`validate-links.py`, `validate-structure.py`, `validate-plantuml.py --engine java`, `validate-mermaid.js`, `validate-katex.js`, `gen_tree.py`) and paste the raw output. Produce the Coverage Reconciliation Matrix independently from the Feature Inventory.
+- **Instructions** — trust nothing the writer asserted. Re-check code authenticity and the public API surface against Demo / test files, never against the writer's prose. Run every machine validator itself (`validate-links.py`, `validate-structure.py`, `validate-titles.py`, `validate-plot.py`, `validate-plantuml.py --engine java`, `validate-mermaid.js`, `validate-katex.js`, `gen_tree.py`) and paste the raw output. Produce the Coverage Reconciliation Matrix independently from the Feature Inventory.
 - **Output** — an ordered FAIL / PASS list with file paths, plus the Coverage Reconciliation Matrix.
 
 After the report returns, the WRITER triages and fixes the findings only — and never "re-reviews" and clears its own findings.
@@ -100,8 +100,31 @@ Diagrams and math are validated by the **actual rendering engines** — ground t
 - [ ] **PlantUML (real engine)** — `python validate-plantuml.py <Wiki_Root> --engine java`; the actual `plantuml.jar -checkonly` must report no errors
 - [ ] **Mermaid (real parser)** — `node validate-mermaid.js <Wiki_Root>`; the real `mermaid.parse` must not throw
 - [ ] **KaTeX (real renderer)** — `node validate-katex.js <Wiki_Root>`; the real `katex.renderToString` must not throw on any `$...$` / `$$...$$`
+- [ ] **Plots (structural)** — `python validate-plot.py <Wiki_Root>` reports no ERROR: every ```plot body is a JSON object, `data` is an array, and each expression (`fn`/`x`/`y`/`r`) uses only the characters the renderer's whitelist accepts
+- [ ] **Curve over prose** — for every page describing a mathematical behaviour (an easing family, a decay, a response curve, a distribution), confirm the page **draws it with `plot`** rather than only tabulating or narrating it. A table of easing formulas where one plot would show the shape is a WARN, and the reviewer must say so explicitly.
 - [ ] Fix every reported **ERROR** — a real-engine error means the diagram/math will not render, it is authoritative
-- [ ] **If the engines are unavailable** (no node/java on the machine), fall back to the dependency-free structural pre-checks `validate-plantuml.py` / `validate-mermaid.py` / `validate-katex.py` (heuristic) and explicitly note that real-render validation was not run
+- [ ] **If the engines are unavailable** (no node/java on the machine), fall back to the dependency-free structural pre-checks `validate-plantuml.py` / `validate-mermaid.py` / `validate-katex.py` / `validate-plot.py` (heuristic) and explicitly note that real-render validation was not run
+
+---
+
+### Title & Localisation Audit (HARD GATE)
+
+The sidebar renders directory names and the pages render headings and link labels. Both are read by humans, so both must be *titles*, not paths, and both must be *in the reader's language*.
+
+- [ ] **No numeric prefix in visible text** — `python validate-titles.py <content root>` reports no ERROR. It flags a `NN_` token that reaches a link label, a heading, or the inner text of an `<a>`; link *destinations* are exempt. Any hit is a defect: a reader must never see `1_QuickStart`, only `QuickStart`.
+- [ ] **Every page title is translated** — in each non-English language tree, every directory segment is either the translation of its English counterpart or a literal code identifier (`MVVM`, `AOP`, `MonoBehaviour`, `00_VeloxPropertyAttribute` — a token that exists as a type/namespace/API name in the source). An untranslated descriptive segment (`prerequisites`, `install`, `complete-code`, `attached-behaviors`, `patterns-overview`) is an ERROR.
+- [ ] **The exception is justified by source, not by convenience** — for every segment kept verbatim in a translated tree, grep 【Project_Root】 for that exact token as a type, namespace or API name. "It is a technical word" is not sufficient; "it is `VeloxDev.MVVM`" is.
+- [ ] **Headings and body prose match the page's language** — an untranslated section heading inside a translated page is the same defect as an untranslated directory name.
+- [ ] **Cross-language meaning parity** — for each language, the page at a given position in the tree is the translation of the page at the same position in the other. `validate-structure.py` checks the topology; the wording is checked here, page by page.
+
+---
+
+### Welcome Page Audit
+
+- [ ] The page is the template body **and nothing else** — no prose paragraphs, tables, feature inventories, "Explore the documentation" sections or repository links after the closing `</div>`
+- [ ] **Every feature card is a link** (`<a class="feat-link" href="…">`) pointing at that feature's QuickStart page (or the QuickStart overview when the feature has none), with `.feat-link` present in the stylesheet so the link adds no underline or colour
+- [ ] No trailing dot-separated tagline row (`· No database · Open source · MIT`, the former `.glow-dot` row)
+- [ ] The hero's link labels carry no numeric prefix (see Title & Localisation Audit)
 
 ---
 
@@ -140,11 +163,12 @@ Diagrams and math are validated by the **actual rendering engines** — ground t
 
 1. Walk through the checklist item by item; **fix issues immediately** before moving to the next item
 2. Code authenticity issues → search source to confirm signatures, then fix docs
-3. Diagram/KaTeX issues → run the real-engine validators (`validate-plantuml.py --engine java`, `validate-mermaid.js`, `validate-katex.js`), fix every ERROR, re-run until clean
+3. Diagram/KaTeX/plot issues → run the real-engine validators (`validate-plantuml.py --engine java`, `validate-mermaid.js`, `validate-katex.js`) plus `validate-plot.py`, fix every ERROR, re-run until clean
 4. Link issues → run `python validate-links.py <Wiki_Root>`, fix every ERROR, re-run until clean
-5. Structure issues → run `python validate-structure.py <content root>` (index.md coverage in every directory, cross-language tree shape, QuickStart/API feature parity); fix every ERROR, re-run until clean
-6. Reconcile the **Coverage Reconciliation Matrix**: if any Demo/Test feature has a ❌, or the matrix was not written, the quality gate FAILS
-7. Run the **Reproducibility Spot-check** against the QuickStart pages
-8. Run `python gen_tree.py`, confirm no pages are missing (once structure is clean there is no missing index.md, so `--strict` is unnecessary here)
-9. Run the project's build command, confirm compilation succeeds
-10. Only after all items are ✅, mark the quality gate as passed
+5. Title/localisation issues → run `python validate-titles.py <content root>` (numeric prefix leaking into visible text; untranslated directory titles); fix every ERROR, re-run until clean, then walk the Welcome Page Audit
+6. Structure issues → run `python validate-structure.py <content root>` (index.md coverage in every directory, cross-language tree shape, QuickStart/API feature parity); fix every ERROR, re-run until clean
+7. Reconcile the **Coverage Reconciliation Matrix**: if any Demo/Test feature has a ❌, or the matrix was not written, the quality gate FAILS
+8. Run the **Reproducibility Spot-check** against the QuickStart pages
+9. Run `python gen_tree.py`, confirm no pages are missing (once structure is clean there is no missing index.md, so `--strict` is unnecessary here)
+10. Run the project's build command, confirm compilation succeeds
+11. Only after all items are ✅, mark the quality gate as passed

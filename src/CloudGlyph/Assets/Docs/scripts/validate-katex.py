@@ -156,7 +156,7 @@ def main():
     if args.path:
         target = Path(args.path)
     else:
-        content = Path(__file__).resolve().parent.parent.parent / "content"
+        content = Path(__file__).resolve().parent.parent / "content"
         target = content / args.lang if args.lang else content
 
     files = [target] if target.is_file() else sorted(target.rglob("*.md"))

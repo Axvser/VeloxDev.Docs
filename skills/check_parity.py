@@ -1,16 +1,18 @@
 """
 check_parity.py
 
-Guard against EN/ZH skill drift: the committed SKILL.md is the EN build, while the
-ZH build is only produced on demand (`gen_skill.py --lang zh`). Because a bilingual
-child wiki can be driven by whichever language build an agent loaded, the two builds
-must stay rule-equivalent. This script regenerates both builds in a temp copy and
+Guard against EN/ZH skill drift: `skills/SKILL.md` is a single artifact regenerated
+per language (`gen_skill.py --lang en|zh`), so only the language built last is
+committed. Because a bilingual child wiki can be driven by whichever language build
+an agent loaded, the two builds must stay rule-equivalent. This script regenerates
+both builds in a temp copy and
 asserts that a curated set of RULES is present in one language iff present in the
 other (technical tokens like script names are identical across languages; rule
 phrases are mapped en→zh).
 
 This is a parity smoke test, not a translation diff: it catches "the zh module
-lagged behind and lost rule X", not wording polish. See .github/workflows/skill-quality.yml.
+lagged behind and lost rule X", not wording polish. Run it manually before committing
+skill changes; nothing invokes it automatically.
 
 Usage:
     python skills/check_parity.py
@@ -38,11 +40,15 @@ PARITY_PAIRS = [
     ("validate-katex.js", "validate-katex.js"),
     ("validate-mermaid.py", "validate-mermaid.py"),
     ("validate-katex.py", "validate-katex.py"),
+    ("validate-titles.py", "validate-titles.py"),
+    ("validate-plot.py", "validate-plot.py"),
     ("gen_tree.py", "gen_tree.py"),
     ("--strict", "--strict"),
     ("tel:", "tel:"),
     ("Templates/welcome-default.md", "Templates/welcome-default.md"),
     ("Run Declaration", "运行声明"),
+    ("title-allowlist.json", "title-allowlist.json"),
+    ("feat-link", "feat-link"),
     # rule phrases (mapped)
     ("Feature Inventory", "功能清单"),
     ("Coverage Reconciliation Matrix", "覆盖率对账矩阵"),
@@ -56,6 +62,12 @@ PARITY_PAIRS = [
     ("Outline-first", "大纲先行"),
     ("leaf budget", "叶子预算"),
     ("cg:atomic", "cg:atomic"),
+    # title hygiene / localisation / welcome-page / plot rules
+    ("code identifier", "代码标识符"),
+    ("Title & Localisation Audit", "标题与本地化审计"),
+    ("Welcome Page Audit", "欢迎页审计"),
+    ("Rendered Content Members", "渲染成员"),
+    ("Function plot rules", "函数图像书写规范"),
 ]
 
 

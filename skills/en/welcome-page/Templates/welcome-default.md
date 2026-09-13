@@ -12,11 +12,6 @@
 	0% { opacity: 0; transform: scale(0.85); }
 	100% { opacity: 1; transform: scale(1); }
   }
-  @keyframes glow-pulse {
-	0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-color, #4a9eff) 0%, transparent); }
-	50% { box-shadow: 0 0 18px 2px color-mix(in srgb, var(--accent-color, #4a9eff) 25%, transparent); }
-  }
-
   .cg-wrapper * {
 	will-change: transform, opacity;
   }
@@ -77,14 +72,12 @@
 	animation: shimmer 4s linear infinite;
   }
 
-  .glow-dot {
-	display: inline-block;
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	margin: 0 4px;
-	vertical-align: middle;
-	animation: glow-pulse 1.8s ease-in-out infinite;
+  /* A feature card is a link. This rule is what keeps the link invisible as a
+     link — the card keeps its own colour, with no underline. */
+  .feat-link {
+	display: block;
+	color: inherit;
+	text-decoration: none;
   }
   .gradient-rule {
 	width: clamp(36px, 8vw, 60px);
@@ -179,41 +172,43 @@
   </div>
 
   <!-- Add or remove entries as appropriate -->
-  <!-- Feature grid -->
+  <!--
+	Feature grid. EVERY card is a link to the QuickStart page of the project
+	feature it names — wrap the card's content in <a class="feat-link" href="…">.
+	From 0_Welcome/index.md the other top-level dimensions are one level up, so a
+	destination reads ../{QuickStart directory}/{feature directory}/index.md
+	(../1_QuickStart/index.md — the section overview — is a valid destination
+	when a feature has no QuickStart page of its own). Directory names carry
+	their numeric prefix; the card text is the label, so the link adds no text.
+  -->
   <div class="cg-feats">
 	<div class="feat-card cg-feat" style="animation-delay: 0s;">
-	  <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📝</span> Markdown<br><span style="opacity: 0.6;">Footnotes · Tables · Task lists</span>
+	  <a class="feat-link" href="../1_QuickStart/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📝</span> Markdown<br><span style="opacity: 0.6;">Footnotes · Tables · Task lists</span></a>
 	</div>
 	<div class="feat-card cg-feat" style="animation-delay: 0.05s;">
-	  <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🧮</span> KaTeX<br><span style="opacity: 0.6;">Inline $ $ · Display $$ $$</span>
+	  <a class="feat-link" href="../1_QuickStart/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🧮</span> KaTeX<br><span style="opacity: 0.6;">Inline and display math</span></a>
 	</div>
 	<div class="feat-card cg-feat" style="animation-delay: 0.1s;">
-	  <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🔍</span> Code Highlighting<br><span style="opacity: 0.6;">highlight.js · VS Code theme</span>
+	  <a class="feat-link" href="../1_QuickStart/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🔍</span> Code Highlighting<br><span style="opacity: 0.6;">highlight.js · VS Code theme</span></a>
 	</div>
 	<div class="feat-card cg-feat" style="animation-delay: 0.15s;">
-	  <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📊</span> Mermaid<br><span style="opacity: 0.6;">Flow · Sequence · Class · Git</span>
+	  <a class="feat-link" href="../1_QuickStart/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📊</span> Mermaid<br><span style="opacity: 0.6;">Flow · Sequence · Class · Git</span></a>
 	</div>
 	<div class="feat-card cg-feat" style="animation-delay: 0.2s;">
-	  <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌿</span> PlantUML<br><span style="opacity: 0.6;">Auto dark/light SVG</span>
+	  <a class="feat-link" href="../1_QuickStart/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌿</span> PlantUML<br><span style="opacity: 0.6;">Auto dark/light SVG</span></a>
 	</div>
 	<div class="feat-card cg-feat" style="animation-delay: 0.25s;">
-	  <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎬</span> Video Embed<br><span style="opacity: 0.6;">Bilibili · YouTube · Vimeo</span>
+	  <a class="feat-link" href="../1_QuickStart/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📈</span> Function Plots<br><span style="opacity: 0.6;">y = f(x) · parametric · polar</span></a>
 	</div>
 	<div class="feat-card cg-feat" style="animation-delay: 0.3s;">
-	  <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌐</span> Multi-language<br><span style="opacity: 0.6;">Independent directories per language</span>
+	  <a class="feat-link" href="../1_QuickStart/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎬</span> Video Embed<br><span style="opacity: 0.6;">Bilibili · YouTube · Vimeo</span></a>
 	</div>
 	<div class="feat-card cg-feat" style="animation-delay: 0.35s;">
-	  <span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎨</span> Theme Editor<br><span style="opacity: 0.6;">RGB sliders · Live preview</span>
+	  <a class="feat-link" href="../1_QuickStart/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌐</span> Multi-language<br><span style="opacity: 0.6;">Independent directories per language</span></a>
+	</div>
+	<div class="feat-card cg-feat" style="animation-delay: 0.4s;">
+	  <a class="feat-link" href="../1_QuickStart/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎨</span> Theme Editor<br><span style="opacity: 0.6;">RGB sliders · Live preview</span></a>
 	</div>
   </div>
 
-  <!-- Add or remove entries as appropriate -->
-  <p style="opacity: 0.4; font-size: 0.85em; margin-top: 1em;">
-	<span class="glow-dot" style="background: #4a9eff; animation-delay: 0s;"></span>
-	Agent-friendly
-	<span class="glow-dot" style="background: #a78bfa; animation-delay: 0.3s;"></span>
-	No DB required
-	<span class="glow-dot" style="background: #f472b6; animation-delay: 0.6s;"></span>
-	Open Source · MIT
-  </p>
 </div>
