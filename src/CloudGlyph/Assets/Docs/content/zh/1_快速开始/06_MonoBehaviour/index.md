@@ -1,7 +1,5 @@
 # MonoBehaviour — 快速开始
 
-## MonoBehaviour
-
 **monobehaviour** 特性把 Unity 风格的行为循环带到纯 .NET。你给一个 `partial` 类打上 `[MonoBehaviour]`，Roslyn 源生成器（位于程序集 `VeloxDev.Core.Generator`）就把桥接写进 `.g.cs`：该类实现运行时接口 `VeloxDev.MonoBehaviour.IMonoBehaviour`，并获得生命周期入口 `Awake`、`Start`、`Update`、`LateUpdate`、`FixedUpdate` 作为 `partial void` 钩子，由你在类的另一半自行实现。不需要继承基类、没有可重写的虚方法 `OnFrame`、也没有 `[Update]` 特性 —— 钩子方法本身就是 API。
 
 运行时方面，静态门面 `VeloxDev.TimeLine.MonoBehaviourManager` 驱动多个具名**通道（channel）**。每个通道拥有两个帧泵：Update 泵（按目标 FPS、默认 60 派发每帧的 `Update` / `LateUpdate`）与 FixedUpdate 泵（固定步长 `FixedUpdate`，默认每 16 ms 一次）。两个泵在后台线程上运行（当平台禁止 `Thread` —— 例如 WASM/iOS —— 则改为 `async` 任务），并按注册顺序调用该通道上每个行为的钩子。管理器还提供按通道的配置（`SetTargetFPS`、`SetFixedUpdateInterval`、`SetTimeScale`、`SetUseAsyncLoop`、`ExecuteOnMainThread`）、生命周期控制（`Start`、`StopAsync`、`Pause`、`Resume`、`TogglePause`、`RestartAsync`）与状态查询（`SystemStatus`、`IsRunning`、`CurrentFPS`、`TotalFrames`、`ActiveBehaviorCount` 等）。

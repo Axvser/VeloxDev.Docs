@@ -1,7 +1,5 @@
 # MVVM — Quick Start
 
-## MVVM
-
 The **mvvm** feature is the view-model layer of VeloxDev: two Roslyn source generators (in assembly `VeloxDev.Core.Generator`, generator classes `VeloxDev.Generators.MVVM` and `VeloxDev.Generators.Command`) turn a plain `partial` class into a full MVVM view-model at compile time. There is no base class to inherit, no interface to declare and no service registration — you annotate members and the compiler writes the rest into `.g.cs` files.
 
 - `[VeloxProperty]` on a private field (or a `partial` property) expands it into a public observable property. When no base class already provides the plumbing, the generator adds the `INotifyPropertyChanging` / `INotifyPropertyChanged` interfaces, the events, `OnPropertyChanging(string)` / `OnPropertyChanged(string)`, and declares `partial void On<Name>Changing(old, new)` / `partial void On<Name>Changed(old, new)` hooks you can implement in your own part of the class.

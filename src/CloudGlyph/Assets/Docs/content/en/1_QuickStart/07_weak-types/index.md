@@ -1,7 +1,5 @@
 # Weak Types — Quick Start
 
-## Weak Types
-
 The **weak-types** feature ships four framework-agnostic collection types that hold their contents through *weak references*, so an entry never keeps its target alive. They exist to prevent the classic .NET memory leak where a long-lived publisher, event source or cache keeps short-lived subscribers and keys reachable through a strong reference long after they are done.
 
 All four types live in the `VeloxDev.WeakTypes` namespace inside the `VeloxDev.Core` package (source folder `Src/Core/VeloxDev.Core/WeakTypes/`), have no UI adapter and no runtime dependency, and are `sealed`:

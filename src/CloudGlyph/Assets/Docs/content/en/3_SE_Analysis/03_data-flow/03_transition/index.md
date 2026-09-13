@@ -217,9 +217,9 @@ A declared path (`.Property(x => x.Foo.Bar, value)`) is parsed once and held in 
 
 Index arguments are the other half of the path story. By default an index argument that can change while the animation runs — a captured local, or a property of the target such as `SelectedIndex` — is re-evaluated on **every frame**, so the path follows it; but the end value was read once when the animation started, so a moving path writes an end value computed against the slot it started on. `PathIndex.Frozen(i)` pins the slot instead. It is part of the path's identity, so `Items[i]` and `Items[Frozen(i)]` are two different paths, and the pin is resolved exactly once, in `Prepare`, by `TransitionProperty.BindTo`.
 
-## Flow Summary `Transition<T>` is `TransitionCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter, TPriorityCore>`, and `CoreExecute` resolves the scheduler internally through `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, TPriorityCore>.FindOrCreate`. (Avalonia and WinUI additionally declare their adapter scheduler as the generic `TransitionScheduler<TTarget>`; its type parameter is unused.)
-
 ## Flow Summary
+
+`Transition<T>` is `TransitionCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter, TPriorityCore>`, and `CoreExecute` resolves the scheduler internally through `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, TPriorityCore>.FindOrCreate`. (Avalonia and WinUI additionally declare their adapter scheduler as the generic `TransitionScheduler<TTarget>`; its type parameter is unused.)
 
 | Scenario | Behavior |
 |---|---|

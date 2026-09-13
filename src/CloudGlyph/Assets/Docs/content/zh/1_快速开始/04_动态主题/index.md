@@ -1,8 +1,6 @@
 # 动态主题 — 快速入门
 
-## 动态主题
-
-### 概览
+## 概览
 
 **动态主题** 为基于 VeloxDev 的编辑器或应用带来**带动画过渡的运行时主题切换**。你用 `[ThemeConfig]` 在控件或视图模型上把每个参与主题的属性映射为「每个主题下一个值」，然后在运行时于主题间切换 —— 通过 `ThemeManager.Transition<T>(effect)` 平滑切换（整场切换作为动画跑在 TransitionSystem 引擎上），或通过 `ThemeManager.Jump<T>()` 即时切换（同步写入目标值，没有时间轴也没有 effect）。
 

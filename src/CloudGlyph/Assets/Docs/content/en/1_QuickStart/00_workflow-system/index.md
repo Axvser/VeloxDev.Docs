@@ -1,7 +1,5 @@
 # Workflow System — Quick Start
 
-## Workflow System
-
 VeloxDev WorkflowSystem is a cross-platform visual workflow editing and execution engine. You build a graph from four kinds of components — **Tree**, **Node**, **Slot**, **Link** — by decorating partial ViewModels with `[WorkflowBuilder.*]` attributes; a Roslyn source generator emits the full ViewModel (properties, commands, helper wiring, undo/redo, connection plumbing). The engine core is UI-framework-agnostic; per-platform *adapters* supply the rendering behaviors and belong to the separate `08_platform-adapters` feature.
 
 The engine executes a graph three ways, and this Quick Start walks all three:

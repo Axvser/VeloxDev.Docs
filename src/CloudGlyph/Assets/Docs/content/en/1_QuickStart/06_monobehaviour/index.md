@@ -1,7 +1,5 @@
 # MonoBehaviour — Quick Start
 
-## MonoBehaviour
-
 The **monobehaviour** feature brings a Unity-style behaviour loop to plain .NET. You mark a `partial` class with `[MonoBehaviour]` and the Roslyn source generator (in assembly `VeloxDev.Core.Generator`) writes the bridge into `.g.cs`: the class implements the runtime interface `VeloxDev.MonoBehaviour.IMonoBehaviour` and gains the lifecycle entry points `Awake`, `Start`, `Update`, `LateUpdate` and `FixedUpdate` as `partial void` hooks that you can fill in on your own half of the class. There is no base class to inherit, no virtual `OnFrame` method and no `[Update]` attribute — the hook methods themselves are the API.
 
 At runtime a static facade, `VeloxDev.TimeLine.MonoBehaviourManager`, drives named **channels**. Each channel owns two frame pumps: the Update pump (per-frame `Update` / `LateUpdate`, paced by a target FPS, default 60) and the FixedUpdate pump (a fixed-timestep `FixedUpdate`, default every 16 ms). Both pumps run on background threads (or `async` tasks when the platform forbids `Thread`, e.g. WASM/iOS) and invoke the hooks of every behaviour registered on that channel in registration order. The manager also carries per-channel configuration (`SetTargetFPS`, `SetFixedUpdateInterval`, `SetTimeScale`, `SetUseAsyncLoop`, `ExecuteOnMainThread`), lifecycle control (`Start`, `StopAsync`, `Pause`, `Resume`, `TogglePause`, `RestartAsync`) and status queries (`SystemStatus`, `IsRunning`, `CurrentFPS`, `TotalFrames`, `ActiveBehaviorCount`, ...).

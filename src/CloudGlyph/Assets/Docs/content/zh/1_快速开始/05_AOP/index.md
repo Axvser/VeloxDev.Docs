@@ -1,9 +1,5 @@
 # AOP — 快速开始
 
-## AOP
-
-### 快速开始
-
 `VeloxDev.Core` 的 **aop** 功能为 `partial class` 提供运行时面向切面拦截：用 `[AspectOriented]` 标记公开成员后，Roslyn 源生成器会生成一个代理接口和一个 `Aop()` 扩展；调用该扩展会得到一个 `DispatchProxy`，此后每个 `[AspectOriented]` 成员的调用都可以被挂上钩子。对每个成员，你可以挂上由 `ProxyHandler` 委托构成的 `(start, coverage, end)` 三元组：
 
 - `start` 在成员执行前运行；
@@ -14,14 +10,14 @@
 
 > 整个 AOP 运行时（`Src/Core/VeloxDev.Core/AspectOriented/` 与 `Src/Core/VeloxDev.Core/Interfaces/AspectOriented/` 下的每个文件）都包裹在 `#if NET` 中，因此它只存在于包的 `net5.0` 构建里。它**不会**被编译进 `netstandard2.0`、`netframework4.6.1` 或 `netcoreapp3.0` 目标。
 
-#### 1. 前置条件
+## 1. 前置条件
 
 - **支持目标**（来自使用方工程）：面向 .NET 5.0+ 的 TFM（`net5.0`、`net6.0`、`net7.0`、`net8.0`、`net9.0`、`net10.0`、…）。`VeloxDev.Core.csproj` 多目标 `netstandard2.0;netframework4.6.1;net5.0;netcoreapp3.0`，但 `#if NET` 的 AOP 运行时只在 `net5.0` 产物中。面向 .NET Framework / `netcoreapp3.0` / 仅 netstandard 的使用方无法使用该功能。
 - **SDK / 运行时：** 能编译 `net5.0+` 且自带源生成器所需 Roslyn 编译器的 .NET SDK（生成器要求 `Microsoft.CodeAnalysis.CSharp` ≥ 4.3.1，即 .NET SDK 6.0.4xx / VS 2022 17.3+ 即可）。已在 SDK 9.0/10.0 上验证——这是*被验证过*的环境。下面的示例面向 `net9.0`。
 - **包管理器：** NuGet / `dotnet` CLI。
 - **所需服务：** 无。不需要任何平台适配器包。
 
-#### 2. 安装 / 添加依赖
+## 2. 安装 / 添加依赖
 
 添加 `VeloxDev.Core` 包（它以依赖形式携带 `VeloxDev.Core.Generator` 分析器，因此代理源生成器会自动对工程生效）：
 
@@ -37,7 +33,7 @@ dotnet add reference ..\..\..\..\Src\Core\VeloxDev.Core\VeloxDev.Core.csproj
 
 **预期结果：** 命令以退出码 0 结束；`.csproj` 中出现 `PackageReference`（或 `ProjectReference`）且还原完成。此后构建工程即会运行 AOP 生成器（`VeloxDev.Generators.AopInterface` 与 `VeloxDev.Generators.AopProxy`，程序集 `VeloxDev.Core.Generator`）。
 
-#### 3. 基础设置 / 注册
+## 3. 基础设置 / 注册
 
 声明一个**位于命名空间中的 `partial` 类**——生成器会产出第二个 `partial` 声明使类实现生成的代理接口，所以声明必须是 `partial`。用 `[AspectOriented]` 标记你想拦截的每个公开成员：
 
@@ -73,7 +69,7 @@ public partial class Counter
 
 **预期结果：** `dotnet build` 成功；`instance.Aop()` 返回实现了所生成接口的代理，对同一实例再次调用返回*同一个*缓存代理。
 
-#### 4. 核心用法（逐步）
+## 4. 核心用法（逐步）
 
 **4.1 获取代理**
 
@@ -134,7 +130,7 @@ var original = Aop.GetTarget<Counter>(proxy);
 
 **生命周期说明：** AOP 不提供取消或按代理释放的 API。代理一旦创建，`ProxyEx.CreateProxy` 会把它登记进静态表 `ProxyInstance.ProxyIDs` / `ProxyInstances`，且 `AopCache.Resolve` 会按目标实例缓存它，因此已创建的代理及其已注册钩子会存活到进程结束。
 
-#### 5. 验证
+## 5. 验证
 
 运行随附的任一 demo —— `Examples/AOP/WPF/Demo`（WPF，`net9.0-windows`，以 `MessageBox` 弹窗提示）或 `Examples/AOP/Avalonia/Demo`（Avalonia，`net9.0`，以 toast `Notification` 提示）——并依次触发五个按钮确认钩子：
 
@@ -150,7 +146,7 @@ var original = Aop.GetTarget<Counter>(proxy);
 
 **预期结果：** 每次交互都弹出对应消息；`Reset()` 弹出取消提示且团队状态*并未*被重置。
 
-#### 6. 完整代码
+## 6. 完整代码
 
 创建一个 `net9.0` 控制台工程，添加 `VeloxDev.Core`（或引用 `Src/Core/VeloxDev.Core/VeloxDev.Core.csproj`），并把 `Program.cs` 替换为：
 
@@ -257,6 +253,6 @@ after Reset, total = 0
 original.Total = 0
 ```
 
-#### 7. 运行声明
+## 7. 运行声明
 
 - ⚠️ 未实际运行 — 仅做了静态验证。本会话完整阅读了 `Examples/AOP/{WPF,Avalonia}/Demo` 下的 WPF 与 Avalonia demo 作为证据（其 `bin/` 产物表明此前构建成功），并把上面的控制台程序与运行时（`Src/Core/VeloxDev.Core/AspectOriented/*.cs`）及生成器（`Src/Generators/VeloxDev.Core.Generator/AopInterface.cs`、`AopProxy.cs`）源码逐一对照，但并未在本会话中编译并运行任何调用 AOP 代理的控制台工程，因此上面的控制台输出是静态推导而非实际录制的结果。

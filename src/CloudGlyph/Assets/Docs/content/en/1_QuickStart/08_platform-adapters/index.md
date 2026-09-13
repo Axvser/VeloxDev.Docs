@@ -1,8 +1,6 @@
 # Platform Adapters — Quick Start
 
-## Platform Adapters
-
-### Overview
+## Overview
 
 VeloxDev's **workflow engine** (`VeloxDev.Core`) is UI-framework-agnostic: the tree model (`IWorkflowTreeViewModel` / `IWorkflowNodeViewModel` / `IWorkflowSlotViewModel` / `IWorkflowLinkViewModel`), the `WorkflowBuilder.Tree` source generator, and the spatial/compile machinery know nothing about WPF or MAUI. A **platform adapter** is the thin layer that turns that engine into a real, interactive editor on one GUI framework.
 
@@ -26,7 +24,7 @@ An adapter provides, per framework:
 
 The **template packs** (`VeloxDev.{Platform}.Templates`) scaffold the same seven-view suite on every platform — node / slot / link / tree / template-selector / grid-decorator / minimap-overlay views with the behaviors already wired. This Quick Start walks the **WPF** path end to end (it has both demos and a complete template suite); the other adapters expose the same type names and namespace, so the same steps apply with their own prefix and framework host.
 
-### Scope of this page
+## Scope of this page
 
 WPF is the exercised walkthrough. Where a non-WPF detail can only be read from source (no demo exercises it), the page marks it as `*inferred*`.
 

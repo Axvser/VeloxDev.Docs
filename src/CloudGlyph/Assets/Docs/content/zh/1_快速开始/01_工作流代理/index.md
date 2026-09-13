@@ -1,7 +1,5 @@
 # 工作流代理 — 快速入门
 
-## 工作流代理
-
 工作流代理（workflow-agent）特性是 VeloxDev 的 AI 控制层。它把一个运行中的工作流树（`IWorkflowTreeViewModel`，也就是工作流系统快速入门构建的那个对象）变成 LLM 可以通过函数调用工具驱动起来的表面：
 
 - `tree.AsAgentScope()` 返回流式的 `WorkflowAgentScope` 构建器。它收集提示词语言、输出语言、类型发现、工具调用预算、主机策略门禁、交互安全、回调与自定义工具。

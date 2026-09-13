@@ -1,7 +1,5 @@
 # MVVM — 快速开始
 
-## MVVM
-
 **mvvm** 特性是 VeloxDev 的视图模型层：两个 Roslyn 源生成器（位于程序集 `VeloxDev.Core.Generator`，生成器类为 `VeloxDev.Generators.MVVM` 与 `VeloxDev.Generators.Command`）在编译期把一个普通的 `partial` 类变成完整的 MVVM 视图模型。不需要继承基类、不需要声明接口、不需要注册服务 —— 你只需标注成员，编译器把其余部分写进 `.g.cs` 文件。
 
 - 在私有字段（或 `partial` 属性）上加 `[VeloxProperty]`，会把它展开为公开可观察属性。当基类没有提供通知基础时，生成器会补上 `INotifyPropertyChanging` / `INotifyPropertyChanged` 接口、事件、`OnPropertyChanging(string)` / `OnPropertyChanged(string)`，并声明 `partial void On<名称>Changing(old, new)` / `partial void On<名称>Changed(old, new)` 钩子供你在类的另一半实现。

@@ -1,7 +1,5 @@
 # Workflow Agent — Quick Start
 
-## Workflow Agent
-
 The **workflow-agent** feature is the AI control layer of VeloxDev. It turns a running workflow tree (an `IWorkflowTreeViewModel`, the same object the Workflow System Quick Start builds) into a surface an LLM can drive through function-calling tools:
 
 - `tree.AsAgentScope()` returns a fluent `WorkflowAgentScope` builder. It collects prompt language, output language, type discovery, tool-call budgets, host-policy gates, interaction safety, callbacks and custom tools.

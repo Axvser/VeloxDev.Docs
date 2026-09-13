@@ -1,8 +1,6 @@
 # 平台适配器 — 快速开始
 
-## 平台适配器
-
-### 概览
+## 概览
 
 VeloxDev 的**工作流引擎**（`VeloxDev.Core`）与 UI 框架无关：树模型（`IWorkflowTreeViewModel` / `IWorkflowNodeViewModel` / `IWorkflowSlotViewModel` / `IWorkflowLinkViewModel`）、`WorkflowBuilder.Tree` 源生成器以及空间/编译机制都不关心底层是 WPF 还是 MAUI。**平台适配器**就是把该引擎变成某个 GUI 框架上真正可交互编辑器的薄层。
 
@@ -26,7 +24,7 @@ VeloxDev 提供**七个适配器**，每个都是独立的 NuGet 包，并配套
 
 **模板包**（`VeloxDev.{Platform}.Templates`）在每个平台都会搭出同样的「七视图套件」——节点 / 槽 / 连线 / 树 / 模板选择器 / 网格装饰层 / 小地图覆盖层，且行为已经接好。本快速开始完整走一遍 **WPF** 路径（它有最完整的演示与模板套件）；其它适配器暴露相同的类型名与命名空间，用各自前缀与框架宿主即可套用同样的步骤。
 
-### 页面范围
+## 页面范围
 
 WPF 是被实际演练的路径。凡是非 WPF 细节只能从源码推断（没有演示演练过），页面都会标注为 `*推断所得*`。
 

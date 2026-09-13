@@ -1,8 +1,6 @@
 # Dynamic Theme — Quick Start
 
-## Dynamic Theme
-
-### Overview
+## Overview
 
 **Dynamic Theme** brings **runtime theme switching with animated transitions** to a VeloxDev-based editor or application. You map each themed property on a control or view-model to one value per theme with `[ThemeConfig]`, then flip between themes at runtime — smoothly through `ThemeManager.Transition<T>(effect)`, which runs the whole switch as an animation on the TransitionSystem engine, or instantly through `ThemeManager.Jump<T>()`, which writes the target values synchronously with no timeline and no effect.
 

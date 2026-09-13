@@ -1,8 +1,6 @@
 # Transition — Quick Start
 
-## Transition
-
-### Overview
+## Overview
 
 **Transition** is VeloxDev's cross-platform, code-driven interpolation engine. Its core idea is **"everything is a state"**: you declare the state an object should reach, path by path (`Transition<T>.Create().Property(x => x.Foo, value)`), and execute it — the engine reads each declared property's current value when the run starts and interpolates it to the declared target over a timed, eased, frame-based timeline. There is no capture step: nothing is discovered or recorded from a live object.
 
