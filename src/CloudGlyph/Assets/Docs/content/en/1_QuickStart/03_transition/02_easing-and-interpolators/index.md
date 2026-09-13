@@ -9,6 +9,44 @@
 | linear | `Eases.Default` | — | — |
 | Sine / Quad / Cubic / Quart / Quint / Expo / Circ / Back / Elastic / Bounce | `Eases.{Group}.In` | `Eases.{Group}.Out` | `Eases.{Group}.InOut` |
 
+**What the three directions mean.** `In` starts slow and accelerates, `Out` starts fast and settles, `InOut` does both — drawn for the `Cubic` group, with the linear ramp (`Eases.Default`) for reference:
+
+```plot
+{
+  "title": "Cubic — In / Out / InOut",
+  "grid": true,
+  "xAxis": { "domain": [0, 1] },
+  "yAxis": { "domain": [-0.1, 1.1] },
+  "data": [
+    { "fn": "x", "color": "#888888", "skipTip": true },
+    { "fn": "x^3", "color": "#4a9eff" },
+    { "fn": "1 - (1-x)^3", "color": "#a78bfa" },
+    { "fn": "x < 0.5 ? 4*x^3 : 1 - (-2*x + 2)^3/2", "color": "#f472b6" }
+  ]
+}
+```
+
+**What each family gives you.** The same `Out` direction across six families, each curve the library's own `Ease` method. `Back` overshoots the target and comes back, `Elastic` oscillates around it, `Bounce` bounces into it, `Expo` and `Circ` are the most abrupt; `Quad`, `Quart` and `Quint` sit between `Cubic` and `Expo`, so the curve you pick is how hard the effect should push at the start. Read the shape, not just the name:
+
+```plot
+{
+  "title": "Eases.*.Out — one curve per family",
+  "grid": true,
+  "xAxis": { "domain": [0, 1] },
+  "yAxis": { "domain": [-0.15, 1.25] },
+  "data": [
+    { "fn": "x", "color": "#888888", "skipTip": true },
+    { "fn": "1 - (1-x)^3", "color": "#4a9eff" },
+    { "fn": "sqrt(1 - (x-1)^2)", "color": "#98c379" },
+    { "fn": "x == 0 ? 0 : x == 1 ? 1 : 1 - 2^(-10*x)", "color": "#e5c07b" },
+    { "fn": "1 + 2.70158*(x-1)^3 + 1.70158*(x-1)^2", "color": "#a78bfa" },
+    { "fn": "x == 0 ? 0 : x == 1 ? 1 : 2^(-10*x)*sin((x*10 - 0.75)*2*PI/3) + 1", "color": "#f472b6" },
+    { "fn": "x < 0.36363636 ? 7.5625*x^2 : x < 0.72727273 ? 7.5625*(x-0.54545455)^2 + 0.75 : x < 0.90909091 ? 7.5625*(x-0.81818182)^2 + 0.9375 : 7.5625*(x-0.95454545)^2 + 0.984375", "color": "#e06c75" }
+  ]
+}
+```
+
+
 For example `Eases.Circ.InOut`, `Eases.Expo.Out`, `Eases.Back.Out` and `Eases.Bounce.Out` are used by the demos. Every built-in `Ease*` class is `public` too, so `new EaseInOutCubic()` is equivalent to `Eases.Cubic.InOut`.
 
 ```csharp

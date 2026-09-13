@@ -9,6 +9,44 @@
 | 线性 | `Eases.Default` | — | — |
 | Sine / Quad / Cubic / Quart / Quint / Expo / Circ / Back / Elastic / Bounce | `Eases.{Group}.In` | `Eases.{Group}.Out` | `Eases.{Group}.InOut` |
 
+**三种方向分别意味着什么。** `In` 起步慢、随后加速，`Out` 起步快、随后落定，`InOut` 两者兼有 —— 下面以 `Cubic` 分组为例画出，并以线性斜坡（`Eases.Default`）作为参照：
+
+```plot
+{
+  "title": "Cubic — In / Out / InOut",
+  "grid": true,
+  "xAxis": { "domain": [0, 1] },
+  "yAxis": { "domain": [-0.1, 1.1] },
+  "data": [
+    { "fn": "x", "color": "#888888", "skipTip": true },
+    { "fn": "x^3", "color": "#4a9eff" },
+    { "fn": "1 - (1-x)^3", "color": "#a78bfa" },
+    { "fn": "x < 0.5 ? 4*x^3 : 1 - (-2*x + 2)^3/2", "color": "#f472b6" }
+  ]
+}
+```
+
+**各分组分别给你什么。** 同样是 `Out` 方向，六个分组的对比；每条曲线都是库自身 `Ease` 方法的形状。`Back` 会冲过目标再回弹，`Elastic` 围绕目标振荡，`Bounce` 弹跳着落定，`Expo` 与 `Circ` 最为陡峭；`Quad`、`Quart`、`Quint` 则落在 `Cubic` 与 `Expo` 之间。选哪条曲线，本质上是在选效果起步时要多用力——请读形状，而不只是读名字：
+
+```plot
+{
+  "title": "Eases.*.Out — one curve per family",
+  "grid": true,
+  "xAxis": { "domain": [0, 1] },
+  "yAxis": { "domain": [-0.15, 1.25] },
+  "data": [
+    { "fn": "x", "color": "#888888", "skipTip": true },
+    { "fn": "1 - (1-x)^3", "color": "#4a9eff" },
+    { "fn": "sqrt(1 - (x-1)^2)", "color": "#98c379" },
+    { "fn": "x == 0 ? 0 : x == 1 ? 1 : 1 - 2^(-10*x)", "color": "#e5c07b" },
+    { "fn": "1 + 2.70158*(x-1)^3 + 1.70158*(x-1)^2", "color": "#a78bfa" },
+    { "fn": "x == 0 ? 0 : x == 1 ? 1 : 2^(-10*x)*sin((x*10 - 0.75)*2*PI/3) + 1", "color": "#f472b6" },
+    { "fn": "x < 0.36363636 ? 7.5625*x^2 : x < 0.72727273 ? 7.5625*(x-0.54545455)^2 + 0.75 : x < 0.90909091 ? 7.5625*(x-0.81818182)^2 + 0.9375 : 7.5625*(x-0.95454545)^2 + 0.984375", "color": "#e06c75" }
+  ]
+}
+```
+
+
 例如示例用到了 `Eases.Circ.InOut`、`Eases.Expo.Out`、`Eases.Back.Out` 与 `Eases.Bounce.Out`。所有内置 `Ease*` 类也都是 `public` 的，因此 `new EaseInOutCubic()` 等价于 `Eases.Cubic.InOut`。
 
 ```csharp
