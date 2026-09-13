@@ -26,26 +26,7 @@
 }
 ```
 
-**各分组分别给你什么。** 同样是 `Out` 方向，六个分组的对比；每条曲线都是库自身 `Ease` 方法的形状。`Back` 会冲过目标再回弹，`Elastic` 围绕目标振荡，`Bounce` 弹跳着落定，`Expo` 与 `Circ` 最为陡峭；`Quad`、`Quart`、`Quint` 则落在 `Cubic` 与 `Expo` 之间。选哪条曲线，本质上是在选效果起步时要多用力——请读形状，而不只是读名字：
-
-```plot
-{
-  "title": "Eases.*.Out — one curve per family",
-  "grid": true,
-  "xAxis": { "domain": [0, 1] },
-  "yAxis": { "domain": [-0.15, 1.25] },
-  "data": [
-    { "fn": "x", "color": "#888888", "skipTip": true },
-    { "fn": "1 - (1-x)^3", "color": "#4a9eff" },
-    { "fn": "sqrt(1 - (x-1)^2)", "color": "#98c379" },
-    { "fn": "x == 0 ? 0 : x == 1 ? 1 : 1 - 2^(-10*x)", "color": "#e5c07b" },
-    { "fn": "1 + 2.70158*(x-1)^3 + 1.70158*(x-1)^2", "color": "#a78bfa" },
-    { "fn": "x == 0 ? 0 : x == 1 ? 1 : 2^(-10*x)*sin((x*10 - 0.75)*2*PI/3) + 1", "color": "#f472b6" },
-    { "fn": "x < 0.36363636 ? 7.5625*x^2 : x < 0.72727273 ? 7.5625*(x-0.54545455)^2 + 0.75 : x < 0.90909091 ? 7.5625*(x-0.81818182)^2 + 0.9375 : 7.5625*(x-0.95454545)^2 + 0.984375", "color": "#e06c75" }
-  ]
-}
-```
-
+**每一族都画了出来。** [缓动曲线图](00_缓动曲线图/index.md) 为每一族各给一张图（该族的 `In`、`Out`、`InOut` 同框），并把十个族的 `Out` 曲线画在同一坐标系里便于比较。
 
 例如示例用到了 `Eases.Circ.InOut`、`Eases.Expo.Out`、`Eases.Back.Out` 与 `Eases.Bounce.Out`。所有内置 `Ease*` 类也都是 `public` 的，因此 `new EaseInOutCubic()` 等价于 `Eases.Cubic.InOut`。
 
