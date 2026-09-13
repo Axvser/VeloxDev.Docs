@@ -3,6 +3,8 @@ using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Platform;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
@@ -20,6 +22,11 @@ namespace CloudGlyph.Views
         public MainView()
         {
             InitializeComponent();
+
+            // Ctrl+K focuses the search box, as in an editor's quick-open. Tunnelling, so it works
+            // wherever focus sits inside the view (note: key events go to the WebView, not here,
+            // while the rendered page itself has focus — there the box is reachable by click).
+            AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
 
             // Route links clicked inside the rendered Markdown: same-language page links navigate
             // the tree; web/mail links keep the library's default (open in the OS browser).
@@ -54,6 +61,17 @@ namespace CloudGlyph.Views
                     }
                 };
             };
+        }
+
+        /// <summary>Ctrl+K moves focus into the search box and selects what is already there.</summary>
+        private void OnPreviewKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.K || !e.KeyModifiers.HasFlag(KeyModifiers.Control))
+                return;
+
+            SearchBox.Focus();
+            SearchBox.SelectAll();
+            e.Handled = true;
         }
 
         private void AttachViewModel(MainViewModel? vm)

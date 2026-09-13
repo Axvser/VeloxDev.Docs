@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using CloudGlyph.Models;
 using CloudGlyph.Services;
 
@@ -78,8 +79,16 @@ public partial class DocumentViewModel : ObservableObject
     [ObservableProperty]
     private SearchHit? _selectedResult;
 
-    /// <summary>True once a query is typed — the sidebar swaps the tree for the result list.</summary>
+    /// <summary>True once a query is typed — the results panel is showing.</summary>
     public bool ShowResults => !string.IsNullOrWhiteSpace(Query);
+
+    /// <summary>
+    /// Whether the results popup is open. It is two-way because the popup closes itself on a click
+    /// outside or Esc; that has to clear the query, or the panel would reappear on the next keystroke
+    /// with no way to dismiss it.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isSearchOpen;
 
     /// <summary>True when the current query matched nothing, so the sidebar can say so.</summary>
     public bool HasNoResults => ShowResults && !IsIndexing && Results.Count == 0;
@@ -156,7 +165,16 @@ public partial class DocumentViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ShowResults));
         OnPropertyChanged(nameof(HasNoResults));
+        IsSearchOpen = !string.IsNullOrWhiteSpace(value);
         QueueSearch(value);
+    }
+
+    partial void OnIsSearchOpenChanged(bool value)
+    {
+        // Dismissed (Esc, click outside, or a picked result): drop the query. Setting the same
+        // value twice is a no-op, so the pair cannot loop.
+        if (!value && !string.IsNullOrWhiteSpace(Query))
+            Query = string.Empty;
     }
 
     partial void OnIsIndexingChanged(bool value) => OnPropertyChanged(nameof(HasNoResults));
@@ -413,9 +431,13 @@ public partial class DocumentViewModel : ObservableObject
         }
     }
 
+    /// <summary>Clears the query, which collapses the results panel. Bound to Esc and the ✕ button.</summary>
+    [RelayCommand]
+    private void ClearQuery() => Query = string.Empty;
+
     /// <summary>
-    /// Navigates to a search hit: opens the branches that lead to it, selects it, and clears the
-    /// query so the sidebar returns to the tree.
+    /// Navigates to a search hit: opens the branches that lead to it, selects it, and closes the
+    /// results panel.
     /// </summary>
     public void NavigateTo(SearchHit hit)
     {

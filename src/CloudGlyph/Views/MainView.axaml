@@ -16,14 +16,17 @@
 
 	<Grid RowDefinitions="Auto,*">
 
-		<!-- 顶部工具栏 -->
+		<!-- 顶部工具栏。三列 `*,Auto,*`：两侧星号列等宽，因此中间那列恰好落在窗口正中，
+			 搜索框不随左右两侧内容宽度变化而偏移。 -->
 		<Border Grid.Row="0"
 				BorderThickness="0,0,0,1"
 				BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
 				Padding="8,6">
-			<Grid ColumnDefinitions="*,Auto">
-				<!-- 左侧 -->
-				<StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
+			<Grid ColumnDefinitions="*,Auto,*">
+
+				<!-- 左：文档语言 -->
+				<StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4"
+							HorizontalAlignment="Left">
 					<ComboBox ItemsSource="{Binding Document.TopLanguages}"
 							  SelectedItem="{Binding Document.SelectedLanguage}"
 							  ToolTip.Tip="Document language"
@@ -35,89 +38,65 @@
 						</ComboBox.ItemTemplate>
 					</ComboBox>
 				</StackPanel>
-				<!-- 右侧工具栏 -->
-				<StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+
+				<!-- 中：搜索框（Ctrl+K 聚焦，Esc 清空） -->
+				<TextBox Grid.Column="1"
+						 x:Name="SearchBox"
+						 Width="440"
+						 PlaceholderText="Search pages…  (Ctrl+K)"
+						 Text="{Binding Document.Query, Mode=TwoWay}">
+					<TextBox.KeyBindings>
+						<KeyBinding Gesture="Escape" Command="{Binding Document.ClearQueryCommand}" />
+					</TextBox.KeyBindings>
+					<TextBox.InnerRightContent>
+						<Button Padding="6,2"
+								Background="Transparent"
+								BorderThickness="0"
+								Content="✕"
+								ToolTip.Tip="Clear search"
+								IsVisible="{Binding Document.ShowResults}"
+								Command="{Binding Document.ClearQueryCommand}" />
+					</TextBox.InnerRightContent>
+				</TextBox>
+
+				<!-- 右：预留工具栏 -->
+				<StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4"
+							HorizontalAlignment="Right">
 				</StackPanel>
 			</Grid>
 		</Border>
 
 
-		<Grid Grid.Row="1" ColumnDefinitions="260,4,*">
-			<!-- 左侧：搜索 + 目录树 -->
+		<Grid Grid.Row="1" ColumnDefinitions="240,4,*">
+
+			<!-- 左侧目录树。搜索不再挤掉它：结果浮在内容之上，导航树始终在位。 -->
 			<Grid Grid.Column="0" RowDefinitions="Auto,*">
-				<TextBox Grid.Row="0"
-						 Margin="8,8,8,6"
-						 PlaceholderText="Search pages…"
-						 Text="{Binding Document.Query, Mode=TwoWay}" />
-
-				<Grid Grid.Row="1">
-
-					<!-- 搜索结果：有查询时替换目录树 -->
-					<Grid IsVisible="{Binding Document.ShowResults}" RowDefinitions="Auto,Auto,*">
-						<TextBlock Grid.Row="0"
-								   Text="{Binding Document.ResultsHeader}"
-								   Margin="10,2,8,4"
-								   Opacity="0.6"
-								   FontSize="11" />
-						<TextBlock Grid.Row="1"
-								   Text="Building index…"
-								   IsVisible="{Binding Document.IsIndexing}"
-								   Margin="10,0,8,6"
-								   Opacity="0.45"
-								   FontSize="11" />
-						<ListBox Grid.Row="2"
-								 ItemsSource="{Binding Document.Results}"
-								 SelectedItem="{Binding Document.SelectedResult}"
-								 Margin="4,0">
-							<ListBox.ItemTemplate>
-								<DataTemplate x:DataType="services:SearchHit">
-									<StackPanel Margin="0,2">
-										<TextBlock Text="{Binding Title}"
-												   FontWeight="SemiBold"
-												   TextTrimming="CharacterEllipsis" />
-										<TextBlock Text="{Binding Snippet}"
-												   FontSize="11"
-												   Opacity="0.6"
-												   MaxLines="2"
-												   TextWrapping="Wrap" />
-									</StackPanel>
-								</DataTemplate>
-							</ListBox.ItemTemplate>
-						</ListBox>
-					</Grid>
-
-					<!-- 目录树 -->
-					<Grid IsVisible="{Binding !Document.ShowResults}" RowDefinitions="Auto,*">
-						<TextBlock Grid.Row="0"
-								   Text="Navigation"
-								   Margin="10,2,8,4"
-								   Opacity="0.6"
-								   FontSize="11" />
-						<TreeView Grid.Row="1"
-								  ItemsSource="{Binding Document.Nodes}"
-								  SelectedItem="{Binding Document.SelectedNode}"
-								  Margin="4,0">
-							<!-- Expansion state lives on PageNode so the view model can open the branches
-								 leading to a navigated page (a link click, a search result). This is a
-								 ReflectionBinding rather than a compiled one because a Style carries no
-								 DataContext type for the binding compiler to use. -->
-							<TreeView.Styles>
-								<Style Selector="TreeViewItem">
-									<Setter Property="IsExpanded"
-											Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
-								</Style>
-							</TreeView.Styles>
-							<TreeView.ItemTemplate>
-								<TreeDataTemplate ItemsSource="{Binding Children}"
-												  x:DataType="models:PageNode">
-									<TextBlock Text="{Binding Title}"
-											   x:DataType="models:PageNode" />
-								</TreeDataTemplate>
-							</TreeView.ItemTemplate>
-						</TreeView>
-					</Grid>
-
-				</Grid>
+				<TextBlock Grid.Row="0"
+						   Text="Navigation"
+						   Margin="10,8,8,4"
+						   Opacity="0.6"
+						   FontSize="11" />
+				<TreeView Grid.Row="1"
+						  ItemsSource="{Binding Document.Nodes}"
+						  SelectedItem="{Binding Document.SelectedNode}"
+						  Margin="4,0">
+					<!-- 展开状态存在 PageNode 上，视图模型才能替跳转到的页面打开其祖先分支。
+						 这里用 ReflectionBinding 而非编译绑定：Style 没有可供绑定编译器推断的
+						 DataContext 类型。 -->
+					<TreeView.Styles>
+						<Style Selector="TreeViewItem">
+							<Setter Property="IsExpanded"
+									Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
+						</Style>
+					</TreeView.Styles>
+					<TreeView.ItemTemplate>
+						<TreeDataTemplate ItemsSource="{Binding Children}"
+										  x:DataType="models:PageNode">
+							<TextBlock Text="{Binding Title}"
+									   x:DataType="models:PageNode" />
+						</TreeDataTemplate>
+					</TreeView.ItemTemplate>
+				</TreeView>
 			</Grid>
 
 			<GridSplitter Grid.Column="1" ResizeDirection="Columns" Width="4" />
@@ -136,6 +115,63 @@
 								 VerticalAlignment="Stretch"
 								 Background="Transparent" />
 			</Grid>
+
 		</Grid>
+
+		<!-- 搜索结果：从搜索框正下方浮出的面板。
+			 用 Popup 而不是普通 Border —— Markdown 预览是 NativeWebView（HWND 子窗口），
+			 Avalonia 自己的内容画不到它上面（airspace 限制），而 Popup 是独立窗口，可以。
+			 宽度 560、搜索框 440，左移 60 使两者同轴居中。 -->
+		<Popup x:Name="ResultsPopup"
+			   IsOpen="{Binding Document.IsSearchOpen, Mode=TwoWay}"
+			   PlacementTarget="{Binding #SearchBox}"
+			   Placement="Bottom"
+			   HorizontalOffset="-60"
+			   VerticalOffset="4"
+			   IsLightDismissEnabled="True">
+			<Border Width="560"
+					MaxHeight="440"
+					CornerRadius="6"
+					BorderThickness="1"
+					BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+					Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+				<Grid RowDefinitions="Auto,Auto,*">
+
+					<TextBlock Grid.Row="0"
+							   Text="{Binding Document.ResultsHeader}"
+							   Margin="12,8,12,4"
+							   Opacity="0.6"
+							   FontSize="11" />
+
+					<TextBlock Grid.Row="1"
+							   Text="Building index…"
+							   IsVisible="{Binding Document.IsIndexing}"
+							   Margin="12,0,12,6"
+							   Opacity="0.45"
+							   FontSize="11" />
+
+					<ListBox Grid.Row="2"
+							 ItemsSource="{Binding Document.Results}"
+							 SelectedItem="{Binding Document.SelectedResult}"
+							 Margin="4,0,4,4"
+							 Background="Transparent">
+						<ListBox.ItemTemplate>
+							<DataTemplate x:DataType="services:SearchHit">
+								<StackPanel Margin="0,2">
+									<TextBlock Text="{Binding Title}"
+											   FontWeight="SemiBold"
+											   TextTrimming="CharacterEllipsis" />
+									<TextBlock Text="{Binding Snippet}"
+											   FontSize="11"
+											   Opacity="0.6"
+											   MaxLines="2"
+											   TextWrapping="Wrap" />
+								</StackPanel>
+							</DataTemplate>
+						</ListBox.ItemTemplate>
+					</ListBox>
+				</Grid>
+			</Border>
+		</Popup>
 	</Grid>
 </UserControl>
