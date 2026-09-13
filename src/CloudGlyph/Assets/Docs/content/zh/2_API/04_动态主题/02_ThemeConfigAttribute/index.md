@@ -35,7 +35,7 @@ public partial class MainWindow
 ```
 
 **说明：**
-- `TConverter` 是把原始 `object?[]` 参数列表转换为属性平台类型的策略（如 `BrushConverter` → 一个 `Brush`；Avalonia 示例使用 `ObjectConverter`）。转换器实现随每个平台适配器一起提供，位于同一 `VeloxDev.DynamicTheme` 命名空间（见 [04 PlatformAdapters](../04_PlatformAdapters/index.md)）。
+- `TConverter` 是把原始 `object?[]` 参数列表转换为属性平台类型的策略（如 `BrushConverter` → 一个 `Brush`；Avalonia 示例使用 `ObjectConverter`）。转换器实现随每个平台适配器一起提供，位于同一 `VeloxDev.DynamicTheme` 命名空间（见 [04 PlatformAdapters](../04_平台适配器/index.md)）。
 - 特性本身只声明数据 —— 单独应用它不会产生任何行为。由主题源生成器消费以生成 `IThemeObject` 的 partial 实现。
 
 ### 源生成器：`Theme`（命名空间 `VeloxDev.Generators`）
@@ -101,5 +101,5 @@ public partial class MainWindow
 | `Convert` | `object? Convert(Type targetType, string propertyName, object?[] parameters)` |
 
 **说明：**
-- 平台适配器提供实现 —— `BrushConverter`、`ColorConverter`、`DoubleConverter`、`PointConverter`、`CornerRadiusConverter`、`ThicknessConverter`、`ObjectConverter`（均位于适配器程序集的 `VeloxDev.DynamicTheme` 命名空间）——见 [04 PlatformAdapters](../04_PlatformAdapters/index.md)。
+- 平台适配器提供实现 —— `BrushConverter`、`ColorConverter`、`DoubleConverter`、`PointConverter`、`CornerRadiusConverter`、`ThicknessConverter`、`ObjectConverter`（均位于适配器程序集的 `VeloxDev.DynamicTheme` 命名空间）——见 [04 PlatformAdapters](../04_平台适配器/index.md)。
 - `ThemeCache` 也暴露一个转换器注册表（`RegisterConverter` / `GetConverter`），用于希望在多个类型间共享单个转换器实例的场景。

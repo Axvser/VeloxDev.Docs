@@ -6,8 +6,8 @@ run/result 背后的执行工具（`RunCompiledWorkflow`、`GetNodeResult`）镜
 
 ## 页面
 
-- [00 · 类图](00_class-diagram/index.md) — 代理作用域 / 工具包 / 状态追踪器 / MCP + 编译执行类
-- [01 · 模式概览](01_patterns-overview/index.md) — 全部八个模式一览表
+- [00 · 类图](00_类图/index.md) — 代理作用域 / 工具包 / 状态追踪器 / MCP + 编译执行类
+- [01 · 模式概览](01_模式总览/index.md) — 全部八个模式一览表
 - [02 · 构建者](02_构建者/index.md) — `WorkflowAgentScope` 上的流畅 `With*` 配置
 - [03 · 门面](03_门面/index.md) — 单一工具表面隐藏反射、命令派发与 JSON
 - [04 · 装饰器](04_装饰器/index.md) — `TrackedAIFunction` 包装每个 `AIFunction`

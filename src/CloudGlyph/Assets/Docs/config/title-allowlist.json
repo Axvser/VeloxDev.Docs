@@ -1,0 +1,110 @@
+{
+  "note": [
+    "Directory titles that stay verbatim in every language, because the title IS a",
+    "name from the code: a public type, delegate, enum member, namespace or framework",
+    "type a reader will grep for. Translating one would make the sidebar disagree with",
+    "the source. Everything else in a translated tree must be translated — a",
+    "descriptive English phrase such as `prerequisites` or `adapter-catalogue` is a",
+    "translation gap, not a code name.",
+    "",
+    "validate-titles.py accepts a segment when every ASCII letter run in it appears",
+    "here (matched case-insensitively). Each entry below was confirmed against",
+    "`Src/` of the VeloxDev source, with the declaration recorded in `where`."
+  ],
+  "codeIdentifiers": [
+    "MVVM",
+    "AOP",
+    "UI",
+    "MCP",
+    "AI",
+    "GC",
+    "Root",
+    "Terminal",
+
+    "Workflow",
+    "WorkflowSystem",
+    "StandardEx",
+    "CompilerEx",
+    "AgentEx",
+    "Functions",
+
+    "VeloxPropertyAttribute",
+    "VeloxCommandAttribute",
+    "VeloxCommand",
+    "IVeloxCommand",
+    "Command",
+    "CommandEventType",
+    "CommandEventHandler",
+    "CommandEventArgs",
+    "ObservableCollectionTracker",
+
+    "TransitionSystem",
+    "Transition",
+    "Eases",
+    "NativeSamplers",
+    "Abstractions",
+    "TimeLine",
+
+    "ThemeManager",
+    "ThemeCache",
+    "ThemeConfigAttribute",
+
+    "ProxyEx",
+    "ProxyInstance",
+
+    "MonoBehaviour",
+    "MonoBehaviourAttribute",
+    "MonoBehaviourManager",
+    "MonoBehaviourChannelEventArgs",
+    "IMonoBehaviour",
+    "FrameEventArgs",
+    "TimeLineEventArgs",
+    "ThreadSafeFrameEventArgs",
+    "TransitionEventArgs",
+
+    "WeakDelegate",
+    "WeakQueue",
+    "WeakStack",
+    "WeakCache"
+  ],
+  "where": {
+    "VeloxDev.MVVM namespace; `Src/Core/VeloxDev.Core/MVVM/`": ["MVVM"],
+    "`Src/Core/VeloxDev.Core/AspectOriented/`": ["AOP"],
+    "`UIThreadInspectorCore`, UI-thread marshalling": ["UI"],
+    "MCP server support in the Workflow Agent": ["MCP"],
+    "`VeloxDev.AI` namespace; `Src/Core/VeloxDev.Core/AI/`": ["AI"],
+    "`System.GC` — `GC.SuppressFinalize`, `GC.GetTotalAllocatedBytes`": ["GC"],
+    "`CompileRole.Root`": ["Root"],
+    "`CompileRole.Terminal`": ["Terminal"],
+    "`VeloxDev.AI.Workflow` namespace": ["Workflow"],
+    "`VeloxDev.WorkflowSystem` namespace": ["WorkflowSystem"],
+    "`VeloxDev.WorkflowSystem.StandardEx` namespace": ["StandardEx"],
+    "`VeloxDev.Core.WorkflowSystem.CompilerEx` namespace": ["CompilerEx"],
+    "`AgentEx` (Src/Core/VeloxDev.Core.Extension/AgentEx.cs)": ["AgentEx"],
+    "`VeloxDev.AI.Workflow.Functions` namespace": ["Functions"],
+    "`Src/Core/VeloxDev.Core/MVVM/*.cs`": [
+      "VeloxPropertyAttribute", "VeloxCommandAttribute", "VeloxCommand",
+      "IVeloxCommand", "Command", "CommandEventType", "CommandEventHandler",
+      "CommandEventArgs", "ObservableCollectionTracker"
+    ],
+    "`VeloxDev.TransitionSystem` namespace / `Transition` class": [
+      "TransitionSystem", "Transition"
+    ],
+    "`Eases` (Src/Core/VeloxDev.Core/TransitionSystem/Eases.cs)": ["Eases"],
+    "`VeloxDev.TransitionSystem.NativeSamplers` namespace": ["NativeSamplers"],
+    "`Abstractions` sub-namespace of VeloxDev.TransitionSystem": ["Abstractions"],
+    "`VeloxDev.TimeLine` namespace": ["TimeLine"],
+    "`Src/Core/VeloxDev.Core/DynamicTheme/*.cs`": [
+      "ThemeManager", "ThemeCache", "ThemeConfigAttribute"
+    ],
+    "`Src/Core/VeloxDev.Core/AspectOriented/*.cs`": ["ProxyEx", "ProxyInstance"],
+    "`Src/Core/VeloxDev.Core/Interfaces/MonoBehaviour/`, `Src/Core/VeloxDev.Core/TimeLine/`": [
+      "MonoBehaviour", "MonoBehaviourAttribute", "MonoBehaviourManager",
+      "MonoBehaviourChannelEventArgs", "IMonoBehaviour", "FrameEventArgs",
+      "TimeLineEventArgs", "ThreadSafeFrameEventArgs", "TransitionEventArgs"
+    ],
+    "`Src/Core/VeloxDev.Core/WeakTypes/*.cs`": [
+      "WeakDelegate", "WeakQueue", "WeakStack", "WeakCache"
+    ]
+  }
+}

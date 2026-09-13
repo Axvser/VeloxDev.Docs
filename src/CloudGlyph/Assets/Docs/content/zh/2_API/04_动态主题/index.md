@@ -29,7 +29,7 @@
 - [01 ThemeCache](01_ThemeCache/index.md) — `ThemeCache`（全部静态成员）及嵌套类 `InstanceCache`。
 - [02 ThemeConfigAttribute](02_ThemeConfigAttribute/index.md) — `ThemeConfigAttribute<TConverter, TTheme...>`（六种元数）与契约 `ITheme`、`IThemeObject`、`IThemeValueConverter`。
 - [03 TransitionSystem](03_TransitionSystem/index.md) — 主题功能所驱动的引擎表面：采样器解析、属性与效果契约。
-- [04 PlatformAdapters](04_PlatformAdapters/index.md) — 适配器提供的 `Interpolator`、`TransitionEffect` / `TransitionEffects` 与主题值转换器。
+- [04 PlatformAdapters](04_平台适配器/index.md) — 适配器提供的 `Interpolator`、`TransitionEffect` / `TransitionEffects` 与主题值转换器。
 
 ## 相关功能
 

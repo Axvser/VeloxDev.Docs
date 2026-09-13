@@ -33,7 +33,7 @@ ThemeManager.SetPlatformInterpolator(new Interpolator());
 ```
 
 **说明：**
-- 在任何带动画的过渡之前必须调用一次，以便主题属性类型能解析到平台采样器。`InterpolatorCore` 声明于 `VeloxDev.TransitionSystem.Abstractions`；具体适配器类型是位于 `VeloxDev.TransitionSystem` 的平台 `Interpolator`（见 [04 PlatformAdapters](../04_PlatformAdapters/index.md)）。
+- 在任何带动画的过渡之前必须调用一次，以便主题属性类型能解析到平台采样器。`InterpolatorCore` 声明于 `VeloxDev.TransitionSystem.Abstractions`；具体适配器类型是位于 `VeloxDev.TransitionSystem` 的平台 `Interpolator`（见 [04 PlatformAdapters](../04_平台适配器/index.md)）。
 - 除了强制适配器执行采样器注册，它还是不带动画就无法成立的那一环：`Transition` 通过 `InterpolatorCore.CreateScheduler` 向该实例索取调度器（`ThemeManager.cs`，`RunSwitch`）。未设置时切换依然发生——只是瞬时完成、没有动画。
 - 若某属性类型没有已注册的采样器，带动画的切换仍会运行，但该属性全程保持旧值，直到切换结束时才被写入目标值（`ThemeManager.cs`，`ApplyHeldValues`）。
 

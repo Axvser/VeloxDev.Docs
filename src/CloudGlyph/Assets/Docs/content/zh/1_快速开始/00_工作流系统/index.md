@@ -23,11 +23,11 @@ seed(2.0) ──► Source ──┬──► Report ──►（打印结果）
 
 ## 子页面
 
-- [00 前置条件](00_prerequisites/index.md) — 支持目标 / SDK / 包管理器 / 运行环境
-- [01 安装 / 添加依赖](01_install/index.md) — 引入 `VeloxDev.Core` 与源生成器
-- [02 定义组件](02_define-components/index.md) — Tree / Slot / Node 类与节点 Helper
-- [03 构建画布](03_build-canvas/index.md) — 建树、注册节点、配通道、连线
-- [04 编译与正向运行](04_compile-and-run/index.md) — `CompileRole.Root` 编译 + `RuntimeEngine` 运行
-- [05 终端结果编译](05_terminal-compile/index.md) — `CompileRole.Terminal` 反向锥 + `Target` 追踪
-- [06 序列化](06_serialization/index.md) — 整棵树 JSON 往返
-- [07 验证与完整代码](07_complete-code/index.md) — 对照 Demo / 测试 + 完整程序 + 运行声明
+- [00 前置条件](00_前置条件/index.md) — 支持目标 / SDK / 包管理器 / 运行环境
+- [01 安装 / 添加依赖](01_安装/index.md) — 引入 `VeloxDev.Core` 与源生成器
+- [02 定义组件](02_定义组件/index.md) — Tree / Slot / Node 类与节点 Helper
+- [03 构建画布](03_构建画布/index.md) — 建树、注册节点、配通道、连线
+- [04 编译与正向运行](04_编译与运行/index.md) — `CompileRole.Root` 编译 + `RuntimeEngine` 运行
+- [05 终端结果编译](05_终端编译/index.md) — `CompileRole.Terminal` 反向锥 + `Target` 追踪
+- [06 序列化](06_序列化/index.md) — 整棵树 JSON 往返
+- [07 验证与完整代码](07_完整代码/index.md) — 对照 Demo / 测试 + 完整程序 + 运行声明

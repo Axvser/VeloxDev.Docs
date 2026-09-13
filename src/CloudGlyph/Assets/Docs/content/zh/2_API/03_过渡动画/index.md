@@ -20,5 +20,5 @@
 - [00_transitionsystem](00_transitionsystem/index.md) — `VeloxDev.TransitionSystem` 核心契约：采样/属性契约、效果-调度-解释器契约、`RotationDirection`、`Eases` 与具体缓动类。
 - [01_abstractions](01_abstractions/index.md) — `VeloxDev.TransitionSystem.Abstractions` 中的引擎实现基础类型。
 - [02_nativesamplers](02_nativesamplers/index.md) — `VeloxDev.TransitionSystem.NativeSamplers` 中的内置采样器。
-- [03_adapter-provided](03_adapter-provided/index.md) — 各适配器在 `VeloxDev.TransitionSystem` 中提供的平台表面。
+- [03_adapter-provided](03_适配器提供/index.md) — 各适配器在 `VeloxDev.TransitionSystem` 中提供的平台表面。
 - [04_timeline](04_timeline/index.md) — `VeloxDev.TimeLine.TransitionEventArgs` 与 `Handled` 取消。

@@ -1,6 +1,6 @@
 # Transition — 核心契约：`VeloxDev.TransitionSystem`
 
-本页记录动画引擎的核心、与 UI 无关的契约。它们声明于 `VeloxDev.Core` 程序集的 `VeloxDev.TransitionSystem` 命名空间（源码：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs` 与 `Src/Core/VeloxDev.Core/TransitionSystem/*.cs`），不引用任何平台类型。平台适配器以具体类型实现这些契约，见 [03_adapter-provided](../03_adapter-provided/index.md)。
+本页记录动画引擎的核心、与 UI 无关的契约。它们声明于 `VeloxDev.Core` 程序集的 `VeloxDev.TransitionSystem` 命名空间（源码：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs` 与 `Src/Core/VeloxDev.Core/TransitionSystem/*.cs`），不引用任何平台类型。平台适配器以具体类型实现这些契约，见 [03_adapter-provided](../03_适配器提供/index.md)。
 
 ## 职责划分
 
@@ -16,6 +16,6 @@
 
 ## 子页
 
-- [00_sampling-capture](00_sampling-capture/index.md) — `ISampler`、`ISampleable`、`ITransitionProperty`、`IFrameState`（采样 + 属性路径契约）。
-- [01_effect-engine](01_effect-engine/index.md) — `ITransitionEffectCore` / `ITransitionEffect<TPriorityCore>`、调度器与解释器接口、`IUIThreadInspectorCore`。
+- [00_sampling-capture](00_采样与捕获/index.md) — `ISampler`、`ISampleable`、`ITransitionProperty`、`IFrameState`（采样 + 属性路径契约）。
+- [01_effect-engine](01_效果引擎/index.md) — `ITransitionEffectCore` / `ITransitionEffect<TPriorityCore>`、调度器与解释器接口、`IUIThreadInspectorCore`。
 - [02_eases](02_eases/index.md) — `RotationDirection`、`Eases` 与 31 个具体缓动类。

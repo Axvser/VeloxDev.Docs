@@ -16,5 +16,5 @@
 
 ## API — 章节
 
-- [AOP 运行时 —— 命名空间 `VeloxDev.AspectOriented`](00_aspect-oriented/index.md) —— 标记特性、标记接口、钩子契约、代理工厂 / 实例与生命周期缓存。
-- [生成器产物（源生成器）](01_generated-api/index.md) —— 编译期生成的 AOP 接口、partial 类胶水与 `Aop(this T)` 扩展。
+- [AOP 运行时 —— 命名空间 `VeloxDev.AspectOriented`](00_面向切面/index.md) —— 标记特性、标记接口、钩子契约、代理工厂 / 实例与生命周期缓存。
+- [生成器产物（源生成器）](01_生成的API/index.md) —— 编译期生成的 AOP 接口、partial 类胶水与 `Aop(this T)` 扩展。

@@ -30,4 +30,4 @@ private async Task<string> MoveNode(
 - `WaitForNDispatchesAsync` —— 为一次工具调用中多次派发的共享树命令计数 N 次退出；
 - `SendReceiveAsync` —— 同时等待 `Tree.SendConnectionCommand` 与 `Tree.ReceiveConnectionCommand`（`WorkflowAgentToolkit.cs`，第 2672-2767 行）。
 
-编译/运行工具扩展了同样的思想：`RunCompiledWorkflow` / `GetNodeResult` 通过 `CompilerViewModel.CompileAsync` + `RuntimeEngine.RunAsync` 派发整张编译图，而非手工逐节点执行——参见[模式概览](../01_patterns-overview/index.md)与[数据流 Terminal 结果页](../../../03_数据流分析/01_工作流代理/04_Terminal结果执行/index.md)。
+编译/运行工具扩展了同样的思想：`RunCompiledWorkflow` / `GetNodeResult` 通过 `CompilerViewModel.CompileAsync` + `RuntimeEngine.RunAsync` 派发整张编译图，而非手工逐节点执行——参见[模式概览](../01_模式总览/index.md)与[数据流 Terminal 结果页](../../../03_数据流分析/01_工作流代理/04_Terminal结果执行/index.md)。

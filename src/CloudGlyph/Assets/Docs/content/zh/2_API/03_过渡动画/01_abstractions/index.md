@@ -1,6 +1,6 @@
 # Transition — 引擎实现：`VeloxDev.TransitionSystem.Abstractions`
 
-`VeloxDev.Core` 程序集中的 `VeloxDev.TransitionSystem.Abstractions` 命名空间（源码：`Src/Core/VeloxDev.Core/TransitionSystem/*.cs`）。这些具体 / 抽象基础类型实现了 [00_transitionsystem](../00_transitionsystem/index.md) 记录的契约。各平台适配器子类化它们，产出你实际构造的 `VeloxDev.TransitionSystem` 类型（见 [03_adapter-provided](../03_adapter-provided/index.md)）。
+`VeloxDev.Core` 程序集中的 `VeloxDev.TransitionSystem.Abstractions` 命名空间（源码：`Src/Core/VeloxDev.Core/TransitionSystem/*.cs`）。这些具体 / 抽象基础类型实现了 [00_transitionsystem](../00_transitionsystem/index.md) 记录的契约。各平台适配器子类化它们，产出你实际构造的 `VeloxDev.TransitionSystem` 类型（见 [03_adapter-provided](../03_适配器提供/index.md)）。
 
 ## 状态构建器与状态
 
@@ -105,7 +105,7 @@ public static class TransitionCoreEx
 
 ### 类：`StateCore : IFrameState`
 
-`IFrameState` 的具体默认实现；适配器的 `State` 派生自它（见 [03_adapter-provided](../03_adapter-provided/index.md)）。
+`IFrameState` 的具体默认实现；适配器的 `State` 派生自它（见 [03_adapter-provided](../03_适配器提供/index.md)）。
 
 | 成员 | 类型 | 说明 |
 |---|---|---|
@@ -155,7 +155,7 @@ public abstract class InterpolatorCore
 
 **`TryGetInterpolator` 解析顺序：** 这不是一次精确匹配。先试精确类型；再沿基类链由近及远；最后扫类型的接口，多个接口命中时取全名序（序数）最小者——接口排最后、且以显式规则打破平局，因为反射给出的接口顺序未作任何规定。之所以要这一趟走查：框架属性常常声明为适配器所注册类型的**子类**（WPF 注册的是 `Brush`，而属性声明为 `LinearGradientBrush`），只做精确匹配会让它不动，并被判为不可采样。这对注册方的含义：注册**一般**类型（一旦注册了基类或接口，再注册具体类型就是冗余）；一般注册必须能处理整个家族，因为走查会把子类交给它；查表按*属性类型*进行，所以声明为 `LinearGradientBrush` 的路径会命中的 `Brush` 采样器。走查每个属性每次动画只跑一次（在 `Prepare` 内），绝不逐帧。*验证依据：* `InterpolatorCoreTests`（`TryGetInterpolator_FallsBackToABaseClass`、`TryGetInterpolator_PrefersTheNearestBaseClass`、`TryGetInterpolator_FallsBackToAnInterface`、`TryGetInterpolator_PrefersABaseClassOverAnInterface`、`TryGetInterpolator_WithTwoMatchingInterfaces_IsDeterministic`）。
 
-**`CreateScheduler` 说明：** 主题系统所跑的那道平台接缝。一次主题切换横跨许多运行时类型的目标，Core 因此无法写出 `Transition<T>` 的类型实参；而调度器由哪个检查器、解释器与分发器优先级组成，恰恰是只有平台知道的事。基类返回 `null`；七个适配器全部重写它，交回自己参数化的调度器（见 [03_adapter-provided/01_effect-interpolator](../03_adapter-provided/01_effect-interpolator/index.md)）。`null` 对两种情形都是诚实的回答——「本平台没有接入」与「该 effect 不属于本平台」，后者正对应调度器在开跑前自己会做的那次强制转换；调用方于是退化为不做动画的切换，而不是启动一场画不出东西的动画。重写必须返回 `TransitionSchedulerCore<...>.FindOrCreate` 交回的那个实例，绝不能自己 `new` 一个：只有这条路径会把调度器登记到目标名下，而正是这条登记让之后的 `Transition.Pause` / `Transition.Seek` / `Transition.Exit(target)` 能找到它。*验证依据：* 七个适配器的 `PlatformAdapters/Interpolator.cs`；`ThemeManager.SetPlatformInterpolator` / `RunSwitch`。
+**`CreateScheduler` 说明：** 主题系统所跑的那道平台接缝。一次主题切换横跨许多运行时类型的目标，Core 因此无法写出 `Transition<T>` 的类型实参；而调度器由哪个检查器、解释器与分发器优先级组成，恰恰是只有平台知道的事。基类返回 `null`；七个适配器全部重写它，交回自己参数化的调度器（见 [03_adapter-provided/01_effect-interpolator](../03_适配器提供/01_效果插值器/index.md)）。`null` 对两种情形都是诚实的回答——「本平台没有接入」与「该 effect 不属于本平台」，后者正对应调度器在开跑前自己会做的那次强制转换；调用方于是退化为不做动画的切换，而不是启动一场画不出东西的动画。重写必须返回 `TransitionSchedulerCore<...>.FindOrCreate` 交回的那个实例，绝不能自己 `new` 一个：只有这条路径会把调度器登记到目标名下，而正是这条登记让之后的 `Transition.Pause` / `Transition.Seek` / `Transition.Exit(target)` 能找到它。*验证依据：* 七个适配器的 `PlatformAdapters/Interpolator.cs`；`ThemeManager.SetPlatformInterpolator` / `RunSwitch`。
 
 **`Prepare` 说明：** 对每个记录值经 `inspector.ProtectedGetValue` 读取当前值；无效路径（`TransitionProperty.UnreadablePath`）被跳过。采样器解析顺序：(1) `state.Interpolators` 中的逐属性自定义采样器；(2) 按 `PropertyType` 查注册表；(3) 仅当 `PropertyType.IsValueType` 且 `currentValue is ISampleable` → `StructAssembler.Create`（各成员采样器须全部可解析，否则返回 `null` 并被跳过）。**引用类型永远不会在此展开**。随后各调用一次 `sampler.NormalizeStart(current, newValue, options)` / `NormalizeEnd(...)`，逐条存入 `(property, sampler, normalizedStart, normalizedEnd, options)`。适配器派生 `Interpolator : InterpolatorCore`，在静态构造函数注册平台类型，并重写 `CreateScheduler`。*验证依据：* `InterpolatorCoreTests`。
 
@@ -262,7 +262,7 @@ public abstract class UIThreadInspectorCore : UIThreadInspectorBase, IUIThreadIn
 - 非泛型接口 `IUIThreadInspector` **已删除**；现在只有 `IUIThreadInspector<TPriorityCore>` 与共享基接口 `IUIThreadInspectorCore`。
 - `ProtectedInvoke` **返回 `bool`**：该 action 是否真的入队（宿主的 dispatcher 已消失、或目标还没有队列时返回 `false`）——这是调用方区分「被丢弃」与「已入队」的唯一途径。
 - `ProtectedInvokeAsync` 与 `ProtectedInvoke` 相同，但只在 action **真的执行完**后才完成；专供每次动画一次、必须发生在帧开始之前的调用（效果的 Awake），帧本身仍是 fire-and-forget。返回 `false` 表示从未入队，没有可等待的对象。
-- 这些是骨架类——每个抽象成员（线程身份、编组、读编组、存活）都由各适配器的 `UIThreadInspector` 填入（见 [03_adapter-provided](../03_adapter-provided/index.md)）。
+- 这些是骨架类——每个抽象成员（线程身份、编组、读编组、存活）都由各适配器的 `UIThreadInspector` 填入（见 [03_adapter-provided](../03_适配器提供/index.md)）。
 
 ## 属性路径
 

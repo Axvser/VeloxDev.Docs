@@ -25,7 +25,7 @@
 
 **说明：**
 - `ThemeManager.PrepareSamplers` 通过 `InterpolatorCore.TryGetInterpolator` 按 `PropertyInfo.PropertyType` 解析属性的采样器。当该类型没有注册采样器时，该属性全程保持旧值，直到切换结束时才写入目标值。
-- 平台适配器 `Interpolator` 继承 `InterpolatorCore`，在其静态构造函数中注册平台采样器，并重写 `CreateScheduler`（见 [04 PlatformAdapters](../04_PlatformAdapters/index.md)）。
+- 平台适配器 `Interpolator` 继承 `InterpolatorCore`，在其静态构造函数中注册平台采样器，并重写 `CreateScheduler`（见 [04 PlatformAdapters](../04_平台适配器/index.md)）。
 - `CreateScheduler` 之所以存在，是因为一场切换横跨许多运行时类型的目标，Core 无法为 `Transition<T>` 指名类型实参，而调度器由哪个 inspector、interpreter 与调度器优先级构成，是只有适配器知道的一件事。返回 `null` 对「该平台没有接入」和「该效果不属于该平台」都是诚实的答案；调用方随后做不带动画的切换，而不是启动一场画不出东西的运行。
 - 重写必须走 `TransitionSchedulerCore<...>.FindOrCreate(target)`，不得直接构造调度器：只有那条路径会把它登记到目标名下，而后续的 `Transition.Pause` / `Seek` / `Exit` 正是靠它找到这个动画。
 
@@ -151,7 +151,7 @@
 **说明：**
 - 由于主题切换运行在过渡系统上，整个效果都会被尊重：`Duration` 与 `Ease` 决定一程的时长与缓动，`FPS` 限制采样率，`IsAutoReverse` 追加反程，`LoopTime` 重复，生命周期事件照常触发。*验证依据：* `ThemeTransitionTests.Switch_HonoursAutoReverseAndLoopTime`。
 - 效果按传入原样使用，且被每个目标逐帧读取，因此它必须是平台自己的效果类型，且在使用它的切换运行期间不得被修改。效果类型还决定平台能否承载这场切换：`InterpolatorCore.CreateScheduler` 对不属于自己的 `ITransitionEffect<TPriority>` 返回 `null`。
-- 基实现 `TransitionEffectCore` 的默认值：`FPS = 60`、`Duration = 0 ms`、`Ease = Eases.Default`、`IsAutoReverse = false`、`LoopTime = 0`。适配器预设见 [04 PlatformAdapters](../04_PlatformAdapters/index.md)。
+- 基实现 `TransitionEffectCore` 的默认值：`FPS = 60`、`Duration = 0 ms`、`Ease = Eases.Default`、`IsAutoReverse = false`、`LoopTime = 0`。适配器预设见 [04 PlatformAdapters](../04_平台适配器/index.md)。
 
 ### 接口：`IEaseCalculator` 与静态类：`Eases`
 

@@ -4,8 +4,8 @@
 
 | 页面 | 内容 |
 |---|---|
-| [类图](00_class-diagram/index.md) | Mermaid 类图——核心/执行模型（CompilerEx）与组件 VM 模型 |
-| [模式总览](01_patterns-overview/index.md) | 模式 → 位置对照表 |
+| [类图](00_类图/index.md) | Mermaid 类图——核心/执行模型（CompilerEx）与组件 VM 模型 |
+| [模式总览](01_模式总览/index.md) | 模式 → 位置对照表 |
 | [模板方法](02_模板方法/index.md) | Helper 生命周期骨架（`Install`/`Uninstall`/`CloseAsync`）+ 可覆写钩子 |
 | [命令模式](03_命令模式/index.md) | `WorkflowActionPair` 撤销/重做命令栈 |
 | [观察者模式](04_观察者模式/index.md) | Helper 集合事件 + `PropertyChanged` 观察 |
