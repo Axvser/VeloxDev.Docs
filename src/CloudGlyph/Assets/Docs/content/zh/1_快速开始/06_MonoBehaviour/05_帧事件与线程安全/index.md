@@ -16,14 +16,14 @@
 ```csharp
 partial void Update(FrameEventArgs e)
 {
-    Console.WriteLine($"delta   = {e.DeltaTime.TotalMilliseconds:F3} ms");  // 经 TimeScale 缩放
-    Console.WriteLine($"elapsed = {e.TotalTime.TotalSeconds:F3} s");        // 通道累计运行时间
+    Console.WriteLine($"delta   = {e.DeltaTime.TotalMilliseconds:F3} ms");  // 由时间源量得，因此已含速率
+    Console.WriteLine($"elapsed = {e.TotalTime.TotalSeconds:F3} s");        // 时间源的位置，即虚拟时间
     Console.WriteLine($"fps     = {e.CurrentFPS} (target {e.TargetFPS})");
 }
 ```
 
-- `DeltaTime` —— 距上一个更新帧的时间，已乘以通道 `TimeScale`（缩放为 `0` 时得到 `0`）。
-- `TotalTime` —— 通道在帧边界处累计的运行时间。
+- `DeltaTime` —— 距上一个更新帧的时间，由该通道的时间源量得，因此已按其速率缩放。只有时间源没有前进时它才是 `TimeSpan.Zero`——这正是泵被告知「本帧无事可做」的方式；而速率为 `0` 时时间源被冻结，根本不会有帧带着零到来。
+- `TotalTime` —— 时间源的位置，即虚拟时间。它随速率变化，并排除每一段停摆，因此只有在速率为 `1` 时才等于通道的墙钟运行时间。
 - `CurrentFPS` / `TargetFPS` —— 实测帧率与配置的目标。
 
 **预期结果：** 打印的三行每帧都在变化，并与管理器的状态查询保持一致。

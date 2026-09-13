@@ -85,7 +85,7 @@ classDiagram
 
 ## 1. 模板方法 — 帧循环生命周期
 
-循环骨架固定在 `LoopChannel`：`UpdateLoop`（第 444-489 行）与 `FixedUpdateLoop`（第 395-442 行）负责逐帧节奏控制、队列排空与错误隔离；`UpdateLoopAsync`（548-605 行）/ `FixedUpdateLoopAsync`（492-546 行）是启用异步循环模式时使用的 `Task.Delay` 孪生版本。可变步骤是用户的 `partial void Awake` / `Start` / `Update` / `LateUpdate` / `FixedUpdate` 钩子。源生成器生成桥接：生成的 partial 上每个 `Invoke*` 方法把事件参数转发进对应的 partial 钩子，`InitializeMonoBehaviour()` 与 `CloseMonoBehaviour()` 提供注册 / 注销入口点。生成代码不会自动调用它们——用户在构造函数中调用 `InitializeMonoBehaviour()`（示例即如此），并在实例需要离开通道时调用 `CloseMonoBehaviour()`。
+循环骨架固定在 `LoopChannel`：`UpdateLoop`（第 510-556 行）与 `FixedUpdateLoop`（第 447-508 行）负责逐帧节奏控制、队列排空与错误隔离；`UpdateLoopAsync`（623-688 行）/ `FixedUpdateLoopAsync`（558-621 行）是启用异步循环模式时使用的 `Task.Delay` 孪生版本。可变步骤是用户的 `partial void Awake` / `Start` / `Update` / `LateUpdate` / `FixedUpdate` 钩子。源生成器生成桥接：生成的 partial 上每个 `Invoke*` 方法把事件参数转发进对应的 partial 钩子，`InitializeMonoBehaviour()` 与 `CloseMonoBehaviour()` 提供注册 / 注销入口点。生成代码不会自动调用它们——用户在构造函数中调用 `InitializeMonoBehaviour()`（示例即如此），并在实例需要离开通道时调用 `CloseMonoBehaviour()`。
 
 ```csharp
 // Src/Generators/VeloxDev.Core.Generator/Writers/MonoWriter.cs — MonoWriter.GenerateBody（第 80-121 行）
@@ -116,7 +116,7 @@ partial void FixedUpdate(VeloxDev.TimeLine.FrameEventArgs e);
 | 桥接 | `[MonoBehaviour]` 类上生成的 `Invoke*` 方法 |
 | 注册 | 生成的 `InitializeMonoBehaviour()` / `CloseMonoBehaviour()` |
 
-出处：`MonoBehaviourManager.cs` 第 444-489 行（UpdateLoop）、395-442 行（FixedUpdateLoop）、492-605 行（异步孪生版）、611-657 行（逐行为执行循环）。
+出处：`MonoBehaviourManager.cs` 第 510-556 行（UpdateLoop）、447-508 行（FixedUpdateLoop）、558-688 行（异步孪生版）、690-738 行（逐行为执行循环）。
 
 ## 2. 生命周期钩子 — Awake / Start / Update / LateUpdate / FixedUpdate
 
@@ -159,16 +159,15 @@ ch.Stopped += (s, e) => OnChannelStopped?.Invoke(s, new MonoBehaviourChannelEven
 
 ## 4. 对象池 — 池化的事件参数与请求 / 注册对象
 
-`LoopChannel` 维护三个固定容量对象池（默认 `DEFAULT_OBJECT_POOL_SIZE = 50`）：`ObjectPool<FrameEventArgs>`、`ObjectPool<ConfigChangeRequest>` 与 `ObjectPool<BehaviorWrapper>`。配置设置器从池中取出一个 `ConfigChangeRequest`、填入字段并入队；逐帧排空时重置并归还。行为注册表复用 `BehaviorWrapper` 对象，每帧取出一个 `FrameEventArgs` 而非重新分配。
+`LoopChannel` 维护三个固定容量对象池（默认 `DEFAULT_OBJECT_POOL_SIZE = 50`）：`ObjectPool<FrameEventArgs>`、`ObjectPool<ConfigChangeRequest>` 与 `ObjectPool<BehaviorWrapper>`。`SetTargetFPS` 从池中取出一个 `ConfigChangeRequest`、填入字段并入队；逐帧排空时重置并归还。另外两个旋钮已不再需要它——`SetFixedUpdateInterval` 通过单个 volatile 字段把值交给固定泵，`SetTimeScale` 则直接写入该通道的时间源。行为注册表复用 `BehaviorWrapper` 对象，每帧取出一个 `FrameEventArgs` 而非重新分配。
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs（第 745-755 行）
-private FrameEventArgs CreateFrameEventArgs(long deltaTime)
+// Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs（第 825-835 行）
+private FrameEventArgs CreateFrameEventArgs(TimeSpan delta, TimeSpan total)
 {
-    var ts = (float)BitConverter.Int64BitsToDouble(Interlocked.Read(ref _timeScaleBits));
     var frameArgs = _frameEventArgsPool.Get();
-    frameArgs.DeltaTime = ScaleDuration(ConvertStopwatchTicksToTimeSpan(deltaTime), ts);
-    frameArgs.TotalTime = TimeSpan.FromTicks(Interlocked.Read(ref _totalTimeTicks));
+    frameArgs.DeltaTime = delta;
+    frameArgs.TotalTime = total;
     frameArgs.CurrentFPS = _currentFPS;
     frameArgs.TargetFPS = Volatile.Read(ref _targetFPS);
     frameArgs.Handled = false;
@@ -176,6 +175,6 @@ private FrameEventArgs CreateFrameEventArgs(long deltaTime)
 }
 ```
 
-未被处理的 `FixedUpdate` 事件被入队，由更新驱动在下一帧开头归还池中（`DrainFixedUpdateEvents`，第 757-761 行）；把 `Handled` 置为 `true` 的 `FixedUpdate` 则立即归还对象池。
+两个时间值都原样取自同一个 `TimeSample`，因此这里不做任何缩放：播放速率由产生该样本的时钟施加。`FixedUpdate` 的推送也走同一个方法，推送一完成就把参数还回同一个池——没有队列把它们带到更新驱动。
 
 > 同一功能的兄弟分析：[数据流 — MonoBehaviour](../../03_数据流分析/06_MonoBehaviour/index.md) 与 [复杂度分析 — MonoBehaviour](../../04_复杂度分析/06_MonoBehaviour/index.md)。

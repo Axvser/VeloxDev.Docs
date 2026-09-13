@@ -8,9 +8,9 @@ $$
 O(b), \quad b = \text{active behaviours}
 $$
 
-`ExecuteBehaviorsUpdateSync` / `ExecuteBehaviorsLateUpdateSync` / `ExecuteBehaviorsFixedUpdateSync` iterate the cached wrapper array once, calling `InvokeUpdate` / `InvokeLateUpdate` / `InvokeFixedUpdate` per behaviour — `MonoBehaviourManager.cs` lines 611-657.
+`ExecuteBehaviorsUpdateSync` / `ExecuteBehaviorsLateUpdateSync` / `ExecuteBehaviorsFixedUpdateSync` iterate the cached wrapper array once, calling `InvokeUpdate` / `InvokeLateUpdate` / `InvokeFixedUpdate` per behaviour — `MonoBehaviourManager.cs` lines 690-738.
 
-The wrapper array is rebuilt by `GetCachedWrappers` (lines 663-673) only when a registration/removal flagged a sort, or every `MAX_CONFIG_CACHE_DURATION_MS = 1000` ms. The rebuild copies the active wrappers and insertion-sorts them by `ExecutionOrder` (`RebuildCachedWrappers`, lines 805-834). Behaviour counts are typically tiny, so the per-frame sort cost is amortized away:
+The wrapper array is rebuilt by `GetCachedWrappers` (lines 742-752) only when a registration/removal flagged a sort, or every `MAX_CONFIG_CACHE_DURATION_MS = 1000` ms. The rebuild copies the active wrappers and insertion-sorts them by `ExecutionOrder` (`RebuildCachedWrappers`, lines 873-903). Behaviour counts are typically tiny, so the per-frame sort cost is amortized away:
 
 $$
 T_{\text{update}} = O(b) \text{ per frame}, \quad b \ll n_{\text{registered}}
@@ -28,21 +28,21 @@ The fixed driver runs `ExecuteBehaviorsFixedUpdateSync` concurrently with the up
 
 ## Event-args reuse (object pool)
 
-Each frame the update driver calls `CreateFrameEventArgs` (lines 745-755), which draws from a per-channel `ObjectPool<FrameEventArgs>` (default `DEFAULT_OBJECT_POOL_SIZE = 50`) instead of allocating:
+Each frame the update driver calls `CreateFrameEventArgs` (lines 825-835), which draws from a per-channel `ObjectPool<FrameEventArgs>` (default `DEFAULT_OBJECT_POOL_SIZE = 50`) instead of allocating:
 
 $$
 O(1) \text{ pool get/return per frame, zero steady-state allocation}
 $$
 
-The pool is a lock-free `ConcurrentStack` with a bounded capacity, shared by both drivers (fixed events come from the same pool). Unhandled `FixedUpdate` events are enqueued and drained back to the pool by the update driver at the top of the next frame (`DrainFixedUpdateEvents`, lines 757-761); handled ones are returned immediately. `ConfigChangeRequest` and `BehaviorWrapper` objects come from their own pools of the same capacity, so registration/config churn also avoids steady-state allocation.
+The pool is a lock-free `ConcurrentStack` with a bounded capacity, shared by both pumps: the fixed pump returns each `FrameEventArgs` to the same pool as soon as that push is done, so nothing crosses threads to recycle it. `ConfigChangeRequest` and `BehaviorWrapper` objects come from their own pools of the same capacity, so registration/config churn also avoids steady-state allocation.
 
 ## Frame pacing
 
-`FrameRateControlSync` sleeps until the target frame duration (`_cachedTargetFrameDurationTicks`, updated when `TargetFPS` is applied). `PrecisionSleep` spins below `SPIN_ONLY_THRESHOLD_MS = 2` ms and otherwise does `Thread.Sleep(1)` plus a tail spin — lines 763-803. Per frame this is $O(1)$ wall-clock. In async-loop mode the same pacing is a `Task.Delay` with a minimum of 1 ms plus `Task.Yield` when a frame overshoots (`UpdateLoopAsync`, lines 548-605).
+`FrameRateControlSync` sleeps until the target frame duration (`_cachedTargetFrameDurationTicks`, updated when `TargetFPS` is applied), and the fixed pump sleeps until the next step is owed. Both go through `Sleep` (lines 863-871), which is an ordinary `Thread.Sleep` in chunks of at most `MAX_SLEEP_CHUNK_MS = 50`, with the token checked between chunks — so there is no busy-wait anywhere on the frame path. Precision was given up deliberately: the samplers own correctness, so a late wake is a late frame and never a lost one or a wrong interval. Per frame this is $O(1)$ wall-clock. In async-loop mode the same pacing is a `Task.Delay` with a minimum of 1 ms plus `Task.Yield` when a frame overshoots (`UpdateLoopAsync`, lines 623-688).
 
 ## Config / registration batching
 
-Config changes, behaviour adds/removes and marshalled main-thread actions are exchanged through concurrent queues drained once per frame by `ProcessMainThreadOperations` (lines 675-688):
+Config changes, behaviour adds/removes and marshalled main-thread actions are exchanged through concurrent queues drained once per frame by `ProcessMainThreadOperations` (lines 754-767):
 
 | Operation | Per frame |
 |---|---|
@@ -57,7 +57,7 @@ Config changes, behaviour adds/removes and marshalled main-thread actions are ex
 |---|---|
 | Cached wrapper array | $O(b)$ `BehaviorWrapper[]`, rebuilt on change or every 1000 ms |
 | Object pools | 3 pools (`FrameEventArgs`, `ConfigChangeRequest`, `BehaviorWrapper`), fixed capacity 50 per channel; instances reused, not garbage |
-| Concurrent queues | $O(q)$ config / $O(r)$ registration / $O(a)$ main-thread actions, drained each frame; `_fixedUpdateEvents` drains next update frame |
+| Concurrent queues | $O(q)$ config / $O(r)$ registration / $O(a)$ main-thread actions, drained each frame; fixed args return to the pool inline rather than through a queue |
 | Drivers | 2 per channel — threads (thread mode) or async tasks (async-loop mode) |
 
 ## Per-operation summary

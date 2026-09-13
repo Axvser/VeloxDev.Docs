@@ -84,7 +84,7 @@ classDiagram
         +Track(run) void
         +Untrack(run) void
     }
-    class TransitionTimeline {
+    class TimeSourceCore {
         +Wake() void
     }
     class StateCore {
@@ -111,7 +111,7 @@ classDiagram
     ThemeManager ..> ITransitionEffectCore : 原样转交效果
     ThemeManager --> IThemeObject : ExecuteThemeChanging/Changed + 读取缓存
     ThemeManager ..> TransitionSchedulerCore : Execute / Track / Untrack
-    ThemeManager ..> TransitionTimeline : 每场切换一条
+    ThemeManager ..> TimeSourceCore : 每场切换一条
     ThemeManager ..> StateCore : 声明终值
     InterpolatorCore ..> TransitionSchedulerCore : CreateScheduler 构建
     TransitionSchedulerCore ..> ISampler : Prepare -> NormalizeStart/End，再逐帧 InsertFrame
@@ -141,7 +141,7 @@ classDiagram
 |---|---|---|
 | 外观（Facade） | `ThemeManager` | 覆盖值存储（`ThemeCache`）、采样器注册表（`InterpolatorCore.NativeInterpolators`）、已注册对象列表，以及过渡系统的 scheduler。调用者只看到 `Transition<T>` / `Jump<T>` / `Register` / `SetPlatformInterpolator`。 |
 | 虚拟接缝 / 策略（Virtual seam / Strategy） | `InterpolatorCore.CreateScheduler` | 一场切换横跨多种运行时类型的目标，Core 无法写出 `Transition<T>` scheduler 的类型实参；由平台给出「inspector + interpreter + priority」的组合，并以 `null` 回答「这不是我的」。 |
-| 共享 transport（Shared transport） | 每场切换一个 `TransitionTimeline` | 一场切换的所有目标锚在同一条 `TransitionTimeline` 上；这正是既有的 `TransitionCore.Pause` / `Seek` / `SetRate` / `Exit` 能不改接口地作用到主题切换上的原因。 |
+| 共享 transport（Shared transport） | 每场切换一个 `ITimeSourceControl` | 一场切换的所有目标锚在同一条 `ITimeSourceControl` 上；这正是既有的 `TransitionCore.Pause` / `Seek` / `SetRate` / `Exit` 能不改接口地作用到主题切换上的原因。 |
 | 模板方法（Template Method） | 源生成的 `IThemeObject` 实现 | `InitializeTheme()` 是固定算法（惰性 `ThemeCache.RegisterType` → `ThemeManager.Register(this)` → 应用当前主题值）。子类添加 `[ThemeConfig]` 属性，生成器链接 `base.InitializeTheme()`；方法按 `virtual`、`override`（祖先带有 `[ThemeConfig]` 时）、或非虚（类为 `sealed` 时）生成。 |
 | 钩子 / partial 回调 | 生成的 `ExecuteThemeChanging/Changed` | `ThemeManager` 在动画前调用 `ExecuteThemeChanging(old, new)`，**只在切换走到终点时**调用 `ExecuteThemeChanged(old, new)`；生成的实现转发给用户的 `partial void OnThemeChanging` / `partial void OnThemeChanged`。 |
 | 注册表（弱引用） | `ThemeManager` | 活跃主题感知实例保存在 `ConditionalWeakTable`（去重）加 `List<WeakReference<IThemeObject>>`（每次切换清理失效项）——注册不泄漏。 |

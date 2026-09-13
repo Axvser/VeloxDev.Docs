@@ -137,9 +137,12 @@ MonoBehaviourManager.SetTargetFPS(30, "game");
 
 | Parameter | Type | Description |
 |---|---|---|
-| `intervalMs` | `int` | Milliseconds between fixed updates, clamped to `1..1000`. Default `16`. |
+| `intervalMs` | `int` | Milliseconds between fixed updates, valid `1..1000`; out of range is ignored. Default `16`. |
 
 **Returns:** `void`
+
+**Notes:**
+- Handed to the FixedUpdate pump and applied there, on the thread that owns the step being changed.
 
 #### `MonoBehaviourManager.SetTimeScale`
 
@@ -148,13 +151,23 @@ MonoBehaviourManager.SetTargetFPS(30, "game");
 
 | Parameter | Type | Description |
 |---|---|---|
-| `timeScale` | `float` | Time scale applied to `FrameEventArgs.DeltaTime`, clamped to `0..10`. Default `1.0`. |
+| `timeScale` | `float` | The playback rate of the channel's time source. Default `1.0`. |
 
 **Returns:** `void`
 
+**Exceptions:**
+| Exception | Condition |
+|---|---|
+| `ArgumentOutOfRangeException` | The value is negative. A time source does not run backwards. |
+
+**Notes:**
+- Applied to the channel's time source immediately, not through the config queue: the source serialises its own writers.
+- It scales the whole virtual clock, so `FrameEventArgs.DeltaTime` and `FrameEventArgs.TotalTime` both follow it, and so does every animation anchored to the same source through `MonoBehaviourManager.Bus`.
+- A rate of `0` freezes the clock without pausing it: no frame is dispatched, and `Resume` does not restart it — only a non-zero rate does.
+
 **Example:**
 ```text
-// Time scale 0.5 halves every FrameEventArgs.DeltaTime (ScaleDuration in the loop)
+// Time scale 0.5 halves every FrameEventArgs.DeltaTime, and TotalTime accrues at half speed
 MonoBehaviourManager.SetTimeScale(0.5f, "game");
 ```
 
@@ -224,6 +237,19 @@ All status queries share the shape `(string channel = DEFAULT_CHANNEL)` and retu
 | `SystemStatus` | `string` — `"Stopped"` / `"Paused"` / `"Running"` |
 | `IsUpdateThreadAlive` | `bool` (with a 2 s inactivity timeout) |
 | `IsFixedUpdateThreadAlive` | `bool` (with a 2 s inactivity timeout) |
+
+Both liveness queries report `true` while the channel's clock is stalled: a parked pump is waiting on a signal rather than idle, so the inactivity timeout does not apply to it.
+
+#### `MonoBehaviourManager.Bus`
+
+**Signature:**
+`public static ITimeSourceControl? Bus(string channel = DEFAULT_CHANNEL)`
+
+**Returns:** The channel's time source, or `null` when the channel has never been created.
+
+**Notes:**
+- The channel's frames and everything anchored to this source share one clock: passing it to `Transition.Execute(target, bus)` makes `Pause`, `Resume` and `SetTimeScale` act on the animation and the frames together.
+- The source is resolved through `TimerCore.CreateTimeSource<ITimeSourceControl>()` when the channel is constructed, so a platform can substitute its own by registering one there. The default is `TimeSourceCore`, in the `VeloxDev.Timing` namespace.
 
 **Example (status queries):**
 ```text

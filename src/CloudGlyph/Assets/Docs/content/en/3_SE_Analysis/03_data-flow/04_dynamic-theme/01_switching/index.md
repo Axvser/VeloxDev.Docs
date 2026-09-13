@@ -1,6 +1,6 @@
 # Data Flow — Theme Switching
 
-`Transition<T>` and `Jump<T>` no longer share a pipeline. An animated switch prepares a grouped entry set and then hands it to one platform `TransitionSchedulerCore` per target, all anchored to a single `TransitionTimeline`, so the transition system owns the clock, the frame pacing and the effect's own flags. An instant switch never touches the transition system: `Jump` writes every end value and advances `Current` directly through `ApplyImmediately`, which is why it neither needs `SetPlatformInterpolator` nor is constrained by the platform's `ITransitionEffect<TPriority>`.
+`Transition<T>` and `Jump<T>` no longer share a pipeline. An animated switch prepares a grouped entry set and then hands it to one platform `TransitionSchedulerCore` per target, all anchored to a single `ITimeSourceControl`, so the transition system owns the clock, the frame pacing and the effect's own flags. An instant switch never touches the transition system: `Jump` writes every end value and advances `Current` directly through `ApplyImmediately`, which is why it neither needs `SetPlatformInterpolator` nor is constrained by the platform's `ITransitionEffect<TPriority>`.
 
 Both entry points share the same prologue — guard, cancel, prune, notify `ExecuteThemeChanging` — and both finish by notifying `ExecuteThemeChanged`, but only a switch that actually landed gets there.
 
@@ -15,7 +15,7 @@ participant "ThemeManager" as TM
 participant "IThemeObject\n(registered view)" as TO
 participant "InterpolatorCore\n(platform adapter)" as IK
 participant "TransitionSchedulerCore\n(one per target)" as SC
-participant "TransitionTimeline\n(one per switch)" as TL
+participant "TimeSourceCore\n(one per switch)" as TL
 participant "ISampler" as SMP
 
 User -> TM: Transition<Light>(effect)
@@ -72,7 +72,7 @@ else passes
         end
         TM -> TM: ApplyImmediately(groups, typeof(Light))
     else every group got a scheduler
-        TM -> TL: new TransitionTimeline()
+        TM -> TL: TimerCore.CreateTimeSource<ITimeSourceControl>()
         loop each (scheduler, group)
             TM -> TO: WriteStartValues(group)
             note right of TM

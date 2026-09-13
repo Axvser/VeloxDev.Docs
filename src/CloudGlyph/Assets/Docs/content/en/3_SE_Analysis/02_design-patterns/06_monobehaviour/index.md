@@ -85,7 +85,7 @@ classDiagram
 
 ## 1. Template Method — frame-loop lifecycle
 
-The loop skeleton is fixed in `LoopChannel`: `UpdateLoop` (lines 444-489) and `FixedUpdateLoop` (lines 395-442) drive the per-frame pacing, queue draining and error isolation; `UpdateLoopAsync` (548-605) / `FixedUpdateLoopAsync` (492-546) are async/`Task.Delay` twins used when async-loop mode is enabled. The variable steps are the user's `partial void Awake` / `Start` / `Update` / `LateUpdate` / `FixedUpdate` hooks. The source generator emits the bridge: each `Invoke*` method on the generated partial forwards the event args into the matching partial hook, and `InitializeMonoBehaviour()` / `CloseMonoBehaviour()` provide the registration / unregistration entry points. The generated code never calls them itself — the user invokes `InitializeMonoBehaviour()` from the constructor (as the demo does) and `CloseMonoBehaviour()` when the instance must leave the channel.
+The loop skeleton is fixed in `LoopChannel`: `UpdateLoop` (lines 510-556) and `FixedUpdateLoop` (lines 447-508) drive the per-frame pacing, queue draining and error isolation; `UpdateLoopAsync` (623-688) / `FixedUpdateLoopAsync` (558-621) are async/`Task.Delay` twins used when async-loop mode is enabled. The variable steps are the user's `partial void Awake` / `Start` / `Update` / `LateUpdate` / `FixedUpdate` hooks. The source generator emits the bridge: each `Invoke*` method on the generated partial forwards the event args into the matching partial hook, and `InitializeMonoBehaviour()` / `CloseMonoBehaviour()` provide the registration / unregistration entry points. The generated code never calls them itself — the user invokes `InitializeMonoBehaviour()` from the constructor (as the demo does) and `CloseMonoBehaviour()` when the instance must leave the channel.
 
 ```csharp
 // Src/Generators/VeloxDev.Core.Generator/Writers/MonoWriter.cs — MonoWriter.GenerateBody (lines 80-121)
@@ -116,7 +116,7 @@ When the attribute supplies a `fps >= 1` (positional second argument or named `T
 | Bridge | Generated `Invoke*` methods on the `[MonoBehaviour]` class |
 | Registration | Generated `InitializeMonoBehaviour()` / `CloseMonoBehaviour()` |
 
-Source: `MonoBehaviourManager.cs` lines 444-489 (UpdateLoop), 395-442 (FixedUpdateLoop), 492-605 (async twins), 611-657 (per-behavior execution loops).
+Source: `MonoBehaviourManager.cs` lines 510-556 (UpdateLoop), 447-508 (FixedUpdateLoop), 558-688 (async twins), 690-738 (per-behavior execution loops).
 
 ## 2. Lifecycle Hook — Awake / Start / Update / LateUpdate / FixedUpdate
 
@@ -159,16 +159,15 @@ The manager is also the channel registry: channels are created lazily and held i
 
 ## 4. Object Pool — pooled event args and request/registry objects
 
-`LoopChannel` keeps three fixed-capacity object pools (default `DEFAULT_OBJECT_POOL_SIZE = 50`): `ObjectPool<FrameEventArgs>`, `ObjectPool<ConfigChangeRequest>` and `ObjectPool<BehaviorWrapper>`. Config setters draw a `ConfigChangeRequest` from the pool, fill it and enqueue it; the per-frame drain resets and returns it. The behavior registry recycles `BehaviorWrapper` objects, and each frame draws one `FrameEventArgs` instead of allocating.
+`LoopChannel` keeps three fixed-capacity object pools (default `DEFAULT_OBJECT_POOL_SIZE = 50`): `ObjectPool<FrameEventArgs>`, `ObjectPool<ConfigChangeRequest>` and `ObjectPool<BehaviorWrapper>`. `SetTargetFPS` draws a `ConfigChangeRequest` from the pool, fills it and enqueues it; the per-frame drain resets and returns it. The other two knobs no longer need one — `SetFixedUpdateInterval` hands a value to the fixed pump through a single volatile field, and `SetTimeScale` writes to the channel's time source directly. The behavior registry recycles `BehaviorWrapper` objects, and each frame draws one `FrameEventArgs` instead of allocating.
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs (lines 745-755)
-private FrameEventArgs CreateFrameEventArgs(long deltaTime)
+// Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs (lines 825-835)
+private FrameEventArgs CreateFrameEventArgs(TimeSpan delta, TimeSpan total)
 {
-    var ts = (float)BitConverter.Int64BitsToDouble(Interlocked.Read(ref _timeScaleBits));
     var frameArgs = _frameEventArgsPool.Get();
-    frameArgs.DeltaTime = ScaleDuration(ConvertStopwatchTicksToTimeSpan(deltaTime), ts);
-    frameArgs.TotalTime = TimeSpan.FromTicks(Interlocked.Read(ref _totalTimeTicks));
+    frameArgs.DeltaTime = delta;
+    frameArgs.TotalTime = total;
     frameArgs.CurrentFPS = _currentFPS;
     frameArgs.TargetFPS = Volatile.Read(ref _targetFPS);
     frameArgs.Handled = false;
@@ -176,6 +175,6 @@ private FrameEventArgs CreateFrameEventArgs(long deltaTime)
 }
 ```
 
-Unhandled `FixedUpdate` events are enqueued and returned to the pool by the update driver at the top of the next frame (`DrainFixedUpdateEvents`, lines 757-761); a `FixedUpdate` that set `Handled = true` is returned to the pool immediately.
+Both times are taken verbatim from one `TimeSample`, so neither is scaled here: the playback rate was applied by the clock that produced the sample. A `FixedUpdate` push goes through the same method and returns its args to the same pool as soon as the push is done — no queue carries them across to the update driver.
 
 > Sibling analyses of the same feature: [Data Flow — MonoBehaviour](../../03_data-flow/06_monobehaviour/index.md) and [Complexity Analysis — MonoBehaviour](../../04_complexity/06_monobehaviour/index.md).

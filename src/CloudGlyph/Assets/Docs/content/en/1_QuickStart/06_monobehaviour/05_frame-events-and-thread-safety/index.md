@@ -16,14 +16,14 @@ All four payload types live in `VeloxDev.TimeLine` (`Src/Core/VeloxDev.Core/Time
 ```csharp
 partial void Update(FrameEventArgs e)
 {
-    Console.WriteLine($"delta   = {e.DeltaTime.TotalMilliseconds:F3} ms");  // scaled by TimeScale
-    Console.WriteLine($"elapsed = {e.TotalTime.TotalSeconds:F3} s");        // channel runtime
+    Console.WriteLine($"delta   = {e.DeltaTime.TotalMilliseconds:F3} ms");  // measured by the time source, so already rate-scaled
+    Console.WriteLine($"elapsed = {e.TotalTime.TotalSeconds:F3} s");        // the source's position, in virtual time
     Console.WriteLine($"fps     = {e.CurrentFPS} (target {e.TargetFPS})");
 }
 ```
 
-- `DeltaTime` — the time since the last update frame, already multiplied by the channel `TimeScale` (a scale of `0` yields `0`).
-- `TotalTime` — the channel's accumulated runtime at the frame boundary.
+- `DeltaTime` — the time since the last update frame, measured by the channel's time source and therefore already scaled by its rate. It is `TimeSpan.Zero` only when the source has not advanced, which is how the pump is told there is nothing to dispatch; a rate of `0` freezes the source, so no frame arrives to carry a zero at all.
+- `TotalTime` — the time source's position, in virtual time. It follows the rate and excludes every span spent stalled, so it is the channel's elapsed wall time only while the rate is `1`.
 - `CurrentFPS` / `TargetFPS` — the measured frame rate and the configured target.
 
 **Expected result:** the three printed lines change every frame and stay consistent with the manager's status queries.

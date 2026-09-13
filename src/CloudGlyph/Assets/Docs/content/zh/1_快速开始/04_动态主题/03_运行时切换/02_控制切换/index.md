@@ -2,7 +2,7 @@
 
 ## 1. 一场切换，一条时间轴
 
-`ThemeManager.Transition` 会创建一条 `TransitionTimeline`，并把这一场切换的**每一个**目标都锚定在它上面。因此每场切换恰好只有一条 transport，而且就是过渡动画本来就暴露的那一条 —— 于是用普通的 `Transition.*` 表面去寻址任意一个已注册目标，就能移动整场切换。一次 `Transition.Pause(tile)` 会同时冻结全部一千个块；不需要额外的构造，也没有主题专用的控制 API 要学。
+`ThemeManager.Transition` 会创建一条 `ITimeSourceControl`，并把这一场切换的**每一个**目标都锚定在它上面。因此每场切换恰好只有一条 transport，而且就是过渡动画本来就暴露的那一条 —— 于是用普通的 `Transition.*` 表面去寻址任意一个已注册目标，就能移动整场切换。一次 `Transition.Pause(tile)` 会同时冻结全部一千个块；不需要额外的构造，也没有主题专用的控制 API 要学。
 
 这条 run 是普通的过渡 run，也是「effect 被原样使用」的原因：`IsAutoReverse`、`LoopTime` 这类标志会被真正遵守，而不是被忽略。`ThemeTransitionTests.Switch_HonoursAutoReverseAndLoopTime` 用 `IsAutoReverse = true` 与 `LoopTime = 1` 做切换，最终停在**起点**值上，因为最后一程是反向程 —— 这条断言本身就是标志仍然生效的证据。
 

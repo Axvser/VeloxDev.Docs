@@ -179,7 +179,7 @@ TI -> TI: stop immediately
 @enduml
 ```
 
-来源：`TransitionSystem/SamplerSet.cs`（`Apply`、`SetCancellation`、`SetRun`、`CanSetValue`、缓存 apply 闭包）、`TransitionInterpreter.cs`（`ExecuteSamplingLoopAsync`、`RunPassAsync`、`EmitFrame`、`ArmNextFrame`）、`TransitionClock.cs`（`TransitionTimeline`、`TransitionRun`）、`ReusableTimerWait.cs`、`TransitionEffect.cs`（事件触发）、`Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`（各平台编组）。
+来源：`TransitionSystem/SamplerSet.cs`（`Apply`、`SetCancellation`、`SetRun`、`CanSetValue`、缓存 apply 闭包）、`TransitionInterpreter.cs`（`ExecuteSamplingLoopAsync`、`RunPassAsync`、`EmitFrame`、`ArmNextFrame`）、`Timing/TimeSourceCore.cs`（`TimeSourceCore`）、`TransitionSystem/TransitionRun.cs`（`TransitionRun`）、`ReusableTimerWait.cs`、`TransitionEffect.cs`（事件触发）、`Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`（各平台编组）。
 
 ## (d) 调度器选择、抢占与扇出
 
@@ -207,7 +207,7 @@ flowchart TD
     M --> N
 ```
 
-`Transition.Exit(target, IncludeMutual, IncludeNoMutual)` 取消目标的互斥调度器，并可选择取消每个正在运行的非互斥调度器；这些调度器随后经上面的 `Canceled`/`Finally` 路径收尾。同一控制面上的另外三个入口——`Pause`/`Resume`、`SetRate` 与 `Seek`——走的是另一条路：它们完全不经过调度器的门控，而是作用于每个 run 所锚定的那条 `TransitionTimeline`。
+`Transition.Exit(target, IncludeMutual, IncludeNoMutual)` 取消目标的互斥调度器，并可选择取消每个正在运行的非互斥调度器；这些调度器随后经上面的 `Canceled`/`Finally` 路径收尾。同一控制面上的另外三个入口——`Pause`/`Resume`、`SetRate` 与 `Seek`——走的是另一条路：它们完全不经过调度器的门控，而是作用于每个 run 所锚定的那条 `ITimeSourceControl`。
 
 ## (e) 路径的两种来源：声明与反射
 
@@ -225,7 +225,7 @@ flowchart TD
 | `IsAutoReverse` | 正向程后解释器运行反向程（复用同一批采样器；程末 `easedT = 0`）。 |
 | `LoopTime` / `int.MaxValue` | 只要 `run.Cycle <= effect.LoopTime` 就一直重复整个正向（+ 反向）对（`Cycle` 自 0 起，每对之后 `NextCycle`），或永远。 |
 | 采样节拍 | 帧落在**何时**由时间轴决定；`1000 / max(1, FPS)` ms 只限制循环查看的频率。每次等待都经 `ArmNextFrame`——默认是每个循环复用一个 `Timer`（取消登记整次动画一次），框架重写时则是宿主的渲染节拍。 |
-| `Pause` / `Resume` / `SetRate` / `Seek` | `Transition.Pause/Resume/SetRate/Seek(target, …)` 作用于该 run 的 `TransitionTimeline`，而不是调度器。暂停会冻结时钟，因此暂停时间是被扣除而非被跳过，且停下的循环完全不产生计时器唤醒；改速率会先重定基准，因此位置不会跳变；seek 替换 `run.PassAnchor`（带 `cycle` 的重载还会设置程计数器），暂停期间则只把新位置画一帧、不恢复播放。零时长的程根本不消耗时间，程计数器正是为此存在。 |
+| `Pause` / `Resume` / `SetRate` / `Seek` | `Transition.Pause/Resume/SetRate/Seek(target, …)` 作用于该 run 的 `ITimeSourceControl`，而不是调度器。暂停会冻结时钟，因此暂停时间是被扣除而非被跳过，且停下的循环完全不产生计时器唤醒；改速率会先重定基准，因此位置不会跳变；seek 替换 `run.PassAnchor`（带 `cycle` 的重载还会设置程计数器），暂停期间则只把新位置画一帧、不恢复播放。零时长的程根本不消耗时间，程计数器正是为此存在。 |
 | 索引实参 | 默认逐帧重新求值，因此路径跟着它走，而终点值仍留在读取时所在的位置；`PathIndex.Frozen(i)` 把槽位钉死整次动画，并且是路径标识的一部分。 |
 | 反射得到的路径 | `TransitionProperty.FromProperty` 对每个 `PropertyInfo` 返回备忘后的共享路径，主题切换因此不再为每个目标、每次切换重编 getter/setter。 |
 | 分段 `Await` 延迟 | 每段的前置延迟（`CoreAwait`/`CoreAwaitThen`），由一个复用的 `ReusableTimerWait` 经 `DelayWhilePausedAsync` 等待完；取消（`OperationCanceledException`）时跳过，且暂停期间流逝的那部分不会被消耗。 |
@@ -236,6 +236,6 @@ flowchart TD
 | 属性无采样器 / 路径无效 | `Prepare` 中跳过（编译 getter 的 `UnreadablePath` 哨兵，或未解析到 `ISampler`）；其余属性照常动画。 |
 | 应用关闭 | `SamplerSet.CanSetValue()` 返回 false → `Apply` 跳过写入，不再触发事件。 |
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/TransitionScheduler.cs`（门控、CWT 表、弱目标、代际/排空、`TransitionRun` 登记）、`TransitionInterpreter.cs`（`ExecuteSamplingLoopAsync`/`RunPassAsync`/`EmitFrame`/`ArmNextFrame`）、`TransitionClock.cs`（`TransitionTimeline.Advance`/`Wake`/`PauseGate`、`TransitionRun.PassAnchor`/`Cycle`）、`ReusableTimerWait.cs`、`SamplerSet.cs`（`Apply` + 取消/应用存活守卫、`Run`/`SetRun`）、`Interpolator.cs`（`Prepare`、`TryGetInterpolator`、`CreateScheduler`）、`TransitionProperty.cs`（`BindTo`、`FromProperty`）、`PathIndex.cs`、`Transition.cs`（`CoreExecute`、`Pause`/`Resume`/`SetRate`/`Seek`）、`Src/Core/VeloxDev.Core.Test/TransitionSystem/ReusableTimerWaitTests.cs`、`Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/TransitionScheduler.cs`（门控、CWT 表、弱目标、代际/排空、`TransitionRun` 登记）、`TransitionInterpreter.cs`（`ExecuteSamplingLoopAsync`/`RunPassAsync`/`EmitFrame`/`ArmNextFrame`）、`Timing/TimeSourceCore.cs`（`TimeSourceCore.Advance`/`Wake`/`PauseGate`）、`TransitionSystem/TransitionRun.cs`（`TransitionRun.PassAnchor`/`Cycle`）、`ReusableTimerWait.cs`、`SamplerSet.cs`（`Apply` + 取消/应用存活守卫、`Run`/`SetRun`）、`Interpolator.cs`（`Prepare`、`TryGetInterpolator`、`CreateScheduler`）、`TransitionProperty.cs`（`BindTo`、`FromProperty`）、`PathIndex.cs`、`Transition.cs`（`CoreExecute`、`Pause`/`Resume`/`SetRate`/`Seek`）、`Src/Core/VeloxDev.Core.Test/TransitionSystem/ReusableTimerWaitTests.cs`、`Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`。
 
 相关分析：[设计模式 — 过渡动画](../../02_设计模式分析/03_过渡动画/index.md) · [复杂度 — 过渡动画](../../04_复杂度分析/03_过渡动画/index.md)

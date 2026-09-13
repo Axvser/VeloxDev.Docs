@@ -6,7 +6,7 @@
 
 该功能分两层提供：
 
-- **引擎核心**（`VeloxDev.Core`）—— 位于 `VeloxDev.DynamicTheme` 命名空间、与框架无关的主题模型：`ThemeManager`（静态 `Current`、`StartModel`、`SetPlatformInterpolator`、`SetCurrent<T>`、`Register`/`Unregister`、`Transition<T>`、`Jump<T>`）、共享的 `ThemeCache`、`[ThemeConfig]` 特性（1 个转换器 + 2–7 个主题，共 6 个泛型元数）、标记接口 `ITheme`（含内置的 `Dark` 与 `Light`）、`IThemeObject`（源生成器契约）与 `IThemeValueConverter`。切换同样由位于 `VeloxDev.Core` 的插值引擎（TransitionSystem）驱动，因此一场切换的所有目标共享同一条 `TransitionTimeline`。
+- **引擎核心**（`VeloxDev.Core`）—— 位于 `VeloxDev.DynamicTheme` 命名空间、与框架无关的主题模型：`ThemeManager`（静态 `Current`、`StartModel`、`SetPlatformInterpolator`、`SetCurrent<T>`、`Register`/`Unregister`、`Transition<T>`、`Jump<T>`）、共享的 `ThemeCache`、`[ThemeConfig]` 特性（1 个转换器 + 2–7 个主题，共 6 个泛型元数）、标记接口 `ITheme`（含内置的 `Dark` 与 `Light`）、`IThemeObject`（源生成器契约）与 `IThemeValueConverter`。切换同样由位于 `VeloxDev.Core` 的插值引擎（TransitionSystem）驱动，因此一场切换的所有目标共享同一条 `ITimeSourceControl`。
 - **平台适配器层**（Platform Adapters 系列包，如 `VeloxDev.WPF`、`VeloxDev.Avalonia`）—— 各框架的**主题值转换器**（`BrushConverter`、`ColorConverter`、`ThicknessConverter`、`DoubleConverter`、`PointConverter`、`CornerRadiusConverter`、`ObjectConverter`），把 `[ThemeConfig]` 的上下文参数转换成真实 UI 值；此外还提供带动画切换所需的 `Interpolator` 子类与 `TransitionEffects` 预设。
 
 要把主题值真正应用到 UI 元素上，需要与你 GUI 框架匹配的适配器 —— 它提供转换器与平台 `Interpolator`。官方两套示例族都覆盖 **WPF** 与 **Avalonia**：最小的一套（`Examples/Theme/WPF Trimmed/Demo`、`Examples/Theme/Avalonia Trimmed/Demo`）可供读者逐行复现，规模的一套（`Examples/Theme/WPF/Demo`、`Examples/Theme/Avalonia/Demo`）把同一套系统跑到一千个元素上，并附带无头基准。

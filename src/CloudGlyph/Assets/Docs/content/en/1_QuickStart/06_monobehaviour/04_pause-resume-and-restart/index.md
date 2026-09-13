@@ -4,7 +4,7 @@ Lifecycle control beyond `Start` / `StopAsync` (covered on the [Configure & Run 
 
 ## 1. Pause
 
-`Pause` does not stop the pumps; it sets the channel's paused flag and both pumps go into a low-cost idle loop (roughly a 10 ms sleep) in which no `Update`, `LateUpdate` or `FixedUpdate` is dispatched and the statistics do not advance:
+`Pause` freezes the channel's time source, and both pumps park on it. No `Update`, `LateUpdate` or `FixedUpdate` is dispatched, no time accrues, and the pumps cost no wake-ups at all until `Resume`. Because the clock stops rather than the callbacks merely being skipped, the paused span never enters `TotalTime`, and it does not count against an animation anchored to the same source:
 
 ```csharp
 MonoBehaviourManager.Pause("game");

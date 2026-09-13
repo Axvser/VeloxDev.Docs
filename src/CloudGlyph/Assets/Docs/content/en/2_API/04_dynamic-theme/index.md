@@ -10,7 +10,7 @@ The dynamic-theme feature switches an app between theme types (`Dark` / `Light` 
 |---|---|---|
 | Core contracts | `VeloxDev.DynamicTheme` (in `VeloxDev.Core`) | `ThemeManager`, `ThemeCache` (+ nested `InstanceCache`), `ThemeConfigAttribute<TConverter, TTheme...>`, enum `StartModel`, `Dark`, `Light`, `ITheme`, `IThemeObject`, `IThemeValueConverter` |
 | Source generator | `VeloxDev.Generators.Theme` | Emits the partial `IThemeObject` implementation for a class carrying `[ThemeConfig<...>]` |
-| Backing engine | `VeloxDev.TransitionSystem` / `.Abstractions` | `InterpolatorCore`, `TransitionSchedulerCore`, `TransitionTimeline`, `TransitionCore`, `ISampler`, `ISampleable`, `ITransitionProperty` / `TransitionProperty`, `ITransitionEffectCore`, `IEaseCalculator`, `Eases` |
+| Backing engine | `VeloxDev.TransitionSystem` / `.Abstractions` / `VeloxDev.Timing` | `InterpolatorCore`, `TransitionSchedulerCore`, `TimeSourceCore` (the default `ITimeSourceControl`), `TransitionCore`, `ISampler`, `ISampleable`, `ITransitionProperty` / `TransitionProperty`, `ITransitionEffectCore`, `IEaseCalculator`, `Eases` |
 | Platform adapters | `VeloxDev.WPF` / `VeloxDev.Avalonia` (and `MAUI` / `WinUI` / `WinForms` / `Razor`) | Adapter `Interpolator`, `TransitionEffect` / `TransitionEffects`, theme value converters (`DoubleConverter`, `PointConverter`, `ThicknessConverter`, `CornerRadiusConverter`, `ColorConverter`, `BrushConverter`, `ObjectConverter`) |
 
 ## Key Types at a Glance
@@ -20,7 +20,7 @@ The dynamic-theme feature switches an app between theme types (`Dark` / `Light` 
 - **`ThemeConfigAttribute<TConverter, TTheme1..TThemeN>`** — six arities (2 to 7 theme types) mapping one property to one value per theme.
 - **`StartModel`** — `[Flags]` enum (`Reflect = 1`, `Cache = 2`) selecting the animation start-value source.
 - **`ITheme` / `IThemeObject` / `IThemeValueConverter`** — theme marker, the generated theme-object contract, and the value-conversion strategy.
-- **Backing engine** — the static sampler registry `InterpolatorCore.NativeInterpolators` (`ConcurrentDictionary<Type, ISampler>`), the platform seam `InterpolatorCore.CreateScheduler` / `TransitionSchedulerCore` / the shared `TransitionTimeline`, the sampling contracts `ISampler`/`ISampleable`, the property contract `TransitionProperty`, and the effect/ease contracts `ITransitionEffectCore` / `IEaseCalculator` / `Eases`.
+- **Backing engine** — the static sampler registry `InterpolatorCore.NativeInterpolators` (`ConcurrentDictionary<Type, ISampler>`), the platform seam `InterpolatorCore.CreateScheduler` / `TransitionSchedulerCore` / the shared `ITimeSourceControl`, the sampling contracts `ISampler`/`ISampleable`, the property contract `TransitionProperty`, and the effect/ease contracts `ITransitionEffectCore` / `IEaseCalculator` / `Eases`.
 - **Platform adapters** — the adapter `Interpolator`, the effect presets `TransitionEffects` (`Empty` / `Theme` / `Hover`), and the theme value converters.
 
 ## Pages

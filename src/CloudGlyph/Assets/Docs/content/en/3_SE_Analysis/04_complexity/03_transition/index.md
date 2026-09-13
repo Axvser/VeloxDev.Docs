@@ -1,6 +1,6 @@
 # Complexity Analysis — Transition
 
-Let $P$ = the number of properties declared in a transition and $k$ = the depth of a property path (number of expression segments). Sampling is continuous, paced by the run's `TransitionTimeline` (whose only time source is a `Stopwatch`), so there is no pre-computed frame array: `ITransitionEffectCore.FPS` caps the maximum sample rate (yield interval = `1000 / FPS` ms), and no per-property frame list is ever materialized.
+Let $P$ = the number of properties declared in a transition and $k$ = the depth of a property path (number of expression segments). Sampling is continuous, paced by the run's `ITimeSourceControl` (whose only time source is a `Stopwatch`), so there is no pre-computed frame array: `ITransitionEffectCore.FPS` caps the maximum sample rate (yield interval = `1000 / FPS` ms), and no per-property frame list is ever materialized.
 
 ## Building a transition (`.Property(...)` calls)
 
@@ -153,6 +153,6 @@ The scheduler work around a run is $O(1)$ per segment plus $O(M)$ for the per-ta
 - `FromProperty`'s memo cache moves the reflection-driven path cost from per-switch to per-process: the parse and the compile happen once for a given `PropertyInfo`, however many switches use it.
 - The wait is per *frame* in time but per *animation* in allocation: after the first frame, waiting costs nothing.
 
-> Sources: `Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`, `TransitionInterpreter.cs`, `Transition.cs`, `TransitionClock.cs`, `ReusableTimerWait.cs`, `PathIndex.cs`, `State.cs`, `SamplerSet.cs`, `TransitionScheduler.cs`, `TransitionProperty.cs`, `StructAssembler.cs`, `NonPriority.cs`, `NativeSamplers/*.cs`, `Src/Core/VeloxDev.Core.Test/TransitionSystem/{InterpolatorCoreTests,ReusableTimerWaitTests}.cs`.
+> Sources: `Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`, `TransitionInterpreter.cs`, `Transition.cs`, `TransitionRun.cs`, `ReusableTimerWait.cs`, `Src/Core/VeloxDev.Core/Timing/TimeSourceCore.cs`, `PathIndex.cs`, `State.cs`, `SamplerSet.cs`, `TransitionScheduler.cs`, `TransitionProperty.cs`, `StructAssembler.cs`, `NonPriority.cs`, `NativeSamplers/*.cs`, `Src/Core/VeloxDev.Core.Test/TransitionSystem/{InterpolatorCoreTests,ReusableTimerWaitTests}.cs`.
 
 Related analysis: [Design patterns — Transition](../../02_design-patterns/03_transition/index.md) · [Data flow — Transition](../../03_data-flow/03_transition/index.md)

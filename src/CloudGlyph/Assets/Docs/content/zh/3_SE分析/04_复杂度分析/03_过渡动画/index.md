@@ -1,6 +1,6 @@
 # 复杂度分析 — 过渡动画
 
-设 $P$ = 声明的属性数，$k$ = 属性路径深度（表达式分段数）。采样是连续的，节拍由该次运行的 `TransitionTimeline` 决定（它唯一的时间来源是 `Stopwatch`），因此没有预计算的帧数组：`ITransitionEffectCore.FPS` 作为最大采样率上限（让出间隔 = `1000 / FPS` ms），且永远不会物化出每属性帧列表。
+设 $P$ = 声明的属性数，$k$ = 属性路径深度（表达式分段数）。采样是连续的，节拍由该次运行的 `ITimeSourceControl` 决定（它唯一的时间来源是 `Stopwatch`），因此没有预计算的帧数组：`ITransitionEffectCore.FPS` 作为最大采样率上限（让出间隔 = `1000 / FPS` ms），且永远不会物化出每属性帧列表。
 
 ## 声明状态（`.Property(...)` 调用）
 
@@ -145,6 +145,6 @@ $$
 - `FromProperty` 的备忘缓存把反射驱动的路径成本从「每次切换」移到「每进程」：对同一个 `PropertyInfo`，解析与编译只发生一次，无论有多少次切换用到它。
 - 等待在**时间**上是每帧的，在**分配**上是每动画的：首帧之后，等待不再花任何分配。
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`、`TransitionInterpreter.cs`、`Transition.cs`、`TransitionClock.cs`、`ReusableTimerWait.cs`、`PathIndex.cs`、`SamplerSet.cs`、`TransitionScheduler.cs`、`TransitionProperty.cs`、`State.cs`、`StructAssembler.cs`、`NativeSamplers/*.cs`、`Src/Core/VeloxDev.Core.Test/TransitionSystem/{InterpolatorCoreTests,ReusableTimerWaitTests}.cs`。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`、`TransitionInterpreter.cs`、`Transition.cs`、`TransitionRun.cs`、`ReusableTimerWait.cs`、`Src/Core/VeloxDev.Core/Timing/TimeSourceCore.cs`、`PathIndex.cs`、`SamplerSet.cs`、`TransitionScheduler.cs`、`TransitionProperty.cs`、`State.cs`、`StructAssembler.cs`、`NativeSamplers/*.cs`、`Src/Core/VeloxDev.Core.Test/TransitionSystem/{InterpolatorCoreTests,ReusableTimerWaitTests}.cs`。
 
 相关分析：[设计模式 — 过渡动画](../../02_设计模式分析/03_过渡动画/index.md) · [数据流 — 过渡动画](../../03_数据流分析/03_过渡动画/index.md)

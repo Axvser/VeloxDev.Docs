@@ -4,7 +4,7 @@
 
 ### Class: `ThemeManager`
 
-Static entry point for theme state and switching. All members are static. Live instances are tracked through a `ConditionalWeakTable<IThemeObject, ...>` plus a `List<WeakReference<IThemeObject>>`, so registration never leaks. The manager does not time a switch itself: an animated switch is run by the platform's `TransitionSchedulerCore`, resolved per target through `InterpolatorCore.CreateScheduler`, and every target of one switch is anchored to a single `TransitionTimeline`. Lifecycle callbacks are raised on every registered object around each switch.
+Static entry point for theme state and switching. All members are static. Live instances are tracked through a `ConditionalWeakTable<IThemeObject, ...>` plus a `List<WeakReference<IThemeObject>>`, so registration never leaks. The manager does not time a switch itself: an animated switch is run by the platform's `TransitionSchedulerCore`, resolved per target through `InterpolatorCore.CreateScheduler`, and every target of one switch is anchored to a single `ITimeSourceControl`. Lifecycle callbacks are raised on every registered object around each switch.
 
 Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`.
 
@@ -118,7 +118,7 @@ ThemeManager.Transition<Light>(TransitionEffects.Theme);
 
 **Notes:**
 - Cancels any switch in flight (`CancelActiveSwitch`), prunes dead `WeakReference`s, then calls `ExecuteThemeChanging(oldValue, newValue)` on every registered object.
-- Awaits the private `async Task<bool> RunSwitch`, which builds the per-target entries with `PrepareSamplers`, resolves each target's scheduler through `InterpolatorCore.CreateScheduler`, and runs them all on one shared `TransitionTimeline`. `RunSwitch` returns `false` when the switch was cancelled or superseded, and `Transition` then announces nothing and leaves `Current` unchanged.
+- Awaits the private `async Task<bool> RunSwitch`, which builds the per-target entries with `PrepareSamplers`, resolves each target's scheduler through `InterpolatorCore.CreateScheduler`, and runs them all on one shared `ITimeSourceControl`. `RunSwitch` returns `false` when the switch was cancelled or superseded, and `Transition` then announces nothing and leaves `Current` unchanged.
 - Falls back to an immediate, un-animated switch (`ApplyImmediately`) when no platform interpolator is set, when no target has an animatable property, or when the platform's scheduler declines the effect.
 - `RunSwitch` is a private `async Task<bool>` precisely because `Transition` is `async void`: exceptions thrown by the adapters' samplers and schedulers are caught inside it (`Debug.WriteLine("[ThemeManager] Error during transition execution: ...")`) instead of escaping into the process.
 - On completion sets `Current = themeType` and calls `ExecuteThemeChanged(oldValue, newValue)` on every registered object.

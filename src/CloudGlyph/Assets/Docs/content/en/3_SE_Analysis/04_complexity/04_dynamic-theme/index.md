@@ -1,6 +1,6 @@
 # Complexity Analysis — Dynamic Theme
 
-Let $N$ = number of registered theme-aware objects, $P$ = number of themed properties per object, $T$ = number of registered types, $K$ = number of themes, and $C$ = number of registered converters. An animated switch is now executed by the platform's `TransitionSchedulerCore`, so its frame count and frame pace belong to the Effect (`FPS`) and its wall time is bounded by the effect's `Duration`, not by the element count: every target of one switch is anchored to a single `TransitionTimeline`.
+Let $N$ = number of registered theme-aware objects, $P$ = number of themed properties per object, $T$ = number of registered types, $K$ = number of themes, and $C$ = number of registered converters. An animated switch is now executed by the platform's `TransitionSchedulerCore`, so its frame count and frame pace belong to the Effect (`FPS`) and its wall time is bounded by the effect's `Duration`, not by the element count: every target of one switch is anchored to a single `ITimeSourceControl`.
 
 ## Core Operations
 
@@ -118,7 +118,7 @@ The scale demo's headless `bench` mode (`Examples/Theme/WPF/Demo/BenchRunner.cs`
 | 200 | 1.6 – 2.0 | 309.8 – 314.4 | 4 000 | 20 | 2 837 – 2 870 | 0.4 – 0.8 |
 | 1000 | 7.1 – 10.0 | 310.4 – 320.4 | 18 416 – 19 833 | 18 – 20 | 12 625 – 13 533 | 1.6 – 4.5 |
 
-- **`anim_ms` is flat.** Roughly 310–320 ms at every size, against a declared 300 ms effect. A thousand-fold increase in targets costs no additional wall time — this is the shared `TransitionTimeline` claim, measured rather than asserted, and it is the empirical form of the claim above: wall time is bounded by `Duration`, not by the element count $N$.
+- **`anim_ms` is flat.** Roughly 310–320 ms at every size, against a declared 300 ms effect. A thousand-fold increase in targets costs no additional wall time — this is the shared `ITimeSourceControl` claim, measured rather than asserted, and it is the empirical form of the claim above: wall time is bounded by `Duration`, not by the element count $N$.
 - **`prep_ms` is the part that scales with $N$.** ~0.2–0.6 ms at one element, ~7–10 ms at a thousand — linear, matching the $O(N \cdot P)$ preparation bound above ($P = 2$ per tile, plus a fixed cost per target). This is the quantity the `58ae23b3` memoization of `TransitionProperty.FromProperty` took from ~1.6 s to ~10 ms at the 1000-element size, and these rows are that memoized state.
 - **Allocation is paid per switch, not per frame.** Roughly 13–22 KB per element per switch at 1000 elements depending on the run, while `frames_per_target` stays fixed at 20 and `gen1` / `gen2` stay 0 all the way up (the 1000-element rows show a single gen-0 collection). The allocation tracks the element count, not the frame count, so it is the prepared entry set that costs, and the sampling loop is allocation-free per frame.
 - **`jump_ms` stays in the low single milliseconds even at 1000 elements**, which is what the synchronous, await-free `ApplyImmediately` path predicts.

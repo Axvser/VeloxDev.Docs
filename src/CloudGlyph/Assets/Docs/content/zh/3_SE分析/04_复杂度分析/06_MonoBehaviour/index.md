@@ -8,9 +8,9 @@ $$
 O(b), \quad b = \text{活动行为数}
 $$
 
-`ExecuteBehaviorsUpdateSync` / `ExecuteBehaviorsLateUpdateSync` / `ExecuteBehaviorsFixedUpdateSync` 对缓存的包装器数组遍历一次，逐个调用 `InvokeUpdate` / `InvokeLateUpdate` / `InvokeFixedUpdate` —— `MonoBehaviourManager.cs` 第 611-657 行。
+`ExecuteBehaviorsUpdateSync` / `ExecuteBehaviorsLateUpdateSync` / `ExecuteBehaviorsFixedUpdateSync` 对缓存的包装器数组遍历一次，逐个调用 `InvokeUpdate` / `InvokeLateUpdate` / `InvokeFixedUpdate` —— `MonoBehaviourManager.cs` 第 690-738 行。
 
-包装器数组由 `GetCachedWrappers`（第 663-673 行）在注册 / 移除触发排序标记时或每 `MAX_CONFIG_CACHE_DURATION_MS = 1000` ms 重建一次；重建会复制活动包装器并按 `ExecutionOrder` 插入排序（`RebuildCachedWrappers`，第 805-834 行）。行为数量通常很小，因此每帧排序代价被摊还掉：
+包装器数组由 `GetCachedWrappers`（第 742-752 行）在注册 / 移除触发排序标记时或每 `MAX_CONFIG_CACHE_DURATION_MS = 1000` ms 重建一次；重建会复制活动包装器并按 `ExecutionOrder` 插入排序（`RebuildCachedWrappers`，第 873-903 行）。行为数量通常很小，因此每帧排序代价被摊还掉：
 
 $$
 T_{\text{update}} = O(b) \text{ 每帧}, \quad b \ll n_{\text{registered}}
@@ -28,21 +28,21 @@ $$
 
 ## 事件参数复用（对象池）
 
-每帧更新驱动调用 `CreateFrameEventArgs`（第 745-755 行），从每通道 `ObjectPool<FrameEventArgs>`（默认 `DEFAULT_OBJECT_POOL_SIZE = 50`）取出而非重新分配：
+每帧更新驱动调用 `CreateFrameEventArgs`（第 825-835 行），从每通道 `ObjectPool<FrameEventArgs>`（默认 `DEFAULT_OBJECT_POOL_SIZE = 50`）取出而非重新分配：
 
 $$
 O(1) \text{ 每帧取/还，稳态零分配}
 $$
 
-对象池是无锁 `ConcurrentStack` 且有界容量，被两个驱动共享（固定事件来自同一池）。未被处理的 `FixedUpdate` 事件入队，由更新驱动在下一帧开头排空时归还（`DrainFixedUpdateEvents`，第 757-761 行）；已处理者立即归还。`ConfigChangeRequest` 与 `BehaviorWrapper` 对象来自各自同容量的池，因此注册 / 配置抖动也不会造成稳态分配。
+对象池是无锁 `ConcurrentStack` 且有界容量，被两个泵共享：FixedUpdate 泵在一次推送结束后立即把该 `FrameEventArgs` 还回同一个池，因此没有任何东西为了回收而跨线程。`ConfigChangeRequest` 与 `BehaviorWrapper` 对象来自各自同容量的池，因此注册 / 配置抖动也不会造成稳态分配。
 
 ## 帧节奏控制
 
-`FrameRateControlSync` 睡眠到目标帧时长（`_cachedTargetFrameDurationTicks`，在应用 `TargetFPS` 时更新）。`PrecisionSleep` 低于 `SPIN_ONLY_THRESHOLD_MS = 2` ms 时纯自旋，否则 `Thread.Sleep(1)` + 尾部自旋 —— 第 763-803 行。每帧墙钟时间 $O(1)$。异步循环模式下同样的节奏控制是 `Task.Delay`（最小 1 ms），帧超时时用 `Task.Yield`（`UpdateLoopAsync`，第 548-605 行）。
+`FrameRateControlSync` 睡眠到目标帧时长（`_cachedTargetFrameDurationTicks`，在应用 `TargetFPS` 时更新），FixedUpdate 泵则睡眠到下一步到期。两者都走 `Sleep`（第 863-871 行）—— 普通的 `Thread.Sleep`，按不超过 `MAX_SLEEP_CHUNK_MS = 50` ms 分块，块间检查令牌。所以帧路径上**没有任何自旋**。精度是刻意放弃的：正确性归采样器所有，因此晚醒只是这一帧晚到，绝不会丢一帧或算错一个间隔。每帧墙钟时间 $O(1)$。异步循环模式下同样的节奏控制是 `Task.Delay`（最小 1 ms），帧超时时用 `Task.Yield`（`UpdateLoopAsync`，第 623-688 行）。
 
 ## 配置 / 注册批处理
 
-配置变更、行为增删与转发的“主线程”动作通过并发队列交换，由 `ProcessMainThreadOperations`（第 675-688 行）每帧排空一次：
+配置变更、行为增删与转发的“主线程”动作通过并发队列交换，由 `ProcessMainThreadOperations`（第 754-767 行）每帧排空一次：
 
 | 操作 | 每帧 |
 |---|---|
@@ -57,7 +57,7 @@ $$
 |---|---|
 | 缓存包装器数组 | $O(b)$ 个 `BehaviorWrapper[]`，变更时或每 1000 ms 重建 |
 | 对象池 | 3 个池（`FrameEventArgs`、`ConfigChangeRequest`、`BehaviorWrapper`），每通道固定容量 50；复用实例，不产生垃圾 |
-| 并发队列 | $O(q)$ 配置 / $O(r)$ 注册 / $O(a)$ 主线程动作，每帧排空；`_fixedUpdateEvents` 于下一更新帧排空 |
+| 并发队列 | $O(q)$ 配置 / $O(r)$ 注册 / $O(a)$ 主线程动作，每帧排空；固定推送的参数就地还池，不经队列 |
 | 驱动 | 每通道 2 个 —— 线程模式为线程，异步循环模式为异步任务 |
 
 ## 单操作汇总

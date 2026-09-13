@@ -4,19 +4,21 @@ All control flows through the static `VeloxDev.TimeLine.MonoBehaviourManager`. E
 
 ## 1. Configuration knobs
 
-The per-channel settings are queued as change requests and applied at the start of the next frame (`Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs`).
+`SetTargetFPS` is applied at the start of the next update frame and `SetFixedUpdateInterval` by the FixedUpdate pump itself, each on the thread that owns what it changes. `SetTimeScale` applies immediately, because it writes to the channel's time source and that source serialises its own writers (`Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs`).
 
 ```csharp
 MonoBehaviourManager.SetTargetFPS(60, "game");            // valid 1..1000; out of range is ignored
 MonoBehaviourManager.SetFixedUpdateInterval(16, "game");  // ms, valid 1..1000; out of range is ignored
-MonoBehaviourManager.SetTimeScale(1.0f, "game");          // clamped to 0..10
+MonoBehaviourManager.SetTimeScale(1.0f, "game");          // the transport's rate; negative throws, 0 freezes
 MonoBehaviourManager.ExecuteOnMainThread(() => DoUiWork(), "game"); // runs at the top of the next update frame
 ```
 
 - `SetTargetFPS` paces the Update pump (default 60).
 - `SetFixedUpdateInterval` sets the fixed-timestep period of the FixedUpdate pump in milliseconds (default 16).
-- `SetTimeScale` scales `FrameEventArgs.DeltaTime` for every behaviour that frame (`0` freezes delta time without stopping the pump).
+- `SetTimeScale` sets the playback rate of the channel's time source — the same value an animation anchored to that channel reads. It scales the whole virtual clock rather than the interval handed to each frame, so `FrameEventArgs.DeltaTime` and `TimeSpan.TotalTime` both follow it; `0` freezes the clock, and both pumps then park instead of spinning against a clock that never moves.
 - `ExecuteOnMainThread` queues an `Action` that the Update pump runs at the top of its next frame — it runs on the *loop* thread, not on any UI thread.
+
+A channel's time source is reachable: `MonoBehaviourManager.Bus("game")` returns it, or `null` for a channel that has never been created. Handing it to `Transition.Execute(target, bus)` anchors an animation to the same clock, so pausing the channel pauses the animation and the rate multiplies both.
 
 **Expected result:** configuration is applied on the next frame boundary; status queries reflect the new values once applied.
 

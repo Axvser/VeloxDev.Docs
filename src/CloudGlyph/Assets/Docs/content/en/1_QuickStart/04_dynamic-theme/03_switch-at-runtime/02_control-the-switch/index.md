@@ -2,7 +2,7 @@
 
 ## 1. One switch, one timeline
 
-`ThemeManager.Transition` creates a single `TransitionTimeline` and anchors **every** target of that switch to it. There is therefore exactly one transport per switch, and it is the same transport the TransitionSystem already exposes — so addressing any one registered target with the ordinary `Transition.*` surface moves the whole switch. One `Transition.Pause(tile)` freezes all thousand tiles; there is nothing extra to build and no theme-specific control API to learn.
+`ThemeManager.Transition` creates a single `ITimeSourceControl` and anchors **every** target of that switch to it. There is therefore exactly one transport per switch, and it is the same transport the TransitionSystem already exposes — so addressing any one registered target with the ordinary `Transition.*` surface moves the whole switch. One `Transition.Pause(tile)` freezes all thousand tiles; there is nothing extra to build and no theme-specific control API to learn.
 
 The run being a normal transition run is also why the effect is used as given: flags such as `IsAutoReverse` and `LoopTime` are honoured rather than ignored. `ThemeTransitionTests.Switch_HonoursAutoReverseAndLoopTime` switches with `IsAutoReverse = true` and `LoopTime = 1` and settles on the **start** value, because the last pass is a reverse one — the assertion is the evidence that the flags still apply.
 

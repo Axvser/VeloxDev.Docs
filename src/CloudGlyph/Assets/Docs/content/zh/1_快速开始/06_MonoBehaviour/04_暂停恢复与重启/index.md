@@ -4,7 +4,7 @@
 
 ## 1. 暂停
 
-`Pause` 并不停止两个泵；它置上通道的暂停标志，两个泵进入低成本空闲循环（约 10 ms 睡眠），期间不再派发任何 `Update`、`LateUpdate` 或 `FixedUpdate`，统计也不再前进：
+`Pause` 冻结该通道的时间源，两个泵随即 park 在它上面。期间不再派发任何 `Update`、`LateUpdate` 或 `FixedUpdate`，时间也不再累计，而且在 `Resume` 之前两个泵**一次唤醒都不产生**。由于是时钟停住而不是仅仅跳过回调，暂停的那一段永远不会进入 `TotalTime`，也不会算在锚到同一时间源的动画头上：
 
 ```csharp
 MonoBehaviourManager.Pause("game");

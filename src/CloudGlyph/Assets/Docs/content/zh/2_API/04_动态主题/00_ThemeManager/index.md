@@ -4,7 +4,7 @@
 
 ### 类：`ThemeManager`
 
-主题状态与切换的静态入口。所有成员均为静态。活跃实例通过 `ConditionalWeakTable<IThemeObject, ...>` 加上 `List<WeakReference<IThemeObject>>` 跟踪，因此注册不会产生泄漏。管理器自己不负责计时：带动画的切换由平台的 `TransitionSchedulerCore` 运行，它按目标经 `InterpolatorCore.CreateScheduler` 解析，而一场切换的所有目标都锚定在同一个 `TransitionTimeline` 上。每次切换前后仍会对每个已注册对象触发生命周期回调。
+主题状态与切换的静态入口。所有成员均为静态。活跃实例通过 `ConditionalWeakTable<IThemeObject, ...>` 加上 `List<WeakReference<IThemeObject>>` 跟踪，因此注册不会产生泄漏。管理器自己不负责计时：带动画的切换由平台的 `TransitionSchedulerCore` 运行，它按目标经 `InterpolatorCore.CreateScheduler` 解析，而一场切换的所有目标都锚定在同一个 `ITimeSourceControl` 上。每次切换前后仍会对每个已注册对象触发生命周期回调。
 
 源码：`Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`。
 
@@ -118,7 +118,7 @@ ThemeManager.Transition<Light>(TransitionEffects.Theme);
 
 **说明：**
 - 先取消在飞的切换（`CancelActiveSwitch`），清理失效的 `WeakReference`，然后对每个已注册对象调用 `ExecuteThemeChanging(oldValue, newValue)`。
-- 等待私有的 `async Task<bool> RunSwitch`：它用 `PrepareSamplers` 构建每个目标的条目，经 `InterpolatorCore.CreateScheduler` 解析每个目标的调度器，并让它们全部跑在同一个共享的 `TransitionTimeline` 上。当切换被取消或被后续切换顶替时 `RunSwitch` 返回 `false`，此时 `Transition` 不宣布任何变更，也不改动 `Current`。
+- 等待私有的 `async Task<bool> RunSwitch`：它用 `PrepareSamplers` 构建每个目标的条目，经 `InterpolatorCore.CreateScheduler` 解析每个目标的调度器，并让它们全部跑在同一个共享的 `ITimeSourceControl` 上。当切换被取消或被后续切换顶替时 `RunSwitch` 返回 `false`，此时 `Transition` 不宣布任何变更，也不改动 `Current`。
 - 未设置平台插值器、没有任何目标含有可动画属性，或平台调度器拒绝该效果时，退化为瞬时切换（`ApplyImmediately`），而不是启动一场画不出东西的动画。
 - `RunSwitch` 之所以是私有的 `async Task<bool>`，正是因为 `Transition` 是 `async void`：适配器的采样器与调度器抛出的异常会在它内部被捕获（`Debug.WriteLine("[ThemeManager] Error during transition execution: ...")`），而不是逃逸到进程里。
 - 完成后设置 `Current = themeType`，并对每个已注册对象调用 `ExecuteThemeChanged(oldValue, newValue)`。

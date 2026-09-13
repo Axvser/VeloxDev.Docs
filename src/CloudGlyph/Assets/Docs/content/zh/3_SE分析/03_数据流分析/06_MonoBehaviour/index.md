@@ -1,6 +1,6 @@
 # 数据流 — MonoBehaviour
 
-每个通道由两个并发的帧驱动驱动：**更新驱动**（注册、配置、`Update` / `LateUpdate`）与**固定驱动**（按固定间隔执行 `FixedUpdate`）。默认情况下它们是两个后台 `Thread`；启用异步循环模式时则以两个 `Task`（`UpdateLoopAsync` / `FixedUpdateLoopAsync`）运行。所有跨线程通信——注册、移除、配置变更、被转发的动作、固定事件——都经由并发队列，由更新驱动在每帧开头排空。
+每个通道由两个并发的帧驱动驱动：**更新驱动**（注册、配置、`Update` / `LateUpdate`）与**固定驱动**（按固定间隔执行 `FixedUpdate`）。默认情况下它们是两个后台 `Thread`；启用异步循环模式时则以两个 `Task`（`UpdateLoopAsync` / `FixedUpdateLoopAsync`）运行。跨线程通信——注册、移除、配置变更、被转发的动作——都经由并发队列，由更新驱动在每帧开头排空；固定推送的事件参数不经过队列，因为推送一完成它们就直接还回自己的池。
 
 ## 1. 注册 → 通道启动 → 每帧 tick → 停止
 
@@ -36,9 +36,9 @@ loop 当 IsRunning && !cts.Canceled
     U -> L: ProcessMainThreadOperations()
     note right of U: 每帧 <= 64 个 ExecuteOnMainThread 动作，\n然后是 config / add / remove 队列
     U -> L: added 队列 -> InvokeAwake + InvokeStart（各一次）
-    U -> L: DrainFixedUpdateEvents() -> 归还池化参数
-    U -> L: CreateFrameEventArgs(deltaTime)
-    L --> U: E（来自对象池，已做时间缩放）
+    U -> L: _updateSampler.Sample() -> 时间源的位置，已按速率缩放
+    U -> L: CreateFrameEventArgs(sample.Delta, sample.Total)
+    L --> U: E（来自对象池）
     U -> B: InvokeUpdate(E) -> partial void Update(E)
     U -> B: InvokeLateUpdate(E) -> partial void LateUpdate(E)
     U -> L: 归还 E 到池；统计；节奏控制到 1/TargetFPS
@@ -47,15 +47,11 @@ deactivate U
 
 activate F
 loop 当 IsRunning && !cts.Canceled
-    F -> L: elapsed >= fixedUpdateInterval（默认 16 ms）
-    F -> L: CreateFrameEventArgs(elapsed)
+    F -> L: _fixedSampler.Advance() -> 时间已经支付的步数
+    F -> L: CreateFrameEventArgs(step, step 序号 * step)
     L --> F: E（来自同一个池）
     F -> B: InvokeFixedUpdate(E) -> partial void FixedUpdate(E)
-    alt E.Handled == false
-        F -> L: 入队 E 供更新驱动排空
-    else E.Handled == true
-        F -> L: 归还 E 到对象池
-    end
+    F -> L: 归还 E 到对象池（Handled 只停止该帧剩下的推送）
 end
 deactivate F
 
@@ -72,9 +68,9 @@ deactivate L
 @enduml
 ```
 
-两个驱动既可以是 `Thread` 也可以是异步 `Task`，取决于循环模式：在使用 `VeloxDev.Core` 的 `net5.0+` 构建的桌面上，`UseAsyncLoop` 默认取 `OperatingSystem.IsBrowser() || OperatingSystem.IsIOS()`（桌面上为 false，因此使用名为 `VeloxDev.Update[name]` / `VeloxDev.FixedUpdate[name]`、`Priority = AboveNormal` 的原生线程）；在 `net5.0` 之前的各目标框架上该常量表达式为 `true`；也可用 `SetUseAsyncLoop(bool, channel)` 在 `Start` 前按通道强制指定（通道运行期间调用会抛 `InvalidOperationException`）。异步孪生版本用 `Task.Delay` 取代 `PrecisionSleep`，执行同一套骨架。只有驱动机制不同——队列交换、对象池与事件参数完全共享。
+两个驱动既可以是 `Thread` 也可以是异步 `Task`，取决于循环模式：在使用 `VeloxDev.Core` 的 `net5.0+` 构建的桌面上，`UseAsyncLoop` 默认取 `OperatingSystem.IsBrowser() || OperatingSystem.IsIOS()`（桌面上为 false，因此使用名为 `VeloxDev.Update[name]` / `VeloxDev.FixedUpdate[name]`、`Priority = AboveNormal` 的原生线程）；在 `net5.0` 之前的各目标框架上该常量表达式为 `true`；也可用 `SetUseAsyncLoop(bool, channel)` 在 `Start` 前按通道强制指定（通道运行期间调用会抛 `InvalidOperationException`）。异步孪生版本用 `Task.Delay` 取代分块的 `Thread.Sleep`，执行同一套骨架。只有驱动机制不同——队列交换、对象池与事件参数完全共享。
 
-关键源码：`MonoBehaviourManager.cs` 的 `Start`（246-292）、`UpdateLoop`（444-489）、`FixedUpdateLoop`（395-442）、`UpdateLoopAsync`/`FixedUpdateLoopAsync`（492-605）、`StopAsync`（294-337）、`ProcessMainThreadOperations`（675-688）。
+关键源码：`MonoBehaviourManager.cs` 的 `Start`（275-328）、`UpdateLoop`（510-556）、`FixedUpdateLoop`（447-508）、`UpdateLoopAsync`/`FixedUpdateLoopAsync`（558-688）、`StopAsync`（330-375）、`ProcessMainThreadOperations`（754-767）。
 
 ## 2. 暂停 / 恢复 / 重启 / 停止
 
@@ -90,17 +86,17 @@ participant "更新驱动" as U
 C -> M: Pause(channel)
 activate M
 M -> L: Pause()
-L -> L: _isPaused = true
+L -> L: _bus.Pause()
 L --> M: Paused 事件
 M --> C: OnChannelPaused
 deactivate M
 
-U -> U: 循环发现 _isPaused -> 跳过本帧\n（PrecisionSleep 10 ms；异步模式为 Task.Delay 10 ms）
+U -> U: 泵在时间源的信号上挂起\n（重新走动前零唤醒）
 
 C -> M: Resume(channel)
 activate M
 M -> L: Resume()
-L -> L: _isPaused = false
+L -> L: _bus.Resume()
 L --> M: Resumed 事件
 M --> C: OnChannelResumed
 deactivate M
@@ -121,7 +117,7 @@ deactivate M
 @enduml
 ```
 
-`Pause` / `Resume` / `Stop` 直接翻转 volatile 状态并立即引发对应的 `LoopChannel` 事件；静态管理器把它以带通道名的事件参数转发为 `OnChannelPaused` / `OnChannelResumed` / `OnChannelStopped`。`RestartAsync`（353-377 行）即 `StopAsync` + 停机确认等待，驱动未及时停止时以 `ForceCleanup()` 兜底，随后等待队列清空再重新 `Start()`。
+`Pause` / `Resume` 作用于该通道的时间源（锚定到同一时间源的动画也会观测到同样的状态），`Stop` 则翻转 volatile 标志；每个都会立即引发对应的 `LoopChannel` 事件，静态管理器再以带通道名的事件参数把它转发为 `OnChannelPaused` / `OnChannelResumed` / `OnChannelStopped`。`RestartAsync`（405-439 行）即 `StopAsync` + 停机确认等待，驱动未及时停止时以 `ForceCleanup()` 兜底，随后等待队列清空再重新 `Start()`。
 
 ## 3. `Handled = true` 短路
 
@@ -150,7 +146,7 @@ note over U,B: 复用的是同一个池化 E，因此 LateUpdate 也被跳过
 @enduml
 ```
 
-`ExecuteBehaviorsUpdateSync` / `ExecuteBehaviorsLateUpdateSync` / `ExecuteBehaviorsFixedUpdateSync` 都会在 `frameArgs.Handled` 被置位后立即 break（`MonoBehaviourManager.cs` 第 611-657 行）。由于同一帧里 `Update` 与 `LateUpdate` 两个阶段复用同一个 `FrameEventArgs` 实例，`Update` 期间把 `Handled` 置 `true` 也会在该帧抑制 `LateUpdate`。把 `Handled` 置 `true` 的 `FixedUpdate` 会立即归还其（池化的）参数，而不入队等待排空。
+`ExecuteBehaviorsUpdateSync` / `ExecuteBehaviorsLateUpdateSync` / `ExecuteBehaviorsFixedUpdateSync` 都会在 `frameArgs.Handled` 被置位后立即 break（`MonoBehaviourManager.cs` 第 690-738 行）。由于同一帧里 `Update` 与 `LateUpdate` 两个阶段复用同一个 `FrameEventArgs` 实例，`Update` 期间把 `Handled` 置 `true` 也会在该帧抑制 `LateUpdate`。把 `Handled` 置 `true` 的 `FixedUpdate` 会停止该帧剩下的推送；其参数无论如何都直接还池，中间没有队列。
 
 ## 4. 时间缩放
 
@@ -164,18 +160,18 @@ participant "FrameEventArgs" as E
 participant "IMonoBehaviour" as B
 
 C -> L: SetTimeScale(0.5f, channel)
-L -> L: 入队 ConfigChangeRequest{ TimeScale = 0.5f }
-note over L: 在下次 ProcessConfigChanges() 生效\n（被钳制到 0..10）
+L -> L: _bus.SetRate(0.5f)
+note over L: 立即生效 —— 时间源自己串行化写入\n（负值被拒绝；速率为 0 冻结时钟）
 
-L -> L: CreateFrameEventArgs(deltaTime) 读取 _timeScaleBits
-L -> E: DeltaTime = ScaleDuration(rawDelta, 0.5f)
-note over E: 原始增量减半；scale <= 0 得 TimeSpan.Zero
+L -> L: _updateSampler.Sample() 读取时间源的位置
+L -> E: DeltaTime = sample.Delta
+note over E: 速率由时钟施加，而不是事后作用于增量
 L --> B: InvokeUpdate(E)
 B -> B: 读取 e.DeltaTime（减半）-> 模拟变慢
 @enduml
 ```
 
-`SetTimeScale` 入队一个池化的 `ConfigChangeRequest`；更新驱动应用它（`ProcessConfigChanges`，第 690-709 行）并钳制到 `0..10`。由于 `CreateFrameEventArgs`（745-755 行）被两个驱动共享，时间缩放同样作用于 `Update`、`LateUpdate` **以及** `FixedUpdate` 的增量时间；`ScaleDuration`（862-868 行）对 `scale <= 0` 返回 `TimeSpan.Zero`。
+`SetTimeScale` 把速率直接写给该通道的时间源（`Timing/TimeSourceCore.cs` 第 209-231 行），时间源自己串行化写入 —— 所以没有配置队列这一跳，也没有钳制：负值被拒绝而不是被忽略，速率为 `0` 则冻结时钟但不算暂停。速率由时钟本身施加，因此 `CreateFrameEventArgs`（825-836 行）从一个 `TimeSample` 里同时取出 `DeltaTime` 与 `TotalTime`，自己不做任何缩放。FixedUpdate 泵也走同一个方法：它的 `DeltaTime` 是固定步长，速率改变的是每秒到来多少步，而不是一步的大小。
 
 ## 5. 转发到更新驱动 — `ExecuteOnMainThread` 与 UI 跳转
 
@@ -213,4 +209,4 @@ UI --> B: 返回
 @enduml
 ```
 
-关键源码：`ExecuteOnMainThread` 入队（第 212 行，静态包装 1049-1050 行），排空在 `ProcessMainThreadOperations`（675-688 行）内，WPF 跳转见 `MainWindow.xaml.cs`。
+关键源码：`ExecuteOnMainThread` 入队（第 241 行，静态包装 1086 行），排空在 `ProcessMainThreadOperations`（754-767 行）内，WPF 跳转见 `MainWindow.xaml.cs`。

@@ -1,6 +1,6 @@
 # 数据流 — 主题切换
 
-`Transition<T>` 与 `Jump<T>` 不再共用同一条管线。带动画的切换先准备出一组按目标分组的条目，再交给每个目标一个平台 `TransitionSchedulerCore`，全部锚定在同一条 `TransitionTimeline` 上，于是时钟、帧节拍和效果自身的标志都归过渡系统所有。即时切换完全不碰过渡系统：`Jump` 经 `ApplyImmediately` 直接写入全部终值并推进 `Current`，因此它既不依赖 `SetPlatformInterpolator`，也不受平台 `ITransitionEffect<TPriority>` 的类型约束。
+`Transition<T>` 与 `Jump<T>` 不再共用同一条管线。带动画的切换先准备出一组按目标分组的条目，再交给每个目标一个平台 `TransitionSchedulerCore`，全部锚定在同一条 `ITimeSourceControl` 上，于是时钟、帧节拍和效果自身的标志都归过渡系统所有。即时切换完全不碰过渡系统：`Jump` 经 `ApplyImmediately` 直接写入全部终值并推进 `Current`，因此它既不依赖 `SetPlatformInterpolator`，也不受平台 `ITransitionEffect<TPriority>` 的类型约束。
 
 两个入口共用同一段前奏 —— 守卫、取消、清理、通知 `ExecuteThemeChanging` —— 也都以通知 `ExecuteThemeChanged` 收尾，但只有真正落地的切换才走到那一步。
 
@@ -15,7 +15,7 @@ participant "ThemeManager" as TM
 participant "IThemeObject\n(registered view)" as TO
 participant "InterpolatorCore\n(platform adapter)" as IK
 participant "TransitionSchedulerCore\n(one per target)" as SC
-participant "TransitionTimeline\n(one per switch)" as TL
+participant "TimeSourceCore\n(one per switch)" as TL
 participant "ISampler" as SMP
 
 User -> TM: Transition<Light>(effect)
@@ -72,7 +72,7 @@ else passes
         end
         TM -> TM: ApplyImmediately(groups, typeof(Light))
     else every group got a scheduler
-        TM -> TL: new TransitionTimeline()
+        TM -> TL: TimerCore.CreateTimeSource<ITimeSourceControl>()
         loop each (scheduler, group)
             TM -> TO: WriteStartValues(group)
             note right of TM

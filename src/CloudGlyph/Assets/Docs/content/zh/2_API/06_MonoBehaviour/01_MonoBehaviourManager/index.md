@@ -137,9 +137,12 @@ MonoBehaviourManager.SetTargetFPS(30, "game");
 
 | 参数 | 类型 | 说明 |
 |---|---|---|
-| `intervalMs` | `int` | 两次固定更新之间的毫秒数，钳位 `1..1000`。默认 `16`。 |
+| `intervalMs` | `int` | 两次固定更新之间的毫秒数，合法 `1..1000`，越界被忽略。默认 `16`。 |
 
 **返回：** `void`
+
+**备注：**
+- 交给 FixedUpdate 泵并在它那条线程上应用 —— 也就是被修改的那个步长的属主线程。
 
 #### `MonoBehaviourManager.SetTimeScale`
 
@@ -148,13 +151,23 @@ MonoBehaviourManager.SetTargetFPS(30, "game");
 
 | 参数 | 类型 | 说明 |
 |---|---|---|
-| `timeScale` | `float` | 作用于 `FrameEventArgs.DeltaTime` 的时间缩放，钳位 `0..10`。默认 `1.0`。 |
+| `timeScale` | `float` | 该通道时间源的播放速率。默认 `1.0`。 |
 
 **返回：** `void`
 
+**异常：**
+| 异常 | 条件 |
+|---|---|
+| `ArgumentOutOfRangeException` | 值为负。时间源不倒着走。 |
+
+**备注：**
+- 立即作用于该通道的时间源，不经过配置队列：时间源自己串行化写入。
+- 它缩放的是**整条虚拟时钟**，所以 `FrameEventArgs.DeltaTime` 与 `FrameEventArgs.TotalTime` 都随它变化；经由 `MonoBehaviourManager.Bus` 锚到同一时间源上的动画也一样。
+- 速率为 `0` 会冻结时钟但不算暂停：不再派发帧，而且 `Resume` 不会让它重新走起来 —— 只有非零速率可以。
+
 **示例：**
 ```text
-// 时间缩放 0.5 会让每个 FrameEventArgs.DeltaTime 减半（循环内 ScaleDuration）
+// 时间缩放 0.5 让每个 FrameEventArgs.DeltaTime 减半，TotalTime 也以半速累计
 MonoBehaviourManager.SetTimeScale(0.5f, "game");
 ```
 
@@ -224,6 +237,19 @@ MonoBehaviourManager.SetTimeScale(0.5f, "game");
 | `SystemStatus` | `string` — `"Stopped"` / `"Paused"` / `"Running"` |
 | `IsUpdateThreadAlive` | `bool`（带 2 秒无活动超时） |
 | `IsFixedUpdateThreadAlive` | `bool`（带 2 秒无活动超时） |
+
+两个存活查询在该通道的时钟停摆期间也返回 `true`：park 住的泵是在等一个信号，而不是闲下来，所以无活动超时对它不适用。
+
+#### `MonoBehaviourManager.Bus`
+
+**签名：**
+`public static ITimeSourceControl? Bus(string channel = DEFAULT_CHANNEL)`
+
+**返回：** 该通道的时间源；通道从未创建过时返回 `null`。
+
+**备注：**
+- 通道的帧与锚到这个源上的所有东西共享同一条时钟：把它交给 `Transition.Execute(target, bus)` 之后，`Pause`、`Resume` 与 `SetTimeScale` 会同时作用于动画与帧。
+- 该源在通道构造时经 `TimerCore.CreateTimeSource<ITimeSourceControl>()` 解析，所以平台可以在那里注册自己的实现来替换。默认实现是 `TimeSourceCore`，位于 `VeloxDev.Timing` 命名空间。
 
 **示例（状态查询）：**
 ```text

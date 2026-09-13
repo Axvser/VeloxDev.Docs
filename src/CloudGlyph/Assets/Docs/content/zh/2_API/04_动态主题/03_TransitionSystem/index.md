@@ -2,7 +2,7 @@
 
 动态主题功能通过 TransitionSystem 引擎对主题属性做动画。一次主题切换完全不由 `ThemeManager` 计时：管理器自己按 `StartModel` 构建每个属性的起始/结束条目，然后把每个目标的 `StateCore` 交给平台的 `TransitionSchedulerCore`，由后者完成采样器解析与采样。本页记录 `ThemeManager` 实际消费的引擎表面；完整引擎由过渡动画功能记录。
 
-> 引擎契约（`ITransitionProperty`、`ISampler`、`ISampleable`、`ITransitionEffectCore`、`IEaseCalculator`）位于 `VeloxDev.TransitionSystem`；基础类型与具体类型（`InterpolatorCore`、`TransitionSchedulerCore`、`TransitionTimeline`、`TransitionCore`、`TransitionProperty`）位于 `VeloxDev.TransitionSystem.Abstractions`。完整引擎参考位于过渡动画功能（`2_API/03_transition`）。
+> 引擎契约（`ITransitionProperty`、`ISampler`、`ISampleable`、`ITransitionEffectCore`、`IEaseCalculator`）位于 `VeloxDev.TransitionSystem`；基础类型与具体类型（`InterpolatorCore`、`TransitionSchedulerCore`、`TransitionCore`、`TransitionProperty`）位于 `VeloxDev.TransitionSystem.Abstractions`；共享 transport 的默认实现 `TimeSourceCore` 位于 `VeloxDev.Timing`。完整引擎参考位于过渡动画功能（`2_API/03_transition`）。
 
 ## 命名空间：`VeloxDev.TransitionSystem.Abstractions`
 
@@ -47,13 +47,15 @@
 - 具体的平台类型是泛型 `TransitionSchedulerCore<TUIThreadInspectorCore, TTransitionInterpreterCore, TPriorityCore>`，适配器通过静态的 `FindOrCreate<T>(T source, bool CanMutualTask = true)` 创建它。
 - `ThemeManager` 在 `Execute` 之前调用 `Track`、在切换结束时调用 `Untrack`：`Execute` 正是靠传进去的 token source 在调度器的活跃表里找回这个 run；没有登记过的 run 会在一条无人控制得住的时间轴上被采样。
 
-### 类：`TransitionTimeline`
+### 类：`TimeSourceCore`
 
-`public sealed class TransitionTimeline`
+`public sealed class TimeSourceCore : ITimeSourceControl`
 
-一条绝对的虚拟时间轴：它在哪里、以多快的速度前进，以及暂停时用来停住采样循环的闸门。`ThemeManager` 每场切换恰好创建一个，并把每个目标的 run 都锚定到它上面。
+命名空间：`VeloxDev.Timing`。它是 `ITimeSourceControl` 的默认实现 —— 当多个动画必须共用同一条 transport 时，消费方传入的就是这个契约；创建它的是注册表调用 `TimerCore.CreateTimeSource<ITimeSourceControl>()`。
 
-源码：`Src/Core/VeloxDev.Core/TransitionSystem/TransitionClock.cs`。
+一条绝对的虚拟时间轴：它在哪里、以多快的速度前进，以及暂停时用来停住采样循环的闸门。`ThemeManager` 每场切换恰好创建一条 `ITimeSourceControl`，并把每个目标的 run 都锚定到它上面。
+
+源码：`Src/Core/VeloxDev.Core/Timing/TimeSourceCore.cs`。
 
 **说明：**
 - 共用一条时间轴，正是既有控制面能原样作用于主题切换的原因：对任一个目标做暂停、定位或改速率都会移动整场切换，因为只有一个 transport 可移动。该控制面是同一命名空间下的 `TransitionCore` —— `Pause` / `Resume` / `Seek` / `SetRate` / `Position` / `Rate` / `Cycle` / `IsPaused` / `Exit`，每个都接一个目标。*验证依据：* `ThemeTransitionTests.Switch_EveryTargetIsAnchoredToTheSameTimeline`、`Switch_SeekIsReachableAndFinishesThePass`。

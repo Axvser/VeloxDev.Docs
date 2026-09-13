@@ -4,19 +4,21 @@
 
 ## 1. 配置旋钮
 
-按通道的设置作为变更请求入队，并在下一帧开始时应用（`Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs`）。
+`SetTargetFPS` 在下一个 update 帧的帧首应用，`SetFixedUpdateInterval` 由 FixedUpdate 泵自己在它那条线程上应用 —— 各自都在其修改对象的属主线程上。`SetTimeScale` 立即生效，因为它是写给该通道的时间源的，而时间源自己串行化写入（`Src/Core/VeloxDev.Core/TimeLine/MonoBehaviourManager.cs`）。
 
 ```csharp
 MonoBehaviourManager.SetTargetFPS(60, "game");            // 合法 1..1000；越界被忽略
 MonoBehaviourManager.SetFixedUpdateInterval(16, "game");  // 毫秒，合法 1..1000；越界被忽略
-MonoBehaviourManager.SetTimeScale(1.0f, "game");          // 钳位到 0..10
+MonoBehaviourManager.SetTimeScale(1.0f, "game");          // 即 transport 的 rate；负值抛异常，0 冻结
 MonoBehaviourManager.ExecuteOnMainThread(() => DoUiWork(), "game"); // 在下一个更新帧的帧首运行
 ```
 
 - `SetTargetFPS` 为 Update 泵定速（默认 60）。
 - `SetFixedUpdateInterval` 设定 FixedUpdate 泵的固定步长周期（毫秒，默认 16）。
-- `SetTimeScale` 缩放该帧每个行为的 `FrameEventArgs.DeltaTime`（`0` 冻结 delta time，但不停止泵）。
+- `SetTimeScale` 设置该通道时间源的播放速率 —— 也就是锚在这条通道上的动画读到的同一个值。它缩放的是*整条虚拟时钟*而不是每帧拿到的间隔，所以 `FrameEventArgs.DeltaTime` 与 `TimeSpan.TotalTime` 都随它变化；`0` 冻结时钟，两个泵随即 park，而不是对着一条不动的时钟空转。
 - `ExecuteOnMainThread` 把一个 `Action` 入队，由 Update 泵在其下一帧的帧首运行 —— 它在*循环*线程上运行，而不是任何 UI 线程。
+
+通道的时间源可以取到：`MonoBehaviourManager.Bus("game")` 返回它，通道从未创建过时返回 `null`。把它交给 `Transition.Execute(target, bus)` 就把动画锚到同一条时钟上 —— 暂停通道即暂停动画，速率同时作用于两者。
 
 **预期结果：** 配置在下一个帧边界生效；状态查询一旦应用即可反映新值。
 

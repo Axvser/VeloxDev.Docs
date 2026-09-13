@@ -84,7 +84,7 @@ classDiagram
         +Track(run) void
         +Untrack(run) void
     }
-    class TransitionTimeline {
+    class TimeSourceCore {
         +Wake() void
     }
     class StateCore {
@@ -111,7 +111,7 @@ classDiagram
     ThemeManager ..> ITransitionEffectCore : hands the effect through unchanged
     ThemeManager --> IThemeObject : ExecuteThemeChanging/Changed + reads caches
     ThemeManager ..> TransitionSchedulerCore : Execute / Track / Untrack
-    ThemeManager ..> TransitionTimeline : one per switch
+    ThemeManager ..> TimeSourceCore : one per switch
     ThemeManager ..> StateCore : declares the end values
     InterpolatorCore ..> TransitionSchedulerCore : CreateScheduler builds one
     TransitionSchedulerCore ..> ISampler : Prepare -> NormalizeStart/End, then InsertFrame
@@ -141,7 +141,7 @@ classDiagram
 |---|---|---|
 | Facade | `ThemeManager` | Static façade over value storage (`ThemeCache`), the sampler registry (`InterpolatorCore.NativeInterpolators`), the registered-object list, and the transition system's schedulers. Callers only see `Transition<T>` / `Jump<T>` / `Register` / `SetPlatformInterpolator`. |
 | Virtual seam / Strategy | `InterpolatorCore.CreateScheduler` | One switch spans targets of many runtime types, so Core cannot name the type argument of a `Transition<T>` scheduler; the platform answers with the composition of inspector + interpreter + priority, and answers `null` for "not mine". |
-| Shared transport | one `TransitionTimeline` per switch | Every target of one switch is anchored to the same `TransitionTimeline`; that is what lets the existing `TransitionCore.Pause` / `Seek` / `SetRate` / `Exit` surface reach a theme switch unchanged. |
+| Shared transport | one `ITimeSourceControl` per switch | Every target of one switch is anchored to the same `ITimeSourceControl`; that is what lets the existing `TransitionCore.Pause` / `Seek` / `SetRate` / `Exit` surface reach a theme switch unchanged. |
 | Template Method | source-generated `IThemeObject` impl | `InitializeTheme()` is a fixed algorithm (lazy `ThemeCache.RegisterType` → `ThemeManager.Register(this)` → apply current theme values). Subclasses add `[ThemeConfig]` properties and the generator chains `base.InitializeTheme()`; methods are emitted `virtual`, `override` (when an ancestor carries `[ThemeConfig]`), or non-virtual (when the class is `sealed`). |
 | Hook / partial callback | generated `ExecuteThemeChanging/Changed` | `ThemeManager` calls `ExecuteThemeChanging(old, new)` before animating and `ExecuteThemeChanged(old, new)` **only when the switch reached its end**; the generated implementation forwards to the user's `partial void OnThemeChanging` / `partial void OnThemeChanged`. |
 | Registry (weak) | `ThemeManager` | Live theme-aware instances live in a `ConditionalWeakTable` (dedupe) plus a `List<WeakReference<IThemeObject>>` pruned at each switch — registration never leaks. |

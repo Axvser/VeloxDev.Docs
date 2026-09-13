@@ -2,7 +2,7 @@
 
 The dynamic-theme feature animates themed properties through the TransitionSystem engine. A theme switch is not timed by `ThemeManager` at all: the manager builds the per-property start/end entries itself (per `StartModel`), then hands each target's `StateCore` to the platform's `TransitionSchedulerCore`, which does the sampler resolution and the sampling. This page documents the engine surface that `ThemeManager` actually consumes; the full engine is documented by the transition feature.
 
-> The engine contracts (`ITransitionProperty`, `ISampler`, `ISampleable`, `ITransitionEffectCore`, `IEaseCalculator`) live in `VeloxDev.TransitionSystem`; the base and concrete types (`InterpolatorCore`, `TransitionSchedulerCore`, `TransitionTimeline`, `TransitionCore`, `TransitionProperty`) live in `VeloxDev.TransitionSystem.Abstractions`. The complete engine reference lives under the transition feature (`2_API/03_transition`).
+> The engine contracts (`ITransitionProperty`, `ISampler`, `ISampleable`, `ITransitionEffectCore`, `IEaseCalculator`) live in `VeloxDev.TransitionSystem`; the base and concrete types (`InterpolatorCore`, `TransitionSchedulerCore`, `TransitionCore`, `TransitionProperty`) live in `VeloxDev.TransitionSystem.Abstractions`; the shared transport's default implementation `TimeSourceCore` lives in `VeloxDev.Timing`. The complete engine reference lives under the transition feature (`2_API/03_transition`).
 
 ## Namespace: `VeloxDev.TransitionSystem.Abstractions`
 
@@ -47,13 +47,15 @@ Source: `Src/Core/VeloxDev.Core/TransitionSystem/TransitionScheduler.cs`.
 - The concrete per-platform type is the generic `TransitionSchedulerCore<TUIThreadInspectorCore, TTransitionInterpreterCore, TPriorityCore>`, which adapters create through the static `FindOrCreate<T>(T source, bool CanMutualTask = true)`.
 - `ThemeManager` calls `Track` before `Execute` and `Untrack` when the switch ends: `Execute` finds the run in the scheduler's active table through the token source it was handed, so a run that was never tracked would be sampled on a timeline nothing controls.
 
-### Class: `TransitionTimeline`
+### Class: `TimeSourceCore`
 
-`public sealed class TransitionTimeline`
+`public sealed class TimeSourceCore : ITimeSourceControl`
 
-An absolute virtual timeline: where it is, how fast it is moving, and the gate that parks sampling loops while it is paused. `ThemeManager` creates exactly one per switch and anchors every target's run to it.
+Namespace: `VeloxDev.Timing`. This is the default implementation of `ITimeSourceControl`, the contract a consumer passes when several animations must share one transport; `TimerCore.CreateTimeSource<ITimeSourceControl>()` is the registry call that creates it.
 
-Source: `Src/Core/VeloxDev.Core/TransitionSystem/TransitionClock.cs`.
+An absolute virtual timeline: where it is, how fast it is moving, and the gate that parks sampling loops while it is paused. `ThemeManager` creates exactly one `ITimeSourceControl` per switch and anchors every target's run to it.
+
+Source: `Src/Core/VeloxDev.Core/Timing/TimeSourceCore.cs`.
 
 **Notes:**
 - Sharing one timeline is what lets the control surface reach a theme switch unchanged: pausing, seeking or re-rating any one target moves the whole switch, because there is only one transport to move. The surface is `TransitionCore` in this same namespace — `Pause` / `Resume` / `Seek` / `SetRate` / `Position` / `Rate` / `Cycle` / `IsPaused` / `Exit`, each taking a target. *Verified by:* `ThemeTransitionTests.Switch_EveryTargetIsAnchoredToTheSameTimeline`, `Switch_SeekIsReachableAndFinishesThePass`.
