@@ -121,12 +121,15 @@
 		<!-- 搜索结果：从搜索框正下方浮出的面板。
 			 用 Popup 而不是普通 Border —— Markdown 预览是 NativeWebView（HWND 子窗口），
 			 Avalonia 自己的内容画不到它上面（airspace 限制），而 Popup 是独立窗口，可以。
-			 宽度 560、搜索框 440，左移 60 使两者同轴居中。 -->
+
+			 宽度与搜索框严格相同（440），水平偏移为 0。这是刻意的：Popup 的贴靠边由
+			 PlacementMode 决定，宽度一旦不同，就只能对齐其中一条边、另一条必然参差。
+			 等宽 + 零偏移则无论贴哪条边，四条边都重合。 -->
 		<Popup x:Name="ResultsPopup"
 			   IsOpen="{Binding Document.IsSearchOpen, Mode=TwoWay}"
 			   PlacementTarget="{Binding #SearchBox}"
 			   Placement="Bottom"
-			   HorizontalOffset="-60"
+			   HorizontalOffset="0"
 			   VerticalOffset="4"
 			   IsLightDismissEnabled="True">
 			<!-- 面板底色跟随本视图的 Background，而不是某个 Fluent 资源键：本应用的换肤由
@@ -134,7 +137,7 @@
 				 ThemeVariant，因此 ThemeDictionaries 类资源不会跟着变（实测
 				 SystemControlBackgroundAltHighBrush 在明暗两种主题下都是白色）。绑定到
 				 Background 则会跟着一起变，包括换肤动画的过程。 -->
-			<Border Width="560"
+			<Border Width="440"
 					MaxHeight="440"
 					CornerRadius="6"
 					BorderThickness="1"

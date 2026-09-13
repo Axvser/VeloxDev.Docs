@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace CloudGlyph.Services;
 
@@ -207,9 +208,10 @@ public sealed class WikiSearchIndex
             .Replace('\r', ' ');
 
     /// <summary>
-    /// Keeps the text a reader would actually see: style blocks, comments and HTML tags are
-    /// dropped (a page's CSS is not content), while fenced code is kept because identifiers
-    /// inside it are exactly what a reader searches for.
+    /// Keeps the text a reader would actually see. Style blocks, comments and HTML tags are
+    /// dropped (a page's CSS is not content) and Markdown syntax is unwrapped, so an indexed
+    /// line reads as prose and a snippet never shows a bare `#` or `[text](url)`. Fenced code is
+    /// kept because identifiers inside it are exactly what a reader searches for.
     /// </summary>
     private static string Clean(string markdown)
     {
@@ -218,7 +220,20 @@ public sealed class WikiSearchIndex
 
         var text = StripBetween(markdown, "<style", "</style>");
         text = StripComments(text);
-        return StripTags(text);
+        text = StripTags(text);
+        return UnwrapMarkdown(text);
+    }
+
+    /// <summary>Replaces Markdown syntax with the text it decorates.</summary>
+    private static string UnwrapMarkdown(string text)
+    {
+        // headings: drop the leading marker, keep the title text
+        text = Regex.Replace(text, @"^[ \t]{0,3}#{1,6}[ \t]+", "", RegexOptions.Multiline);
+        // images and links: keep the label
+        text = Regex.Replace(text, @"!?\[([^\]\n]*)\]\([^)\n]*\)", "$1");
+        // emphasis and inline code markers: they are syntax, not content
+        text = text.Replace("**", string.Empty).Replace("`", string.Empty);
+        return text;
     }
 
     private static string StripBetween(string text, string open, string close)
