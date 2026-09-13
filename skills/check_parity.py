@@ -71,6 +71,8 @@ PARITY_PAIRS = [
     # heading-repetition rules
     ("restates the heading above it", "重复其上方标题"),
     ("dimension echo", "维度回声"),
+    # plot granularity rule
+    ("The unit is the family, not the function", "图的单位是「族」，不是「单个函数」"),
 ]
 
 

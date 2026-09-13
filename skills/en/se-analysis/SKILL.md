@@ -52,6 +52,17 @@ behaviour that varies over a domain:
 - **damping and response** — oscillation envelopes, spring settling;
 - **distributions and coverage curves** used by an algorithm.
 
+**The unit is the family, not the function.** When a page documents a set of related
+functions — an easing catalogue, a set of sampler kernels, a family of complexity
+classes — give each family **one** chart carrying its variants together (`In` / `Out` /
+`InOut` on one axis, one curve each, plus the linear ramp for reference). Not one
+chart per member, which hides the comparison the reader came for, and not one chart
+for everything, which is unreadable past a handful of curves. A catalogue of ten
+families is ten charts; put them on a sub-page if that breaks the leaf budget, and
+keep one illustrative chart on the parent that introduces the idea. Fit each chart's
+axes to its own curves — an oscillating family needs a wider `y` domain than a
+monotonic one, and a shared domain that suits the rest will clip it.
+
 Rules that bite (all verified against the renderer):
 
 - The body is **JSON**, so numbers are JSON numbers — `2*PI` is invalid JSON, write
