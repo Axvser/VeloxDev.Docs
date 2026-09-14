@@ -3,7 +3,13 @@
 Every built-in family, drawn from the library's own `Ease` methods. The expressions
 are the code in `Src/Core/VeloxDev.Core/TransitionSystem/Eases.cs` transcribed, so
 each curve is the calculation the engine actually performs — not a redrawing of it.
-The grey line is `Eases.Default` (linear), for reference.
+
+One edit is made to that transcription: `Math.Pow(2, u)` is written `exp(u*ln2)`.
+The plotter's interval sampler returns an empty interval for a power with a
+**non-integer exponent**, so the whole curve silently fails to draw — no exception,
+no message. `exp(u*ln2)` is mathematically identical to `2^u`; the two agree to
+1e-16, which is double rounding itself. The grey line is `Eases.Default` (linear),
+for reference.
 
 Each chart puts one family's `In`, `Out` and `InOut` on the same axes: `In` starts
 slow and accelerates, `Out` starts fast and settles, `InOut` does both.
@@ -26,10 +32,10 @@ how abrupt the start is, and which ones overshoot.
     { "fn": "1 - (1-x)^3", "color": "#98c379" },
     { "fn": "1 - (1-x)^4", "color": "#e5c07b" },
     { "fn": "1 - (1-x)^5", "color": "#d19a66" },
-    { "fn": "x == 1 ? 1 : 1 - 2^(-10*x)", "color": "#e06c75" },
+    { "fn": "x == 1 ? 1 : 1 - exp((-10*x)*0.6931471805599453)", "color": "#e06c75" },
     { "fn": "sqrt(1 - (x-1)^2)", "color": "#c678dd" },
     { "fn": "1 + 2.70158*(x-1)^3 + 1.70158*(x-1)^2", "color": "#a78bfa" },
-    { "fn": "x == 0 ? 0 : x == 1 ? 1 : 2^(-10*x)*sin((x*10 - 0.75)*2*PI/3) + 1", "color": "#f472b6" },
+    { "fn": "x == 0 ? 0 : x == 1 ? 1 : exp((-10*x)*0.6931471805599453)*sin((x*10 - 0.75)*2*PI/3) + 1", "color": "#f472b6" },
     { "fn": "x < 0.36363636 ? 7.5625*x^2 : x < 0.72727273 ? 7.5625*(x-0.54545455)^2 + 0.75 : x < 0.90909091 ? 7.5625*(x-0.81818182)^2 + 0.9375 : 7.5625*(x-0.95454545)^2 + 0.984375", "color": "#56b6c2" }
   ]
 }
@@ -130,9 +136,9 @@ how abrupt the start is, and which ones overshoot.
   "yAxis": { "domain": [-0.1, 1.1] },
   "data": [
     { "fn": "x", "color": "#888888", "skipTip": true },
-    { "fn": "x == 0 ? 0 : 2^(10*x - 10)", "color": "#4a9eff" },
-    { "fn": "x == 1 ? 1 : 1 - 2^(-10*x)", "color": "#a78bfa" },
-    { "fn": "x == 0 ? 0 : x == 1 ? 1 : x < 0.5 ? 2^(20*x - 10)/2 : (2 - 2^(-20*x + 10))/2", "color": "#f472b6" }
+    { "fn": "x == 0 ? 0 : exp((10*x - 10)*0.6931471805599453)", "color": "#4a9eff" },
+    { "fn": "x == 1 ? 1 : 1 - exp((-10*x)*0.6931471805599453)", "color": "#a78bfa" },
+    { "fn": "x == 0 ? 0 : x == 1 ? 1 : x < 0.5 ? exp((20*x - 10)*0.6931471805599453)/2 : (2 - exp((-20*x + 10)*0.6931471805599453))/2", "color": "#f472b6" }
   ]
 }
 ```
@@ -181,9 +187,9 @@ how abrupt the start is, and which ones overshoot.
   "yAxis": { "domain": [-0.51, 1.51] },
   "data": [
     { "fn": "x", "color": "#888888", "skipTip": true },
-    { "fn": "x == 0 ? 0 : x == 1 ? 1 : -2^(10*x - 10)*sin((x*10 - 10.75)*2*PI/3)", "color": "#4a9eff" },
-    { "fn": "x == 0 ? 0 : x == 1 ? 1 : 2^(-10*x)*sin((x*10 - 0.75)*2*PI/3) + 1", "color": "#a78bfa" },
-    { "fn": "x == 0 ? 0 : x == 1 ? 1 : x < 0.5 ? -(2^(20*x - 10)*sin((20*x - 11.125)*2*PI/4.5))/2 : (2^(-20*x + 10)*sin((20*x - 11.125)*2*PI/4.5))/2 + 1", "color": "#f472b6" }
+    { "fn": "x == 0 ? 0 : x == 1 ? 1 : -exp((10*x - 10)*0.6931471805599453)*sin((x*10 - 10.75)*2*PI/3)", "color": "#4a9eff" },
+    { "fn": "x == 0 ? 0 : x == 1 ? 1 : exp((-10*x)*0.6931471805599453)*sin((x*10 - 0.75)*2*PI/3) + 1", "color": "#a78bfa" },
+    { "fn": "x == 0 ? 0 : x == 1 ? 1 : x < 0.5 ? -(exp((20*x - 10)*0.6931471805599453)*sin((20*x - 11.125)*2*PI/4.5))/2 : (exp((-20*x + 10)*0.6931471805599453)*sin((20*x - 11.125)*2*PI/4.5))/2 + 1", "color": "#f472b6" }
   ]
 }
 ```
