@@ -198,7 +198,7 @@ Wiki_Root/
 ```
 ````
 
-⚙ Plot rules that bite: constants are **upper-case** (`PI`, `E` — lower-case `pi` is undefined and the curve silently vanishes); `"data"` is an array of objects with `fn` (or `x`/`y`/`r`); piecewise curves use the ternary `?:`; a non-`y = f(x)` graph type (`fnType` `parametric`/`polar`/`points`/`vector`, or `graphType` `scatter`) additionally needs `"sampler": "builtIn"`, and its parameter is `t` for parametric but **`theta`** for polar. Keep the domain tight around the interesting region — a default zoom shows nothing.
+⚙ Plot rules that bite: constants are **upper-case** (`PI`, `E` — lower-case `pi` is undefined and the curve silently vanishes); `"data"` is an array of objects with `fn` (or `x`/`y`/`r`); piecewise curves use the ternary `?:`; a non-`y = f(x)` graph type (`fnType` `parametric`/`polar`/`points`/`vector`, or `graphType` `scatter`) additionally needs `"sampler": "builtIn"`, and its parameter is `t` for parametric but **`theta`** for polar; a power's exponent must be a literal integer — a variable exponent (`2^x`, `2^(10*x - 10)`) or a fractional one (`x^0.5`) comes back from the interval sampler as an empty interval and the curve silently does not draw, so write it as `exp(u*ln(base))`. Keep the domain tight around the interesting region — a default zoom shows nothing.
 
 ## Template Conventions
 

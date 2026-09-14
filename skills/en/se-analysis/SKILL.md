@@ -75,6 +75,13 @@ Rules that bite (all verified against the renderer):
 - A non-`y = f(x)` graph type (`fnType` `parametric` / `polar` / `points` / `vector`,
   or `graphType` `scatter`) additionally needs `"sampler": "builtIn"`; the parameter
   is `t` for parametric and **`theta`** for polar.
+- **A power's exponent must be a literal integer.** The default interval sampler
+  accepts only an exponent of exactly one integer; anything else comes back as an
+  empty interval — the `<path>` is still emitted, but with no path data, so the curve
+  draws nothing and reports no error. `2^x`, `2^(10*x - 10)` and `x^0.5` all fail;
+  `x^2` and `(x-1)^3` are fine. When the exponent varies, write it as
+  `exp(u*ln(base))`: `2^(10*x - 10)` becomes `exp((10*x - 10)*0.6931471805599453)`
+  (`ln 2`).
 - **Set the domain to the interesting region.** `"xAxis": { "domain": [0, 1] }` and
   `"yAxis": { "domain": [-0.2, 1.2] }` for an easing curve; a default axis scale
   usually shows a flat line and one spike.
@@ -94,7 +101,7 @@ Example — an easing family, the case a formula table gets wrong:
     { "fn": "x", "color": "#888888", "skipTip": true },
     { "fn": "sin(x*PI/2)", "color": "#4a9eff" },
     { "fn": "1 - (1-x)^3", "color": "#a78bfa" },
-    { "fn": "1 - 2^(-10*x)", "color": "#f472b6" },
+    { "fn": "1 - exp((-10*x)*0.6931471805599453)", "color": "#f472b6" },
     { "fn": "1 + 2.70158*(x-1)^3 + 1.70158*(x-1)^2", "color": "#e5c07b" }
   ]
 }

@@ -20,9 +20,18 @@ Checks (per ```plot fenced block):
          and backslashes are rejected before the expression reaches the evaluator
   ERROR  a non-linear datum ("fnType" parametric/polar/points/vector, or
          "graphType" scatter) carries "sampler": "builtIn"
+  ERROR  a "^" whose exponent is not an integer -- the default interval sampler's
+         pow() refuses it ("power is not an integer, you should use nth-root
+         instead, returning an empty interval"), so the series still emits a
+         <path class="line"> but with d="", and the curve never appears. A variable
+         exponent (2^x, 2^(10*x - 10)) always has this shape; rewrite it as
+         exp(u*ln(base)) -- 2^(10*x - 10) becomes exp((10*x - 10)*0.6931471805599453)
   WARN   "data" is missing entirely -- the plot draws bare axes
   WARN   a lower-case "pi" token -- constants are upper-case (PI, E); lower-case
          forms are undefined and the series silently fails to draw
+  WARN   a "^" whose exponent is a non-literal expression containing no sampling
+         variable -- not decidable statically; it is only safe if it evaluates to
+         a single integer
 
 Usage:
     python validate-plot.py                  # auto-detect content root
@@ -54,6 +63,83 @@ NEEDS_BUILTIN_SAMPLER = frozenset({"parametric", "polar", "points", "vector"})
 # A bare lower-case pi token: `pi` not preceded/followed by an identifier char.
 # (`exp`, `skip`, an identifier named `pi2` … must not match.)
 _LOWER_PI_RE = re.compile(r"(?<![A-Za-z0-9_])pi(?![A-Za-z0-9_])")
+
+# A power operator. function-plot's default sampler is the interval one, and it routes
+# "^" to interval-arithmetic's pow(), which accepts only an exponent interval that is a
+# single integer. Anything else -- a range, or a lone non-integer -- comes back as an
+# EMPTY interval, so the series emits `<path class="line" d="">` and the curve is
+# invisible. Nothing is thrown: the only trace is a library warning on the console.
+# Integer exponents (x^2, (x-1)^3) are fine, and so is sqrt(), which is the library's
+# own suggested nth-root.
+_POW_RE = re.compile(r"\^")
+_NUMBER_RE = re.compile(r"[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?")
+_IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+# The sampling variable of a plot expression -- `x` for a plain fn, `t` for parametric,
+# `theta` for polar. Its presence in an exponent makes that exponent a non-degenerate
+# interval, which pow() cannot accept, so the shape is decidable without evaluating.
+_SAMPLING_VAR_RE = re.compile(r"(?<![A-Za-z0-9_])(?:x|t|theta)(?![A-Za-z0-9_])")
+
+
+def _exponent_operand(expr, i):
+    """Return the exponent operand of the "^" that ends at *i*, or None if unterminated.
+
+    The operand is a parenthesised group when one follows the caret, otherwise a single
+    primary -- a number (possibly signed, e.g. `x^-2`) or an identifier.
+    """
+    if i >= len(expr):
+        return None
+    if expr[i] == "(":
+        depth = 0
+        for j in range(i, len(expr)):
+            if expr[j] == "(":
+                depth += 1
+            elif expr[j] == ")":
+                depth -= 1
+                if depth == 0:
+                    return expr[i + 1 : j]
+        return None
+    if expr[i] == "-":
+        return expr[i:] if _NUMBER_RE.match(expr, i + 1) else None
+    m = _NUMBER_RE.match(expr, i) or _IDENT_RE.match(expr, i)
+    return m.group(0) if m else None
+
+
+def check_powers(expr):
+    """Return [(level, message)] for every "^" in *expr* the interval sampler rejects."""
+    issues = []
+    for m in _POW_RE.finditer(expr):
+        operand = _exponent_operand(expr, m.end())
+        if operand is None:
+            continue
+
+        if _NUMBER_RE.fullmatch(operand.lstrip("+-")):
+            if float(operand).is_integer():
+                continue
+            issues.append((
+                "ERROR",
+                f"raises to the non-integer exponent {operand} -- the interval sampler "
+                f"returns an empty interval for it, so the curve is drawn with an empty "
+                f"path and never appears. Use an integer exponent, sqrt(), or "
+                f"exp(u*ln(base))",
+            ))
+        elif _SAMPLING_VAR_RE.search(operand):
+            issues.append((
+                "ERROR",
+                f'raises to the exponent "{operand}", which varies with the sampling '
+                f"variable and so is never a single integer -- the interval sampler "
+                f"returns an empty interval and the curve never appears. Rewrite it as "
+                f"exp(u*ln(base)): 2^(10*x - 10) becomes exp((10*x - 10)*0.6931471805599453)",
+            ))
+        else:
+            issues.append((
+                "WARN",
+                f'raises to the exponent "{operand}", which is not a literal -- this is '
+                f"safe only if it evaluates to a single integer, otherwise the series "
+                f"silently draws nothing",
+            ))
+
+    return issues
 
 
 def find_plot_blocks(lines):
@@ -134,12 +220,16 @@ def check_block(body_lines):
 
         for key in PLOT_EXPR_KEYS:
             val = datum.get(key)
-            if isinstance(val, str) and _LOWER_PI_RE.search(val):
+            if not isinstance(val, str):
+                continue
+            if _LOWER_PI_RE.search(val):
                 issues.append((
                     "WARN",
                     f'"data[{idx}].{key}" uses lower-case "pi"; constants are upper-case '
                     f"(PI, E) and the lower-case form is undefined — the curve will not draw",
                 ))
+            for level, msg in check_powers(val):
+                issues.append((level, f'"data[{idx}].{key}" {msg}'))
 
     return issues
 
