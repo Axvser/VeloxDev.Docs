@@ -125,7 +125,7 @@ $$
 | Undo / Redo stacks | $O(n)$ — $n$ submitted pairs | `ConcurrentStack` |
 | `CompiledGraph` + segments | $O(V + E)$ | segment trees + visited set + cone |
 | Runtime output registry | $O(\text{driven nodes})$ | pass-stamped `RegisterOutput` table |
-| Serialized JSON | $O(P)$ — total serialized size | Newtonsoft string |
+| Serialized JSON | $O(P)$ — total serialized size | System.Text.Json string (Newtonsoft on the netstandard2.0 asset) |
 
 ## Summary Table
 
@@ -138,4 +138,4 @@ $$
 | Execute segments (`RuntimeEngine`) | $O(N)$ | $O(N)$ | one pass over segments; join aggregation $O(\text{inputs})$; redirect worst $O(50N)$ |
 | Undo / Redo | $O(1)$ per action | $O(n)$ | concurrent stacks |
 | `SlotEnumerator.TrySelect` | $O(1)$ expected | $O(\text{members})$ | dictionary lookup |
-| `ComponentModelEx.Serialize` / `Deserialize` | $O(P)$ | $O(P)$ | Newtonsoft graph traversal (PreserveReferences) |
+| `ComponentModelEx.Serialize` / `Deserialize` | $O(P)$ | $O(P)$ | graph traversal + reference table (System.Text.Json on the modern assets, Newtonsoft on the netstandard2.0 asset) |

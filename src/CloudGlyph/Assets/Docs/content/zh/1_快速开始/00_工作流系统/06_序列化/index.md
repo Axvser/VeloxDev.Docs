@@ -13,7 +13,7 @@ Console.WriteLine($"copy Nodes={copy.Nodes.Count} Links={copy.Links.Count} " +
 
 要点：
 
-- `Serialize<T>()` 用 Newtonsoft 序列化，**只写公开可写属性**（生成器的 `RuntimeId` 等计算属性被排除）。
+- `Serialize<T>()` 在现代 TFM 上用 System.Text.Json 序列化（`netstandard2.0` 资产仍是 Newtonsoft），两者**只写公开可写属性**（生成器的 `RuntimeId` 等计算属性被排除）。
 - 反序列化走无参构造（构造里已 `InitializeWorkflow` 装好 Helper / 默认槽位），再按 JSON 属性重建对象图；`CompileContext` 这类私 setter 的编译身份不落盘，下次编译时重新注入。
 - 还有 `SerializeAsync` / `DeserializeAsync` / `TryDeserialize<T>` / `SerializationOptions`（缩进、类型名处理等）等重载。
 
