@@ -4,6 +4,8 @@
 
 run/result 背后的执行工具（`RunCompiledWorkflow`、`GetNodeResult`）镜像 GUI 编译路径：`CompilerViewModel.CompileAsync(node, CompileRole{Root,Terminal})` 驱动 `RuntimeEngine`，且路由器保持真实语义（选中兄弟分支意味着目标**未到达**——不伪造任何值）。安全性由代码中的能力门控制（`WithAllowNodeExecution`、`WithAllowedGenericCommands`），而非仅仅靠提示词描述。
 
+在这套表面之上还叠着第二块自成一体的面：**子代理**子系统（`VeloxDev.AI.SubAgents`）—— 一个代理在后台派发子代理，并把自身能力的一份收窄切片交给每一个。它的两个结构性主题是**收窄的视图**（一份工具名清单表达不了的能力，改用一份过滤过的源来承载）与**双向计量**（调用沿账本链向上汇总，token 沿树自下而上汇总）。
+
 ## 页面
 
 - [00 · 类图](00_类图/index.md) — 代理作用域 / 工具包 / 状态追踪器 / MCP + 编译执行类
@@ -16,3 +18,5 @@ run/result 背后的执行工具（`RunCompiledWorkflow`、`GetNodeResult`）镜
 - [07 · 命令](07_命令/index.md) — 变更工具各自恰好派发一个组件命令
 - [08 · 观察者](08_观察者/index.md) — `ToolCalled` / `ServerError` 事件
 - [09 · 策略](09_策略/index.md) — `WorkflowToolCategory` 旗标 + 交互处理器
+- [10 · 子代理能力收窄](10_子代理能力收窄/index.md) — 一次 spawn 为什么交下去的是一份收窄的**视图**而不是工具名清单
+- [11 · 子代理树与消耗计量](11_子代理树与消耗计量/index.md) — 扁平名册投影成一棵树、调用向上记账与 token 自下而上汇总、以及那道重建闸门

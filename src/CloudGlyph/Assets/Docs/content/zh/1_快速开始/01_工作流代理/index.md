@@ -11,6 +11,7 @@
   - **结果级（Terminal）** — `GetNodeResult(nodeIndex, seed?)` 从某个节点的祖先锥计算其值；`CompileNodeResult(nodeIndex)` 仅编译锥。
   - 编译/运行建立在 `CompilerViewModel.CompileAsync(component, CompileRole.Root | CompileRole.Terminal)` 与 `RuntimeEngine` 之上（命名空间 `VeloxDev.Core.WorkflowSystem.CompilerEx`）——这是现行引擎；代码里已没有 `CompilerEngine` / `CompileToAsync`。
 - `WorkflowStateTracker` 对树做 JSON 快照并报告 `addedNodes/removedNodes/modifiedNodes` 差异，让代理用最少上下文观察变化。
+- 子代理（`VeloxDev.AI.SubAgents`）：`SubAgentScope.ForClient(chatClient)` + `scope.WithSubAgents(...)` 让代理能够**在后台派发子代理**，每个子代理拿到派发者能力的一份收窄切片（工具、技能、MCP 服务器与预算）。五个管理工具（`SpawnSubAgent`、`WaitSubAgents`、`GetSubAgentResult`、`ListSubAgents`、`CancelSubAgent`）走的是派发加轮询；额度是整棵树一口锅；`SubAgentTreeViewModel` 把按作用域分开的名册投影成一棵可绑定的树。
 - MCP 支持（`VeloxDev.AI.MCP`）：`McpScope` 加载 Model Context Protocol 服务器（`McpServerRunMode.Npx`、`Http` 等）并把它们的工具合并进每一轮对话；`McpAgentToolkit` 把主机预注册的服务器以 list/load/unload/describe 工具的形式交给代理。
 - `VeloxDev.AI` 的反射工具（`AgentContextAttribute`、`AgentLanguages`、`AgentContextReader`、`AgentCommandDiscoverer`、`AgentMethodInvoker`、`AgentPropertyAccessor`、`AgentTypeResolver`、事件参数类型、`SlotSelectorsAttribute`）支撑类型注册表与这些工具。
 
@@ -27,3 +28,4 @@
 - [06 三种执行模型](06_三种执行模型/) — 节点级、Root 链级与 Terminal 结果级工具；仅编译计划；其下的编译引擎
 - [07 终结点结果语义](07_终结点结果语义/) — `GetNodeResult` / `CompileNodeResult`：祖先锥、真实 `BranchSegment` 路由、`targetReached` 契约与恢复
 - [08 验证与完整代码](08_验证与完整代码/) — 演示与测试覆盖、可运行的单文件程序、运行声明
+- [09 派发子代理](09_子代理/) — `SubAgentScope.ForClient` + `WithSubAgents`、五个管理工具、能力收窄（工具 / 技能 / MCP）、一口锅的额度与深度上限、派发加轮询、以及树面板

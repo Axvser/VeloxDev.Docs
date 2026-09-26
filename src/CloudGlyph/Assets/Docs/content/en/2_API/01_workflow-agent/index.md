@@ -1,11 +1,12 @@
 # Workflow Agent — API Reference
 
-Public API of the `workflow-agent` feature: the pieces that turn a workflow tree into a tool-operable AI agent. It spans four namespaces plus the entry-point extension:
+Public API of the `workflow-agent` feature: the pieces that turn a workflow tree into a tool-operable AI agent. It spans five namespaces plus the entry-point extension:
 
 - `VeloxDev.AI.Workflow` — `AgentEx.AsAgentScope` → `WorkflowAgentScope` (fluent configuration, context prompts, capability gates), `WorkflowStateTracker`, `AgentContextCollector`.
 - `VeloxDev.AI.Workflow.Functions` — `WorkflowAgentToolkit` (the ~60 `AITool` set), `WorkflowToolCategory`, and the helper classes `CommandInvoker`, `ComponentPatcher`, `TypeIntrospector`.
 - `VeloxDev.AI.MCP` — `McpScope`, `McpServerConfiguration`, `McpServerRunMode`, `McpServerStatus`, the bindable status view-models, and `McpAgentToolkit`.
 - `VeloxDev.AI` — generic AI context/reflection utilities (`AgentContextAttribute`, `AgentContextReader`, `AgentCommandDiscoverer`, `AgentMethodInvoker`, `AgentPropertyAccessor`, `AgentTypeResolver`, `AgentLanguages`), interaction event args + notifier contracts, and the generic object toolkit `AgentObjectToolkit`.
+- `VeloxDev.AI.SubAgents` — background child agents: `SubAgentScope` (the subsystem), `SubAgentAgentToolkit` + `SubAgentAgentContextProvider` (the five management tools and their prompt), `SubAgentState` / `SubAgentSummary` / `SubAgentStatusViewModel` (state and roster rows), `SubAgentTreeNodeViewModel` / `SubAgentTreeViewModel` (the tree panel).
 
 Every documented type/member/signature is verified against the current source; source paths are cited. Underlying compiled execution is the `VeloxDev.Core.WorkflowSystem.CompilerEx` engine (`CompilerViewModel.CompileAsync(node, CompileRole)` + `RuntimeEngine`), whose full API is documented on the `workflow-system` feature's `02_compilerex` API page.
 
@@ -18,3 +19,4 @@ Every documented type/member/signature is verified against the current source; s
 - [mcp](02_mcp/index.md) — `VeloxDev.AI.MCP`: `McpScope`, `McpServerConfiguration`, `McpServerRunMode`, `McpServerStatus`, status view-models, `McpAgentToolkit`.
 - [ai](03_ai/index.md) — `VeloxDev.AI` generic utilities: attributes, `AgentLanguages`, reflection readers/discoverers/invokers, event args + notifier interfaces, `AgentObjectToolkit`, `AgentEmbeddedResources`.
 - [agentex](04_agentex/index.md) — `AgentEx.AsAgentScope` entry point and the `chatClient.AsAIAgent(...)` wiring the host uses to run the agent.
+- [subagents](05_subagents/index.md) — `VeloxDev.AI.SubAgents`: `SubAgentScope` (budget, depth, roster, disposal), `SubAgentAgentToolkit` + `SubAgentAgentContextProvider` (the five tools and their prompt), `SubAgentState` / `SubAgentSummary` / `SubAgentStatusViewModel` (state and rows), and the `SubAgentTreeViewModel` pair.

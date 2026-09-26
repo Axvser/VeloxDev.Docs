@@ -10,6 +10,7 @@
 | 4 | `RunCompiledWorkflow`：`CompileRole.Root` 编译 + `RuntimeEngine` 驱动整条链 | [Root 链运行](03_Root链运行/index.md) |
 | 5 | `GetNodeResult`：`CompileRole.Terminal` 反向编译祖先锥 + “未到达”错误契约 | [Terminal 结果](04_Terminal结果执行/index.md) |
 | 6 | 工具抛错 → JSON 错误结果 → 失败处理协议（不静默重试循环） | [错误与恢复](05_错误与恢复/index.md) |
+| 7 | `SpawnSubAgent`：能力收窄 + 递减授予 → 配置子作用域 → 后台运行 → 行落定；随后 `WaitSubAgents` 收回 | [子代理派发](06_子代理派发/index.md) |
 
 所有结果都是紧凑 JSON（`Formatting.None`）。工具绝不绕过组件命令/生命周期管线：变更都经 `IWorkflow*ViewModel` 命令，使 Core 的撤销/重做栈保持唯一真相源。
 
