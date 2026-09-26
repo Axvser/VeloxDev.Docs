@@ -20,6 +20,19 @@ All suites contain the same seven kinds: node view, slot view, link view, tree v
 
 Each template's default class name is `NodeView`, `SlotView`, `LinkView`, `TreeView`, `TemplateSelector`, `GridDecorator`, or `MinimapOverlay` respectively (set the actual name with `-n <Name>`). The node/slot/link/tree templates generate a markup + code-behind pair on the XAML-style platforms (`.xaml`/`.cs` or Avalonia/WinUI equivalents), while selector/decorator/minimap generate a single code-behind file. Razor generates `.razor` (+ `.razor.cs`) files.
 
+## The seven pieces come pre-connected
+
+A generated project needs no hand-wiring. The **tree view** is the hub: it hosts the pool and the surface behaviors and references its sibling templates — the node/slot/link views by name, and the **template selector** as the thing the pool asks first.
+
+| Adapter | How the tree view hands the selector to the pool |
+|---|---|
+| WPF / Avalonia / WinUI / MAUI | `ViewPool.TemplateSelector="{StaticResource WorkflowTemplateSelector}"` — an attached property on the canvas |
+| WinForms | `ViewPool.SetTemplateSelector(PART_Canvas, _selector)` — this platform has no attached-property system, so the pool is fed with a method call |
+| Jalium | `ViewPool.SetTemplateSelector(this, TemplateSelector)`; the selector property ships with a **default value**, so a generated tree view is never selector-less |
+| Razor | a `<TemplateSelector …>` component whose `ItemTemplate` is the pool's only source of views |
+
+**The selector is the highest-priority source of views**, and it is asked *before* the platform's own template lookup; on the adapters that have such a lookup (the four XAML-style ones) a non-matching selector degrades to it, while WinForms/Jalium/Razor have nothing to degrade to — a missing selector there yields no views and no error (see [View pool](../00_attached-behaviors/01_view-pool/index.md)). To customize, replace the generated selector class or that single reference — not the pool.
+
 ## CLI options (WPF suite example)
 
 Each template accepts `-ns <Namespace>` for the generated namespace. View templates additionally declare style parameters; the WPF suite's `dotnetcli.host.json` maps them as follows:

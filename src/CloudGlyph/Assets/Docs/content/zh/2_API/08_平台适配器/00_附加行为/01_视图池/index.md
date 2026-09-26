@@ -38,9 +38,12 @@
 | WinForms | `ViewManager(Control host)`（`: IDisposable`） | `void SetTemplateSelector(IWorkflowTemplateSelector)`；`void Attach(INotifyCollectionChanged)`；`void Detach()`；`void Dispose()` |
 | Jalium | `ViewManager(Panel host)`（`: IDisposable`） | `void SetTemplateSelector(IWorkflowTemplateSelector)`；`void Attach(INotifyCollectionChanged)`；`void Detach()`；`void Dispose()` |
 
-**渲染（已验证，WPF）：** 按每个 dispatcher `Background` 滴答 **3** 个一批渲染视图。被移除项折叠为 `Visibility.Collapsed`、解绑并归还池。模板查找顺序：`ViewPool.TemplateSelector` → 容器资源树 → `Application.Current.Resources`。其它适配器实现相同的批处理语义；是否逐字复用同样的批次大小属 `*推断所得*`。
+**渲染（已验证，WPF）：** 按每个 dispatcher `Background` 滴答 **3** 个一批渲染视图。被移除项折叠为 `Visibility.Collapsed`、解绑并归还池。其它适配器实现相同的批处理语义；是否逐字复用同样的批次大小属 `*推断所得*`。
 
-**Avalonia 说明：** 提供模板选择器时使用 `IDataTemplate.Match(context)`；否则按条目类型找模板。
+**模板查找：选择器最先被问到，而只有一部分适配器有「退回」可言。** 四个 XAML 风格适配器的顺序是 `ViewPool.TemplateSelector` → 容器资源树 → `Application.Current.Resources`，所以**选择器没匹配上会退回平台自己的查找**。**WinForms / Jalium / Razor 没有平台查找可退** —— 它们的池只经选择器创建视图（`IWorkflowTemplateSelector` 工厂，或 Razor 的 `ItemTemplate` 组件），选择器为空或不匹配就是**一个视图都不建、也不报错**。（WPF/Avalonia/WinForms/Jalium/Razor 已核；MAUI 那条链属 `*推断所得*`。）
+**四家共有的一个坑：** 解析出的模板按**条目 `Type`** 缓存，而缓存**先于**选择器被读 —— 选择器若**按实例**判定（同类型、不同视图），只有第一次的判定会被整个类型沿用。
+
+**Avalonia 说明：** 有选择器时它是**带着条目**被问的 —— 池以 `IDataTemplate.Build(item)` 建视图 —— 所以自定义 `IDataTemplate` 必须按这个参数分派（`Match` 选出选择器，`Build` 再选并物化内层模板）。忽略该参数的选择器会**什么都不画，且不报错**。
 
 ## 接口：`IWorkflowTemplateSelector`
 

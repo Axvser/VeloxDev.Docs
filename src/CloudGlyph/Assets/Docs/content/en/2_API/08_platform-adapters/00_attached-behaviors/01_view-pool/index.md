@@ -36,9 +36,12 @@ Sealed per-container manager (created by `ViewPool`). It pools views per item `T
 | WinForms | `ViewManager(Control host)` (`: IDisposable`) | `void SetTemplateSelector(IWorkflowTemplateSelector)`; `void Attach(INotifyCollectionChanged)`; `void Detach()`; `void Dispose()` |
 | Jalium | `ViewManager(Panel host)` (`: IDisposable`) | `void SetTemplateSelector(IWorkflowTemplateSelector)`; `void Attach(INotifyCollectionChanged)`; `void Detach()`; `void Dispose()` |
 
-**Rendering (verified, WPF):** renders in batches of **3** views per dispatcher `Background` tick. Removed items are collapsed (`Visibility.Collapsed`), unbound, and returned to the pool. Template lookup order: `ViewPool.TemplateSelector` → resource-walk of the container → `Application.Current.Resources`. The other adapters implement the same batching semantics; whether each reuses the exact batch size is `*inferred*`.
+**Rendering (verified, WPF):** renders in batches of **3** views per dispatcher `Background` tick. Removed items are collapsed (`Visibility.Collapsed`), unbound, and returned to the pool. The other adapters implement the same batching semantics; whether each reuses the exact batch size is `*inferred*`.
 
-**Avalonia note:** `IDataTemplate.Match(context)` is used when a template selector is present; otherwise templates are found per item type.
+**Template lookup: the selector is consulted first, and only some adapters have anything to fall back to.** The four XAML-style adapters resolve `ViewPool.TemplateSelector` → resource-walk of the container → `Application.Current.Resources`, so a selector that does **not** match degrades to the platform's own lookup. **WinForms, Jalium and Razor have no platform lookup at all** — their pools create views only through the selector (the `IWorkflowTemplateSelector` factory, or the Razor `ItemTemplate` component), so a null or non-matching selector yields **no views and no error**. (Verified WPF/Avalonia/WinForms/Jalium/Razor; the MAUI chain is `*inferred*`.)
+**One gotcha shared by the four:** the resolved template is cached **per item `Type`**, and the cache is read *before* the selector — a selector that decides **per instance** (same type, different view) only has its first verdict reused for the whole type.
+
+**Avalonia note:** when a selector is present it is asked *with the item* — the pool builds the view as `IDataTemplate.Build(item)` — so a custom `IDataTemplate` must dispatch on that argument (`Match` picks the selector, `Build` picks and materializes the inner template). A selector that ignores the argument draws nothing, silently.
 
 ## Interface: `IWorkflowTemplateSelector`
 

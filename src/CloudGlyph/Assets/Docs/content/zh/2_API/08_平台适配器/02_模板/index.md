@@ -20,6 +20,19 @@
 
 各模板的默认类名依次为 `NodeView`、`SlotView`、`LinkView`、`TreeView`、`TemplateSelector`、`GridDecorator`、`MinimapOverlay`（用 `-n <Name>` 指定实际名）。节点/槽/连接/树模板在 XAML 风格平台生成标记 + 代码后置对（`.xaml`/`.cs` 或 Avalonia/WinUI 等价物）；选择器/装饰层/小地图生成单个代码后置文件。Razor 生成 `.razor`（+ `.razor.cs`）。
 
+## 七个模板出厂就是接好的
+
+生成出来的项目不需要手工接线。**树视图是枢纽**：它托管池与各类表面行为，并按名字引用兄弟模板 —— 节点/槽/连接视图，以及**模板选择器**（池最先问的那一个）。
+
+| 适配器 | 树视图怎么把选择器交给池 |
+|---|---|
+| WPF / Avalonia / WinUI / MAUI | `ViewPool.TemplateSelector="{StaticResource WorkflowTemplateSelector}"` —— 画布上的附加属性 |
+| WinForms | `ViewPool.SetTemplateSelector(PART_Canvas, _selector)` —— 这家没有附加属性系统，只能方法调用 |
+| Jalium | `ViewPool.SetTemplateSelector(this, TemplateSelector)`；该属性**自带默认值**，所以生成出来的树视图不会是「没有选择器」的 |
+| Razor | 一个 `<TemplateSelector …>` 组件，它的 `ItemTemplate` 是池唯一的视图来源 |
+
+**选择器是最高优先级的视图来源**，它在平台自己的查找**之前**被问到；有平台查找的那四家（四个 XAML 风格适配器）在它不匹配时**退回**平台查找，而 WinForms / Jalium / Razor 没有可退的东西 —— 那里选择器缺失就是**一个视图都不建、也不报错**（见[视图池](../00_附加行为/01_视图池/index.md)）。要客制化，替换生成的选择器类或那一处引用即可，**不要改池**。
+
 ## CLI 选项（以 WPF 套件为例）
 
 每个模板都接受 `-ns <Namespace>` 指定生成的命名空间。视图模板另声明样式参数；WPF 套件的 `dotnetcli.host.json` 映射如下：
