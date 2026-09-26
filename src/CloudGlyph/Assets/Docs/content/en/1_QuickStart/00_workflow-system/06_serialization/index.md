@@ -16,7 +16,7 @@ dotnet add reference ..\Src\Core\VeloxDev.Core.Extension\VeloxDev.Core.Extension
 
 ## 2. Serialize the tree to JSON and rebuild it
 
-`Serialize()` / `Deserialize<T>()` are extension methods on any `INotifyPropertyChanged` ViewModel (`VeloxDev.MVVM.Serialization.ComponentModelEx`, source: `Src/Core/VeloxDev.Core.Extension/ComponentModelEx.cs`). The serializer writes **public writable properties only** (the generator's computed properties such as `RuntimeId` are excluded), writes an assembly-qualified **type discriminator** so polymorphic node instances round-trip (System.Text.Json on the modern TFMs, Newtonsoft on the `netstandard2.0` asset), and goes through the parameterless constructor on the way back — where `InitializeWorkflow()` re-installs each Helper and its preset default slots before the JSON values are applied:
+`Serialize()` / `Deserialize<T>()` are extension methods on any `INotifyPropertyChanged` ViewModel (`VeloxDev.MVVM.Serialization.ComponentModelEx`, source: `Src/Core/VeloxDev.Core.Extension/ComponentModelEx.cs`). The serializer writes **public writable properties only** (the generator's computed properties such as `RuntimeId` are excluded), uses Newtonsoft `TypeNameHandling.Auto` so polymorphic node instances round-trip, and goes through the parameterless constructor on the way back — where `InitializeWorkflow()` re-installs each Helper and its preset default slots before the JSON values are applied:
 
 ```csharp
 using VeloxDev.MVVM.Serialization;

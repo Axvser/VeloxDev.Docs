@@ -116,7 +116,7 @@ $$
 | `WorkflowSpatialManager` | $O(V + E)$——节点 provider + 节点对 provider + 反向索引 | 字典 |
 | 撤销 / 重做栈 | $O(n)$——$n$ 个已提交操作对 | `ConcurrentStack` |
 | `CompiledGraph` + 段 | $O(V + E)$ | 条目 + 访问集 |
-| 序列化 JSON | $O(P)$——序列化总大小 | System.Text.Json 字符串（netstandard2.0 资产为 Newtonsoft） |
+| 序列化 JSON | $O(P)$——序列化总大小 | Newtonsoft 字符串 |
 
 ## 汇总表
 
@@ -129,4 +129,4 @@ $$
 | 执行（`RuntimeEngine`） | $O(N)$ | $O(N)$ | 单遍段驱动；回退最坏 $O(50N)$；汇合 $O(k_{\text{in}})$ |
 | 撤销 / 重做 | 每操作 $O(1)$ | $O(n)$ | 并发栈 |
 | `SlotEnumerator.TrySelect` | $O(1)$ 期望 | $O(\text{成员数})$ | 字典查找 |
-| `ComponentModelEx.Serialize` / `Deserialize` | $O(P)$ | $O(P)$ | 图遍历 + 引用表（现代资产 System.Text.Json，netstandard2.0 资产 Newtonsoft） |
+| `ComponentModelEx.Serialize` / `Deserialize` | $O(P)$ | $O(P)$ | Newtonsoft 图遍历（PreserveReferences） |

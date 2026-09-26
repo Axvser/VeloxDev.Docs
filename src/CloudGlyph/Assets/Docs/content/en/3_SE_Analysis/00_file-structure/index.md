@@ -95,7 +95,7 @@ flowchart LR
     EXT[VeloxDev.Core.Extension] --> Core
     EXT --> MCP[ModelContextProtocol]
     EXT --> EXAI[Microsoft.Extensions.AI]
-    EXT --> NJ[Newtonsoft.Json<br/>netstandard2.0 asset only]
+    EXT --> NJ[Newtonsoft.Json]
     WPF[VeloxDev.WPF] --> Core
     AV[VeloxDev.Avalonia] --> Core
     WU[VeloxDev.WinUI] --> Core
