@@ -151,7 +151,7 @@ Wiki_Root/
 
 ⚙ **每一个页面标题都用本 Wiki 自身的语言书写。** 产出某个语言树时，每个目录名与每个页面标题都必须翻译——`00_workflow-system` 要写成 `00_工作流系统`，而不是照抄英文目录。这并非可选的润色：侧边栏渲染的正是目录名，未翻译的目录名会在整篇已翻译的 Wiki 里直接显示为突兀的英文。
 
-⚙ **唯一的例外是代码标识符。** 若某个目录名**本身就是**源码中的公开类型、特性、命名空间或 API 名称——`MVVM`、`AOP`、`MonoBehaviour`、`00_VeloxPropertyAttribute`、`00_transitionsystem`——则它在所有语言中都原样保留，因为翻译它会让读者无法按名检索。判定标准是机械的、而非审美的：**该字面量是否作为类型/命名空间/API 名出现在源码中？** 是，则保留；若它只是一个描述性英文短语（`prerequisites`、`install`、`complete-code`、`attached-behaviors`、`patterns-overview`），那就是翻译遗漏，必须翻译。
+⚙ **唯一的例外是代码标识符。** 若某个目录名**本身就是**源码中的公开类型、特性、命名空间或 API 名称——`MVVM`、`AOP`、`Tickable`、`00_VeloxPropertyAttribute`、`00_transitionsystem`——则它在所有语言中都原样保留，因为翻译它会让读者无法按名检索。判定标准是机械的、而非审美的：**该字面量是否作为类型/命名空间/API 名出现在源码中？** 是，则保留；若它只是一个描述性英文短语（`prerequisites`、`install`、`complete-code`、`attached-behaviors`、`patterns-overview`），那就是翻译遗漏，必须翻译。
 
 ⚙ 两种语言必须在**结构**上对齐（数字前缀拓扑一致，由 `validate-structure.py` 机器校验），并在**语义**上对齐——一种语言中某页的标题，就是另一种语言中同一位置标题的译文。
 

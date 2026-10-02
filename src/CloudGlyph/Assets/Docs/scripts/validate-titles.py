@@ -30,7 +30,7 @@ Declared code identifiers live in `config/title-allowlist.json` next to the
 content root (user-owned — a sync never overwrites it):
 
     {
-      "codeIdentifiers": ["MVVM", "MonoBehaviour", "VeloxPropertyAttribute"]
+      "codeIdentifiers": ["MVVM", "Tickable", "VeloxPropertyAttribute"]
     }
 
 Matching is case-insensitive and whole-run: a segment is accepted when every
