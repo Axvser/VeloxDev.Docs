@@ -98,7 +98,7 @@ Assert.AreEqual(42, result);
 
 **Notes:**
 - Under lock, iterates the stored handlers, copies only the ones whose target is still alive, then computes the copy's combined cache.
-- Verified by `WeakDelegateTests.Clone_ReturnsIndependentCopy` and `MultipleHandlers_CloneInvokesAll`.
+- Verified by `WeakDelegateTests.Clone_ReturnsIndependentCopy`.
 
 ## Source
 

@@ -17,12 +17,12 @@ The package `VeloxDev.Core` multi-targets `netstandard2.0` / `netframework4.6.1`
 
 This feature's Quick Start is split into the following pages (they build toward the single runnable program on the last page):
 
-- [00 Prerequisites](00_prerequisites/) — supported targets, SDK/runtime, and where the behavioural evidence lives
-- [01 Install](01_install/) — add `VeloxDev.Core` from NuGet or project-reference it from this repo
-- [02 Pick a Collection](02_choose-a-collection/) — which of the four types fits a scenario (leaks, FIFO/LIFO buffers, per-target values)
-- [03 WeakDelegate](03_weak-delegate/) — event-like weak subscription: `AddHandler` / `RemoveHandler` / `GetInvocationList` / `Invoke` / `Clone`
-- [04 WeakQueue](04_weak-queue/) — FIFO processing of ephemeral work items
-- [05 WeakStack](05_weak-stack/) — LIFO undo/redo-style stacks that cannot hold items alive
-- [06 WeakCache](06_weak-cache/) — target-keyed values that die with their key
-- [07 GC Behavior](07_gc-behavior/) — what “weak” really means, sweep-on-access, and the Debug/Release caveats
-- [08 Verify & Complete Code](08_verify-and-complete-code/) — the tests, the single runnable program, the recorded output, and the run declaration
+- [00 Prerequisites](00_prerequisites/index.md) — supported targets, SDK/runtime, and where the behavioural evidence lives
+- [01 Install](01_install/index.md) — add `VeloxDev.Core` from NuGet or project-reference it from this repo
+- [02 Pick a Collection](02_choose-a-collection/index.md) — which of the four types fits a scenario (leaks, FIFO/LIFO buffers, per-target values)
+- [03 WeakDelegate](03_weak-delegate/index.md) — event-like weak subscription: `AddHandler` / `RemoveHandler` / `GetInvocationList` / `Invoke` / `Clone`
+- [04 WeakQueue](04_weak-queue/index.md) — FIFO processing of ephemeral work items
+- [05 WeakStack](05_weak-stack/index.md) — LIFO undo/redo-style stacks that cannot hold items alive
+- [06 WeakCache](06_weak-cache/index.md) — target-keyed values that die with their key
+- [07 GC Behavior](07_gc-behavior/index.md) — what “weak” really means, sweep-on-access, and the Debug/Release caveats
+- [08 Verify & Complete Code](08_verify-and-complete-code/index.md) — the tests, the single runnable program, the recorded output, and the run declaration

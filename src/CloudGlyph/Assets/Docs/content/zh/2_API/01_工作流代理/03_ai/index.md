@@ -107,7 +107,20 @@
 
 | 成员 | 签名 |
 |---|---|
+| `ToLanguageCode` | `string ToLanguageCode(AgentLanguages language)` —— 仅 `Chinese` 映射 `"zh"`，否则 `"en"`（只内嵌了 zh/en 目录） |
 | `ReadSkill` / `ListSkills` / `ReadAllSkills` | `string?` / `IEnumerable<string>` / `string`，参数 `(string system, string name, AgentLanguages language = English)` |
+| `ListSkillsExact` | `IEnumerable<string> ListSkillsExact(string system, AgentLanguages language)` —— 仅精确语言，无回退 |
 | `ReadReference` / `ListReferences` / `ReadAllReferences` | 同构，作用于 `References/` 类别 |
 | `ReadSafety` / `ReadSafetyFiles` | 同构，作用于 `Safety/` 类别；`ReadSafetyFiles(system, language, params string[] names)` 依序拼接 |
 | `ReadScript` / `ListScripts` / `ReadAllScripts` | 同构，作用于语言无关的 `Scripts/` 类别 |
+
+### `AgentTelemetryExtensions`
+
+`public static class AgentTelemetryExtensions` —— 打开 Agent Framework 的 OpenTelemetry 插桩。
+
+| 成员 | 签名 | 说明 |
+|---|---|---|
+| `UseAgentTelemetry` | `static AIAgentBuilder UseAgentTelemetry(this AIAgentBuilder builder, string? sourceName = null, bool enableSensitiveData = false)` | 推荐形式；`sourceName ?? OpenTelemetryAgent.DefaultSourceName`。 |
+| `WithAgentTelemetry` | `static AIAgent WithAgentTelemetry(this AIAgent agent, string? sourceName = null, bool enableSensitiveData = false)` | 包装形式：`agent.AsBuilder().UseAgentTelemetry(...).Build()`。 |
+
+除非 `enableSensitiveData` 为 `true`，提示文本不进入 span。测试 `AgentTelemetryExtensionsTests`（带 `[DoNotParallelize]` —— 它挂载进程级 `ActivitySource` 监听器）。

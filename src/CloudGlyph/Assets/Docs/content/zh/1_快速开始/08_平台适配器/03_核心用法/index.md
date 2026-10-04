@@ -15,6 +15,7 @@ behaviors:WorkflowSurfaceBehavior.CanvasName="PART_Canvas"
 behaviors:WorkflowSurfaceBehavior.GridDecoratorName="PART_GridDecorator"
 behaviors:WorkflowSurfaceBehavior.PointerPressSourceName="PART_SurfaceBorder"
 behaviors:WorkflowSurfaceBehavior.MinimapOverlayName="PART_MinimapOverlay"
+behaviors:WorkflowSurfaceBehavior.LinkMenuKey="LinkContextMenu"
 ```
 
 把一棵工作流树作为 `DataContext` 供上——也就是由 `[WorkflowBuilder.Tree]` 源生成器产生的 `IWorkflowTreeViewModel` 实例（构树部分见「工作流系统」快速开始）：
@@ -129,3 +130,21 @@ ThemeManager.Transition<Light>(TransitionEffects.Theme);
 ```
 
 **预期结果：** 主题切换通过平台插值器在正确的 UI 线程上动画完成。各平台的编组方式：WPF 经 `Application.Current.Dispatcher` / 目标 `DispatcherObject` 自己的 `Dispatcher`；Avalonia 经 `Dispatcher.UIThread`；WinUI 经 `DispatcherQueue`（在 UI 线程捕获，或取自目标 `DependencyObject`）；MAUI 经 `Application.Current.Dispatcher`；WinForms/Razor 经捕获的 `SynchronizationContext`（WinForms 还优先用 `Control.Invoke` / `BeginInvoke`）；Jalium 经 `Dispatcher.MainDispatcher` / `Application.Current.Dispatcher`。WPF 与 Avalonia 由 Transition/Theme 演示覆盖；其余适配器的接线为 `*推断所得*`。
+
+## 7. 连线的右键菜单
+
+生成的 `WorkflowView` 为连线声明了一个右键菜单，并以资源键让表面行为指向它：
+
+```xml
+behaviors:WorkflowSurfaceBehavior.LinkMenuKey="LinkContextMenu"
+
+<!-- ... -->
+
+<ContextMenu x:Key="LinkContextMenu">
+    <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />
+</ContextMenu>
+```
+
+行为解析该资源、订阅 Core 的 `LinkInteraction` 中枢、在按下位置弹出菜单、把菜单自身的上下文设成它下面那条连线，并把开/合报回中枢（中枢在菜单打开期间挂起悬停）。因此条目直接绑定那条连线 —— 上面的 `{Binding DeleteCommand}` 就是新增的一个动作，只在模板里增删即可。WinForms 与 Jalium 改为在 `WorkflowTreeView.OnBuildLinkMenu(menu, link)` 里构建同一份菜单（基类会加「Delete」），Razor 则由树视图传入 `<LinkMenu Context="link"> … </LinkMenu>` 片段。
+
+**预期结果：** 右键一条连线会弹出菜单，「Delete」删除该连线。菜单打开期间指针虽在菜单上，连线仍保持选中；若菜单打开时那条连线离开树，中枢会抛出 `ContextMenuDismissRequested`，由宿主收起菜单。

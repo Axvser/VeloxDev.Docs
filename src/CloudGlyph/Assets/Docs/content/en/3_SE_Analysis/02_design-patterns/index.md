@@ -10,6 +10,6 @@ Design-pattern analysis for each feature. Every page below documents the pattern
 | [03 Transition](03_transition) | Fluent Builder + chain, Registry, Strategy (Eases + ISampler), Template Method, Adapter, Scheduler + CWT cache, Composite, Observer |
 | [04 Dynamic Theme](04_dynamic-theme) | Facade, Weak Registry, Cache, Virtual seam (`CreateScheduler`), Shared transport (one `ITimeSourceControl`), Memoized factory (`FromProperty`), Strategy (`StartModel` + sampler), Template Method (generator), Adapter/Bridge (platform converters) |
 | [05 AOP](05_aop) | Proxy, Decorator, Interceptor |
-| [06 MonoBehaviour](06_monobehaviour) | Lifecycle Hook / Template Method, Publisher-Subscriber |
+| [06 Tickable](06_tickable) | Template Method, Shared transport (Adapter), Publisher-Subscriber, Object Pool |
 | [07 Weak Types](07_weak-types) | Weak Reference, Sweep-on-Access |
 | [08 Platform Adapters](08_platform-adapters) | Adapter, Attached Behavior, Object Pool, Command, Strategy / Bridge, Observer |

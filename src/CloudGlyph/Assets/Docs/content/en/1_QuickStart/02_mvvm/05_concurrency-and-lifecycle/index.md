@@ -1,71 +1,92 @@
-# MVVM — Concurrency, Cancellation & Lifecycle
+# MVVM — Concurrency, Cancellation and Lifecycle
 
 `VeloxDev.MVVM.VeloxCommand` (`Src/Core/VeloxDev.Core/MVVM/VeloxCommand.cs`) is the runtime behind every generated command. It is a thread-safe, UI-agnostic async command: it serializes or parallelizes executions, supports cooperative cancellation per run, and reports every transition through a lifecycle-event stream.
 
-## 1. Lifecycle events
+## 1. The eight lifecycle events
 
-`IVeloxCommand` exposes eight events, all typed `CommandEventHandler` (delegate `void CommandEventHandler(CommandEventArgs e)`). `CommandEventArgs` carries `Parameter`, `EventType` (`CommandEventType`), `Exception` (on failure) and `Cts`.
+Every event is typed `CommandEventHandler` — `void CommandEventHandler(CommandEventArgs e)`. `CommandEventArgs` exposes `Parameter`, `EventType` and `Exception` publicly; its per-execution `CancellationTokenSource` is **`internal`** and is not part of the public surface (see the API reference for the full member list).
 
 | Event | Meaning |
 |---|---|
-| `Created` | an execution request was received |
+| `Created` | an execution request was accepted |
 | `Enqueued` | capacity is full — the request is waiting in the FIFO queue |
 | `Dequeued` | a queued request left the queue and is about to run |
 | `Started` | the wrapped method actually began |
 | `Completed` | the method returned normally |
-| `Failed` | the method threw (non-cancellation) — `e.Exception` holds it |
-| `Canceled` | the run was cancelled (see below) |
+| `Failed` | the method threw — `e.Exception` holds it (and only this stage carries one) |
+| `Canceled` | the run was cancelled, or the request was refused |
 | `Exited` | the run finished and left the active set |
 
-`CanExecuteChanged` (the standard `ICommand` event) is raised separately after each execution request and after each run completes, so bound controls re-query `CanExecute`.
+`CanExecuteChanged` is the standard `ICommand` event and is raised separately.
 
-**Normal, capacity-free sequence:** `Created → Started → Completed → Exited`.
-**Queued sequence:** `Created → Enqueued` … then when a slot frees `Dequeued → Started → Completed → Exited`.
+**Sequences:**
 
-**Expected result:** subscribing `cmd.Started += e => ...` and `cmd.Completed += e => ...` observes `Started` before the method body runs and `Completed` after it returns; an exception inside the body raises `Failed` (with `e.Exception`) instead of `Completed`.
+- immediate: `Created → Started → Completed → Exited`
+- queued: `Created → Enqueued` … then, when a slot frees, `Dequeued → Started → Completed → Exited`
+- refused by a lock: `Created → Canceled` only — never `Started`, never `Exited`
+- cancelled while running: `Created → Started → Canceled → Exited`
 
-## 2. Serial vs parallel execution (`semaphore`)
+An execution reports at most **one** `Canceled`. Both `Interrupt`/`Clear` and the body's own `OperationCanceledException` would like to report one; the first to arrive wins, so a handler that counts `Canceled` per execution counts one.
 
-`ExecuteAsync` checks a concurrency budget (`_maxConcurrency`, from the attribute's `semaphore`, default `1`):
+**Expected result:** subscribing `cmd.Started += e => ...` and `cmd.Completed += e => ...` observes `Started` before the body runs and `Completed` after it returns; an exception inside the body raises `Failed` with `e.Exception` instead of `Completed`; `e.Exception` stays `null` on every other stage, including `Exited` — do not treat `Exited` as a success signal.
 
-- `_active.Count < semaphore` → the run starts immediately.
+## 2. Serial vs parallel execution
+
+Execution is bounded by a concurrency capacity (`_maxConcurrency`, from the attribute's `semaphore`, default `1`):
+
+- `_active.Count < capacity` → the run starts immediately.
 - otherwise → the request is enqueued (`Enqueued`) and started later (`Dequeued`) when an active run exits.
 
-So with `semaphore: 1` every trigger is executed exactly once, in FIFO order — a second trigger while the first is running is **queued, not lost or coalesced**. With `semaphore: 3` up to three bodies may run in parallel; the 4th enqueues.
+With the default capacity every trigger runs exactly once, in FIFO order — a second trigger while the first is running is **queued, not dropped or coalesced**. `ChangeSemaphore(n)` adjusts the cap at run time and immediately drains whatever fits.
 
-**Expected result:** firing `Execute` ten times quickly on a `semaphore: 1` command whose body takes 100 ms yields ten sequential executions of the body; with `semaphore: 3` three overlap at a time. Raising `ChangeSemaphore(2)` later adjusts the budget live.
+**Expected result:** firing ten executions at a capacity-1 command whose body takes 100 ms yields ten sequential body runs; at capacity 3, three overlap. Raising the cap later starts the queued backlog. A capacity below 1 is rejected: the constructor and `ChangeSemaphoreAsync` throw `ArgumentOutOfRangeException`, and the synchronous `ChangeSemaphore` validates before dispatching for the same reason.
 
 ## 3. Per-run cancellation
 
-Each run of a method that takes a `CancellationToken` gets its **own** `CancellationTokenSource` (created inside `ExecuteAsync`), so tokens are never shared across queued runs. The wrapper watches the body: an `OperationCanceledException` surfaces as a `Canceled` event, never as `Failed`.
+Each run of a method that takes a `CancellationToken` gets its **own** `CancellationTokenSource`, disposed when that execution ends — including a queued call that `Clear` drops before it ever runs. Tokens are never shared across queued runs, and an `OperationCanceledException` surfaces as `Canceled`, never as `Failed`.
 
-For method signatures *without* a token the runtime still tracks the run but cannot cooperatively cancel the body — `Canceled` is raised and the run is dropped, yet the body itself keeps going until it returns.
+For method shapes *without* a token (parameterless bodies, `void` bodies, `Task M(object?)`) the runtime still tracks the run but cannot stop the body: `Canceled` is raised and the run is removed, yet the body keeps going until it returns.
 
-**Expected result:** a body that `await Task.Delay(Timeout.Infinite, ct)` raises `Canceled` (not `Failed`) when its token is cancelled.
+**Expected result:** a body that awaits `Task.Delay(Timeout.Infinite, ct)` raises `Canceled` when interrupted; the equivalent parameter-only body raises `Canceled` too, but its own code continues to completion.
 
-## 4. Lock / interrupt / clear / continue
+## 4. Lock, interrupt, clear, continue
 
 | API (sync / async) | Effect |
 |---|---|
-| `Lock()` / `LockAsync()` | enters a force-locked state: `CanExecute` returns `false` and new requests are cancelled immediately; running work is untouched |
-| `UnLock()` / `UnLockAsync()` | leaves the locked state and starts any queued work |
-| `Interrupt()` / `InterruptAsync()` | locks, then cancels the currently running runs (`Canceled`) |
-| `Clear()` / `ClearAsync()` | locks, drops the whole queue (`Dequeued` + `Canceled` per pending item) and cancels the active runs |
-| `Continue()` / `ContinueAsync()` | starts pending work if not locked |
-| `ChangeSemaphore(n)` / `ChangeSemaphoreAsync(n)` | changes the concurrency budget (ignored if `< 1`) and starts pending work |
-| `Notify()` | raises `CanExecuteChanged` so bound controls re-run the `CanExecute` predicate |
+| `Lock()` / `LockAsync()` | enter the force-locked state: `CanExecute` returns `false` and new requests are refused (`Created → Canceled`); running work is untouched |
+| `Unlock()` / `UnlockAsync()` | leave the locked state and start whatever the queue can now hold |
+| `Interrupt()` / `InterruptAsync()` | cancel the currently running executions; a command that was already locked stays locked |
+| `Clear()` / `ClearAsync()` | drop the whole queue (`Dequeued` then `Canceled` per pending item) and cancel the active executions |
+| `Continue()` / `ContinueAsync()` | start pending work — a no-op while locked |
+| `ChangeSemaphore(n)` / `ChangeSemaphoreAsync(n)` | change the capacity (`< 1` throws) and start pending work |
+| `Notify()` | raise `CanExecuteChanged` so bound controls re-run the `CanExecute` predicate |
 
-The WPF demo shows both calling styles (`FreeCommand` fire-and-forget vs `FreeCommandAsync` awaitable).
+The synchronous members are fire-and-forget conveniences over their `Async` twins. Note the spelling: the member is **`Unlock`**, not `UnLock`.
 
-**Expected result:** after `MinusCommand.Lock()`, `MinusCommand.Execute(null)` immediately produces a `Canceled` event and the body never runs; `MinusCommand.Clear()` empties a saturated queue; `Notify()` after a state change flips a disabled bound button to enabled (as in the properties/commands pages).
+The WPF demo shows both calling styles — `FreeCommand` (fire-and-forget) next to `FreeCommandAsync` (awaitable) — against `MinusCommand`.
 
-## 5. Thread & dispatch notes
+**Expected result:** after `MinusCommand.Lock()`, `MinusCommand.Execute(null)` produces `Created → Canceled` and the body never runs; `MinusCommand.Clear()` empties a saturated queue and leaves the command unlocked; `Notify()` after a state change flips a disabled bound button to enabled.
 
-- **Thread-safe runtime:** all internal state (`_pendingQueue`, `_active`, `_isForceLocked`, `_maxConcurrency`) is guarded by a private `SemaphoreSlim`; internal awaits use `ConfigureAwait(false)`. You may call `ExecuteAsync` / `LockAsync` / … from any thread, and `await` them from a UI thread without deadlock.
-- **No auto-marshalling:** VeloxDev does not inject a dispatcher. Where a command body starts and where the events fire depends on the caller's context. Bound WPF/Avalonia commands start on the UI thread, so a body's own `await` continuations resume on that thread via its `SynchronizationContext`; a body that was started on a background thread (or whose awaited task completes on the pool) resumes there. If such a continuation touches UI-bound state, marshal it yourself with the host dispatcher (`Dispatcher.InvokeAsync` in WPF, Avalonia's `Dispatcher`).
+## 5. Threads, dispatch and broken subscribers
 
-**Expected result:** a command that does pure compute can run entirely on a background thread with no UI reference; a command that updates observable properties read by the UI completes those updates on the UI thread when it was invoked from the UI.
+- **Thread-safe:** all internal state (`_pendingQueue`, `_active`, `_isForceLocked`, `_maxConcurrency`) is guarded by a private `SemaphoreSlim(1,1)`, and internal awaits use `ConfigureAwait(false)`. No user code runs while that lock is held, so a handler that blocks on the command cannot deadlock it.
+- **`EventContext`** — by default events are raised inline, on whatever thread the pipeline is on, so a handler that touches UI must dispatch itself. Setting `EventContext` to the UI framework's `SynchronizationContext` makes the command post them there instead, in lifecycle order. Posting is asynchronous: an event can reach its handler after the call that raised it returned.
+- **`HandlerException`** — a subscriber that throws never disturbs the command, and the exception is swallowed. `VeloxCommand.HandlerException` is a static event that reports those failures (this holds for `CanExecuteChanged` subscribers too). With nothing subscribed the behaviour is exactly as if the event did not exist, and a hook that itself throws is discarded rather than propagated.
+- **`Dispose()`** — releases the command's internal lock. Use it only at teardown, once nothing is in flight; a command that is merely dropped needs no disposal. Disposal is final.
+
+**Expected result:** with `EventContext` unset, a UI-touching handler runs on the pipeline's thread; with it set, handlers run on the context's thread in lifecycle order; a handler that throws produces `Completed` (not `Failed`) and, if `HandlerException` is subscribed, reports the exception there.
 
 ## Run declaration
 
-- ⚠️ Statically verified only — no compilation or execution was run while writing this page. Event order and the lock/interrupt/clear/continue semantics come from `VeloxDev.Core/MVVM/VeloxCommand.cs`; the demo calling styles come from `Examples/MVVM/*/.../MainWindowViewModel.cs`.
+- ✅ Partially executed on 2026-10-01. The lifecycle and lock behaviour was exercised against a scratch console project built with a Debug project reference to `VeloxDev.Core` (`dotnet run -c Debug`, recorded output):
+
+  ```text
+  Increment -> Completed (Succeeded=True)
+  Decrement -> Completed
+  status: IsBusy=False, Active=0, Pending=0
+  while locked -> Refused
+  ```
+
+  The third and fourth lines are the observable consequence of sections 2 and 4: the counter is idle after both commands finish, and a call issued while `LockAsync()` is held is refused.
+
+- Event ordering, the single-`Canceled` rule, disposal of the per-execution source, and the `EventContext` posting path were **not** executed in this pass. They are transcribed from `VeloxCommand.cs` and are pinned by `Src/Core/VeloxDev.Core.Test/MVVM/` (`VeloxCommandLifecycleTests`, `VeloxCommandCancellationTests`, `VeloxCommandDisposalTests`, `VeloxCommandEventContextTests`, `VeloxCommandDiagnosticsTests`, `VeloxCommandControlTests`, `VeloxCommandConcurrencyTests`, `VeloxCommandLockInvariantTests`).

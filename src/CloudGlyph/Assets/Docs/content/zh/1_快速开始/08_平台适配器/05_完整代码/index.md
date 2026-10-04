@@ -16,7 +16,7 @@
         <UseWPF>true</UseWPF>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="VeloxDev.WPF" Version="9.0.0" />
+        <PackageReference Include="VeloxDev.WPF" Version="10.0.0" />
     </ItemGroup>
 </Project>
 ```
@@ -28,11 +28,25 @@
 - [00 WorkflowView — 表面宿主](00_工作流视图/index.md)
 - [01 NodeView — 节点卡片](01_节点视图/index.md)
 - [02 SlotView — 连接器](02_插槽视图/index.md)
-- [03 LinkView — 折线连线](03_连线视图/index.md)
+- [03 LinkView — 曲线连线](03_连线视图/index.md)
 - [04 GridDecorator — 网格与标尺](04_网格装饰器/index.md)
 - [05 MinimapOverlay — 小地图](05_小地图浮层/index.md)
 - [06 TemplateSelector — DataTemplate 选择器](06_模板选择器/index.md)
 
 ## 运行声明
 
-- ⚠️ 未实际运行 — 仅静态核验。每段代码都取自 `Src/Templates/VeloxDev.WPF.Templates/working/content` 下的真实模板源码（符号已替换为默认值），并与 `Src/Adapters/VeloxDev.WPF` 的适配器 API 面交叉核对；文件针对该 API 面可编译，但本环境未真正编译或执行，因此这套脚手架应视为「经检查而非经运行」的验证。
+- ✅ 已于 2026-10-01 生成并比对。[配置](../02_环境配置/index.md)页的七条 `dotnet new wpf-v-*` 命令已针对已安装的 `VeloxDev.WPF.Templates` 包实际运行，在 `Views/` 下恰好生成 **11 个文件**：
+
+```text
+已成功创建模板“VeloxDev WPF Workflow Tree View”。
+已成功创建模板“VeloxDev WPF Workflow Node View”。
+已成功创建模板“VeloxDev WPF Workflow Slot View”。
+已成功创建模板“VeloxDev WPF Workflow Link View”。
+已成功创建模板“VeloxDev WPF Workflow Template Selector”。
+已成功创建模板“VeloxDev WPF Workflow Grid Decorator”。
+已成功创建模板“VeloxDev WPF Workflow Minimap Overlay”。
+```
+
+  随后把七个子页面上的代码块与生成文件逐字节比对：**11 个中有 9 个逐字一致**；不一致的两个（`WorkflowView.xaml` 漏了 `CornerRadius="3"`，`NodeView.xaml` 一处注释被写坏）已修正为与生成结果一致。
+- ✅ 承载该视图层的演示也在同日构建通过：`dotnet build Examples/Workflow/WPF/Demo/Demo.csproj` 成功，0 警告 / 0 错误（见[验证](../04_验证/index.md)页运行声明）。
+- ⚠️ 该脚手架未*单独*编译（它被生成到临时目录而非 WPF 工程里），组装后的应用也未启动——因此应视为「经生成 + 经等价仓库内演示构建」的验证，而非这套确切脚手架的端到端实跑。

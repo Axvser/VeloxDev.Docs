@@ -20,10 +20,10 @@ dotnet new wpf-v-minimap  -n MinimapOverlay    -ns Demo.Views.Workflow -o Views
 
 | 文件 | 模板 | 角色 |
 |---|---|---|
-| `WorkflowView.xaml(.cs)` | `wpf-v-tree` | 表面宿主：`WorkflowSurfaceBehavior`（含 `ZoomEnabled`）、命名的部件 `PART_ScrollViewer` / `PART_Canvas` / `PART_GridDecorator` / `PART_SurfaceBorder` / `PART_MinimapOverlay`、绑定 `Helper.VisibleItems` 的 `ViewPool`、`NodeTemplate` / `LinkTemplate` 两个 `DataTemplate` 及 `TemplateSelector` |
+| `WorkflowView.xaml(.cs)` | `wpf-v-tree` | 表面宿主：`WorkflowSurfaceBehavior`（含 `ZoomEnabled`）、命名的部件 `PART_ScrollViewer` / `PART_Canvas` / `PART_GridDecorator` / `PART_SurfaceBorder` / `PART_MinimapOverlay`、绑定 `Helper.VisibleItems` 的 `ViewPool`、`NodeTemplate` / `LinkTemplate` 两个 `DataTemplate` 及 `TemplateSelector`、以及连线的右键菜单（`LinkMenuKey="LinkContextMenu"` 指向一个带键的 `ContextMenu`，其条目绑定它们作用于的那条连线） |
 | `NodeView.xaml(.cs)` | `wpf-v-node` | 节点卡片：`WorkflowSlotLayoutBehavior`（`PART_InputSlot`、`PART_OutputSlots`、`CoordinateHostName="PART_Canvas"`），头部还有 `WorkflowNodeDragBehavior` |
 | `SlotView.xaml(.cs)` | `wpf-v-slot` | 连接器：`WorkflowSlotConnectionBehavior.IsEnabled="True"`，外加执行 `SendConnectionCommand` / `ReceiveConnectionCommand` 的指针处理器；`SlotState` 决定颜色 |
-| `LinkView.xaml(.cs)` | `wpf-v-link` | 被动的正交折线连线，`CanRender` 且连线可渲染时才绘制 |
+| `LinkView.xaml(.cs)` | `wpf-v-link` | 只管绘制的三次贝塞尔连线，`CanRender` 且连线可渲染时才绘制，并发布自己的曲线供命中测试、实现 `ILinkHighlight` 以支持悬停 |
 | `TemplateSelector.cs` | `wpf-v-selector` | `DataTemplateSelector`，把 `IWorkflowLinkViewModel` / `IWorkflowSlotViewModel` / `IWorkflowNodeViewModel` / `IWorkflowTreeViewModel` 映射到四个 `DataTemplate` 属性 |
 | `GridDecorator.cs` | `wpf-v-decorator` | 基于 `Grid` 的装饰层，实现 `IWorkflowGridDecorator`（网格层 + 浮动标尺），由表面行为喂偏移 |
 | `MinimapOverlay.cs` | `wpf-v-minimap` | `WorkflowMinimapOverlay` 的子类，套用配色模板符号 |

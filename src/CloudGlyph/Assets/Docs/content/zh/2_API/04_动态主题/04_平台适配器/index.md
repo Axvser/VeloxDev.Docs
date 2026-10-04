@@ -19,7 +19,7 @@ ThemeManager.SetPlatformInterpolator(new Interpolator());
 
 | 适配器 | 注册的属性类型 |
 |---|---|
-| WPF（`VeloxDev.WPF`） | `Brush`、`Thickness`、`Point`、`CornerRadius`、`Transform`、`Size`、`Rect`、`Vector`、`Color`、`DropShadowEffect`、`Point3D`、`Vector3D` |
+| WPF（`VeloxDev.WPF`） | `Brush`、`Thickness`、`Point`、`CornerRadius`、`Transform`、`Size`、`Rect`、`Vector`、`Color`、`Effect`（抽象基类，由 `DropShadowEffectSampler` 采样）、`Point3D`、`Vector3D` |
 | Avalonia（`VeloxDev.Avalonia`） | `IBrush`、`ITransform`、`Thickness`、`Point`、`CornerRadius`、`Size`、`PixelPoint`、`PixelSize`、`PixelRect`、`RelativePoint`、`RelativeRect`、`Color`、`BoxShadows`、`GridLength` |
 
 #### Interpolator.CreateScheduler

@@ -35,4 +35,4 @@ public string GetChangesSinceLastSnapshot()
 }
 ```
 
-`ComputeDiff` 按 `RuntimeId`（来自每个组件的 `IWorkflowIdentifiable.Helper`）为节点/连接建索引，且只通过 `JToken.DeepEquals` 比较标量/枚举属性，因此差异绝不会物化整棵子树比较（`WorkflowStateTracker.cs`，第 73-192 行）。工具包每作用域持有一个追踪器（`WorkflowAgentToolkit.cs`，第 27 行），并通过 `TakeSnapshot` 与 `GetChangesSinceSnapshot` 工具暴露它。底层的撤销/重做（Core）是发起者自身的历史机制；该追踪器是对同一张图的轻量正交视图。
+`ComputeDiff` 按 `RuntimeId`（来自每个组件的 `IWorkflowIdentifiable.Helper`）为节点/连接建索引，且只通过 `JToken.DeepEquals` 比较标量/枚举属性，因此差异绝不会物化整棵子树比较（`WorkflowStateTracker.cs`，第 73-192 行）。工具包每作用域持有一个追踪器（`WorkflowAgentToolkit.cs`，第 31 行），并通过 `TakeSnapshot` 与 `GetChangesSinceSnapshot` 工具暴露它。底层的撤销/重做（Core）是发起者自身的历史机制；该追踪器是对同一张图的轻量正交视图。

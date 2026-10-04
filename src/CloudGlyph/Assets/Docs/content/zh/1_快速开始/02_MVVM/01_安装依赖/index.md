@@ -1,20 +1,20 @@
 # MVVM — 安装与引用
 
-MVVM 运行时与两个源生成器住在同两个包里：`VeloxDev.Core`（命名空间 `VeloxDev.MVVM` 下的运行时类型）以及它的分析器包 `VeloxDev.Core.Generator`（生成器类 `VeloxDev.Generators.MVVM` / `VeloxDev.Generators.Command`）。`VeloxDev.Core.csproj` 以同版本引用生成器，因此添加 Core 即可把生成器一起带进来。
+MVVM 运行时位于 `VeloxDev.Core` 包中（命名空间 `VeloxDev.MVVM`）；两个源生成器位于仅含分析器的包 `VeloxDev.Core.Generator` 中（命名空间 `VeloxDev.Generators`，类 `VeloxDev.Generators.MVVM` 与 `VeloxDev.Generators.Command`）。`VeloxDev.Core.csproj` 在除 `Debug` 之外的所有配置下把生成器声明为包依赖，所以两者一起发布时生成器会随 Core 一起被引用。
 
-## 1. 从 NuGet（消费已发布的包）
+## 1. 从 NuGet 安装（使用已发布的包）
 
 ```bash
 dotnet add package VeloxDev.Core
 ```
 
-`VeloxDev.Core`（当前为 `9.0.0`）把 `VeloxDev.Core.Generator` `9.0.0` 声明为包依赖（`Src/Core/VeloxDev.Core/VeloxDev.Core.csproj`），于是生成器程序集作为*你项目*的分析器被还原 —— 无需手动接线分析器。
+`Src/Core/VeloxDev.Core/VeloxDev.Core.csproj` 在 `Configuration != Debug` 时以 `PackageReference` 引用 `VeloxDev.Core.Generator` 版本 `10.0.0`。生成器包把 DLL 放在 `analyzers/dotnet/cs` 下，因此它会作为**你的项目**的分析器被还原 —— 无需手动接线。
 
-**预期结果：** 还原输出列出 `VeloxDev.Core.Generator`；`dotnet build` 成功。
+**预期结果：** 还原输出里出现 `VeloxDev.Core.Generator`；`dotnet build` 成功，并且生成器会在你标注的类上运行。
 
-## 2. 从本仓库（项目引用）
+## 2. 从本仓库引用（项目引用）
 
-所有仓库内的演示都走这条路 —— 直接项目引用 Core 源工程：
+项目引用**不会**传递分析器，所以每个用到 `[VeloxProperty]` / `[VeloxCommand]` 的项目都必须自己加上生成器。演示的做法是：`Debug` 下用 analyzer 项目引用，其它配置用包引用 —— 与 `Examples/MVVM/WPF/Demo/Demo.csproj` 完全一致（不同项目的路径深度不同）：
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -30,23 +30,42 @@ dotnet add package VeloxDev.Core
     <ProjectReference Include="..\..\..\..\Src\Core\VeloxDev.Core\VeloxDev.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\Src\Generators\VeloxDev.Core.Generator\VeloxDev.Core.Generator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="VeloxDev.Core.Generator" Version="10.0.0"
+                      Condition="'$(Configuration)' != 'Debug'" />
+  </ItemGroup>
+
 </Project>
 ```
 
-这正是 `Examples/MVVM/WPF/Demo/Demo.csproj` 与 `Examples/MVVM/Avalonia/Demo/Demo.csproj` 里的引用形态（不同工程的相对路径深度不同）。从源码构建 Core 会把生成器编入构建并喂给引用它的工程，因此当你标注成员后会出现生成的 `.g.cs` 文件。
-
-**预期结果：** 添加引用后 `dotnet build` 成功；在下一页第 1 步标注的 partial 类会生成到 `obj/<配置>/<目标框架>/generated/` 下（例如 `CounterViewModel_QuickStart_Mvvm_MVVM.g.cs` 与 `CounterViewModel_QuickStart_Mvvm_Commands.g.cs`）。
+**预期结果：** 只要类里有被标注的 `partial` 类，`dotnet build` 就会成功，并在 `obj/Debug/net9.0/generated/` 下产生文件（每个含 `[VeloxProperty]` 成员的类一个 `*_MVVM.g.cs`，每个含 `[VeloxCommand]` 方法的类一个 `*_Commands.g.cs`）。
 
 ## 3. 添加 using
 
-每个 MVVM 类型都在命名空间 `VeloxDev.MVVM` 里。承载特性的文件需要它：
+所有 MVVM 类型都在 `VeloxDev.MVVM` 命名空间下，因此一个 `using` 就同时覆盖特性与运行时：
 
 ```csharp
 using VeloxDev.MVVM;
 ```
 
-**预期结果：** `VeloxPropertyAttribute`、`VeloxCommandAttribute`、`IVeloxCommand`、`VeloxCommand`、`CommandEventArgs`、`CommandEventHandler`、`CommandEventType`、`ObservableCollectionTracker` 都能从这个单一命名空间解析 —— 该特性不需要其它 `using`。
+**预期结果：** `VeloxPropertyAttribute`、`VeloxCommandAttribute`、`IVeloxCommand`、`IVeloxCommandCompletion`、`IVeloxCommandStatus`、`VeloxCommand`、`VeloxCommandExtensions`、`CommandEventArgs`、`CommandEventHandler`、`CommandEventType`、`CommandOutcome`、`CommandCompletion` 与 `ObservableCollectionTracker` 都能从这一个命名空间解析出来 —— 该特性不需要其它 `using`。
 
 ## 运行声明
 
-- ⚠️ 仅静态核验 —— 编写本页时未编译或运行任何内容。版本号与生成器依赖来自 `VeloxDev.Core.csproj`；引用形态来自 MVVM 演示的 `Demo.csproj`。
+- ✅ 2026-10-01 实际构建过（下列命令在仓库根目录执行，转录为每次构建的尾部输出）：
+
+  ```text
+  dotnet build Examples/MVVM/WPF/Demo/Demo.csproj -c Debug
+  Demo -> E:\VisualStudio\Projects\VeloxDev\Examples\MVVM\WPF\Demo\bin\Debug\net9.0-windows\Demo.dll
+  已成功生成。0 个警告 0 个错误
+
+  dotnet build Examples/MVVM/Avalonia/Demo/Demo.csproj -c Debug
+  Demo -> E:\VisualStudio\Projects\VeloxDev\Examples\MVVM\Avalonia\Demo\bin\Debug\net9.0\Demo.dll
+  已成功生成。0 个警告 0 个错误
+  ```
+
+- 步骤 1 的 NuGet 途径**没有**执行（需要联网源）；其版本号来自 `VeloxDev.Core.csproj`。步骤 2 的项目引用写法抄自两个 `Demo.csproj`，并且**确实**被上面的构建编译过。

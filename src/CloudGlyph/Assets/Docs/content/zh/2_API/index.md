@@ -10,6 +10,6 @@
 | [03 过渡动画](03_过渡动画) | `VeloxDev.TransitionSystem`、`.Abstractions`、`.NativeSamplers`、`VeloxDev.TimeLine` |
 | [04 动态主题](04_动态主题) | `VeloxDev.DynamicTheme`、`VeloxDev.TransitionSystem` |
 | [05 AOP](05_AOP) | `VeloxDev.AspectOriented` |
-| [06 MonoBehaviour](06_MonoBehaviour) | `VeloxDev.TimeLine`、`VeloxDev.MonoBehaviour` |
+| [06 Tickable](06_Tickable) | `VeloxDev.TimeLine` |
 | [07 弱引用类型](07_弱引用类型) | `VeloxDev.WeakTypes` |
 | [08 平台适配器](08_平台适配器) | `VeloxDev.WorkflowSystem.AttachedBehaviors`、各适配器 `VeloxDev.*` |

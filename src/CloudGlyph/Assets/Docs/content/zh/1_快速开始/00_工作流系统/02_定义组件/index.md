@@ -1,6 +1,6 @@
 # 工作流系统 — 定义组件
 
-四种组件都以 `[WorkflowBuilder.*]` 修饰一个 `partial class`，类型参数是它的 Helper；`[VeloxProperty]` 把字段/分部属性变成可通知属性。下面的类就是[完整代码](../07_完整代码/index.md)里的类型，抄进去即可编译。
+四种组件都以 `[WorkflowBuilder.*]` 修饰一个 `partial class`，类型参数是它的 Helper；`[VeloxProperty]` 把字段/分部属性变成可通知属性。下面的类就是`完整代码`里的类型，抄进去即可编译。
 
 ```csharp
 using VeloxDev.Core.WorkflowSystem.CompilerEx;
@@ -44,7 +44,7 @@ public partial class CalcNode : ICompileTimeAware
 
 要点：
 
-- **槽位是节点的一部分。** 每个 `Slot` 型的 `[VeloxProperty]` 成员在构造（`InitializeWorkflow`）时被预置一个默认 `SlotViewModel` 并注册进 `Slots`；随后用 `SetChannelCommand` 配置通道容量（见 [03 构建画布](../03_构建画布/index.md)）。
+- **槽位是节点的一部分。** 每个 `Slot` 型的 `[VeloxProperty]` 成员在构造（`InitializeWorkflow`）时被预置一个默认 `SlotViewModel` 并注册进 `Slots`；随后用 `SetChannelCommand` 配置通道容量（见 `03 构建画布`）。
 - **节点不写 `ReceiveAsync`，业务写在 Helper 上。** `CalcNodeHelper` 继承 `NodeHelper<CalcNode>` 并重写 `ReceiveAsync`：入参是 `ITaskContext`（数据流任务上下文），返回值会被写回运行时上下文的 `Data`，供下游节点读取。实现 `ICompileTimeAware` 后还能读出本次编译分配的全局序号 `Order`（`-1` = 绝对停止态）。
 
 在**同一文件、同一命名空间**内追加这个 Helper 类（继续上面声明的 `Demo.QuickStart`）：
@@ -78,4 +78,4 @@ public class CalcNodeHelper : NodeHelper<CalcNode>
 
 ## 下一步
 
-组件定义好了，进入 [03 构建画布](../03_构建画布/index.md) 把节点连成图。
+组件定义好了，进入 `03 构建画布` 把节点连成图。

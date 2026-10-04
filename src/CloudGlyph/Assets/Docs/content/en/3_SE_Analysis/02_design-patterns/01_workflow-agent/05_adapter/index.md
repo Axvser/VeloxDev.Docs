@@ -4,7 +4,7 @@
 
 `LoadOneAsync` (a) installs/prepares the runtime for `Npm`/`Pip`, (b) builds a transport — `StdioClientTransport` for local modes, `HttpClientTransport` for `Http` — and (c) creates the MCP client, lists its tools and returns them as `AITool[]`. A per-server failure becomes a `ServerError` event and an empty tool set instead of aborting the batch.
 
-> Source: `Src/Core/VeloxDev.Core.Extension/Agent/MCP/McpScope.cs`, lines 193-230 and 300-418
+> Source: `Src/Core/VeloxDev.Core.Extension/Agent/MCP/McpScope.cs`, lines 843-888 and 971-1097
 
 ```csharp
 private async Task<AITool[]> LoadOneAsync(McpServerConfiguration config, string mcpRoot, CancellationToken ct)
@@ -49,4 +49,4 @@ private async Task<AITool[]> LoadOneAsync(McpServerConfiguration config, string 
 
 The adapter is wrapped further by `McpAgentToolkit`, which exposes four management tools (`ListMcpServers`, `LoadMcpServers`, `UnloadMcpServer`, `DescribeMcpServer`). The host pre-registers the `McpServerConfiguration`s; the agent can only load/unload/inspect them, never reconfigure — configuration is immutable once loaded (`Src/Core/VeloxDev.Core.Extension/Agent/MCP/McpAgentToolkit.cs`).
 
-The demo registers Microsoft Learn (remote HTTP), a throwaway remote endpoint, and a local filesystem server via npx in `AgentHelper.DemoMcpServers` (`Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`, lines 37-68).
+The demo registers Microsoft Learn (remote HTTP), a throwaway remote endpoint, and a local filesystem server via npx in `AgentHelper.DemoMcpServers` (`Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`, lines 95-126).

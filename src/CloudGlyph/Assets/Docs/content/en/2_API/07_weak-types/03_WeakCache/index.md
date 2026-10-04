@@ -21,7 +21,7 @@ Both type parameters must be class types. Because the `ConditionalWeakTable` tre
 
 **Notes:**
 - A public, mutable field (name kept exactly as in source) controlling how many insertions may accumulate before `AddOrUpdate` runs a cleanup sweep.
-- `AddOrUpdate` sweeps once the internal counter exceeds this value: it removes collected targets from the sweep list, resets the counter to `0`, and re-derives the threshold from the number of remaining targets (`GetNextCleanupThreshold` — about `0.9 × 2 × count`, or back to `4` when no target remains). So the field is both a tunable knob and an adaptive watermark.
+- `AddOrUpdate` sweeps once the internal counter exceeds this value: it removes collected targets from the sweep list, resets the counter to `0`, and re-derives the threshold from the number of remaining targets (`GetNextCleanupThreshold`: `nextCapacity = count == 0 ? 4 : count * 2; return (int)(nextCapacity * 0.9);`). So with no target remaining the returned threshold is `3`, not `4` — the `4` is the intermediate `nextCapacity`, which is then scaled by `0.9`. The field is both a tunable knob and an adaptive watermark.
 - Default `4`. Verified together with the sweep behaviour by `WeakCacheTests.AddOrUpdate_ManyItems_TriggersCleanup`.
 
 ## Methods

@@ -4,7 +4,7 @@
 
 The demo wires the full builder chain in one place (`AgentHelper.ProvideAgent`):
 
-> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`, lines 155-183
+> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`, lines 215-256
 
 ```csharp
 var scope = tree.AsAgentScope()

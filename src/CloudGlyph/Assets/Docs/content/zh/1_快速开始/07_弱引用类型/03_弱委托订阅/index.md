@@ -34,7 +34,7 @@ changed.Invoke(["nobody"]);
 Console.WriteLine($"counter: {counter.Value}");   // 仍为 1
 ```
 
-**预期结果：** 移除后调用不再触发处理器，对应 `RemoveHandler_RemovesFromHandlerList`。
+**预期结果：** 移除后调用不再触发处理器，对应 `RemoveHandler_StopsInvoking`（它还断言当最后一个处理器被移除后 `GetInvocationList()` 为 `null`）。
 
 ## 3. 已缓存的组合委托（依赖 GC 前请先读这段）
 
@@ -70,4 +70,4 @@ var snapshot = changed.Clone();             // 只从存活处理器重建
 snapshot.Invoke(["second"]);
 ```
 
-**预期结果：** 已回收订阅者的处理器不会经克隆被调用。这对应测试 `Clone_ReturnsIndependentCopy` 与 `MultipleHandlers_CloneInvokesAll`（后者触发 `h1` 与 `h2`，并断言组合计数为 `11`）。
+**预期结果：** 已回收订阅者的处理器不会经克隆被调用。这对应测试 `Clone_ReturnsIndependentCopy`（克隆恰好调用其复制来的处理器一次）与 `MultipleHandlers_InvokeInRegistrationOrder`（两个处理器按加入顺序依次触发）。

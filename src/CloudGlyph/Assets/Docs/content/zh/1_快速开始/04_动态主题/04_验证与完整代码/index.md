@@ -85,7 +85,7 @@ dotnet test Src/Core/VeloxDev.Core.Test/VeloxDev.Core.Test.csproj --filter "Full
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="VeloxDev.WPF" Version="9.0.0" />
+        <PackageReference Include="VeloxDev.WPF" Version="10.0.0" />
     </ItemGroup>
 
 </Project>
@@ -171,6 +171,12 @@ internal static class Program
 
 ## 5. 运行声明
 
+- ✅ **已于 2026-10-01 复验。** 四个 demo 全部构建通过，两个测试文件全部通过（针对当前源码重新运行）：
+    - `dotnet build "Examples/Theme/WPF Trimmed/Demo/Demo.csproj" -c Debug` —— `已成功生成。 0 个警告 0 个错误`（`Demo -> bin/Debug/net9.0-windows/Demo.dll`）。
+    - `dotnet build "Examples/Theme/WPF/Demo/Demo.csproj" -c Debug` —— `已成功生成。 0 个警告 0 个错误`（`Demo -> bin/Debug/net9.0-windows/Demo.dll`）。
+    - `dotnet build "Examples/Theme/Avalonia Trimmed/Demo/Demo.csproj" -c Debug` —— `已成功生成。 0 个警告 0 个错误`（`Demo -> bin/Debug/net9.0/Demo.dll`）。
+    - `dotnet build "Examples/Theme/Avalonia/Demo/Demo.csproj" -c Debug` —— `已成功生成。 0 个警告 0 个错误`。
+    - `dotnet test Src/Core/VeloxDev.Core.Test/VeloxDev.Core.Test.csproj --filter "FullyQualifiedName~DynamicTheme"` —— `已通过! - 失败: 0，通过: 15，已跳过: 0，总计: 15`（`net10.0`）。
 - ✅ **2026-09-13 实际构建并测量。** 记录输出：
     - `dotnet build "Examples/Theme/WPF Trimmed/Demo/Demo.csproj" -c Debug` —— `已成功生成。 0 个警告 0 个错误`。
     - `dotnet build "Examples/Theme/Avalonia Trimmed/Demo/Demo.csproj" -c Debug` —— 同上，0 警告 / 0 错误。

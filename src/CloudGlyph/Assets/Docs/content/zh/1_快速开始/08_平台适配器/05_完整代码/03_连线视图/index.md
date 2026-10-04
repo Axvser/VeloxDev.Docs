@@ -1,6 +1,6 @@
 # 平台适配器 - `LinkView.xaml / LinkView.xaml.cs`
 
-`dotnet new wpf-v-link -n LinkView -ns Demo.Views.Workflow` 的精确输出。一种被动的正交（折线）连线，带黄金比例短桩，仅当 `CanRender` 为 true 且连线报告可渲染（`IsRenderReady()`）时才绘制自身。
+`dotnet new wpf-v-link -n LinkView -ns Demo.Views.Workflow` 的精确输出（模板默认颜色已替换）。一种只管绘制的三次贝塞尔连线，两端各自水平出线，仅当 `CanRender` 为 true 且连线报告可渲染（`IsRenderReady()`）时才绘制自身。它把自己画出的曲线发布给表面做命中测试（`PublishCurve`，落在连线 Helper 的 `ILinkHitTestable` 上），并实现 `ILinkHighlight`，使交互中枢能在悬停时点亮它；它自身不处理任何输入。
 
 ```xml
 <!-- VeloxDev customization: Customize line geometry, color, thickness, hit testing, and virtual-link rendering in the code-behind. -->
@@ -13,7 +13,6 @@
 ```csharp
 // VeloxDev customization: Customize line geometry, color, and thickness here.
 using System;
-using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -22,18 +21,27 @@ using VeloxDev.WorkflowSystem;
 namespace Demo.Views.Workflow;
 
 /// <summary>
-/// Orthogonal (polyline) connection with golden-ratio stubs.
-/// Passive visual only — no hover, highlight, or keyboard interaction.
+/// Cubic Bézier connection that leaves each port horizontally.
+/// The view only paints: it publishes its curve for hit-testing and implements
+/// <see cref="ILinkHighlight"/> so the surface lights it on hover. It handles no input itself.
 /// </summary>
-public partial class LinkView : UserControl
+public partial class LinkView : UserControl, ILinkHighlight
 {
+    // Extension point: the least horizontal pull of the two control points. Keep it in step with the curve
+    // that is published for hit-testing below.
+    private const double MinimumPull = 40;
+
+    // The link this view last published a curve to; retracted on rebind so a pooled view cannot leave a
+    // stale curve answering for a link that no longer draws here.
+    private IWorkflowLinkViewModel? _publishedLink;
+
     public LinkView()
     {
         InitializeComponent();
         IsHitTestVisible = false;
         Panel.SetZIndex(this, -100);
 
-        DataContextChanged += (_, _) => InvalidateVisual();
+        DataContextChanged += OnDataContextChanged;
     }
 
     #region Dependency properties
@@ -52,6 +60,10 @@ public partial class LinkView : UserControl
         DependencyProperty.Register(nameof(IsVirtual), typeof(bool), typeof(LinkView), new PropertyMetadata(false, OnRenderChanged));
     public static readonly DependencyProperty LineColorProperty =
         DependencyProperty.Register(nameof(LineColor), typeof(Color), typeof(LinkView), new PropertyMetadata((Color)ColorConverter.ConvertFromString("#DDFFFFFF"), OnRenderChanged));
+    public static readonly DependencyProperty HighlightColorProperty =
+        DependencyProperty.Register(nameof(HighlightColor), typeof(Color), typeof(LinkView), new PropertyMetadata((Color)ColorConverter.ConvertFromString("#FFFFFFFF"), OnRenderChanged));
+    public static readonly DependencyProperty IsHighlightedProperty =
+        DependencyProperty.Register(nameof(IsHighlighted), typeof(bool), typeof(LinkView), new PropertyMetadata(false, OnRenderChanged));
 
     public double StartLeft { get => (double)GetValue(StartLeftProperty); set => SetValue(StartLeftProperty, value); }
     public double StartTop { get => (double)GetValue(StartTopProperty); set => SetValue(StartTopProperty, value); }
@@ -61,8 +73,22 @@ public partial class LinkView : UserControl
     public bool IsVirtual { get => (bool)GetValue(IsVirtualProperty); set => SetValue(IsVirtualProperty, value); }
     public Color LineColor { get => (Color)GetValue(LineColorProperty); set => SetValue(LineColorProperty, value); }
 
+    /// <summary>The soft light the link turns into while it is hovered.</summary>
+    public Color HighlightColor { get => (Color)GetValue(HighlightColorProperty); set => SetValue(HighlightColorProperty, value); }
+
+    /// <inheritdoc />
+    public bool IsHighlighted { get => (bool)GetValue(IsHighlightedProperty); set => SetValue(IsHighlightedProperty, value); }
+
     private static void OnRenderChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         => ((LinkView)d).InvalidateVisual();
+
+    private void OnDataContextChanged(object? sender, DependencyPropertyChangedEventArgs e)
+    {
+        // Retract the previous link's curve, then let the next draw publish the new one.
+        _publishedLink?.PublishCurve(null);
+        _publishedLink = null;
+        InvalidateVisual();
+    }
 
     private bool IsVirtualLink
         => IsVirtual
@@ -80,34 +106,78 @@ public partial class LinkView : UserControl
     {
         base.OnRender(ctx);
         if (!CanRender) return;
-
         if (DataContext is IWorkflowLinkViewModel link && !link.IsRenderReady()) return;
 
-        var points = BuildPoints();
-        if (points.Count < 2) return;
+        // Publish the curve the surface hit-tests against: same control points as BuildCurve, same
+        // canvas-local space. Replace this together with BuildCurve if you change the shape.
+        PublishCurve(LinkCurve.BuildCubic(StartLeft, StartTop, EndLeft, EndTop, MinimumPull));
 
-        var color = LineColor;
+        var color = IsHighlighted ? HighlightColor : LineColor;
         var thickness = 2;
-        var brush = new SolidColorBrush(color);
+        var geometry = BuildCurve(StartLeft, StartTop, EndLeft, EndTop);
 
+        // Extension point: this is the hover feedback. Swap the halo's width or alpha, or HighlightColor,
+        // to restyle the highlighted link.
+        if (IsHighlighted)
+        {
+            ctx.DrawGeometry(null, new Pen(new SolidColorBrush(AtAlpha(color, 0.18)), thickness + 8)
+            {
+                StartLineCap = PenLineCap.Round,
+                EndLineCap = PenLineCap.Round,
+            }, geometry);
+        }
+
+        var brush = new SolidColorBrush(color);
         var pen = IsVirtualLink
             ? new Pen(brush, thickness) { DashStyle = new DashStyle(new double[] { 4, 2 }, 0) }
             : new Pen(brush, thickness);
 
-        for (int i = 0; i < points.Count - 1; i++)
-            ctx.DrawLine(pen, points[i], points[i + 1]);
+        ctx.DrawGeometry(null, pen, geometry);
     }
 
-    private List<Point> BuildPoints()
+    // Extension point: the hover halo's opacity (0..1); 0 turns the glow off.
+    private static Color AtAlpha(Color color, double alpha)
+        => Color.FromArgb((byte)Math.Round(Math.Clamp(alpha, 0, 1) * 255), color.R, color.G, color.B);
+
+    // Extension point: the control points set the curve's shape. Both are pulled horizontally by
+    // max(40, |dx| / 2), which is what makes the line leave each port horizontally — keep that
+    // property if you replace the formula.
+    private static Geometry BuildCurve(double startLeft, double startTop, double endLeft, double endTop)
     {
-        var s = new Point(StartLeft, StartTop);
-        var e = new Point(EndLeft, EndTop);
-        double dx = EndLeft - StartLeft;
-        const double phi = 0.6180339887;
-        double stub = dx / 2.0 * (1.0 - phi);
-        var p1 = new Point(s.X + stub, s.Y);
-        var p4 = new Point(e.X - stub, e.Y);
-        return [s, p1, p4, e];
+        var dx = endLeft - startLeft;
+        var pull = Math.Max(MinimumPull, Math.Abs(dx) * 0.5);
+        var figure = new PathFigure
+        {
+            StartPoint = new Point(startLeft, startTop),
+            IsClosed = false,
+            IsFilled = false,
+        };
+        figure.Segments.Add(new BezierSegment(
+            new Point(startLeft + pull, startTop),
+            new Point(endLeft - pull, endTop),
+            new Point(endLeft, endTop),
+            true));
+
+        var geometry = new PathGeometry();
+        geometry.Figures.Add(figure);
+        geometry.Freeze();
+        return geometry;
+    }
+
+    // Extension point: change the second argument if one view no longer draws exactly one link.
+    private void PublishCurve(LinkCurve curve)
+    {
+        var link = DataContext as IWorkflowLinkViewModel;
+        if (!ReferenceEquals(_publishedLink, link))
+        {
+            _publishedLink?.PublishCurve(null);
+            _publishedLink = link;
+        }
+
+        if (link is not null)
+        {
+            link.PublishCurve(curve, this);
+        }
     }
 
     #endregion

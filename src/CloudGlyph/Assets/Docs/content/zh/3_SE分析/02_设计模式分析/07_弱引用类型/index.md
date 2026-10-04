@@ -132,7 +132,7 @@ private void Prune()
 `WeakDelegate` 充当过渡引擎生命周期事件的后备：`TransitionEffectCore` 把每个事件声明为 `WeakDelegate<EventHandler<TransitionEventArgs>>` 字段，并把 C# `event` 访问器转发到它。
 
 ```csharp
-// Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs（第 51-55 行）
+// Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs（第 60-64 行）
 public virtual event EventHandler<TransitionEventArgs> Awaked
 {
     add => _awaked.AddHandler(value);
@@ -140,7 +140,7 @@ public virtual event EventHandler<TransitionEventArgs> Awaked
 }
 ```
 
-调用经由组合委托进行，`TransitionEffectCore` 以**类型化**（免反射）方式调用它（`Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs`，第 87-90 行）：
+调用经由组合委托进行，`TransitionEffectCore` 以**类型化**（免反射）方式调用它（`Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs`，第 106-109 行）：
 
 ```csharp
 public virtual void InvokeAwake(object sender, TransitionEventArgs e)

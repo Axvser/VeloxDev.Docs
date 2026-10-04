@@ -1,68 +1,98 @@
-# Workflow Agent — Run a Conversation
+# 05 · Run a Conversation
 
-With a built scope, a prompt and a tool set you can create a `ChatClientAgent` (`Microsoft.Agents.AI`), open a session and run messages. The tool set is **re-assembled per conversation call**, so servers loaded or unloaded mid-session take effect on the next call without rebuilding the agent.
+This is the page where a model is actually involved. Everything before it is offline configuration.
 
-## 1. Create the agent
-
-`IChatClient.AsAIAgent(instructions: prompt)` wraps the chat client with the workflow system prompt. Tools are *not* fixed at construction time:
+## 1. Build the agent
 
 ```csharp
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using VeloxDev.AI.Pipelines;
 
-var agent = chatClient.AsAIAgent(instructions: prompt);   // ChatClientAgent
+scope.WithTranscript(transcript);                                 // attach the conversation first
+
+var instructions = scope.ProvideProgressiveContextPrompt();       // static skeleton
+
+var agent = chatClient.AsAIAgent(new ChatClientAgentOptions
+{
+    ChatOptions = new ChatOptions { Instructions = instructions },
+    AIContextProviders = scope.CreateContextProviders(),
+}).WithPipeline(scope.Pipeline);                                  // observe both Run and RunStreaming
+
+var session = await agent.CreateSessionAsync();
 ```
 
-The `chatClient` is an `IChatClient` from `Microsoft.Extensions.AI` — the demo builds one from an OpenAI-compatible endpoint (`OpenAIClient(...).GetChatClient(model).AsIChatClient()`); you may equally use any other `IChatClient` implementation.
+Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs` (`ProvideAgent`).
 
-**Expected result:** `agent` is a non-null `ChatClientAgent` whose instructions contain the scope's prompt.
+Two rules are load-bearing here:
 
-## 2. Open a session and define the per-call tool set
+- **The context provider is the sole source of tools.** The Agent Framework unions the tools a provider contributes with whatever `ChatOptions.Tools` carries, and that union does **not** deduplicate by name. Supplying a tool through both channels sends it to the model twice. So leave `ChatOptions.Tools` empty — the provider is what renders the tool list.
+- **Attach the transcript before the agent exists.** The scope composes its pipeline stage chain from the transcript at that moment; the agent is wrapped with the chain.
+
+The convenience overload `AgentClientExtensions.AsAIAgent(this IChatClient chatClient, IReadOnlyList<AIContextProvider> providers, string? instructions = null)` does the same thing without spelling out `ChatClientAgentOptions`.
+
+**Expected result:** `agent` is an `AIAgent` and `session` is created; when `chatClient` is a real model client this performs no network call yet.
+
+## 2. The provider renders per turn
+
+`WorkflowAgentContextProvider` (one of `scope.CreateContextProviders()`) is what makes attaching, switching off or loading something take effect on the **next** turn without rebuilding the agent. It keys its cached render on `scope.ContextKey` (the scope `Version` plus a budget-usage band):
+
+- On an **unchanged** turn it takes no lock and allocates nothing — it returns the very same `AIContext` instance it returned last time.
+- On a changed turn it rebuilds the instructions (`BuildDynamicInstructions`) and, if the scope `Version` moved, the tool list (`BuildDynamicTools`).
+
+`CreateContextProviders()` assembles, in a **fixed** order (so the sequence of `With*` calls cannot change how the prompt reads):
+
+1. the compaction provider, if `WithContextCompaction` was called;
+2. this scope's own `WorkflowAgentContextProvider`;
+3. the skill provider (if `WithSkills`);
+4. the MCP provider (if `WithMcps`);
+5. the sub-agent roster provider (if `WithSubAgents`);
+6. the framework's todo provider (if `WithTodoTracking`) and mode provider (if `WithAgentModes`);
+7. one provider per factory registered with `WithContextProvider`.
+
+**Expected result:** calling the provider twice with no configuration change returns the same `AIContext` instance; a `SetToolEnabled(...)` between the two calls makes the second render a new one.
+
+## 3. Optional framework scaffolding
 
 ```csharp
-var baseTools = scope.ProvideTools().ToArray();            // fixed workflow surface (+ any custom tools)
-var session = await agent.CreateSessionAsync();            // AgentSession (conversation history)
-
-var runOptions = new ChatClientAgentRunOptions
-{
-    ChatOptions = new ChatOptions
-    {
-        // base workflow tools + the MCP tools of the servers connected right now
-        Tools = [.. baseTools, .. mcp.LoadedTools],
-    },
-};
+scope.WithTodoTracking()                     // the framework's todos_* tools + outstanding-work prompt
+     .WithAgentModes(new AgentModeProviderOptions { /* Modes = [...], DefaultMode = "build" */ })
+     .WithContextCompaction(maxContextWindowTokens: 128_000, maxOutputTokens: 8_192);
 ```
 
-`baseTools` is the fixed workflow surface (`scope.ProvideTools()` possibly plus custom tools). `mcp.LoadedTools` are the tools of currently connected MCP servers. Because the options are built fresh for every call, an agent that loads a server through `LoadMcpServers` mid-conversation sees its tools on the very next message.
+- `WithTodoTracking(options?)` puts the framework's todo list into play; the `todos_*` tools come from the framework's own provider and are deliberately **not** wrapped the way the workflow tools are (they neither read nor write the tree).
+- `WithAgentModes(options)` adds the `mode_set` / `mode_get` tools. `options` is required — there is no useful default. The property `AgentMode` lets a host switch modes.
+- `WithContextCompaction(maxContextWindowTokens, maxOutputTokens)` bounds the conversation: past a threshold the oldest tool results are summarised, and past the next the oldest turns are dropped. **The two numbers are facts about the host's model** — pass the real context window and output cap, not a guess (the demo omits this call for exactly that reason).
 
-**Expected result:** `session` is a fresh `AgentSession`; `runOptions.ChatOptions.Tools` contains the workflow tools plus every loaded MCP server's tools.
+**Expected result:** after `WithTodoTracking` the model is offered the framework's `todos_*` tools; those calls do not spend the workflow budget and do not mark the tree dirty.
 
-## 3. Run a message
+## 4. Send a turn
 
 ```csharp
-string message = "List all nodes and report how many are connected.";
-var response = await agent.RunAsync(message, session, runOptions);
-var text = response.Text;
-
-// Streaming variant used by the demo when you want token-by-token UI:
-await foreach (var part in agent.RunStreamingAsync(message, session, runOptions))
-{
-    Console.Write(part.Text);
-}
+AgentResponse response = await agent.RunAsync("Add a node of type Demo.ViewModels.NetworkRequest and wire it to the existing controller.", session);
+Console.WriteLine(response.Text);
 ```
 
-**Expected result:** `RunAsync` returns a non-null response whose `Text` is the model's reply. Structural mutations the model performed through mutation tools (create/move/connect/patch nodes) are visible on `tree` afterwards and are undoable via `tree.UndoCommand` — single operations such as `MoveNode` replay GUI drag semantics and are intentionally not recorded in undo history, while command-backed edits (e.g. `AddSlotToCollection`) are.
+**Expected result:** the model answers and, if it decides to act, the transcript gains `ToolCall` entries in order; each tool call runs on the UI thread (if a `SynchronizationContext` was registered), is counted against the budgets, and (for mutations with auto-mark on) dirties the tree.
 
-## 4. Watch for the host-policy gates
+## 5. The transcript and the pipeline
 
-Because the toolkit enforces policy in code, the conversation stays safe even if the model tries a blocked action:
+```csharp
+public AgentTranscript Transcript { get; } = new();
+```
 
-- Running node business code (`ExecuteNode`, `GetNodeResult`, …) without `WithAllowNodeExecution(true)` returns an error JSON citing the host policy — the model should then ask the host to enable it.
-- A mutation tool that exceeds `WithMaxWriteToolCalls` returns a limit error before executing.
-- At safety level 3 the model must call `RequestConfirmation` before destructive changes; the host dialog's `Deny` surfaces as a `status:"denied"` result and the model must adapt.
+The pipeline is a chain of `IAgentPipelineStage`s the scope assembles for you:
 
-**Expected result:** a blocked or over-budget tool call does not throw the whole conversation; it returns a `status:"error"` JSON that the model reads and reacts to.
+```text
+TextPipeline  →  SharedTools (ToolPipeline)  →  AccountingStage
+```
+
+- `TextPipeline` folds `AgentTextDelta` / `AgentReasoningDelta` / turn events into the `AgentTranscript` (`Entries`, `ToMarkdown`, `ToPlainTextLines`). Reasoning is kept beside the answer, wrapped in a fenced block (`AgentMarkdownOptions.ReasoningFence`, default `"thinking"`).
+- `SharedTools` (a `ToolPipeline`) marshals onto the UI context and enforces the three call budgets before a call runs.
+- `AccountingStage` counts a completed `Succeeded` call against the ledger, raises the callback, and marks the tree dirty when asked. A `Refused` or `Failed` call never ran its body, so it is not counted.
+
+**Expected result:** `Transcript.Entries` after a turn contains the user message, the model's reasoning, its tool calls and the final answer, in order.
 
 ## Run declaration
 
-- ⚠️ Statically verified only. The call pattern (`AsAIAgent(instructions:)`, `CreateSessionAsync`, `RunAsync` / `RunStreamingAsync`, `ChatClientAgentRunOptions`) is taken verbatim from `Examples/Workflow/Common/Lib/ViewModels/Workflow/TreeViewModel.cs` (AskAsync) and `AgentHelper.cs`; no live model conversation was run in this documentation pass.
+- ⚠️ Not actually run — statically verified only. Running a conversation needs a real `IChatClient` and an API key (the demo reads `API_KEY_DEEPSEEK`), which was not available. The provider caching, pipeline composition and transcript behaviour are read from `WorkflowAgentContextProvider.cs`, `WorkflowAgentScope.cs` and `AgentHelper.cs`; nothing on this page was executed end-to-end.

@@ -2,7 +2,7 @@
 
 两条执行机制驱动**同一个**单一入口。**Compiler** 是引擎驱动：先对可达子图（或目标节点的祖先锥）做编译，再由 `RuntimeEngine` 沿图逐节点驱动。**非Compiler** 路径是节点驱动：每个节点执行后*自动广播*结果到下游，投递本身触发下一个节点。两者最终都落到同一个方法——节点只能靠**收到的 context 类型**区分自己走的是哪条路径。
 
-> 本页是“数据究竟怎么流动”的指南。CompilerEx 类型参考见 [compilerex](../02_compilerex/index.md)；核心接口表见 [workflowsystem](../00_workflowsystem/index.md)；编译产物与运行语义见 [data-flow 数据流分析](../../../3_SE分析/03_数据流分析/00_工作流系统/index.md)。
+> 本页是“数据究竟怎么流动”的指南。CompilerEx 类型参考见 `compilerex`；核心接口表见 `workflowsystem`；编译产物与运行语义见 `data-flow 数据流分析`。
 
 ---
 
@@ -129,13 +129,13 @@ RunAsync(graph, context, ct)           // RuntimeEngine
                         节点报错(Error/Warn/异常) → IRedirectable? → PendingRedirectTarget → 重跑(跳 Order<target)
        BranchSegment  → 驱动 Router（除非“仅重新路由”）→ 选键（CompileKey | ResolveRouteKey(context)）
                         → 驱动选中子图；IsTerminal → 整轮结束
-       ParallelSegment → 每分支前 Data = 源负载 → 顺序驱动每个分支图
+       ParallelSegment → 每分支前 Data = 源负载 → 并发驱动每个分支图
 ```
 
-时序图见 [数据流分析](../../../3_SE分析/03_数据流分析/00_工作流系统/index.md)。
+时序图见 `数据流分析`。
 
 - 节点**不**广播；引擎取返回值驱动下一个节点。
-- 节点调用 `Error()`/`Warn()` 或抛异常即请求重定向 → `IRedirectable` 从目标 Order 重跑（见 [策略-运行期](../../../3_SE分析/02_设计模式分析/00_工作流系统/10_策略-运行期/index.md)）；不实现 `IRedirectable` 则流程以状态 -1 结束。
+- 节点调用 `Error()`/`Warn()` 或抛异常即请求重定向 → `IRedirectable` 从目标 Order 重跑（见 `策略-运行期`）；不实现 `IRedirectable` 则流程以状态 -1 结束。
 
 ### 4.2 非Compiler 路径（节点驱动的广播链式反应）
 
@@ -155,7 +155,52 @@ ReceiveCommand.Execute(seed)
 
 ---
 
-## 5. 该用哪种
+## 5. 每次驱动周围的能力管线
+
+自 2026-09-27 起，引擎的逐节点驱动被七个可选宿主接缝包住。每一个都从**具体**的 `RuntimeContext` 上读（绝不从 `IRuntimeContext` 上读），每一个都经私有的 `Session()` 助手取用（因此在扇出内同样有效），每一个不设置时都精确复现 2026-09-27 之前的行为。它们运行的先后顺序就是契约：
+
+```
+询问 ExecutionGate.WaitAsync(ct)            → 关着 ⇒ Status = "Paused" 直到放开
+   ↓
+Observer.OnObservedAsync(NodeStarted)       → 抛异常的观察者只换来一行日志
+   ↓
+IRuntimeAware.AttachRuntimeContext(context)  → 在失败纪律之内：抛出即结束整轮
+   ↓
+InputNodes.Count > 1 时注入 GroupData
+   ↓
+Helper.ReceiveAsync(context, ct)
+   ├─ 返回                      → RegisterOutput；Data = result；Observer(NodeSucceeded)
+   │                              CheckpointStore.SaveAsync(Snapshot())
+   └─ 抛出                     → Observer(NodeFailed)
+                                 RetryPolicy.NextRetryAsync(NodeFailure)
+                                   ├─ 有等待时长 ⇒ 记 [Retry n]；Observer(NodeRetried)；Task.Delay；从同一输入重驱动
+                                   └─ null      ⇒ ErrorSink.OnErrorAsync(Node 相位)；RegisterOutput(node, null)；Data = null；重抛
+   ↓
+报了错且不是 IRedirectable                  → ErrorSink.OnErrorAsync(Node 相位)；CurrentOrder = -1；EndedWithError；Status = "Stopped"
+报了错且是 IRedirectable                    → ResolveRedirectAsync（抛出 ⇒ ErrorSink 记 Redirect 相位，整轮结束）
+只是警告                                    → 值照常传下去；不请求任何重定向
+   ↓
+RunEnded 观察；算出 RunOutcome；Compensation.CompensateAsync 按驱动逆序
+   （仅在结局为 Failed 或 Cancelled 时）
+```
+
+| 接缝 | 在何时被询问 | 能否改变运行的数据 |
+|---|---|---|
+| `IExecutionGate` | 每个节点之前 | 不能 —— 它只是延后 |
+| `IExecutionObserver` | 7 种观察，在各自的点上 | 不能 —— 抛出只换回一行日志 |
+| `INodeRetryPolicy` | 只在**抛出的**异常之后 | 它只回答「何时」，不回答「什么」 |
+| `IExecutionErrorSink` | 每条记录下来的失败 | 不能 —— 抛出被吞掉 |
+| `IExecutionCompensation` | 结尾一次，且仅在 Failed/Cancelled 时 | 不能 —— 抛出记日志，其余照跑 |
+| `IExecutionCheckpointStore` | 每次成功之后 | 不能 —— 抛出记日志，运行继续 |
+| `ILogWriter` | `AppendLog` 内、保留检查之前 | 不能 —— 但仅因为该行同时留在 `Logs` 里；抛出在 `LogWriteFailed` 上上报 |
+
+有两条规矩贯穿所有接缝：**引擎不为取消写任何日志行**（宿主停掉自己的运行不是失败，加一行 `[Error]` 会让以后读日志的人以为出过错），以及**一次上报绝不会让上报它的那次运行失败**。
+
+> 这些路径的时序图见 `数据流 — 宿主能力` 与 `数据流 — 从检查点恢复`。
+
+---
+
+## 6. 该用哪种
 
 - **Compiler** —— 任何需要确定性整链时序的运行：多输入汇合（`IGroupData`）、路由（`ICompileTimeRouter`）、共享源负载的扇出、重定向，以及“只求某个节点结果”的反向运行（`CompileRole.Terminal` + `RuntimeContext.Target`/`TargetReached`）。demo 的 Run 路径见 `ControllerViewModel`：`Compiler.CompileAsync(this, CompileRole.Root)` → `RuntimeEngine.RunAsync`。
 - **非Compiler** —— 手动单步执行（`ReceiveCommand.Execute(data)`）、每个节点自动转发的简单线性馈送、GUI/AI 逐步驱动。它没有汇合与重定向模型。

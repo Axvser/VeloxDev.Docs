@@ -179,3 +179,38 @@ M -> SV : ClampScrollOffset + ScrollToHorizontal/VerticalOffset
 SV -> B : ScrollChanged（反馈回路闭合）
 @enduml
 ```
+
+## (g) 最小宿主（「Trimmed」）构建路径
+
+每个平台都带一个 `* Trimmed` 兄弟演示（`Examples/Workflow/<平台> Trimmed`），只保留真实宿主必需的部分 —— 同样的七个视图加树视图模型，去掉额外的编辑器外壳。WPF 那个就是权威的最小路径：`App → MainWindow → MainView → TreeView`，目标 `net10.0-windows`，视图模型在 `ViewModels/Workflow/` 下，`Views/Workflow/` 下各保留一份生成视图的手抄副本。
+
+```plantuml
+@startuml
+!theme plain
+
+participant "App (StartupUri)" as App
+participant "MainWindow" as MW
+participant "MainView (UserControl)" as MV
+participant "TreeView (UserControl)" as TV
+participant "WorkflowSurfaceBehavior" as B
+participant "TreeViewModel\\n[WorkflowBuilder.Tree]" as VM
+
+App -> MW : StartupUri = MainWindow.xaml
+MW -> MV : <views:MainView />
+MV -> TV : <local:TreeView />
+TV -> B : 具名 PART_* 部件 + IsEnabled="True"
+TV -> VM : DataContext = TreeViewModel
+B -> VM : Helper.Viewport <- 可见区域
+VM --> TV : VisibleItems 物化为节点/插槽/连线视图
+
+note over App, VM
+  dotnet build (Debug) 针对 VeloxDev.WPF
+  Demo -> bin/Debug/net10.0-windows/Demo.dll
+  0 警告 / 0 错误
+end note
+@enduml
+```
+
+构建证据：`dotnet build "Examples/Workflow/WPF Trimmed/Demo/Demo.csproj"` 已于 2026-10-01 成功（Debug，`net10.0-windows`），0 警告 / 0 错误。非裁剪版的 `Examples/Workflow/WPF/Demo` 同样如此；两条构建记录都在「快速开始」特性「验证」页的运行声明里。
+
+> **裁剪/AOT 探针。** 特性清单还把 `Src/Verification/VeloxDev.TrimProbe` 列为证据，但该工程在本仓库里**没有源码** —— 只剩 `bin/`/`obj/` 构建产物；它既不在 `git ls-files Src/Verification/` 里，也不在 `VeloxDev.slnx` 里，其验证线在别处运行。因此除上面的普通 `dotnet build` 之外，本页不对 AOT/裁剪发布路径作任何断言。

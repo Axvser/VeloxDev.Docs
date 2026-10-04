@@ -1,4 +1,4 @@
-# 01 · Functional Structure
+﻿# 01 · Functional Structure
 
 ## Feature → Project → Dependencies
 
@@ -12,7 +12,7 @@ The wiki is organized around **features**, not directories. A feature is a cohes
 | **transition** | `VeloxDev.Core` + adapters | `Eases`, `Transition<T>`, `InterpolatorCore`, `TransitionSchedulerCore`, native interpolators | `System.Numerics`, `System.Drawing` | Demo + Test |
 | **dynamic-theme** | `VeloxDev.Core` + adapters | `ThemeManager`, `ThemeConfigAttribute`, `IThemeObject`, converters | Transition engine | Demo + Test |
 | **aop** | `VeloxDev.Core` (`#if NET`) | `ProxyEx`, `ProxyInstance`, `AopCache`, `IAspectOriented` | `DispatchProxy`, generator | Demo + Test |
-| **monobehaviour** | `VeloxDev.Core` | `MonoBehaviourManager`, `MonoBehaviourAttribute`, `IMonoBehaviour` | Roslyn generator | Demo + Test |
+| **tickable** | `VeloxDev.Core` | `TickManager`, `TickableAttribute`, `ITickable` | Roslyn generator | Demo + Test |
 | **weak-types** | `VeloxDev.Core` | `WeakDelegate`, `WeakQueue`, `WeakStack`, `WeakCache` | — | Test |
 | **platform-adapters** | 6 adapters + `Src/Templates` | Attached workflow behaviors, per-platform Transition/Theme wiring, `dotnet new` templates | per-framework SDK | README + Demo + Source |
 
@@ -26,7 +26,7 @@ flowchart TD
         TR[TransitionSystem<br/>interpolation · easing · scheduler]
         TH[DynamicTheme<br/>theme registry · switching]
         AOP[AspectOriented<br/>proxy interception]
-        MB[MonoBehaviour<br/>frame loop]
+        MB[Tickable<br/>frame loop]
         WT[WeakTypes<br/>weak collections]
         AI[AI<br/>agent attributes + reflection]
     end
@@ -60,5 +60,5 @@ flowchart TD
 | Switch a theme | `ThemeManager.Transition<Light>(...)` | `Examples/Theme/*` |
 | Run an async command | `[VeloxCommand]` on a partial method | `Examples/MVVM/*` |
 | Intercept node execution | `ProxyEx.CreateProxy(...)` + `SetProxy(...)` | `Examples/AOP/*` |
-| Tick-based simulation | `[MonoBehaviour]` + `MonoBehaviourManager.Start()` | `Examples/MonoBehaviour/*` |
+| Tick-based simulation | `[Tickable]` + `TickManager.Start()` | `Examples/Tickable/*` |
 | Install prebuilt views | `dotnet new wpf-v-node -n NodeView ...` | `Src/Templates` |

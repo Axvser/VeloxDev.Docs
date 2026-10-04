@@ -10,6 +10,6 @@ Complete API catalog for every VeloxDev feature, grouped by feature and namespac
 | [03 Transition](03_transition) | `VeloxDev.TransitionSystem`, `.Abstractions`, `.NativeSamplers`, `VeloxDev.TimeLine` |
 | [04 Dynamic Theme](04_dynamic-theme) | `VeloxDev.DynamicTheme`, `VeloxDev.TransitionSystem` |
 | [05 AOP](05_aop) | `VeloxDev.AspectOriented` |
-| [06 MonoBehaviour](06_monobehaviour) | `VeloxDev.TimeLine`, `VeloxDev.MonoBehaviour` |
+| [06 Tickable](06_tickable) | `VeloxDev.TimeLine` |
 | [07 Weak Types](07_weak-types) | `VeloxDev.WeakTypes` |
 | [08 Platform Adapters](08_platform-adapters) | `VeloxDev.WorkflowSystem.AttachedBehaviors`, per-adapter `VeloxDev.*` |

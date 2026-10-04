@@ -1,6 +1,6 @@
 # Workflow System — Design Patterns — Template Method
 
-Each component's Helper defines the lifecycle skeleton — `Install` subscribes collection events, `Uninstall` unsubscribes, `Closing/CloseAsync/Closed` drive the whole command set — and exposes overridable hooks. `TreeHelper<T>` calls `base.Install`; when it was constructed with a cell size it also enables spatial virtualization (`EnableMap`) and starts a 10 fps MonoBehaviour loop that re-virtualizes while the tree is dirty.
+Each component's Helper defines the lifecycle skeleton — `Install` subscribes collection events, `Uninstall` unsubscribes, `Closing/CloseAsync/Closed` drive the whole command set — and exposes overridable hooks. `TreeHelper<T>` calls `base.Install`; when it was constructed with a cell size it also enables spatial virtualization (`EnableMap`) and starts a 10 fps Tickable loop that re-virtualizes while the tree is dirty.
 
 > Source: `Src/Core/VeloxDev.Core/WorkflowSystem/Templates/Helpers/TreeHelper.cs`, lines 109-124
 
@@ -19,7 +19,7 @@ public virtual void Install(IWorkflowTreeViewModel tree)
     {
         Debug.Fail("EnableMap did not return a non-negative value as expected. Please check the implementation of EnableMap in the IWorkflowTreeViewModel.");
     }
-    InitializeMonoBehaviour();
+    InitializeTickable();
 }
 ```
 
@@ -44,4 +44,4 @@ public override async Task<object?> ReceiveAsync(ITaskContext ctx, CancellationT
 }
 ```
 
-The compiled run, by contrast, never enters these helpers through the node's commands — the engine calls `Helper.ReceiveAsync` directly (see the [Data Flow page](../../../03_data-flow/00_workflow-system/index.md)).
+The compiled run, by contrast, never enters these helpers through the node's commands — the engine calls `Helper.ReceiveAsync` directly (see the `Data Flow page`).

@@ -36,7 +36,7 @@ MAUI 用颜色类型的可绑定属性而非画刷（`MinimapBackgroundColor`、
 ### 行为（已验证，WPF）
 
 - 订阅树的节点/连接集合作脏跟踪，并重测世界边界。
-- **视口拖拽：** 在视口矩形内按下时保持其位置并对齐到光标；在别处按下时把视口块中心移到光标处，并夹在小地图内。
+- **视口拖拽：** 在小地图上任意位置按下，都会把点击点变成新的**视口中心** —— 无条件调用 `NavigateToWorld(pt.X, pt.Y)`，没有「内/外」分支，也没有对指示块的抓取锚点。WPF 源码原话是「the clicked point always becomes the viewport center — no grab-anchor on the indicator block, so pressing anywhere recenters the view」。按下期间每次指针移动都重复同样的调用，因此视图随手势平移；得到的滚动偏移会被夹住（`WorkflowSurfaceMath.ClampScrollOffset`），使视口块留在小地图内。Avalonia、WinUI、MAUI 实现同一规则 —— 各自都带着「Match the Jalium adapter」注释。
 - **导航到世界：** 把小地图坐标映射回世界坐标并滚动 `ScrollViewer`，在边缘增长 `Layout.NegativeOffset` / `PositiveOffset`。
 - 表面行为在每次渲染前推送 `ScrollOffset*`、`ContentOffset*`、`ViewportWidth/Height`、`WorkflowTree` 与 `IsMinimapVisible`。
 

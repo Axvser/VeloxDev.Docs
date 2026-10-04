@@ -8,9 +8,9 @@ Every Transition app references `VeloxDev.Core`. Add it to any .NET project:
 dotnet add package VeloxDev.Core
 ```
 
-`VeloxDev.Core` contains the framework-agnostic engine: `Eases` and the `Ease*` classes, the sampler registry (`InterpolatorCore` + `NativeSamplers/*`), `TransitionEffectCore`, the scheduler/interpreter, the open-generic builder base `TransitionCore<...>` / `StateSnapshotCore<...>`, and the `TransitionCoreEx` chaining extensions. Nothing here depends on a GUI framework.
+`VeloxDev.Core` contains everything framework-agnostic: `Eases` and the `Ease*` classes, the sampler registry (`InterpolatorCore` + `NativeSamplers/*`), `TransitionEffectCore`, the scheduler/interpreter (with the `FramePacerCore` pacing base), the open-generic builder base `TransitionCore<...>` / `StateSnapshotCore<...>`, the `TransitionCoreEx` chaining extensions, the time layer (`VeloxDev.Timing`), and the host seam (`VeloxDev.Threading` / `VeloxDev.Lifetime`). Nothing here depends on a GUI framework.
 
-**Expected result:** the package appears in the `.csproj`; after restore, `using VeloxDev.TransitionSystem;` resolves and `Eases.Cubic.InOut.Ease(0.5)` runs in a plain console.
+**Expected result:** the package appears in the `.csproj`; after restore, `using VeloxDev.TransitionSystem;` resolves and `Eases.Cubic.InOut.Ease(0.5)` runs in a plain console. `using VeloxDev.Timing;` resolves too, so a headless clock is available with no adapter at all (see [Timing Layer](../07_timing-layer/index.md)).
 
 ## 2. Add the platform adapter for UI-bound properties
 
@@ -31,6 +31,8 @@ The adapter packages belong to VeloxDev's Platform Adapters suite; each one carr
 
 ## 3. When can you skip the adapter?
 
-The engine core alone is enough when you drive the primitives directly and the values need no UI-thread marshaling — the pattern exercised by `Src/Core/VeloxDev.Core.Test/TransitionSystem/SamplingLoopTests.cs` (a `StateCore` holding `double` targets, a `TransitionEffectCore`, a `InterpolatorCore`-derived producer, and an interpreter that applies frames inline). This is what "Transition needs no adapter for non-UI values" means.
+The engine core alone is enough when you drive the primitives directly and the values need no UI-thread marshaling — the pattern exercised by `Src/Core/VeloxDev.Core.Test/TransitionSystem/SamplingLoopTests.cs` (a `StateCore` holding `double` targets, a `TransitionEffectCore`, an `InterpolatorCore`-derived producer, and an interpreter that applies frames inline). This is what "Transition needs no adapter for non-UI values" means.
 
 The out-of-box `Transition<T>` builder, however, is shipped by each adapter package, so the simplest path to the top-level API — including for targets that are plain objects inside a running app — is to reference the adapter for your framework. UI-bound targets additionally require the adapter so that property writes are dispatched on the owning UI thread (see [UI Thread & Marshaling](../06_ui-thread-marshaling/index.md)).
+
+Two things work with **no adapter at all**: pure-value interpolation driven through the core primitives, and the entire `VeloxDev.Timing` layer — a time source, a sampler and the park signal are all in `VeloxDev.Core` (see [Timing Layer](../07_timing-layer/index.md)).

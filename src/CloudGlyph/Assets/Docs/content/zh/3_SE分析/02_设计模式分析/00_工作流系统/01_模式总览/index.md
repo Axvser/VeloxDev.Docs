@@ -14,4 +14,8 @@
 | 8. 虚拟代理 | 空间虚拟化 | `WorkflowSpatialEx.Virtualize`/`VirtualizeCore`、`TreeHelper.OnViewportChanged`、`EnableMap` | `GUI/Virtualization/WorkflowSpatialEx.cs`、`Templates/Helpers/TreeHelper.cs` |
 | 9. 策略（运行期） | 重定向 / 回退到更早的编译状态 | `IRedirectable.ResolveRedirectAsync`、`RuntimeEngine.RunAsync`（朝向目标 Order 的整图重跑） | `CompilerEx/Runtime/Contracts/IRedirectable.cs`、`CompilerEx/Runtime/RuntimeEngine.cs` |
 
+| 10. 策略家族 + 空对象 | 2026-09-27 的宿主接缝：门、观察者、重试、错误接收器、补偿、检查点存储、日志写入器 | `IExecutionGate` / `IExecutionObserver` / `INodeRetryPolicy` / `IExecutionErrorSink` / `IExecutionCompensation` / `IExecutionCheckpointStore` / `ILogWriter`，各有 `Delegate*` 或具体实现，默认全为 `null` | `CompilerEx/Runtime/Contracts/*.cs`、`CompilerEx/Runtime/Model/*.cs`、`RuntimeEngine.Session()` |
+| 11. 备忘录 | 运行位置作为一份看管者只负责保存的快照 | `ExecutionCheckpoint`、`RuntimeContext.Snapshot`、`RuntimeEngine.Restore` / `RequireSameShape`、`ExecutionCheckpoint.Rekey`、`InMemoryCheckpointStore`、`FileCheckpointStore` | `CompilerEx/Runtime/Model/ExecutionCheckpoints.cs`、`Runtime/RuntimeEngine.cs`、`VeloxDev.Core.Extension/CheckpointEx.cs` |
+| 12. 适配器（委托） | 把 lambda 变成契约实现 | `DelegateExecutionGate`、`DelegateExecutionObserver`、`DelegateExecutionErrorSink`、`DelegateExecutionCompensation`、`DelegateLogWriter` | `CompilerEx/Runtime/Model/` —— `ExecutionGates.cs`、`ExecutionObservers.cs`、`ErrorSinks.cs`、`Compensations.cs`、`LogWriters.cs` |
+
 注：`WorkflowSpatialEx` 命名空间虽为 `VeloxDev.WorkflowSystem.StandardEx`，物理文件在 `WorkflowSystem/GUI/Virtualization/`。

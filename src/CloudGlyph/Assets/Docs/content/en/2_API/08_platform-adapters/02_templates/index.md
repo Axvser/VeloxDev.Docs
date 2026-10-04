@@ -33,6 +33,19 @@ A generated project needs no hand-wiring. The **tree view** is the hub: it hosts
 
 **The selector is the highest-priority source of views**, and it is asked *before* the platform's own template lookup; on the adapters that have such a lookup (the four XAML-style ones) a non-matching selector degrades to it, while WinForms/Jalium/Razor have nothing to degrade to — a missing selector there yields no views and no error (see [View pool](../00_attached-behaviors/01_view-pool/index.md)). To customize, replace the generated selector class or that single reference — not the pool.
 
+## The link context menu
+
+The tree-view template also declares the **link context menu** and points the surface at it. The wiring (right press, positioning, open/close, hub reporting) belongs to the adapter, not to the template code-behind — the XAML four add one attached property plus the menu resource, Razor passes a fragment parameter, and the code-only two override a hook:
+
+| Adapter | Declaration |
+|---|---|
+| WPF / Avalonia | a `ContextMenu` resource keyed by `WorkflowSurfaceBehavior.LinkMenuKey` |
+| WinUI / MAUI | a `MenuFlyout` resource keyed the same way |
+| Razor | a `<LinkMenu Context="link">…</LinkMenu>` fragment parameter on the surface component |
+| WinForms / Jalium | `WorkflowTreeView.OnBuildLinkMenu(menu, link)` — the base adds a single "Delete" item |
+
+Each entry binds the link it acts on, so adding or removing an action is a template-only edit: a `MenuItem` / `MenuFlyoutItem` with `Command="{Binding DeleteCommand}"`, or a Razor button with `@onclick="() => link.DeleteCommand.Execute(null)"`. The Avalonia menu resource carries no `x:DataType`, so under compiled bindings it writes `{ReflectionBinding DeleteCommand}`.
+
 ## CLI options (WPF suite example)
 
 Each template accepts `-ns <Namespace>` for the generated namespace. View templates additionally declare style parameters; the WPF suite's `dotnetcli.host.json` maps them as follows:

@@ -12,7 +12,7 @@ Feature: dynamic, aspect-oriented proxies for `.NET` targets. `AspectOrientedAtt
 - Demo: `Examples/AOP/WPF/Demo`, `Examples/AOP/Avalonia/Demo`.
 - Runtime source: `Src/Core/VeloxDev.Core/AspectOriented/*.cs` and `Src/Core/VeloxDev.Core/Interfaces/AspectOriented/IAspectOriented.cs`.
 - Generator source: `Src/Generators/VeloxDev.Core.Generator/AopInterface.cs`, `AopProxy.cs`, `Writers/AopWriter.cs`.
-- **Test note:** no AOP-specific suite exists under `VeloxDev.Core.Test` at refresh time (the feature inventory's `Demo + Test` row is stale on the Test half). The surface below is verified against the demos and the runtime / generator sources.
+- **Test note:** no AOP-specific suite exists under `VeloxDev.Core.Test` — `Src/Core/VeloxDev.Core.Test/` has no `AspectOriented` directory. This feature's evidence is Demo-only, as the feature inventory records. The surface below is verified against the demos and the runtime / generator sources.
 
 ## API — sections
 

@@ -1,212 +1,100 @@
-# Workflow Agent — Dispatch Sub-Agents
+# 09 · Dispatch Sub-Agents
 
-The sub-agent subsystem (`VeloxDev.AI.SubAgents`, source `Src/Core/VeloxDev.Core.Extension/Agent/SubAgents/`) lets the agent dispatch **background child agents**. A child is a fresh `WorkflowAgentScope` over the same tree, carrying a *narrowed slice* of its dispatcher's capabilities. Its tool calls and its reasoning never reach the dispatcher's context — only the child's final report does — and it runs while the dispatcher carries on.
-
-The shape is **dispatch and poll**, not call and wait: `SpawnSubAgent` returns a handle immediately, and `WaitSubAgents` collects. That is forced by where a spawn runs — inside a tool body, on the thread the host's UI owns; a synchronous child would hold that thread for the child's whole conversation.
-
-## 1. Prerequisites
-
-The subsystem ships inside `VeloxDev.Core.Extension` — no extra package beyond the ones the [install page](../01_install/index.md) already adds. You need only what the rest of this Quick Start needs: a running `IWorkflowTreeViewModel` and an `IChatClient`. Since the library never holds a chat client of its own, the model a child runs on is the host's decision, expressed as a factory.
-
-**Expected result:** the following compiles against `VeloxDev.AI.SubAgents` with the same package references already in place.
-
-## 2. Build the subsystem
+The sub-agent subsystem lets one agent dispatch **background children** and hand each a narrowed slice of its own capabilities. It is a subsystem like MCP or Skills: one `With*` call attaches it, and it contributes its own tools and prompt text every turn.
 
 ```csharp
 using VeloxDev.AI.SubAgents;
 
-var subAgents = SubAgentScope.ForClient(chatClient)  // children share the host's own model
-    .WithSubAgentDepth(3)                            // how deep the tree may go
-    .WithSpawnBudget(64)                             // the stand-in cap for an uncapped parent
-    .WithSynchronizationContext(SynchronizationContext.Current);
+var subAgents = SubAgentScope.ForClient(chatClient).WithSubAgentDepth(3);
+
+scope.WithSubAgents(subAgents);   // attach BEFORE CreateContextProviders()
 ```
 
-- `SubAgentScope.ForClient(IChatClient, string? instructions = null)` is the factory the library supplies: it builds each child as `scope => client.AsAIAgent(scope.CreateContextProviders(), instructions ?? DefaultInstructions).WithPipeline(scope.Pipeline)`. The default preamble is a few hundred bytes — deliberately not the megabyte workflow skeleton, because a background child learns what it can do from its own context provider on every turn.
-- `SubAgentScope(Func<WorkflowAgentScope, AIAgent> agentFactory, string? instructions = null)` is the public constructor behind it. Pass a factory when children should run on a different model than the dispatcher.
-- `WithSubAgentDepth(int depth)` bounds how deep the tree may go: a child of the scope this is attached to is depth 1, a grandchild depth 2. A scope at or past the limit keeps no ability to spawn, and says so instead of failing silently.
-- `WithSpawnBudget(int budget)` sets the allowance *assumed* for a spawn when the host never called `WithMaxToolCalls`. Its default is 64. Without it, "the parent's remaining allowance" would be undefined for an uncapped parent and the descending grant that guarantees termination would not exist — set it explicitly rather than relying on the default.
-- `WithSynchronizationContext(SynchronizationContext)` binds the roster to the host's UI thread; `WithSubAgents` sets it from the workflow scope anyway, so call it only when the subsystem is configured before the scope is.
+Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs` (`ProvideAgent`).
 
-**Expected result:** `subAgents.SpawnBudget == 64`, `subAgents.MaxDepth == 3`, `subAgents.Children` is empty.
+The five dispatch tools reach the model as the subsystem's context provider's contribution, so attaching **after** `CreateContextProviders()` would leave the model with none of them and the subsystem unreachable however it was configured. The depth limit is not redundant with `WithMaxToolCalls`: the budget makes the tree terminate, but a root allowing 200 calls also permits a 199-deep chain — bounded and useless. Three levels is what the demo wants.
 
-## 3. Attach it to the host scope
+**Expected result:** before `WithSubAgents` the scope has one provider and no sub-agent tools; after it, the model is offered exactly `SpawnSubAgent`, `WaitSubAgents`, `GetSubAgentResult`, `ListSubAgents`, `CancelSubAgent`.
 
-```csharp
-scope.WithSubAgents(subAgents);
-```
+## 1. `SubAgentScope` — the subsystem
 
-Attach last: skills (`WithSkills`) and MCP servers (`WithMcps`) must be configured **before** this call, because the narrowing reads them off the parent at spawn time. `WithSubAgents` hands the subsystem this scope rather than the other way round — it needs the parent's real capabilities to narrow against and the parent's ledger to charge to, and neither exists until the scope does.
-
-The five management tools then join the agent's surface on every turn, wrapped like the built-in tools so each spawn is counted, gated and reported exactly like any other call:
-
-| Tool | Required argument | What it does |
+| Member | Signature | Notes |
 |---|---|---|
-| `SpawnSubAgent` | `task` | Dispatches a child; returns its `id` at once |
-| `WaitSubAgents` | — | Waits for named ids (or every running child) up to `timeoutMs` (default 60000) |
-| `GetSubAgentResult` | `id` | One child's state, and its **untruncated** report once finished |
-| `ListSubAgents` | — | The roster this scope issued, with state, depth and call counts |
-| `CancelSubAgent` | `id` | Stops a running child; it reports as `Cancelled`, not as a failure |
+| `ForClient` | `static SubAgentScope ForClient(IChatClient client, string? instructions = null)` | Builds the factory from a chat client — the host owns that client, the subsystem never does. |
+| `SubAgentScope` | `SubAgentScope(Func<WorkflowAgentScope, AIAgent> agentFactory, string? instructions = null)` | Custom factory form. |
+| `WithSubAgentDepth` | `WithSubAgentDepth(int depth)` | Maximum nesting depth (default `int.MaxValue`); clamped `>= 0`; inherited by children. |
+| `WithSpawnBudget` | `WithSpawnBudget(int budget)` | Stand-in allowance for an **uncapped** parent (default 64) so a descending grant stays finite. |
+| `WithSynchronizationContext` | `WithSynchronizationContext(SynchronizationContext? context)` | Roster/UI thread. |
+| `Children` | `ObservableCollection<SubAgentStatusViewModel> { get; }` | Direct children, oldest first, as bindable rows (UI thread only). |
+| `Snapshot` | `IReadOnlyList<SubAgentSummary> { get; }` | Immutable, thread-safe copy of the roster — read this from anywhere but the UI thread. |
+| `Version` | `long { get; }` | Monotonic roster version; the provider caches its render on it. |
+| `Changed` | `event EventHandler?` | Raised whenever `Version` advances. |
+| `CreateContextProvider` | `AIContextProvider CreateContextProvider(ToolPipeline? tools = null, AgentPipeline? pipeline = null)` | The provider the scope composes. |
+| `DisposeAsync` | `ValueTask DisposeAsync()` | Cancels and **awaits** every running child, then clears the roster. Idempotent. |
 
-**Expected result:** `scope.SubAgents` is the instance you passed, and all five names reach the model. They are contributed by `SubAgentAgentContextProvider`, **not** by `WorkflowAgentToolkit`, so they do not appear in `scope.ProvideTools()` — a scope nobody attached the subsystem to contributes none of them.
+## 2. The five tools
 
-## 4. Narrow what a child may have
-
-Every capability argument is optional, and **omitting one means inherit, not none**:
-
-| Argument | Omitted | Empty |
+| Tool | Required parameter | Purpose |
 |---|---|---|
-| `allowedTools` | every tool the parent currently offers | no tools at all |
-| `allowedSkills` | every skill the parent has switched on | none, **and its skill tools go with them** |
-| `allowedMcpServers` | every connected, switched-on server | none |
-| `maxToolCalls` | up to as much of the parent's remaining allowance as can be granted | — |
-| `maxReadToolCalls` / `maxWriteToolCalls` | inherited from the parent | — |
-| `allowNodeExecution` | `false` | — |
-| `allowedGenericCommands` | none | — |
-| `autoMarkDirty` | follows the parent | — |
-| `name` | a numbered stand-in (`子代理 N`) | — |
-| `notes` | nothing | — |
+| `SpawnSubAgent` | `task` | Dispatch a background child; returns immediately with its `id`. |
+| `WaitSubAgents` | — (`ids?`, `timeoutMs?` default 60000) | Wait for named/all-running children; returns rows with `state`, `callCount`, a truncated `result` (limit 4000, `"truncated":true`), `error`, `dropped`. |
+| `GetSubAgentResult` | `id` | The full, untruncated report. |
+| `ListSubAgents` | — | Lists **this scope's own** children (task preview truncated to 120 chars); `count` + `running`. |
+| `CancelSubAgent` | `id` | Cancels a child; reads as `Cancelled`, not a failure. |
 
-Naming is the **only** way to take anything away, and it is where the subsystem's central invariant lives: a child's abilities are its parent's own, or fewer, never more. Whatever a spawn asked for and did not get is refused **and reported** in the reply's `dropped` array — read it, because nothing else tells you.
+Dispatch is **dispatch-and-poll, never call-and-wait** — a spawn happens inside a tool call on the host's UI thread, so it returns an id and the parent polls. `SpawnSubAgent` is the only tool whose `task` is required; every capability is optional. Source: `SubAgentToolSchemaTests`.
 
-```jsonc
-// SpawnSubAgent("count the nodes", allowedTools: ["ListNodes", "DeleteNode"])
-{
-  "status": "ok",
-  "id": "9f2c…",
-  "name": "子代理 1",
-  "depth": 1,
-  "maxToolCalls": 199,
-  "grantedToolCount": 1,
-  "grantedSkillCount": 0,
-  "grantedMcpServerCount": 0,
-  "dropped": ["DeleteNode: not available to this agent, or switched off by the host"],
-  "message": "Dispatched, but not with everything you asked for — read \"dropped\". Call WaitSubAgents to collect its report."
-}
-```
-
-A child that was granted **zero** skills also loses the skill tools (`ListSkills`, `load_skill`, `UnloadSkill`, `read_skill_resource`) — a `load_skill` with nothing behind it is a tool that can only fail. Custom tools travel in the groups they were registered in, so the child is told how to use the tools it holds and not the ones it does not.
-
-**Expected result:** naming a tool the host switched off, or one that does not exist, puts a line in `dropped`; the child's own surface contains exactly the names the reply listed.
-
-## 5. The allowance is one pot for the whole tree
-
-A child's budget is a **share of its parent's**, not a second pot beside it: the child's scope is given the parent's ledger as its outer ledger, so every call anywhere in the tree is counted at the root, and the root's cap is the tree's cap. What a grant sets is a *sub-limit on the child's own subtree*, never a reservation — spawning three children does not divide the pot, it bounds each of them.
+The success payload:
 
 ```text
-effective cap  = MaxToolCalls ?? SpawnBudget            // always finite
-grant          = min(requested ?? remaining, remaining - 1)
-remaining      = min(effective cap - this level spent, root cap - root spent)
-grant < 1  ⇒ the spawn is refused (a row is not created)
+{"status":"ok","id":"...","name":"...","depth":1,"maxToolCalls":19,
+ "grantedToolCount":67,"grantedSkillCount":7,"grantedMcpServerCount":1,
+ "dropped":[],"message":"..."}
 ```
 
-The `- 1` is what makes an **unbounded depth terminate**: along any root-to-leaf path the grants strictly decrease and each is at least one, so the tree cannot be deeper than the root's allowance. That buys termination, not practicality — a root allowing 200 calls permits a 199-deep chain — which is why `WithSubAgentDepth` exists and why a host should set both: the budget is the guarantee, the depth limit is what makes the tree useful.
+**Expected result:** a spawn returns `status:"ok"` with an `id` and `depth:1`; `WaitSubAgents` on that id later returns `state:"Completed"` with the child's `result`.
 
-Anchored arithmetic from the tests (`SubAgentBudgetTests`, `SubAgentNarrowingTests`, `SubAgentHierarchyTests`): a parent capped at 10 grants 9 to a child that asks for 20, and reports the clamp; a parent capped at 40 grants 39 / 38 / 37 down a chain; each sibling gets the *remainder*, not a share of it.
+## 3. Capability narrowing — the parent is the ceiling
 
-**Expected result:** a spawn whose requested `maxToolCalls` exceeds what the parent has left comes back with the granted number in `maxToolCalls` **and** a `dropped` line naming the clamp.
+Every request a spawn carries is **intersected with what the parent actually has**, and whatever is dropped is reported back in the spawn's own `dropped` array — so the child cannot believe it holds something it was refused.
 
-## 6. Collect, cancel, dispose
+| Spawn parameter | Narrowing rule |
+|---|---|
+| `allowedTools` | Intersect with the parent's current surface. Omitted ⇒ inherit all; an empty array ⇒ grant none. Every parent tool **not** granted is switched off on the child. |
+| `allowedSkills` | Intersect with the parent's enabled skills. Omitted ⇒ inherit; an empty array ⇒ grant none **and** drop the skill tools too. A skill the parent switched off is not grantable. |
+| `allowedMcpServers` | Intersect with the parent's loaded servers; the granted server arrives **without** the load/unload/add switches that would change it. |
+| `maxToolCalls` | Clamped to the parent's remaining allowance **minus one**, so grants strictly decrease along every root-to-leaf path (guaranteeing termination). Asking beyond the remainder is clamped and reported. |
+| `maxReadToolCalls` / `maxWriteToolCalls` | `Math.Min` of the request and the parent's cap; a cap the parent does not have cannot be handed down. |
+| `allowNodeExecution` | Opt-in on **both** sides: asking when the parent lacks it is dropped, not granted. |
+| `allowedGenericCommands` | Filtered by the parent's allowlist. |
+| `autoMarkDirty` | Inherited from the parent, never granted beyond it. |
 
-```csharp
-// the model's side — these are the tools it calls, in the order the standing text asks for
-// SpawnSubAgent(task: "…")             → {"status":"ok","id":"9f2c…", …}
-// WaitSubAgents(ids: ["9f2c…"], timeoutMs: 60000)
-//   → {"status":"ok","timedOut":false,"agents":[{"id":"9f2c…","state":"Completed","result":"…"}]}
-// ListSubAgents()                      → {"status":"ok","count":1,"running":0,"agents":[…]}
-// CancelSubAgent(id: "9f2c…")          → {"state":"Cancelled", …}
-```
+Interaction configuration (safety level, per-level prompts, both handlers) travels whole via `GrantInteractionTo`, so the child's `RequestSelection` / `RequestConfirmation` / `ResetToolCallLimit` are usable rather than advertised-but-dead. Custom tools are copied as a **subset with only the guidance for the tools the child actually holds**. Source: `SubAgentNarrowingTests`, `SubAgentCapabilityGrantTests`.
 
-- A wait that times out is information, not a failure: it returns `"timedOut": true` with the children still marked `Running`, so the model can decide between waiting again and cancelling. Prefer one long wait over polling — each `WaitSubAgents` call costs the model a tool call, while the children cost it none while they run.
-- `WaitSubAgents` results are truncated at 4000 characters per report; `GetSubAgentResult` returns the whole thing, untruncated. The truncation marker is inside the text as well as in a `truncated` flag, so a model reading the value alone can tell a complete report from a cut one.
-- Cancelling a child that already finished changes nothing. Cancellation is its own state — a child stopped by the host, by its parent or by disposal did not go wrong, and a panel that painted it red would teach the user to distrust the control.
-- `await subAgents.DisposeAsync()` cancels every running child and **waits** for them to settle. The wait is what makes disposal a boundary rather than a race: a child's tool calls are marshalled onto the host's UI thread, so a host that tore its dispatcher down while children were in flight would have them post into a pump that no longer exists. After disposal no further spawn is accepted.
+**Expected result:** a spawn naming a tool the parent switched off reports it in `dropped` and the child does not hold it; a silent spawn holds everything the parent has.
 
-**Expected result:** waiting with nothing running returns `{"count":0,"timedOut":false}` at once rather than serving out its timeout; `CancelSubAgent` on a completed child returns `"state":"Completed"` unchanged.
+## 4. One pot, not one per agent
 
-## 7. Watch it — the tree panel
+A child's allowance is a **share of its parent's**, not a second budget beside it. The toolkit's `ToolCallLedger` is chained: `child.ParentLedger = parentLedger` before the child's toolkit exists, and `Spend` walks the chain, so the outermost ledger's total is the number of calls made anywhere in the tree. Spawning three children does not divide the pot — it bounds each. The clamp in §3 is what makes depth bounded: a root allowing N terminates an N-1-deep chain, hence `WithSubAgentDepth` for usability.
 
-A roster is **flat and per scope**: it holds only the children that scope issued, which is exactly what keeps one branch from reading another's work. `SubAgentTreeViewModel` projects those rosters into one bindable tree:
+When a child hits a wall, the refusal sends it to `ResetToolCallLimit` **and** tells it to report upward (a dispatcher is suspended on its result). The reset reaches the user exactly as the parent's does, and reopening zeroes the whole chain. Source: `SubAgentBudgetTests` (e.g. `AChildsCalls_AreCountedOnTheRootsLedger`, `AChildsReset_ReachesTheUser_AndReopensTheWholeTree`).
 
-```csharp
-using VeloxDev.AI.SubAgents;
+**Expected result:** with a root cap of 6 and two children granted 3 and 2, the second child's refusal mentions the *session's* tool-call budget; total spend stays 6.
 
-var tree = new SubAgentTreeViewModel(subAgents);  // bind Tree (one node: the scope itself)
-// later, from your own clock:
-tree.TickElapsed();                               // the library owns no timer
-```
+## 5. State, tokens and the tree panel
 
-- Read the tree's `Roots` (the scope's own children), its counts (`TotalCount`, `RunningCount`, `CompletedCount`, `FailedCount`, `CancelledCount`), and its `SubtreeTokens`.
-- Read `Snapshot` — not `Children` — from anywhere off the roster's thread. An agent invocation renders its prompt on a thread of the framework's choosing, and enumerating the bound `ObservableCollection` there races the host's UI.
-- `Dispose()` detaches from the scopes and **does not cancel anything**. Closing a panel is not a decision about the work the panel was showing.
-- The tree node's `Title` is the spawn's `name` — a task title for the person watching, not an identifier. Omitted, it falls back to `子代理 N`, numbered per parent.
+`SubAgentState` is `Queued`, `Running`, `Completed`, `Failed`, `Cancelled` — `Cancelled` is its own value, not a flavour of `Failed`. `SubAgentSummary` is the immutable row; `SubAgentStatusViewModel` is the bindable one (`StateText` in Chinese, `DurationText`, `TokensText`).
 
-**Expected result:** after one spawn, `tree.Roots` has one node whose `Row.StateText` reads `已完成` once its run settles; a grandchild dispatched by that child hangs off its node rather than beside it.
+Two separate consumption figures:
 
-## 8. Complete code
+- **Calls aggregate up.** `CallCount` includes everything the child spawned.
+- **Tokens aggregate down.** `TokensUsed` / `InputTokens` / `OutputTokens` are the child's **own** spend; `SubAgentTreeNodeViewModel.SubtreeTokens` sums them bottom-up. A provider that reports no usage leaves the figure `null` — "not measured", never a fake `0`.
 
-One runnable block: a scope over a tree, a sub-agent subsystem sharing the host's model, and one turn in which the model is asked to delegate. `tree` and `chatClient` are the same two objects the earlier pages describe.
+`SubAgentTreeViewModel(scope)` projects the flat per-scope rosters into one bindable tree (`Roots`, `TotalCount`, `RunningCount`, `FailedCount`, `SubtreeTokens`), reconciling in place so expanded state survives rebuilds. `TickElapsed()` refreshes elapsed times — the library owns no timer, the host drives it.
 
-```csharp
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Agents.AI;
-using Microsoft.Extensions.AI;
-using VeloxDev.AI.SubAgents;
-using VeloxDev.AI.Workflow;
-using VeloxDev.WorkflowSystem;
+**Expected result:** the tree's `ScopeRoot.SubtreeTokens` equals the sum of every descendant's `TokensUsed`; a child that reports no usage shows no token text rather than `0`.
 
-public static class SubAgentQuickStart
-{
-    public static async Task RunAsync(IWorkflowTreeViewModel tree, IChatClient chatClient)
-    {
-        var scope = tree.AsAgentScope()
-            .WithMaxToolCalls(60)
-            .WithAllowNodeExecution(true)
-            .WithSynchronizationContext(SynchronizationContext.Current);
+## Run declaration
 
-        // Attached after the capabilities the narrowing reads off the parent at spawn time.
-        var subAgents = SubAgentScope.ForClient(chatClient)
-            .WithSubAgentDepth(2)
-            .WithSpawnBudget(64);
-        scope.WithSubAgents(subAgents);
-
-        using var panel = new SubAgentTreeViewModel(subAgents);
-
-        var host = chatClient.AsAIAgent(new ChatClientAgentOptions
-        {
-            ChatOptions = new ChatOptions
-            {
-                Instructions = "You are an assistant working on a workflow graph. Use the tools you are given.",
-            },
-            AIContextProviders = scope.CreateContextProviders(),
-        });
-
-        await using (subAgents)
-        {
-            await host.RunAsync(
-                "Work out how many nodes the graph has by dispatching a background sub-agent to count "
-                + "them — do not count them yourself. Then wait for it and tell me the number.");
-
-            // The roster is flat and per scope: this scope holds only the children it issued.
-            foreach (var row in subAgents.Snapshot)
-            {
-                Console.WriteLine($"{row.Name} [depth {row.Depth}] {row.StateText} " +
-                                  $"{row.CallCount} call(s), {row.GrantedToolCount} tool(s), " +
-                                  $"tokens {(row.HasTokens ? row.TokensUsed!.Value.ToString() : "unmeasured")}");
-                if (row.DroppedRequests.Count > 0)
-                    Console.WriteLine("  dropped: " + string.Join(" | ", row.DroppedRequests));
-                Console.WriteLine("  " + (row.Result ?? row.Error ?? "(no report yet)"));
-            }
-
-            Console.WriteLine($"tree total: {panel.TotalCount} sub-agent(s), {panel.SubtreeTokensText} tokens");
-        }
-    }
-}
-```
-
-## 9. Run declaration
-
-- ⚠️ Not actually run — statically verified only. Every signature on this page was checked against `Src/Core/VeloxDev.Core.Extension/Agent/SubAgents/*.cs` and `Agent/Workflow/WorkflowAgentScope.cs`; the tool replies and the arithmetic are copied from real assertions in `VeloxDev.Core.Extension.Test/Agent/SubAgents/` (`SubAgentDispatchTests`, `SubAgentNarrowingTests`, `SubAgentBudgetTests`, `SubAgentHierarchyTests`, `SubAgentToolSchemaTests`). The assembled program was not compiled or executed in this documentation pass, and no `API_KEY_DEEPSEEK` was available to exercise the live tests.
-
-- The subsystem's own structure follows the parent feature's Quick Start: [build the scope](../02_build-the-scope/index.md) → [tool budgets & host policy](../03_tool-budgets-and-host-policy/index.md) → this page.
+- ✅ Actually built and ran — the deterministic agent test suite (2026-10-01, `已通过! 失败: 0，通过: 387`) includes all `SubAgents/**` except `SubAgentLiveTests`. It covers the narrowing rules, the one-pot ledger, depth clamping, the dispatch/poll contract, cancellation, token metrics and the tree view-models.
+- ⚠️ `SubAgentLiveTests` (a real model dispatching a real child) needs `API_KEY_DEEPSEEK` and is non-deterministic; it is **excluded** and no claim here rests on it.

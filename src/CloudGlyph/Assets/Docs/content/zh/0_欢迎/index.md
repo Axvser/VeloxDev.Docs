@@ -189,7 +189,7 @@
       <a class="feat-link" href="../1_快速开始/05_AOP/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌀</span> AOP<br><span style="opacity: 0.6;">切面代理 · 前置/覆盖/后置</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.3s;">
-      <a class="feat-link" href="../1_快速开始/06_MonoBehaviour/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">⚙️</span> MonoBehaviour<br><span style="opacity: 0.6;">帧驱动循环 · Tick 模拟</span></a>
+      <a class="feat-link" href="../1_快速开始/06_Tickable/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">⚙️</span> Tickable<br><span style="opacity: 0.6;">帧驱动循环 · Tick 模拟</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.35s;">
       <a class="feat-link" href="../1_快速开始/07_弱引用类型/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📎</span> 弱引用类型<br><span style="opacity: 0.6;">WeakDelegate · WeakQueue · WeakStack · WeakCache</span></a>

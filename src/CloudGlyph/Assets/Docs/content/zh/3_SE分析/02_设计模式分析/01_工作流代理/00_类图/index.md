@@ -1,6 +1,6 @@
-# Workflow Agent — 设计模式 — 类图
+# 工作流代理 —— 设计模式 —— 类图
 
-下图展示代理控制层真实的参与者集合。左侧是工作流控制核心（`WorkflowAgentScope` → `WorkflowAgentToolkit` → 受追踪工具 + 状态追踪器 + 内省辅助），右侧是 MCP 适配器表面，底部是 run/result 工具复用的 `CompilerEx` 执行模型。
+作用域及其协作者。类型类别层级见 [12 · 工具类别层级](../12_工具类别层级/index.md)。
 
 ```mermaid
 classDiagram
@@ -10,40 +10,59 @@ classDiagram
     class WorkflowAgentScope {
         <<IAgentToolCallNotifier>>
         +IWorkflowTreeViewModel Tree
-        +int? MaxToolCalls
-        +bool AutoMarkDirty
-        +event ToolCalled
+        +long Version
+        +event Changed
+        +AgentPipeline Pipeline
         +WithPromptLanguage(AgentLanguages)
         +WithOutputLanguage(AgentLanguages)
         +WithMaxToolCalls(int)
         +WithMaxReadToolCalls(int)
         +WithMaxWriteToolCalls(int)
-        +WithAutoMarkDirty(bool)
-        +WithAllowNodeExecution(bool)
-        +WithAllowedGenericCommands(params string[])
-        +WithSynchronizationContext(SynchronizationContext)
-        +WithToolCallCallback(Func~AgentToolCallEventArgs, Task~)
-        +WithSelectionHandler(Func~AgentSelectionEventArgs, Task~)
-        +WithConfirmationHandler(Func~AgentConfirmationEventArgs, Task~)
-        +WithInteractionSafety(int)
-        +WithInteractionSafetyPrompt(int, string)
-        +WithTools(string?, params AITool[])
-        +WithQueryTools(string?, params AITool[])
         +WithAutoDiscovery(Assembly, AgentLanguages)
         +WithEnums() WithInterfaces() WithComponents() WithData()
-        +ProvideAllContexts() string
+        +WithTools(string?, params AITool[])
+        +WithQueryTools(string?, params AITool[])
+        +WithToolEnabled(string, bool)
+        +SetToolEnabled(string, bool) bool
+        +WithAllowNodeExecution(bool)
+        +WithAllowedGenericCommands(params string[])
+        +WithAutoMarkDirty(bool)
+        +WithInteractionSafety(int)
+        +WithInteractionSafetyPrompt(int, string)
+        +WithSelectionHandler(Func~AgentSelectionEventArgs, Task~)
+        +WithConfirmationHandler(Func~AgentConfirmationEventArgs, Task~)
+        +WithToolApproval(bool)
+        +WithSynchronizationContext(SynchronizationContext)
+        +WithToolCallCallback(Func~AgentToolCallEventArgs, Task~)
+        +WithLogWriter(ILogWriter) WithCheckpointStore(IExecutionCheckpointStore)
+        +WithSessionConfiguration(Action~RuntimeContext~)
+        +WithTranscript(AgentTranscript)
+        +WithSkills(SkillScope) WithMcps(McpScope) WithSubAgents(SubAgentScope)
+        +WithTodoTracking() WithAgentModes(AgentModeProviderOptions)
+        +WithContextCompaction(int, int)
+        +WithContextProvider(Func~WorkflowAgentScope, AIContextProvider~)
         +ProvideProgressiveContextPrompt() string
-        +ProvideFrameworkContext() string
-        +ProvideCustomerContext() string
-        +ProvideFrameworkDataContext() string
-        +ProvideCustomerDataContext() string
+        +ProvideAllContexts() string
         +CreateToolkit() WorkflowAgentToolkit
-        +ProvideTools() IList~AITool~
+        +ProvideTools(WorkflowToolCategory) IList~AITool~
+        +CreateContextProviders() IReadOnlyList~AIContextProvider~
     }
     class WorkflowAgentToolkit {
         -WorkflowStateTracker _tracker
-        -int _toolCallCount _readToolCallCount _writeToolCallCount
-        +CreateTools(categories) IList~AITool~
+        -ToolCallLedger _ledger
+        -Dictionary~string, CompiledRun~ _runs
+        +CreateTools(WorkflowToolCategory) IList~AITool~
+        +CreateAllTools(WorkflowToolCategory) IList~AITool~
+        +CreateAccountingStage() IAgentPipelineStage
+        +TryGetRun(handle, out run, out error) bool
+    }
+    class ToolCallLedger {
+        +WorkflowAgentScope Owner
+        +ToolCallLedger Outer
+        +ToolCallLedger Root
+        +Spend(bool isQuery)
+        +Usage (int,int,int)
+        +ResetChain()
     }
     class WorkflowStateTracker {
         -JObject _lastSnapshot
@@ -51,133 +70,108 @@ classDiagram
         +TakeSnapshot() string
         +GetChangesSinceLastSnapshot() string
     }
+    class WorkflowAgentContextProvider {
+        <<AIContextProvider>>
+        -Render _published
+        +StateKeys IReadOnlyList~string~
+        -BuildContext() AIContext
+    }
     class TrackedAIFunction {
         <<Decorator>>
         -InvokeCoreAsync(args, ct)
-        -TrackAsync(name, result)
+        -InvokeCoreInnerAsync(args, ct)
+        -ReportAsync(result, outcome, elapsed, ct)
     }
-    class CommandInvoker {
-        +DiscoverCommands(component) IReadOnlyList~CommandDescriptor~
-        +Invoke(component, name, jsonParameter) string
+    class WorkflowToolCategory {
+        <<enum>>
+        Query Mutation Execution Command Graph
+        Layout Analytics State Composite Interaction All
     }
-    class ComponentPatcher {
-        +ApplyPatch(target, jsonPatch) string
+    class AgentPipeline {
+        +Stages IReadOnlyList~IAgentPipelineStage~
+        +Use(IAgentPipelineStage) AgentPipeline
+        +PublishAsync(AgentEvent, ct) ValueTask
+        +event StageFailed
     }
-    class TypeIntrospector {
-        +ResolveType(fullName) Type
-        +GetTypeSchema(type) string
+    class ToolPipeline {
+        +MarshalTo Func~SynchronizationContext~
+        +Refuse Func~string,string~
+        +Confirm Func~string,CancellationToken,ValueTask~string~~
     }
-    class AgentContextCollector {
-        +GetAgentContext(member, lang) string[]
-        +GetEnumContext(type, lang) string
-        +GetClassContext(type, lang) string
+    class TextPipeline {
+        +OnEventAsync(event, next, ct) ValueTask
     }
-    class AgentEmbeddedResources {
-        +ReadAllReferences(system, lang) string
-        +ReadAllSkills(system, lang) string
-        +ReadSafety(system, name, lang) string
+    class AgentTranscript {
+        +Entries ObservableCollection~AgentTranscriptEntry~
+        +AppendReasoning(fragment) AgentTranscriptEntry
+        +AddToolCall(name, result, outcome) AgentTranscriptEntry
+        +ToMarkdown(options) string
+    }
+    class SkillScope {
+        +long Version
+        +WithSource(ISkillSource) SkillScope
+        +CreateNarrowed(allowed) SkillScope
     }
     class McpScope {
-        +McpStatusViewModel Status
-        +IReadOnlyList~AITool~ LoadedTools
-        +event ServerError
-        +LoadAsync(servers, ct) Task~AITool[]~
-        +UnloadServer(name) bool
-        +GetServerTools(name) IReadOnlyList~AITool~
+        +long Version
+        +McpSelfServiceLevel SelfServiceLevel
+        +CreateGrantedView(source, servers, tools) McpScope
     }
-    class McpAgentToolkit {
-        +CreateTools() IList~AITool~
+    class SubAgentScope {
+        +int MaxDepth
+        +int SpawnBudget
+        +TrySpawn(request, out refusal) string
     }
-    class McpServerConfiguration {
-        +string Name
-        +McpServerRunMode RunMode
-        +string Package
-        +string? Version
-        +string[] Arguments
-        +string? Endpoint
-        +object? Options
+    class AgentDashboardViewModel {
+        +Create(scope) AgentDashboardViewModel
+        +SystemTools ObservableCollection~ToolMemberViewModel~
     }
-    class McpServerRunMode {
-        <<enum>>
-        Npm Npx Uvx Dotnet Pip Exe Http
-    }
-    class McpServerStatus {
-        <<enum>>
-        NotStarted Installing Connecting Connected Error
+    class AgentMemberViewModel {
+        <<abstract>>
+        +ApplyToScope(bool)
     }
     class CompilerViewModel {
         +CompileAsync(node, role) IReadOnlyList~CompiledGraph~
     }
     class RuntimeEngine {
-        +RunAsync(graph, context, ct) Task
+        +RunAsync(graph, context, ct, resumeFrom) Task
     }
     class RuntimeContext {
-        +object? Data
-        +IWorkflowNodeViewModel Target
-        +bool TargetReached
-        +string Status
-        +bool EndedWithError
-        +IReadOnlyList~string~ Logs
-    }
-    class CompileRole {
-        <<enum>>
-        Root Terminal
-    }
-    class IWorkflowTreeViewModel {
-        <<interface>>
-        +Nodes
-        +Links
-        +LinksMap
-        +UndoCommand
-        +RedoCommand
-        +SendConnectionCommand
-        +ReceiveConnectionCommand
-    }
-    class IWorkflowIdentifiable {
-        <<interface>>
-        +RuntimeId
-    }
-    class AIFunction {
-        <<abstract>>
-    }
-    class DelegatingAIFunction {
-        <<abstract>>
-    }
-    class AITool {
-        <<abstract>>
+        +RunOutcome Outcome
+        +IExecutionGate ExecutionGate
+        +bool IsRunning
+        +SnapshotLogs() string[]
     }
 
     AgentEx ..> WorkflowAgentScope : AsAgentScope()
-    WorkflowAgentScope ..> WorkflowAgentToolkit : CreateToolkit()
-    WorkflowAgentToolkit *-- WorkflowStateTracker : owns
-    WorkflowAgentToolkit --> IWorkflowTreeViewModel : operates via commands
-    WorkflowAgentToolkit ..> TrackedAIFunction : wraps each AIFunction
-    TrackedAIFunction --|> DelegatingAIFunction
-    DelegatingAIFunction --|> AIFunction
-    AIFunction --|> AITool
-    WorkflowAgentToolkit ..> CommandInvoker
-    WorkflowAgentToolkit ..> ComponentPatcher
-    WorkflowAgentToolkit ..> TypeIntrospector
-    WorkflowAgentToolkit ..> AgentContextCollector
-    WorkflowAgentScope ..> AgentEmbeddedResources : bilingual prompt docs
+    WorkflowAgentScope *-- WorkflowAgentToolkit : CreateToolkit()
+    WorkflowAgentScope --> ToolCallLedger : 拥有
+    WorkflowAgentScope ..> WorkflowAgentContextProvider : CreateContextProviders()
+    WorkflowAgentScope --> AgentPipeline
+    WorkflowAgentScope --> SkillScope
+    WorkflowAgentScope --> McpScope
+    WorkflowAgentScope --> SubAgentScope
+    WorkflowAgentToolkit *-- WorkflowStateTracker
+    WorkflowAgentToolkit --> WorkflowToolCategory : CreateTools
+    WorkflowAgentToolkit ..> TrackedAIFunction : 包装每个 AIFunction
     WorkflowAgentToolkit ..> CompilerViewModel : RunCompiledWorkflow / GetNodeResult
-    CompilerViewModel ..> RuntimeEngine : graph[0]
-    WorkflowAgentToolkit ..> RuntimeContext : Target / TargetReached
-    WorkflowAgentToolkit --> CompileRole
-    IWorkflowTreeViewModel "1" o-- "many" IWorkflowIdentifiable : stable RuntimeId
-    McpAgentToolkit ..> McpScope
-    McpScope ..> McpServerConfiguration
-    McpScope --> McpServerRunMode
-    McpScope --> McpServerStatus
-    McpAgentToolkit ..> AITool : server tools
+    CompilerViewModel ..> RuntimeEngine
+    RuntimeEngine ..> RuntimeContext
+    ToolCallLedger --> ToolCallLedger : Outer 链
+    AgentPipeline o-- ToolPipeline
+    AgentPipeline o-- TextPipeline
+    TextPipeline ..> AgentTranscript
+    AgentDashboardViewModel --> AgentMemberViewModel
+    AgentDashboardViewModel ..> WorkflowAgentScope : 读写开关
 ```
 
 关键结构事实：
 
-- **一个作用域拥有一个工具包。** `WorkflowAgentScope` 是流畅构建者；`CreateToolkit()` 返回绑定到同一棵树的 `WorkflowAgentToolkit`（`WorkflowAgentToolkit.cs`，第 24-31 行）。工具包拥有唯一的 `WorkflowStateTracker`（`_tracker`，第 27 行）。
-- **每个 `AIFunction` 都被装饰。** `CreateTools` 把每个内置及开发者注册的 `AIFunction` 包装进嵌套的 `TrackedAIFunction : DelegatingAIFunction`（`WorkflowAgentToolkit.cs`，第 178-242 行）。非 `AIFunction` 工具（原始 MCP 客户端工具）按原样加入。
-- **撤销/重做栈保留在 Core。** 变更工具不伪造撤销条目——它们派发 `IWorkflow*ViewModel` 组件命令（`SetAnchorCommand`、`CreateNodeCommand`、`DeleteCommand`、`SendConnectionCommand`、……）。`ComponentPatcher` 拒绝任何有对应命令的属性。
-- **run/result 复用编译器。** `RunCompiledWorkflow` 与 `GetNodeResult` 都汇入 `RunCompiledRoleAsync`：调用 `new CompilerViewModel().CompileAsync(node, role)`，再用 `new RuntimeEngine().RunAsync(graph, context, ct)`（`WorkflowAgentToolkit.cs`，第 1804-1861 行）。`CompileRole.Root` = 从起始节点开始的整条链；`CompileRole.Terminal` = 单个节点的祖先锥，设置 `RuntimeContext.Target`/`TargetReached`。
-- **安全由代码强制。** `WithAllowNodeExecution` 与 `WithAllowedGenericCommands` 是工具读取的属性门；禁用时返回结构化 `error` 结果，而非提示词暗示。
+- **一个作用域拥有一个工具包。** `CreateToolkit()` 返回绑定同一树的 `WorkflowAgentToolkit`，并按作用域缓存。工具包拥有一个 `WorkflowStateTracker` 与一个 `ToolCallLedger`。
+- **账本是一条链。** 根作用域的账本没有 `Outer`；被派发的子代理在其工具包存在之前就设好 `ParentLedger`，因此 `Spend` 沿链上行，根的总数就是整棵树的总数。
+- **每个 `AIFunction` 都被装饰。** `CreateTools` 把每个内置与开发者注册的 `AIFunction` 包装为 `TrackedAIFunction : DelegatingAIFunction`（命名空间 `VeloxDev.AI`，`internal sealed`）。非 `AIFunction` 工具按原样加入。
+- **提供器是工具的唯一来源。** `CreateContextProviders()` 以固定顺序组合：压缩 → workflow → 技能 → MCP → 子代理 → todo → 模式 → 宿主工厂。
+- **运行/结果复用编译器。** `RunCompiledWorkflow` / `GetNodeResult` / 运行句柄家族都经 `RunCompiledRoleAsync` 与 `StartCompiledAsync`，二者都调用 `new CompilerViewModel().CompileAsync(node, role)` 然后 `new RuntimeEngine().RunAsync(graph, context, ct)`。
+- **子系统是收窄视图。** 派发会在同一树上构建*新的* `WorkflowAgentScope`，并交给它父级技能（`CreateNarrowed`）与 MCP 服务器（`CreateGrantedView`）的过滤视图，绝不共享父级自身对象。
 
-> 源文件：`Src/Core/VeloxDev.Core.Extension/Agent/Workflow/WorkflowAgentScope.cs`、`.../Workflow/WorkflowStateTracker.cs`、`.../Workflow/Functions/WorkflowAgentToolkit.cs`、`.../Workflow/Functions/CommandInvoker.cs`、`.../Workflow/Functions/ComponentPatcher.cs`、`.../Workflow/Functions/TypeIntrospector.cs`、`.../Agent/MCP/McpScope.cs`、`.../Agent/MCP/McpAgentToolkit.cs`；`VeloxDev.Core.WorkflowSystem.CompilerEx` 中的编译类型位于 `Src/Core/VeloxDev.Core`。
+> 源文件：`Src/Core/VeloxDev.Core.Extension/Agent/Workflow/{WorkflowAgentScope,WorkflowStateTracker,WorkflowAgentContextProvider}.cs`、`.../Workflow/Functions/{WorkflowAgentToolkit,ToolCallLedger,WorkflowToolCategory}.cs`、`.../TrackedAIFunction.cs`、`.../Pipelines/*`、`.../Skills/*`、`.../MCP/*`、`.../SubAgents/*`、`.../Dashboard/*`；编译类型位于 `Src/Core/VeloxDev.Core` 的 `VeloxDev.Core.WorkflowSystem.CompilerEx` 之下。

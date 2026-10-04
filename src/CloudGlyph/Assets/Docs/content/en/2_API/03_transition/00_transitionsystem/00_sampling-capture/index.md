@@ -1,6 +1,6 @@
 # Transition — Contracts: Sampling & Property Addressing
 
-Namespace `VeloxDev.TransitionSystem`. These four contracts describe how a value is sampled and how a target property is addressed and declared; the two exceptions at the end reject a declared path that is invalid for the transition or can never animate.
+Namespace `VeloxDev.TransitionSystem`. These four contracts describe how a value is sampled and how a target property is addressed and declared; `BoundedProgress` is the group helper a multi-channel sampler uses; the two exceptions at the end reject a declared path that is invalid for the transition or can never animate.
 
 ### Interface: `ISampler`
 
@@ -21,7 +21,7 @@ public interface ISampler
 | `InsertFrame` | Computes the frame at `t ∈ [0, 1]` and writes it to `property` on `target`. `working` is a per-animation reusable scratch object (created lazily via `ref` on the first middle-frame call, then reused — zero per-frame allocation); value-type samplers ignore it. |
 
 **Notes:**
-- Implementations are stateless, thread-safe shared singletons registered in `Abstractions.InterpolatorCore.NativeInterpolators` (or supplied as a per-property override in `IFrameState.Interpolators`).
+- Implementations are stateless, thread-safe shared singletons, reached through `Abstractions.InterpolatorCore.RegisterInterpolator` (or supplied as a per-property override in `IFrameState.Interpolators`). The registry dictionary itself is **private** — the three members (`RegisterInterpolator` / `UnregisterInterpolator` / `TryGetInterpolator`) are the whole surface, because a caller that could reach the dictionary could replace it wholesale and drop every default.
 - Endpoints are handled *inside* `InsertFrame`: `t <= 0` writes the exact (normalized) start, `t >= 1` writes the exact end. No `Update`/`Sample` method exists — this three-method shape replaces the older `IValueInterpolator`/`IInPlaceSampler` designs.
 - Implementations **must not mutate** the `start` / `end` arguments: they are shared with the transition declaration that recorded them, so mutating them pollutes it.
 - `options` still carries the `RotationDirection` for angular samplers (see [eases](../02_eases/index.md)).
@@ -38,11 +38,11 @@ public interface ISampleable
 ```
 
 **Notes:**
-- Declares how a composite **value type** is animated as a whole — *one level, not recursive*. Only value types take this path: a struct's members cannot be written back in place, so the whole value has to be rebuilt every frame.
+- Declares how a composite **value type** is animated as a whole — *one level, not recursive*. Only value types take this path: a struct's members cannot be written back in place, so the whole value has to be rebuilt every frame. Reference types do **not** use this interface.
 - `GetAnimatableMembers` returns the animatable members (paths relative to this type, in `CreateFrameValue` order). Prefer declaring them with `TransitionProperty.Members<Foo>(f => f.Bar, ...)` (see [abstractions](../../01_abstractions/index.md)).
 - `CreateFrameValue` reconstructs the value from its interpolated members, in `GetAnimatableMembers` order — implementations build it through their constructor (compile-time, zero reflection).
 - `InterpolatorCore.Prepare` reaches for this interface **last**: a *struct* value type that implements `ISampleable` and has no registered sampler is handed to the internal `StructAssembler`, which interpolates each declared member with its own registered sampler and reassembles the struct through `CreateFrameValue`. If any member sampler does not resolve, the property is skipped.
-- Reference types do **not** use this interface. `Offset` / `Anchor` / `Size` / `Scale` (WorkflowSystem) no longer implement it; only `Viewport` (a struct) does. A property holding a reference type is animated through explicit member paths (`Property(x => x.Foo.Bar, end)`) or by a dedicated `ISampler` that performs decomposition / normalization / interpolation internally — otherwise `Transition<T>.Execute` rejects the path (see below).
+- Reference types are animated either through explicit member paths (`Property(x => x.Foo.Bar, end)`) or by a dedicated `ISampler` that performs decomposition / normalization / interpolation internally — otherwise `Transition<T>.Execute` rejects the path (see below).
 - *Verified by:* `StructAssemblerTests`, `NativeSamplersExtendedTests` (test structs).
 
 ### Interface: `ITransitionProperty`
@@ -68,7 +68,7 @@ public interface ITransitionProperty
 | `SetValue` | `bool SetValue(object target, object? value)` | Writes through the chain. Returns `false` (no `TargetException`) when an intermediate type mismatches or is null; a `null` value on a reference-type leaf is allowed and returns `true`. |
 
 **Notes:**
-- Deliberately narrow: the interface exposes no `PropertyInfo` and no `Segments`, because a path may end in an array element or an indexer and neither can be described by them — an array element has no `PropertyInfo` at all, and every indexer on a type reports the same `Item` member, so it could not tell `Items[0]` from `Items[1]`. What a consumer is given is what it can do with the value, not how the path was spelled. Index paths and the `PathIndex.Frozen` marker are documented in [abstractions](../../01_abstractions/index.md).
+- Deliberately narrow: the interface exposes no `PropertyInfo` and no `Segments`, because a path may end in an array element or an indexer and neither can be described by them — an array element has no `PropertyInfo` at all, and every indexer on a type reports the same `Item` member, so it could not tell `Items[0]` from `Items[1]`.
 - The concrete type `TransitionProperty` (namespace `VeloxDev.TransitionSystem.Abstractions`) compiles the getter / setter into single delegates on first use — no per-frame reflection (see [abstractions](../../01_abstractions/index.md)).
 - *Verified by:* `TransitionPropertyTests` (`GetValue_ReadsFromTarget`, `SetValue_WritesToTarget`, `GetValue_IntermediateTypeMismatch_ReturnsUnreadablePath_NotTargetException`, `SetValue_IntermediateTypeMismatch_ReturnsFalse_NotTargetException`, `GetValue_NullIntermediate_ReturnsNull_NotUnreadable`).
 
@@ -112,6 +112,33 @@ public interface IFrameState
 - `Clone()` returns an independent copy of all three dictionaries.
 - `InterpolatorCore.Prepare` consumes a state: it reads `state.Values`, consults `state.Interpolators` for a per-property sampler override, and `state.Options` for the options argument.
 - *Verified by:* `StateCoreTests` (`SetValue_Expression_CanRetrieve`, `SetInterpolator_Expression_CanRetrieve`, `Clone_ReturnsIndependentCopy`).
+
+### Struct: `BoundedProgress`
+
+The shared progress of a group of channels that have to stay inside a range, capped at the eased time.
+
+```csharp
+public struct BoundedProgress
+{
+    public BoundedProgress(double t, double minimum = 0d, double maximum = 1d);
+    public void Add(double start, double end);
+    public readonly double Progress { get; }
+    public readonly double At(double start, double end);
+}
+```
+
+| Member | Description |
+|---|---|
+| Constructor | Starts a group at `t`, bounded to `[minimum, maximum]`. |
+| `Add(start, end)` | Adds a channel to the group. Only ever **tightens** the progress, so the order channels are added in does not matter. Both ends of the range bound it, not just the far one — a channel leaves by the maximum on an overshoot and by the minimum on an anticipation. A zero delta is ignored. |
+| `Progress` | The progress the whole group moves by. |
+| `At(start, end)` | Interpolates one of the group's channels at `Progress`. |
+
+**Notes:**
+- Exists because an easing curve may overshoot past 1, and a group of channels has to move **by one progress** or the value is distorted rather than pushed past its target: interpolating colour channels one by one lets red saturate while green keeps climbing, which shifts the hue. This finds the largest progress that keeps every added channel inside the range and never lets a later channel loosen it.
+- The remaining overshoot is dropped for that group, and that is unavoidable rather than a compromise: a value that keeps its proportions cannot go past a limit without leaving the range its type can represent. A channel with no limit is simply not added, so it keeps the full eased time — alpha is the usual example (it is its own single-channel range, and letting it in would let an already-opaque opacity truncate the colour's overshoot).
+- For an eased time in `[0, 1]` the result is always that same time: interpolating between two in-range endpoints stays in range, so only an overshoot is affected.
+- *Verified by:* the `AUTO TEST` conformance suite's independently written `Conformance/ClosedForm.SharedProgress` / `ColorAt`; `Src/Core/VeloxDev.Core.Test/TransitionSystem/EaseOvershootTests.cs`.
 
 ### Exception: `TransitionPathConflictException`
 

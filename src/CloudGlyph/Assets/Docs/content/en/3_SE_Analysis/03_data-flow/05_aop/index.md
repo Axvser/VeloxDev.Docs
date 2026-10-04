@@ -49,7 +49,7 @@ deactivate E
 @enduml
 ```
 
-`SetProxy` then classifies the member with `ProxyMembers` and resolves the live `ProxyInstance` through `ProxyIDs` → `ProxyInstances` (both static in `ProxyEx.cs`). When the key already exists the whole `(start, coverage, end)` triple is overwritten:
+`SetProxy` then classifies the member with `ProxyMembers` and resolves the live `ProxyInstance` through `ProxyIDs` → `ProxyInstances` (both static dictionaries declared in `ProxyInstance.cs`; `ProxyEx.cs` only reads them). When the key already exists the whole `(start, coverage, end)` triple is overwritten:
 
 | Member kind (`ProxyMembers`) | Dictionary written | Accessor key |
 |---|---|---|

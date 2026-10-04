@@ -1,178 +1,244 @@
-# 工作流系统 — 验证与完整代码
+# Workflow System — 完整代码
 
-## 1. 在仓库里如何验证
+下面的程序就是整条核心流程 —— 搭画布、正向编译、编译一个结果、序列化并重建 —— 全在一个 `Program.cs` 里。它用到的每样东西都在本快速开始的前面几页定义过，没有任何省略。
 
-**Demo（第一证据源）：** `Examples/Workflow/Common/Lib` 提供一张真实成品链，会话由 `WorkflowDemoSession.Create()` 构建（`Examples/Workflow/Common/Lib/ViewModels/Workflow/WorkflowDemoSession.cs`）：
+| 标识符 | 定义在哪 |
+|---|---|
+| `QuickTree`、`QuickSlot`、`QuickLink` | `Components.cs` —— 见 `02_定义组件` |
+| `TickerNode` / `BiasNode` / `PrinterNode` 及其 Helper | `TickerNode.cs`、`BiasNode.cs`、`PrinterNode.cs` —— 见 `02_定义组件` |
+| `FlakyNode` / `FlakyHelper` | 见 `10_重试与补偿` |
+| `BoomNode` / `BoomHelper` | 见 `10_重试与补偿` |
+| `SourceNode`、`LeftNode`、`RightNode`、`BranchClock` | `FanOutNodes.cs` —— 见 `12_并行与大纲` |
+| 项目文件（引用、`net10.0`） | 见 `01_安装` |
 
-```text
-Controller → Timer → Generate Dataset（普通节点扇出）
-            → [Numeric Stats, Frequency Dist, Anomaly Scan]
-            → join Merge Report（多输入汇合，收 IGroupData 并按档位打分）
-            → Enum Selector（ICompileTimeRouter，Dynamic 运行期按 grade 选支）
-            → [Report High / Report Low / Report Zero]
-```
+组件与节点文件在各自页面里全文给出；每个文件声明一个组件（或一个节点加它的 Helper）。把它们和 `Program.cs` 一起建在 `WorkflowQuickStart` 项目里。
 
-它覆盖了 `ChainSegment`（线性）、`ParallelSegment`（扇出）、`IGroupData`（汇合）与 `BranchSegment`（路由器）四类编译段；控制器上的“编译/运行”按钮就是 `ControllerViewModel` 里 `Compiler.CompileAsync(this, CompileRole.Root)` + `new RuntimeEngine().RunAsync(...)`（`Examples/Workflow/Common/Lib/ViewModels/Workflow/ControllerViewModel.cs`）。路由器实现见 `EnumSelectorNodeViewModel.cs`。
-
-**测试（语义边界）：** `Src/Core/VeloxDev.Core.Test/WorkflowSystem/CompilerEx/`：
-
-- `CompileDecompositionTests` —— 线性→单 `ChainSegment`、动态 Router 保留全部分支、静态 Router 剪除未选支（下游 `Order = -1`）、普通节点扇出→`ParallelSegment`、`AccessAsync` 拒绝的边被剪枝。
-- `RuntimeEngineRunTests` —— 数据沿会话链式传递、动态分支运行期选键、扇出各支读到同一源负载、双上游汇合收 `IGroupData`、无下游路由键=终止支、无 `IRedirectable` 出错→`Stopped`。
-- `CompileToReverseTests` —— 目标中途锥从自身入口编译、Router 选中目标支→`TargetReached`、选中兄弟支→目标不驱动不编造值、多源漏斗→汇合、入口缺失时目标自己就是入口、非串-并联锥抛说明性异常。
-- `RuntimeRedirectTests`、`EntrySemanticsTests` —— `IRedirectable` 重定向语义与“节点级 / 边级 / 链级”三条执行入口的边界。
-
-## 2. 完整代码
-
-单一最小可运行程序：控制台 `net9.0`，开启 `<ImplicitUsings>enable</ImplicitUsings>`，引用 [01 安装 / 添加依赖](../01_安装/index.md) 的 `VeloxDev.Core` + `VeloxDev.Core.Extension`（含源生成器）。本程序把前几页的 `CalcTree / SlotViewModel / CalcNode(+Helper)` 与四段执行逻辑拼成一份文件 —— 每个标识符都在本文件内定义。
+`Program.cs`：
 
 ```csharp
+using System.Diagnostics;
 using VeloxDev.Core.WorkflowSystem.CompilerEx;
-using VeloxDev.MVVM;
 using VeloxDev.MVVM.Serialization;
 using VeloxDev.WorkflowSystem;
 
-namespace Demo.QuickStart
+namespace WorkflowQuickStart
 {
-    [WorkflowBuilder.Tree<TreeHelper>]
-    public partial class CalcTree
-    {
-        public CalcTree() => InitializeWorkflow();
-    }
-
-    [WorkflowBuilder.Slot<SlotHelper>]
-    public partial class SlotViewModel
-    {
-        public SlotViewModel() => InitializeWorkflow();
-    }
-
-    [WorkflowBuilder.Node<CalcNodeHelper>(workSemaphore: 1)]
-    public partial class CalcNode : ICompileTimeAware
-    {
-        public CalcNode() => InitializeWorkflow();
-
-        [VeloxProperty] private SlotViewModel input = new();
-        [VeloxProperty] private SlotViewModel output = new();
-        [VeloxProperty] private string title = "";
-        [VeloxProperty] private string kind = "pass";
-        [VeloxProperty] private double seed = 0;
-
-        public ICompileContext? CompileContext { get; private set; }
-
-        public void AttachCompileTimeContext(ICompileContext context) => CompileContext = context;
-    }
-
-    public class CalcNodeHelper : NodeHelper<CalcNode>
-    {
-        public override Task<object?> ReceiveAsync(ITaskContext context, CancellationToken ct)
-        {
-            if (Component is null) return Task.FromResult<object?>(null);
-
-            object? result = Component.Kind switch
-            {
-                "seed" => Component.Seed,
-                "double" => context.Data is double d ? d * 2 : context.Data,
-                _ => context.Data,
-            };
-
-            var order = Component.CompileContext is { } cc ? cc.Order : -1;
-            Console.WriteLine($"  [{Component.Title}] kind={Component.Kind} order={order} result={result}");
-            return Task.FromResult(result);
-        }
-    }
-
     internal static class Program
     {
         private static async Task Main()
         {
-            // 1. Build the graph on an editable canvas (tree + nodes + channels + links).
-            var tree = new CalcTree();
-            tree.Layout.OriginSize = new Size(1200, 800);
+            // 1. 在可编辑画布上搭出这张图。
+            var tree = new QuickTree();
+            tree.Layout.OriginSize = new Size(2400, 850);
             var helper = tree.GetHelper();
 
-            var source = new CalcNode { Title = "Source", Kind = "double", Anchor = new Anchor(40, 200, 0) };
-            var report = new CalcNode { Title = "Report", Kind = "pass", Anchor = new Anchor(420, 120, 0) };
-            var discard = new CalcNode { Title = "Discard", Kind = "pass", Anchor = new Anchor(420, 360, 0) };
+            var ticker = new TickerNode { Anchor = new Anchor(60, 60, 0) };
+            var bias = new BiasNode { Anchor = new Anchor(460, 60, 0) };
+            var printer = new PrinterNode { Anchor = new Anchor(860, 60, 0) };
 
-            helper.CreateNode(source);
-            helper.CreateNode(report);
-            helper.CreateNode(discard);
+            helper.CreateNode(ticker);
+            helper.CreateNode(bias);
+            helper.CreateNode(printer);
 
-            source.Output.SetChannelCommand.Execute(SlotChannel.MultipleTargets);
-            report.Input.SetChannelCommand.Execute(SlotChannel.OneSource);
-            discard.Input.SetChannelCommand.Execute(SlotChannel.OneSource);
+            SetChannel(ticker.OutputSlot, SlotChannel.OneTarget);
+            SetChannel(bias.InputSlot, SlotChannel.OneSource);
+            SetChannel(bias.OutputSlot, SlotChannel.OneTarget);
+            SetChannel(printer.InputSlot, SlotChannel.OneSource);
 
-            helper.SendConnection(source.Output);
-            helper.ReceiveConnection(report.Input);
-            helper.SendConnection(source.Output);
-            helper.ReceiveConnection(discard.Input);
+            Connect(helper, ticker.OutputSlot!, bias.InputSlot!);
+            Connect(helper, bias.OutputSlot!, printer.InputSlot!);
 
-            Console.WriteLine($"Nodes={tree.Nodes.Count} Links={tree.Links.Count} " +
-                              $"source.Output.Targets={source.Output.Targets.Count} " +
-                              $"channels={source.Output.Channel}|{report.Input.Channel}|{discard.Input.Channel}");
+            Console.WriteLine($"[1] Nodes={tree.Nodes.Count} Links={tree.Links.Count}");
 
-            // 2. Forward compiled run (CompileRole.Root) — seed data 2.0.
+            // 2. 正向（Root）编译 + 运行时运行。
             var compiler = new CompilerViewModel();
-            var forwardGraphs = await compiler.CompileAsync(source, CompileRole.Root);
-            var forwardGraph = forwardGraphs[0];
-            Console.WriteLine($"Forward entries={forwardGraph.Entries.Count} " +
-                              $"first={forwardGraph.Entries[0].GetType().Name} " +
-                              $"second={forwardGraph.Entries[1].GetType().Name}");
+            var rootGraph = (await compiler.CompileAsync(
+                ticker, CompileRole.Root, CancellationToken.None))[0];
+            var forward = new RuntimeContext();
+            await new RuntimeEngine().RunAsync(rootGraph, forward, CancellationToken.None);
+            Console.WriteLine($"[2] root: {forward.Status} data={forward.Data} attempt={forward.Attempt} outcome={forward.Outcome}");
+            Console.WriteLine($"[2] orders: {ticker.CompileContext!.Order},{bias.CompileContext!.Order},{printer.CompileContext!.Order}");
+            Console.WriteLine($"[2] entries={rootGraph.Entries.Count} first={rootGraph.Entries[0].GetType().Name}");
+            foreach (var row in CompiledOutline.Of(rootGraph))
+                Console.WriteLine($"[2] outline: {new string(' ', row.Depth * 2)}{row.Kind} | {row.Label}");
 
-            var forwardCtx = new RuntimeContext { Data = 2.0 };
-            await new RuntimeEngine().RunAsync(forwardGraph, forwardCtx, CancellationToken.None);
-            Console.WriteLine($"Forward status={forwardCtx.Status} data={forwardCtx.Data} " +
-                              $"sourceOrder={source.CompileContext?.Order} reportOrder={report.CompileContext?.Order} " +
-                              $"discardOrder={discard.CompileContext?.Order}");
+            // 3. 终端（结果）编译 + 运行时运行。
+            var resultGraph = (await compiler.CompileAsync(
+                bias, CompileRole.Terminal, CancellationToken.None))[0];
+            var result = new RuntimeContext { Target = bias };
+            await new RuntimeEngine().RunAsync(resultGraph, result, CancellationToken.None);
+            Console.WriteLine($"[3] result: {result.Status} data={result.Data} reached={result.TargetReached}");
 
-            // 3. Terminal (reverse) compiled run: compute the Report value only.
-            var terminalGraphs = await compiler.CompileAsync(report, CompileRole.Terminal);
-            var terminalGraph = terminalGraphs[0];
-            Console.WriteLine($"Terminal entries={terminalGraph.Entries.Count} " +
-                              $"first={terminalGraph.Entries[0].GetType().Name}");
-
-            var terminalCtx = new RuntimeContext { Data = 2.0, Target = report };
-            await new RuntimeEngine().RunAsync(terminalGraph, terminalCtx, CancellationToken.None);
-            Console.WriteLine($"Terminal status={terminalCtx.Status} targetReached={terminalCtx.TargetReached} " +
-                              $"data={terminalCtx.Data}");
-
-            // 4. Serialize the whole tree to JSON, then rebuild it from the JSON.
+            // 4. 把整棵树序列化成 JSON，重建，再跑一遍。
             var json = tree.Serialize();
-            var copy = json.Deserialize<CalcTree>();
-            Console.WriteLine($"copy Nodes={copy.Nodes.Count} Links={copy.Links.Count} " +
-                              $"origin={copy.Layout.OriginSize.Width}x{copy.Layout.OriginSize.Height} jsonLen={json.Length}");
-
-            var copySource = copy.Nodes.OfType<CalcNode>().First(n => n.Title == "Source");
-            var copyGraphs = await new CompilerViewModel().CompileAsync(copySource, CompileRole.Root);
-            var copyCtx = new RuntimeContext { Data = 2.0 };
+            var copy = json.Deserialize<QuickTree>();
+            var tickerCopy = copy.Nodes.OfType<TickerNode>().Single();
+            var copyGraphs = await new CompilerViewModel().CompileAsync(
+                tickerCopy, CompileRole.Root, CancellationToken.None);
+            var copyCtx = new RuntimeContext();
             await new RuntimeEngine().RunAsync(copyGraphs[0], copyCtx, CancellationToken.None);
-            Console.WriteLine($"copy run status={copyCtx.Status} data={copyCtx.Data}");
+            Console.WriteLine($"[4] copy: Nodes={copy.Nodes.Count} Links={copy.Links.Count} {copyCtx.Status} data={copyCtx.Data}");
+
+            // 5. 执行门：握住运行，再放开。
+            var gate = new ManualExecutionGate();
+            gate.Pause();
+            var gated = new RuntimeContext { ExecutionGate = gate };
+            var gatedRun = new RuntimeEngine().RunAsync(rootGraph, gated, CancellationToken.None);
+            await Task.Delay(80);
+            Console.WriteLine($"[5] paused: status={gated.Status} isPaused={gate.IsPaused} running={gated.IsRunning} data={gated.Data ?? "<null>"}");
+            gate.Resume();
+            await gatedRun;
+            Console.WriteLine($"[5] resumed: status={gated.Status} data={gated.Data} outcome={gated.Outcome}");
+
+            // 6. 干净一轮上的观察者 + 错误接收器。
+            var observed = new List<string>();
+            var sink = new List<string>();
+            var observedCtx = new RuntimeContext
+            {
+                Observer = new DelegateExecutionObserver(o =>
+                {
+                    if (o.Kind is ExecutionObservationKind.NodeStarted or ExecutionObservationKind.NodeSucceeded)
+                        observed.Add($"{o.Kind}:{o.Node?.GetType().Name}");
+                }),
+                ErrorSink = new DelegateExecutionErrorSink(e => sink.Add($"{e.Phase}:{e.Message}")),
+            };
+            await new RuntimeEngine().RunAsync(rootGraph, observedCtx, CancellationToken.None);
+            Console.WriteLine($"[6] observed: {string.Join(", ", observed)}");
+            Console.WriteLine($"[6] sink on a clean run: {sink.Count} records");
+
+            // 7. 检查点：第一个节点之后停下，再从保存下来的位置恢复。
+            var store = new InMemoryCheckpointStore();
+            var cts = new CancellationTokenSource();
+            var partial = new RuntimeContext
+            {
+                CheckpointStore = store,
+                Observer = new DelegateExecutionObserver(o =>
+                {
+                    if (o.Kind == ExecutionObservationKind.NodeSucceeded) cts.Cancel();
+                }),
+            };
+            try
+            {
+                await new RuntimeEngine().RunAsync(rootGraph, partial, cts.Token, null);
+            }
+            catch (OperationCanceledException) { }
+            var saved = (await store.LoadAsync(CancellationToken.None))!;
+            Console.WriteLine($"[7] checkpoint: attempt={saved.Attempt} outputs={saved.Outputs.Count} shape=<三个 RuntimeId GUID>");
+
+            var resumed = new RuntimeContext();
+            await new RuntimeEngine().RunAsync(rootGraph, resumed, CancellationToken.None, saved);
+            Console.WriteLine($"[7] resume: status={resumed.Status} data={resumed.Data} outcome={resumed.Outcome}");
+
+            var refused = new RuntimeContext();
+            try
+            {
+                await new RuntimeEngine().RunAsync(copyGraphs[0], refused, CancellationToken.None, saved);
+                Console.WriteLine("[7] refused: NO (unexpected)");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Console.WriteLine($"[7] refused on a serialized copy: {ex.Message.Split(':')[0]} status={refused.Status}");
+            }
+
+            // 8. 抖动节点上的重试策略。
+            var flakyTree = new QuickTree();
+            var flaky = new FlakyNode { Anchor = new Anchor(0, 0, 0) };
+            flakyTree.GetHelper().CreateNode(flaky);
+            var retryGraph = (await compiler.CompileAsync(
+                flaky, CompileRole.Root, CancellationToken.None))[0];
+            var retryCtx = new RuntimeContext
+            {
+                RetryPolicy = new ExponentialBackoffRetry(maxAttempts: 3, baseDelayMs: 1),
+            };
+            await new RuntimeEngine().RunAsync(retryGraph, retryCtx, CancellationToken.None);
+            Console.WriteLine($"[8] retry: status={retryCtx.Status} data={retryCtx.Data} drives={FlakyHelper.Attempts} attempt={retryCtx.Attempt}");
+            Console.WriteLine($"[8] retry logs: {string.Join(" | ", retryCtx.Logs)}");
+
+            // 9. 日志写入器 + 有界的日志保留。
+            var logPath = Path.Combine(Path.GetTempPath(), "veloxqs-run.log");
+            if (File.Exists(logPath)) File.Delete(logPath);
+            RuntimeContext capped;
+            using (var writer = TextWriterLogWriter.For(logPath))
+            {
+                capped = new RuntimeContext { LogWriter = writer, MaxRetainedLogs = 2 };
+                await new RuntimeEngine().RunAsync(rootGraph, capped, CancellationToken.None);
+            }
+            var fileLines = File.ReadAllLines(logPath);
+            Console.WriteLine($"[9] logfile: fileLines={fileLines.Length} retained={capped.Logs.Count} snapshot={capped.SnapshotLogs().Length}");
+            Console.WriteLine($"[9] retained: {string.Join(" | ", capped.SnapshotLogs())}");
+            Console.WriteLine($"[9] file head: {fileLines[0]}");
+
+            // 10. 失败一轮上的补偿。
+            var boomTree = new QuickTree();
+            var boom = new BoomNode { Anchor = new Anchor(0, 0, 0) };
+            boomTree.GetHelper().CreateNode(boom);
+            var boomGraph = (await compiler.CompileAsync(
+                boom, CompileRole.Root, CancellationToken.None))[0];
+            var compensated = new List<string>();
+            var boomCtx = new RuntimeContext
+            {
+                Compensation = new DelegateExecutionCompensation(c => compensated.Add(c.Node.GetType().Name)),
+            };
+            try
+            {
+                await new RuntimeEngine().RunAsync(boomGraph, boomCtx, CancellationToken.None);
+            }
+            catch (InvalidOperationException) { }
+            Console.WriteLine($"[10] compensate: status={boomCtx.Status} outcome={boomCtx.Outcome} currentOrder={boomCtx.CurrentOrder} reversed=[{string.Join(", ", compensated)}]");
+
+            // 11. 并行扇出：默认并发，MaxParallelBranches = 1 时串行。
+            var fanTree = new QuickTree();
+            var fanHelper = fanTree.GetHelper();
+            var source = new SourceNode { Anchor = new Anchor(0, 0, 0) };
+            var left = new LeftNode { Anchor = new Anchor(200, 0, 0) };
+            var right = new RightNode { Anchor = new Anchor(400, 0, 0) };
+            fanHelper.CreateNode(source);
+            fanHelper.CreateNode(left);
+            fanHelper.CreateNode(right);
+            SetChannel(source.OutputSlot, SlotChannel.MultipleTargets);
+            SetChannel(left.InputSlot, SlotChannel.OneSource);
+            SetChannel(right.InputSlot, SlotChannel.OneSource);
+            Connect(fanHelper, source.OutputSlot!, left.InputSlot!);
+            Connect(fanHelper, source.OutputSlot!, right.InputSlot!);
+
+            var fanGraph = (await compiler.CompileAsync(
+                source, CompileRole.Root, CancellationToken.None))[0];
+            Console.WriteLine($"[11] segments: {string.Join(", ", fanGraph.Entries.Select(e => e.GetType().Name))}");
+
+            BranchClock.Starts.Clear(); BranchClock.Ends.Clear();
+            await new RuntimeEngine().RunAsync(fanGraph, new RuntimeContext(), CancellationToken.None);
+            Console.WriteLine($"[11] MaxParallelBranches=null: overlap={Overlap(BranchClock.Starts, BranchClock.Ends)}");
+
+            BranchClock.Starts.Clear(); BranchClock.Ends.Clear();
+            var oneAtATime = new RuntimeContext { MaxParallelBranches = 1 };
+            await new RuntimeEngine().RunAsync(fanGraph, oneAtATime, CancellationToken.None);
+            Console.WriteLine($"[11] MaxParallelBranches=1:    overlap={Overlap(BranchClock.Starts, BranchClock.Ends)}");
+        }
+
+        private static bool Overlap(List<(int Index, int Tick)> starts, List<(int Index, int Tick)> ends)
+        {
+            if (starts.Count < 2 || ends.Count < 2) return false;
+            var s0 = starts.First(s => s.Index == 0).Tick;
+            var s1 = starts.First(s => s.Index == 1).Tick;
+            var e0 = ends.First(e => e.Index == 0).Tick;
+            var e1 = ends.First(e => e.Index == 1).Tick;
+            return s0 < e1 && s1 < e0;
+        }
+
+        private static void SetChannel(QuickSlot slot, SlotChannel channel)
+            => slot.SetChannelCommand.Execute(channel);
+
+        private static void Connect(IWorkflowTreeViewModelHelper helper, QuickSlot sender, QuickSlot receiver)
+        {
+            helper.SendConnection(sender);
+            helper.ReceiveConnection(receiver);
         }
     }
 }
 ```
 
-## 3. 运行声明
+**预期结果：** 第 1–4 步与前面几页一致（`Nodes=3 Links=2`、`Completed data=tick->bias->print`、`reached=True`、重建的副本跑出同一条链）；第 5–11 步走一遍宿主能力层。完整的实测输出在 `13_验证与运行声明`。
 
-- ✅ **实际构建并运行于 2026-09-07。**
-  - 环境：Windows 11；.NET SDK 10.0.400；`TargetFramework` `net9.0`；以 `ProjectReference` 引用本仓库 `Src/Core/VeloxDev.Core` 与 `Src/Core/VeloxDev.Core.Extension`（源码生成器经 `VeloxDev.Core` 传递自动启用）。
-  - 上述 `Program.cs` 逐字编译运行，记录输出如下：
+没有省略号，上面每个标识符都在本文件里定义，或在本页顶部的表格点名的某个组件文件里定义。`namespace WorkflowQuickStart` 必须与各组件文件用的那个一致。
 
-```text
-Nodes=3 Links=2 source.Output.Targets=2 channels=MultipleTargets|OneSource|OneSource
-Forward entries=2 first=ChainSegment second=ParallelSegment
-  [Source] kind=double order=0 result=4
-  [Report] kind=pass order=1 result=4
-  [Discard] kind=pass order=2 result=4
-Forward status=Completed data=4 sourceOrder=0 reportOrder=1 discardOrder=2
-Terminal entries=1 first=ChainSegment
-  [Source] kind=double order=0 result=4
-  [Report] kind=pass order=1 result=4
-Terminal status=Completed targetReached=True data=4
-copy Nodes=3 Links=2 origin=1200x800 jsonLen=7366
-  [Source] kind=double order=0 result=4
-  [Report] kind=pass order=1 result=4
-  [Discard] kind=pass order=2 result=4
-copy run status=Completed data=4
-```
-
-`jsonLen=7366` 仅对当前程序集/类型版本成立；其余断言（节点/连线/编译段/结果值/`TargetReached`）对同一示例是确定性的。
+下一步去 `08_暂停与恢复` 看第一项能力，或去 `13_验证与运行声明` 看实测运行。

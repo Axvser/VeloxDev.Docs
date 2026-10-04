@@ -1,83 +1,84 @@
-# 工作流代理 — 三种执行模型
+# 06 · 三种执行模型
 
-代理可以在三个不同的层级驱动你的工作流，并且每一层都同时有**运行**工具（Execution 分类）与**仅编译计划**工具（Query 分类，只校验图、不运行节点代码）。这些运行工具都建立在现行引擎之上 —— `VeloxDev.Core.WorkflowSystem.CompilerEx` 中的 `CompilerViewModel.CompileAsync(component, CompileRole)` 加 `RuntimeEngine.RunAsync(graph, context)`。代码里已没有旧的 `CompilerEngine` / `CompileToAsync` API。
+agent 可以在三个层级运行工作流。它们**并非**互相替代 —— 各答一个问题，且每个运行工具旁都有一个只编译的计划工具。
 
-## 1. 执行入口对照表
+| 层级 | 计划工具 | 运行工具 | 驱动什么 |
+|---|---|---|---|
+| 节点 | — | `ExecuteNode` / `ExecuteNodes`、`BroadcastNode`、`ReverseBroadcastNode` | 单个节点的 `ReceiveCommand` / 广播命令（非编译） |
+| 链（Root） | `CompileWorkflow` | `RunCompiledWorkflow` | 从起始节点可达的整条链 |
+| 结果（Terminal） | `CompileNodeResult` | `GetNodeResult` | 单个节点的取值，来自其祖先锥 |
 
-| 层级 | 运行工具（Execution） | 仅编译计划工具（Query） | 角色 | 驱动什么 |
-|---|---|---|---|---|
-| 节点 | `ExecuteNode` / `ExecuteNodes` | — | — | 单节点（或多节点）的 `ReceiveCommand`，不编译 |
-| 节点（广播） | `BroadcastNode` / `ReverseBroadcastNode` | — | — | 沿连接向下游 / 向上游推送，不编译 |
-| 链级（Root） | `RunCompiledWorkflow(startNodeIndex, seed?)` | `CompileWorkflow(startNodeIndex)` | `CompileRole.Root` | 从控制器可达的前向链 |
-| 结果级（Terminal） | `GetNodeResult(nodeIndex, seed?)` | `CompileNodeResult(nodeIndex)` | `CompileRole.Terminal` | 某个节点的值，从其祖先锥计算而来 |
+## 1. 节点层 —— `ExecuteNode` 及同类
 
-`CompileRole.Root` 沿 `Targets` 向下游编译该节点可达的执行图；`CompileRole.Terminal` 沿 `Sources` 反向收集节点的祖先锥，只编译生成该节点所需的内容。
-
-## 2. 节点级入口
-
-节点级工具直接调用节点的命令 —— 从不编译，因此不涉及 `Order`/`CompileContext`：
-
-- `ExecuteNode(nodeIndex, parameter?)` 会等待 `ReceiveCommand` 真正完成并报告完成（或取消/失败）—— 不只是派发。
-- `ExecuteNodes(nodeIndicesJson, parameter?)` 对一组 JSON 索引做同样的事，返回汇总 `{status, completed, errors}`。
-- `BroadcastNode(nodeIndex, parameter?)` 触发 `BroadcastCommand`（下游派发是即发即忘）；`ReverseBroadcastNode(nodeIndex, parameter?)` 触发 `ReverseBroadcastCommand`（上游 `ReceiveCommand`）。
-
-可选的 `parameter` 会成为节点的 `ITaskContext.Data`。
-
-**预期结果：** 对命令正常返回的节点调用 `ExecuteNode` 会报告完成；抛异常的节点返回失败消息，而不是挂起工具调用。
-
-## 3. 链级（Root）—— 先编译后运行
-
-`RunCompiledWorkflow(startNodeIndex, seed?)` 一步完成：编译某控制器下游的子图，再用执行引擎驱动它。其返回 JSON 形如：
-
-```json
-{ "status": "ok", "role": "Root", "runStatus": "Completed",
-  "endedWithError": false, "attempts": 1,
-  "data": "<最后一个节点的输出>", "logs": "[...]" }
+```text
+ExecuteNode(nodeIndex: 3, parameter: null)
+→ {"status":"ok","message":"... completed ..."}
 ```
 
-可选的 `seed` 会成为运行时会话的 `Data`（第一个节点收到它）。想先查看计划，`CompileWorkflow(startNodeIndex)` 返回：
+在单个节点上运行 `ReceiveCommand` 并**等待**该节点真正完成；只有真正完成后才返回 `ok`。`ExecuteNodes` 对一维索引 JSON 数组（`nodeIndicesJson`）做同样的事，返回 `completed` 以及失败项的 `errors` 数组。`BroadcastNode` 运行 `BroadcastCommand`，`ReverseBroadcastNode` 运行 `ReverseBroadcastCommand`（上游 `ReceiveCommand`）；两者都等待各自的命令，尽管下游/上游派发本身是发后即忘。
 
-```json
-{ "status": "ok", "role": "Root", "graphCount": 1,
-  "entries": ["Ticker"], "nodeOrders": { "Ticker": 1, "Bias": 2, "Printer": 3 } }
+这四个都需要 `WithAllowNodeExecution(true)`；没有它时返回 `... is disabled by host policy. The host must enable node execution via WithAllowNodeExecution(true).` 来源：`WorkflowLifecycleFidelityTests.ExecuteNode_WaitsForCommandCompletion`、`GetNodeResult_WithoutAllowNodeExecution_IsRejectedByPolicy`。
+
+**预期结果：** 在单节点树上，`ExecuteNode(0)` 返回 `status:"ok"`，消息含 `completed`。
+
+## 2. 链层 —— `RunCompiledWorkflow`
+
+```text
+RunCompiledWorkflow(startNodeIndex: 0, seed: "42")
 ```
 
-## 4. 结果级（Terminal）—— 计算单个节点的值
+编译从起始节点（通常是控制器）可达的子图，并通过执行引擎驱动整条链 —— 与 demo 的 **Run** 按钮所用入口相同。节点以 `IRuntimeContext` 执行其 `ReceiveAsync`（编译步语义：**不**自动广播 —— 引擎负责下游派发）。`CompileWorkflow(startNodeIndex)` 只做编译并返回计划。
 
-`GetNodeResult(nodeIndex, seed?)` 反向编译节点的祖先锥，并从锥自身的入口前沿运行它。它的行为与到达该节点的正常前向运行完全一致，只是多带一个仅 Terminal 的字段：
+结果形状：
 
-```json
-{ "status": "ok", "role": "Terminal", "runStatus": "Completed",
-  "endedWithError": false, "attempts": 1,
-  "data": "<结果节点自身的输出>", "targetReached": true,
-  "logs": "[...]" }
+| 字段 | 含义 |
+|---|---|
+| `role` | `"Root"` |
+| `runStatus` | `"Completed"` 或 `"Stopped"` |
+| `outcome` | `Completed` / `Cancelled` / `Failed` —— 精确读法，因为 `runStatus` 在失败与取消之间共用 `"Stopped"` |
+| `endedWithError` | 某节点报告错误且流程终止时为 `true` |
+| `attempts` | 本次运行做过的节点尝试数 |
+| `data` | 本次运行的最终数据 |
+| `failures` | 失败记录（`phase` / `level` / `message` / `attempt` / `order`） |
+| `logs` | 运行会话日志 |
+| `logFile` | 当宿主把日志行写入文件时是绝对路径，否则 `null` |
+
+`RunCompiledWorkflow` 等待到结束。若需要 agent 持有、放开或停止一次运行，请用下一页的运行句柄家族。
+
+## 3. 结果层 —— `GetNodeResult`
+
+```text
+GetNodeResult(nodeIndex: 4, seed: null)
 ```
 
-`CompileNodeResult(nodeIndex)` 是仅计划的孪生，返回与 `CompileWorkflow` 相同的形状，只是 `"role": "Terminal"`。两个 Terminal 工具都绝不捏造结果 —— 确切的 `was NOT reached` 契约见下一页。
+发现该节点的**祖先锥**（从它的输入槽向上游回溯的全部生产者），并从锥自身的入口前沿驱动它，因此**不需要**控制器/起始节点。锥内的路由器保留*真实的*分支选择 —— 只编译通往该节点的分支，故结果与一次走该分支的正常运行完全一致。`CompileNodeResult(nodeIndex)` 只做编译。
 
-**预期结果：** 对一棵锥只有自身的单节点树，`GetNodeResult` 会把锥运行到完成，报告 `targetReached: true` 与 `endedWithError: false`（这一确切场景由生命周期测试 `GetNodeResult_SingleNodeTree_RunsToCompletionWithTerminalRole` 钉死）。
+`GetNodeResult` 在结果形状中增加 `targetReached`（节点确实被驱动时为 `true`）。它的错误契约是下一页的主题。
 
-## 5. 其下的引擎
+## 4. 底层引擎
 
-这些工具是同一引擎的薄包装 —— 工作流系统快速入门直接驱动它：
+两个运行工具共用 `RunCompiledRoleAsync`（`WorkflowAgentToolkit.cs`），它做：
 
 ```csharp
-using VeloxDev.Core.WorkflowSystem.CompilerEx;
-
-var controller = tree.Nodes.First();                       // 来自你的树的 IWorkflowNodeViewModel
-var seed = "start value";                                  // 可选的起始节点负载
-var ct = CancellationToken.None;                           // 或真实的取消令牌
-
-var compiler = new CompilerViewModel();
-var graphs = await compiler.CompileAsync(controller, CompileRole.Root); // 或 CompileRole.Terminal
-var context = new RuntimeContext { Data = seed };
+var graphs = await new CompilerViewModel().CompileAsync(node, role);   // role = Root | Terminal
 await new RuntimeEngine().RunAsync(graphs[0], context, ct);
 ```
 
-做 Terminal 运行时，工具包还会设置 `context.Target = node`，让引擎跟踪 `context.TargetReached`。因为引擎把一次运行视作一个带 `Data`/`Status`/`Attempt`/日志的会话，所有节点输出都会经由同一个共享 `RuntimeContext` 串联。
+命名空间 `VeloxDev.Core.WorkflowSystem.CompilerEx`。`CompileRole.Root` 从起始节点编译下游子图；`CompileRole.Terminal` 反向编译单个节点的锥，并把 `context.Target` 设为该节点。不再有 `CompilerEngine` / `CompileToAsync`。
 
-**预期结果：** 对同一控制器编译两次得到同一张图；运行后 `context.Data` 是最后一个节点的输出。
+`RunCompiledRoleAsync` 经 `NewSession(seed, target, run)` 构建会话，它先应用宿主的 `WithSessionConfiguration`，然后只填补仍未设置的部分（`CheckpointStore`、执行门、错误汇）。
+
+## 5. 事后读取计划
+
+| 工具 | 签名 | 返回 |
+|---|---|---|
+| `GetCompileStatus` | `GetCompileStatus()` | 每个编译感知节点的编译身份（`Order` / `ChainIndex` / `Offset`；`isStopped = Order == -1`），**无需重新编译** |
+| `GetExecutionLog` | `GetExecutionLog()` | 树的聚合**直接**（非编译器）执行日志（一个约定命名的 `ExecutionLog` 属性） |
+
+编译器运行会话日志（带序号与 `[Warning]` / `[Error]` 标记）请用运行工具的 `logs` 字段；`GetExecutionLog` 只是直接执行日志。
+
+**预期结果：** `CompileWorkflow(0)` 后，`GetCompileStatus()` 列出已编译节点且 `Order` 非负；起始节点不是 `isStopped`。
 
 ## 运行声明
 
-- ⚠️ 仅静态核验。工具名、参数列表、角色与 JSON 形状取自 `WorkflowAgentToolkit.cs`（`CompileRoleAsync`、`RunCompiledRoleAsync`）与 CompilerEx 源码；本页内容未编译或执行。
+- ✅ 实际构建并运行 —— 2026-10-01 执行了确定性 agent 测试套件（`已通过! 失败: 0，通过: 387`）。它覆盖 `WorkflowLifecycleFidelityTests`（`CompileNodeResult_SingleNodeTree_ProducesTerminalCompilePlan`、`GetNodeResult_SingleNodeTree_RunsToCompletionWithTerminalRole`、`GetNodeResult_WithoutAllowNodeExecution_IsRejectedByPolicy`）与 `CompiledRunControlTests`，这些都在带桩解释器的 demo 图上驱动编译器路径。该运行不包含对模型的对话。

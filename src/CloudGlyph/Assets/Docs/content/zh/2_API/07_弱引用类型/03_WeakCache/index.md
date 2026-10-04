@@ -21,7 +21,7 @@ public sealed class WeakCache<TTargetKey, TCacheKey>
 
 **说明：**
 - 一个 public、可变的字段（名字与源码完全一致），决定允许累积多少次插入后再由 `AddOrUpdate` 触发一次清扫。
-- `AddOrUpdate` 在内部计数器超过该值后清扫：从清扫列表移除已回收目标、把计数器归 `0`，再按剩余目标数重新推导阈值（`GetNextCleanupThreshold` —— 约为 `0.9 × 2 × count`；无目标剩余时回到 `4`）。因此该字段既是一个可调旋钮，也是一个自适应水位。
+- `AddOrUpdate` 在内部计数器超过该值后清扫：从清扫列表移除已回收目标、把计数器归 `0`，再按剩余目标数重新推导阈值（`GetNextCleanupThreshold`：`nextCapacity = count == 0 ? 4 : count * 2; return (int)(nextCapacity * 0.9);`）。所以无目标剩余时得到的阈值是 `3` 而不是 `4` —— 那个 `4` 是中间的 `nextCapacity`，之后还要再乘 `0.9`。因此该字段既是一个可调旋钮，也是一个自适应水位。
 - 默认 `4`。与清扫行为一起由 `WeakCacheTests.AddOrUpdate_ManyItems_TriggersCleanup` 验证。
 
 ## 方法

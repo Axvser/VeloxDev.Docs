@@ -2,7 +2,9 @@
 
 ## 1. 逐条声明状态
 
-适配器的构建器就是 **`Transition<T>` 本身**（`T` 是目标类型）。用 `Transition<T>.Create()` 创建它，再用 `.Property(...)` **逐条显式声明**每个路径的目标值、用 `.Effect(...)` 声明时序。在执行之前它不触碰目标（见 [执行与控制](../05_执行与控制/index.md)）。由于构建器只是一份描述，可以只构建一次、存成静态字段，并在任意多个目标上复用。
+适配器的构建器就是 **`Transition<T>` 本身**（`T` 是目标类型）。用 `Transition<T>.Create()` 创建它，再用 `.Property(...)` **逐条显式声明**每个路径的目标值、用 `.Effect(...)` 声明时序。在执行之前它不触碰目标（见 [执行与控制](../05_执行与控制/index.md)）。由于构建器只是一份描述，可以只构建一次、存成静态字段，并在任意多个目标上复用 —— 也可以锚定到调用方提供的时间轴上，让多个动画共享一套传输。
+
+在适配器的 `Transition<T>` 之下是 Core 的构建器 `TransitionCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter, TPriorityCore>` —— 一个分段，外加一条指向后一个分段的 `next` 链。它的三种声明是 `.Property(...)`（一个目标值）、`.Effect(...)`（时序）与 `Repeat(count)` 链式扩展（本段的循环还要再跑几次；见[分段与循环](../04_分段与循环/index.md)）。
 
 ```csharp
 using System;
@@ -28,7 +30,7 @@ public static class QuickStart
 
 这与 `Examples/Transition/WPF/Demo/MainWindow.xaml.cs` 中 `Animation0` 的形状一致（在那里它是窗口 partial 类的成员）。这里没有「拍摄」或「捕获」这一步：**每条要动画的路径都必须显式写出**，声明的值就是该路径的终点值。
 
-适配器的 `Transition<T>` 为平台值类型提供了类型化 `Property` 重载（`Brush`、`Transform` 集合、`Color`、`Point`、`CornerRadius`、`Thickness`、`Size` … 以及数值 `int` / `double` / `float` / `decimal`），因此目标值会以已类型化形式存储。泛型 `Property<TValue>` 重载覆盖其余情形。
+适配器的 `Transition<T>` 为平台值类型提供了类型化 `Property` 重载（`Brush`、`Transform` 集合、`Color`、`Point`、`CornerRadius`、`Thickness`、`Size` … 以及数值 `int` / `double` / `float` / `decimal`），因此目标值会以已类型化形式存储。泛型 `Property<TValue>` 重载覆盖其余情形 —— 每个适配器都声明了它，**唯 Razor 例外**（它只提供带类型重载）。
 
 **预期结果：** 流式链返回同一个 `Transition<Rectangle>`，含三个已声明属性（`Opacity`、`RenderTransform.X`、`Fill`）与一个 2 秒自动往返的效果。此刻还不会动画。
 

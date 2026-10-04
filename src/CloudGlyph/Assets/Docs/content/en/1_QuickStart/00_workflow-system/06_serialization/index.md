@@ -1,6 +1,6 @@
 # Workflow System — Serialize & Rebuild the Tree
 
-Persist the whole graph — nodes, slots, links, layout and custom `[VeloxProperty]` state — as JSON, then rebuild it from that JSON. Whole-tree serialization is provided by the extension package `VeloxDev.Core.Extension` (`VeloxDev.MVVM.Serialization.ComponentModelEx`), so this page first adds that reference to the console project from [Install & Create the Project](../01_install/index.md).
+Persist the whole graph — nodes, slots, links, layout and custom `[VeloxProperty]` state — as JSON, then rebuild it from that JSON. Whole-tree serialization is provided by the extension package `VeloxDev.Core.Extension` (`VeloxDev.MVVM.Serialization.ComponentModelEx`), so this page first adds that reference to the console project from `Install & Create the Project`.
 
 ## 1. Reference the serialization extension
 
@@ -50,7 +50,7 @@ Console.WriteLine(copyCtx.Status);   // Completed
 Console.WriteLine(copyCtx.Data);     // tick->bias->print   (same chain as the original)
 ```
 
-**Expected result:** the rebuilt `QuickTree` runs the same `Ticker → Bias → Printer` chain and yields the same `context.Data == "tick->bias->print"` as the forward run on the original tree ([Compile & run forward](../04_compile-and-run/index.md)).
+**Expected result:** the rebuilt `QuickTree` runs the same `Ticker → Bias → Printer` chain and yields the same `context.Data == "tick->bias->print"` as the forward run on the original tree (`Compile & run forward`).
 
 ## 4. Where save/load lives in the real repository
 
@@ -58,4 +58,4 @@ The demo's save command is `TreeViewModel.Save` in `Examples/Workflow/Common/Lib
 
 > The JSON length is not a stable assertion (it depends on assembly/type versions); the node/link counts and the re-run result are the deterministic contract.
 
-Go to [Verify & complete code](../07_complete-code/index.md) for the single-file program and the run declaration.
+Go to `Verify & complete code` for the single-file program and the run declaration.

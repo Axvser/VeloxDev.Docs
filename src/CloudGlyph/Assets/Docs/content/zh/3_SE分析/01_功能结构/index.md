@@ -1,4 +1,4 @@
-# 01 · 功能结构
+﻿# 01 · 功能结构
 
 ## 功能 → 项目 → 依赖
 
@@ -12,7 +12,7 @@ Wiki 围绕**功能**而非目录组织。功能是项目对外暴露的一组�
 | **过渡动画** | `VeloxDev.Core` + 适配器 | `Eases`、`Transition<T>`、`InterpolatorCore`、`TransitionSchedulerCore`、原生插值器 | `System.Numerics`、`System.Drawing` | Demo + Test |
 | **动态主题** | `VeloxDev.Core` + 适配器 | `ThemeManager`、`ThemeConfigAttribute`、`IThemeObject`、转换器 | 过渡引擎 | Demo + Test |
 | **AOP** | `VeloxDev.Core`（`#if NET`） | `ProxyEx`、`ProxyInstance`、`AopCache`、`IAspectOriented` | `DispatchProxy`、生成器 | Demo + Test |
-| **MonoBehaviour** | `VeloxDev.Core` | `MonoBehaviourManager`、`MonoBehaviourAttribute`、`IMonoBehaviour` | Roslyn 生成器 | Demo + Test |
+| **Tickable** | `VeloxDev.Core` | `TickManager`、`TickableAttribute`、`ITickable` | Roslyn 生成器 | Demo + Test |
 | **弱引用类型** | `VeloxDev.Core` | `WeakDelegate`、`WeakQueue`、`WeakStack`、`WeakCache` | — | Test |
 | **平台适配器** | 6 个适配器 + `Src/Templates` | 附加工作流行为、各平台过渡/主题接线、`dotnet new` 模板 | 各框架 SDK | README + Demo + 源码 |
 
@@ -26,7 +26,7 @@ flowchart TD
         TR[TransitionSystem<br/>插值 · 缓动 · 调度器]
         TH[DynamicTheme<br/>主题注册 · 切换]
         AOP[AspectOriented<br/>代理拦截]
-        MB[MonoBehaviour<br/>帧循环]
+        MB[Tickable<br/>帧循环]
         WT[WeakTypes<br/>弱集合]
         AI[AI<br/>代理属性 + 反射]
     end
@@ -60,5 +60,5 @@ flowchart TD
 | 切换主题 | `ThemeManager.Transition<Light>(...)` | `Examples/Theme/*` |
 | 运行异步命令 | 分部方法上的 `[VeloxCommand]` | `Examples/MVVM/*` |
 | 拦截节点执行 | `ProxyEx.CreateProxy(...)` + `SetProxy(...)` | `Examples/AOP/*` |
-| 基于 tick 的模拟 | `[MonoBehaviour]` + `MonoBehaviourManager.Start()` | `Examples/MonoBehaviour/*` |
+| 基于 tick 的模拟 | `[Tickable]` + `TickManager.Start()` | `Examples/Tickable/*` |
 | 安装预制视图 | `dotnet new wpf-v-node -n NodeView ...` | `Src/Templates` |

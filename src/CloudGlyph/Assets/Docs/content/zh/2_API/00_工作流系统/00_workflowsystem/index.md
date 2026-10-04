@@ -110,7 +110,7 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 
 *源码：`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowNodeViewModel.cs`。*
 
-> `ReceiveAsync` 是 Compiler（引擎驱动）与非Compiler（节点驱动广播）两条路径共享的单一执行入口——每条路径以不同的 context 到达。入口、参数、时序见 [执行机制](../05_执行机制)。
+> `ReceiveAsync` 是 Compiler（引擎驱动）与非Compiler（节点驱动广播）两条路径共享的单一执行入口——每条路径以不同的 context 到达。入口、参数、时序见 `执行机制`。
 
 #### `IWorkflowSlotViewModel : IWorkflowViewModel`
 
@@ -158,13 +158,13 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 
 *源码：`Interfaces/WorkflowSystem/IWorkflowActionPair.cs`、`IWorkflowIdentifiable.cs`、`IContext.cs`、`ITaskContext.cs`、`ISlotProvider.cs`、`ISpatialMap.cs`、`ISpatialBoundsProvider.cs`。*
 
-### 值类型与枚举
+### 值类型、几何类与枚举
 
 | 类型 | 说明 |
 |---|---|
-| `Anchor(left, top, layer)` | 位置；`ICloneable`、`IEquatable<Anchor>`、`ISampleable`/`ISampler`（`Update` 原地修改 `start` 现有实例，不 new）；`==`/`!=`/`+`/`-` 运算符 |
-| `Size(width, height)` | 尺寸；`ICloneable`、`IEquatable<Size>`、`ISampleable`/`ISampler` |
-| `Offset(left, top)` | 增量向量；`ICloneable`、`IEquatable<Offset>`、`ISampleable`/`ISampler` |
+| `Anchor(left, top, layer)` | 几何类（`sealed partial class`）；位置。`ICloneable`、`IEquatable<Anchor>`；`==`/`!=`/`+`/`-` 运算符 |
+| `Size(width, height)` | 几何类（`sealed partial class`）；尺寸。`ICloneable`、`IEquatable<Size>`；`==`/`!=`/`+`/`-` 运算符 |
+| `Offset(left, top)` | 几何类（`sealed partial class`）；增量向量。`ICloneable`、`IEquatable<Offset>`；`==`/`!=`/`+`/`-` 运算符 |
 | `Viewport(left, top, width, height)` | `readonly struct`；`Empty`、`Right`、`Bottom`、`IsEmpty`、`Contains`、`IntersectsWith`、`Union`、`==`/`!=` |
 | `CanvasLayout` | `OriginSize`、`PositiveOffset`、`NegativeOffset`、`ActualSize`、`ActualOffset`、`ViewportOffset`；`AdaptTo(Size)`；`UpdateCommand` |
 | `CellKey(x, y)` | `readonly struct` 网格单元坐标；`==`/`!=` |
@@ -173,7 +173,7 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 | `SlotChannel` | `[Flags] int`：`None=0`、`OneTarget=1`、`OneSource=2`、`OneBoth=3`、`MultipleTargets=4`、`MultipleSources=8`、`MultipleBoth=12` |
 | `SlotState` | `[Flags] int`：`StandBy=1`、`PreviewSender=2`、`PreviewReceiver=4`、`Sender=8`、`Receiver=16` |
 
-*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/` 下的 `Anchor.cs`、`Size.cs`、`Offset.cs`、`Viewport.cs`、`CanvasLayout.cs`、`CellKey.cs`、`TaskContext.cs`、`WorkflowActionPair.cs`、`Enums/Slot.cs`。*
+*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/` 下的 `GUI/GeometryModels/Anchor.cs`、`GUI/GeometryModels/Size.cs`、`GUI/GeometryModels/Offset.cs`、`GUI/GeometryModels/Viewport.cs`、`GUI/GeometryModels/CanvasLayout.cs`、`GUI/Virtualization/CellKey.cs`、`TaskContext.cs`、`WorkflowActionPair.cs`、`Enums/Slot.cs`。*
 
 ### 默认 ViewModel 与 Helper
 
@@ -186,7 +186,7 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 
 说明：
 
-- `TreeHelper()` 关闭虚拟化；`TreeHelper(double cellSize)` 开启。类型标注 `[MonoBehaviour(channel: nameof(TreeHelper), fps: 10)]`，`Install` 时调用 `tree.EnableMap(CellSize, VisibleItems)`。`CellSize` 默认 `200`。
+- `TreeHelper()` 关闭虚拟化；`TreeHelper(double cellSize)` 开启。类型标注 `[Tickable(channel: nameof(TreeHelper), fps: 10)]`，`Install` 时调用 `tree.EnableMap(CellSize, VisibleItems)`。`CellSize` 默认 `200`。
 - `NodeHelper.SetAnchor/SetSize/Move` 在变更后调用 `Component.Parent.GetHelper().MarkDirty()`。
 - `NodeDefaultViewModel.ReceiveCommand` 把参数包装成 `TaskContext` 并调用 `Helper.ReceiveAsync(ctx, ct)` —— 携带可空 data/sender/receiver 的唯一接收路径（`NodeDefaultViewModel.cs` 的 `Receive` 命令，约第 116-120 行）。
 - 四个默认 ViewModel 都实现 `IWorkflowIdentifiable`（`RuntimeId = Guid.NewGuid().ToString("N")`）。
@@ -226,7 +226,7 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 | `WorkflowSpatialEx` | 扩展：`EnableMap(tree, cellSize, observable)`、`Virtualize(tree, viewport)`、`QueryNodes(tree, viewport)`、`ClearMap(tree)`。 |
 | `ISpatialMap<T>` / `ISpatialBoundsProvider` | 空间抽象（见上文「其他接口」）。 |
 
-*源码：`WorkflowSystem/SpatialGridHashMap.cs`、`WorkflowSystem/WorkflowSpatialManager.cs`、`WorkflowSystem/NodeBoundsProvider.cs`、`WorkflowSystem/NodePairBoundsProvider.cs`、`StandardEx/WorkflowSpatialEx.cs`、`Interfaces/WorkflowSystem/ISpatialMap.cs`、`Interfaces/WorkflowSystem/ISpatialBoundsProvider.cs`。*
+*源码：`WorkflowSystem/GUI/Virtualization/SpatialGridHashMap.cs`、`WorkflowSystem/GUI/Virtualization/WorkflowSpatialManager.cs`、`WorkflowSystem/GUI/Virtualization/NodeBoundsProvider.cs`、`WorkflowSystem/GUI/Virtualization/NodePairBoundsProvider.cs`、`WorkflowSystem/GUI/Virtualization/WorkflowSpatialEx.cs`、`Interfaces/WorkflowSystem/ISpatialMap.cs`、`Interfaces/WorkflowSystem/ISpatialBoundsProvider.cs`。*
 
 ### 渲染就绪辅助（核心层，与 GUI 无关）
 
@@ -237,3 +237,20 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 | `WorkflowGuard` | `[Conditional("DEBUG")] Fail(message)` —— 仅调试态的契约守卫，抛出 `InvalidOperationException` |
 
 *源码：`WorkflowSlotUpdateGate.cs`、`WorkflowLinkRenderEx.cs`、`WorkflowGuard.cs`。*
+
+### 连线交互（`LinkInteraction`）
+
+所有 GUI 把连线输入转发进来的中枢，每棵树一个实例。`LinkInteraction.For(IWorkflowTreeViewModel)` 返回共享实例；宿主用 `Publish(PointerEvent)`、`Publish(KeyEvent)` 发布翻译后的输入，并在自己的菜单开/合时用 `Publish(ContextMenuEvent)` 上报，然后订阅结果，而不必各平台各自重推命中测试。
+
+| 成员 | 类别 | 说明 |
+|---|---|---|
+| `For(tree)` | 静态 | 一棵树唯一的中枢（与树同寿）。 |
+| `HoveredLink`、`HitRadius` | 属性 | 指针下的连线；曲线两侧的命中半径。 |
+| `AutoHighlight`、`AutoDelete`、`IsSuspended` | 属性 | 悬停高亮与 Delete 删除默认开启；宿主菜单打开期间 `IsSuspended` 为真，使指针移到菜单上不会清掉选中。 |
+| `HoverChanged`、`LinkPressed`、`LinkDeleteRequested` | 事件 | 结果事件；删除只是「请求」，除非 `AutoDelete` 才真正执行。 |
+| `PreviewHoverChanged`、`PreviewLinkPressed`、`PreviewLinkDeleteRequested` | 事件 | 预览阶段，可用 `WorkflowEventHandle.PreventDefault` 逐事件拒绝。 |
+| `ContextMenuRequesting`、`ContextMenuRequested` | 事件 | 右键的两个阶段，交给弹菜单的人；在 `Requesting` 里拒绝会由构造保证连 `Requested` 也不报。 |
+| `ContextMenuOpened`、`ContextMenuClosed` | 事件 | `Publish(ContextMenuEvent)` 上报菜单已开/已合之后抛出；悬停挂起随之升降。 |
+| `ContextMenuDismissRequested` | 事件 | 当打开的菜单所针对的连线离开树时抛出，请宿主收起那份菜单 —— 菜单绝不比它作用的连线活得更久。宿主收起后报 `ContextMenuPhase.Closed`。 |
+
+*源码：`WorkflowSystem/GUI/Events/LinkInteraction.cs`、`WorkflowSystem/GUI/Events/Link/*.cs`、`WorkflowSystem/GUI/Events/Menu/*.cs`。*

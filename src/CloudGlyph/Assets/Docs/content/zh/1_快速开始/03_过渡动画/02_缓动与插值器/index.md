@@ -45,7 +45,7 @@ public static class QuickStart
 }
 ```
 
-**预期结果：** 效果对象的 `Ease` 是 `Eases.Back.Out`；`Back` 曲线会先冲过目标再回弹落定，写入值前帧采样器会把 `t` 钳制到 `[0,1]`。
+**预期结果：** 效果对象的 `Ease` 是 `Eases.Back.Out`；`Back` 曲线会先冲过目标再回弹落定 —— 解释器把缓动后的值**不夹取**地交给采样器，由采样器决定是能外推（数值型可以）还是必须钉在端点。
 
 ## 2. 定义自定义缓动
 
@@ -84,7 +84,7 @@ Transition<Rectangle>.Create()
 - `NormalizeEnd(start, end, options)` —— 在 `t >= 1` 时写入的值（默认原样返回 `end`）。
 - `InsertFrame(target, property, ref working, start, end, options, t)` —— 在缓动时间 `t` 插值 `start → end` 并写入目标。实现**绝不能修改** `start` / `end`（它们与快照共享）。
 
-引擎核心注册表在 `InterpolatorCore`（`NativeInterpolators` 字典）中，覆盖 `double`、`float`、`int`、`long`、`Point`、`PointF`、`Size`、`SizeF`、`Color`、`Rectangle`、`RectangleF`，以及 —— `netstandard2.0` 之外 —— `Vector2/3/4`、`Quaternion`。每个 GUI 适配器再注册各自的框架采样器（例如 WPF 增加 `Brush`、`Thickness`、`CornerRadius`、`Transform`、`DropShadowEffect`、`Point3D`、`Vector3D`）。自定义采样器用静态注册表 API 增删：
+引擎核心的注册在 `InterpolatorCore` 的静态构造函数里（注册表本身是私有的，只有 `RegisterInterpolator` / `UnregisterInterpolator` / `TryGetInterpolator` 能触达它），覆盖 `double`、`float`、`int`、`long`、`Point`、`PointF`、`Size`、`SizeF`、`Color`、`Rectangle`、`RectangleF`，以及 —— `netstandard2.0` 之外 —— `Vector2/3/4`、`Quaternion`。每个 GUI 适配器再注册各自的框架采样器（例如 WPF 增加 `Brush`、`Thickness`、`CornerRadius`、`Transform`、`Effect`、`Point3D`、`Vector3D`）。自定义采样器用静态注册表 API 增删：
 
 ```csharp
 using VeloxDev.TransitionSystem;

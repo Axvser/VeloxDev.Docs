@@ -10,6 +10,6 @@ PlantUML sequence diagrams for each feature's core API call chains. Each page co
 | [03 Transition](03_transition) | Execute chain → per-target scheduler (mutual/non-mutual) → Prepare → FPS-paced sampling loop → UI-thread apply → lifecycle events |
 | [04 Dynamic Theme](04_dynamic-theme) | `InitializeTheme` registration + converter pipeline → `PrepareSamplers` groups → one `CreateScheduler` per target on a shared `ITimeSourceControl` (animated), or `ApplyImmediately` (`Jump`) → runtime overrides (`SetThemeValue`/`RestoreThemeValue`) |
 | [05 AOP](05_aop) | CreateProxy → set hooks → invoke → start/coverage/end chain |
-| [06 MonoBehaviour](06_monobehaviour) | Start channel → update/late/fixed ticks → stop |
+| [06 Tickable](06_tickable) | Start + registration → per-frame Update/LateUpdate + fixed batch → pause/resume → stop |
 | [07 Weak Types](07_weak-types) | Enqueue/push → sweep-on-access → dequeue/pop |
 | [08 Platform Adapters](08_platform-adapters) | Attach & wiring → pan/pointer → zoom collapse → node drag → slot connect → minimap navigation |

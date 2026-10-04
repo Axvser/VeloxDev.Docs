@@ -1,6 +1,6 @@
 # 工作流系统 — 构建画布
 
-把 [02 定义组件](../02_定义组件/index.md) 的 `CalcTree` / `CalcNode` 实例注册进画布并连成一张**扇出图**：`Source` 的出线同时接到 `Report` 与 `Discard`（本页类型沿用前页定义，最终代码见 [07 完整代码](../07_完整代码/index.md)）。
+把 `02 定义组件` 的 `CalcTree` / `CalcNode` 实例注册进画布并连成一张**扇出图**：`Source` 的出线同时接到 `Report` 与 `Discard`（本页类型沿用前页定义，最终代码见 `07 完整代码`）。
 
 #### 1. 建树并设定画布尺寸
 
@@ -69,4 +69,4 @@ Nodes=3 Links=2 source.Output.Targets=2 channels=MultipleTargets|OneSource|OneSo
 
 ## 下一步
 
-图画好了，进入 [04 编译与正向运行](../04_编译与运行/index.md) 编译并驱动它。
+图画好了，进入 `04 编译与正向运行` 编译并驱动它。

@@ -6,15 +6,15 @@ Each platform adapter (`Src/Adapters/VeloxDev.WPF|Avalonia|WinUI|MAUI|WinForms|R
 
 | Type | Role | Derives from |
 |---|---|---|
-| `Transition` | Non-generic static entry (cancel / exit helpers) | `TransitionCore` |
-| `Transition<T>` | Generic entry point, fluent builder and executor in one type (`Create` / `Property` / `Effect`, plus the inherited `Execute` / `Exit` / `GetState`) | `TransitionCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter, TPriorityCore>` |
+| `Transition` | Non-generic static entry (cancel / exit / control helpers) | `TransitionCore` |
+| `Transition<T>` | Generic entry point, fluent builder and executor in one type (`Create` / `Property` / `Effect`, plus the inherited `Execute` / control methods / `GetState`) | `TransitionCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter, TPriorityCore>` |
 | `Interpolator` | Platform sampler registry (subclasses `InterpolatorCore` and registers platform types in its static ctor) | `InterpolatorCore` |
 | `State` | Declared-state bag | `StateCore` |
 | `TransitionEffect` | Timing descriptor with a default priority where applicable | `TransitionEffectCore` or `TransitionEffectCore<TPriorityCore>` |
 | `TransitionEffects` | `Empty` / `Theme` / `Hover` presets | static class (instance class on WinUI) |
-| `UIThreadInspector` | Platform UI-thread marshaling | `UIThreadInspectorCore` or `UIThreadInspectorCore<TPriorityCore>` |
-| `TransitionScheduler` | Per-target scheduler | `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter[, TPriorityCore]>` |
-| `TransitionInterpreter` | Sampling-loop interpreter | `TransitionInterpreterCore<TransitionEffect[, TPriorityCore]>` |
+| `UIThreadInspector` | The adapter's **host**: thread affinity + dispatch + liveness | `TransitionHostBase<TPriorityCore>` |
+| `TransitionScheduler` | Per-target scheduler | `TransitionSchedulerCore<UIThreadInspector, TransitionInterpreter, TPriorityCore>` |
+| `TransitionInterpreter` | Sampling-loop interpreter (and its `FramePacerCore` override) | `TransitionInterpreterCore<TransitionEffect[, TPriorityCore]>` |
 | platform samplers | Registered value-type interpolators | `ISampler` (namespace `VeloxDev.Adapters.NativeSamplers` per adapter) |
 
 Priority-typed adapters (WPF, Avalonia, Jalium, WinUI) marshal writes at a dispatcher priority; MAUI, WinForms and Razor are non-priority.
@@ -31,6 +31,6 @@ Priority-typed adapters (WPF, Avalonia, Jalium, WinUI) marshal writes at a dispa
 
 ## Sub-pages
 
-- [transition](00_transition/index.md) — `Transition`, `Transition<T>` (the `Property` / `Effect` overload sets, and the inherited `Execute` / `Exit` / `GetState`).
-- [effect-interpolator](01_effect-interpolator/index.md) — `Interpolator` and its per-adapter sampler registrations, `TransitionEffect`, `TransitionEffects`, and `State`.
-- [ui-inspector](02_ui-inspector/index.md) — `UIThreadInspector` per adapter, plus the `TransitionScheduler` / `TransitionInterpreter` adapter subclasses.
+- [transition](00_transition/index.md) — `Transition`, `Transition<T>` (the `Property` / `Effect` overload sets, and the inherited `Execute` / control / `GetState` surface).
+- [effect-interpolator](01_effect-interpolator/index.md) — `Interpolator` and its per-adapter sampler registrations, `TransitionEffect` (including the `Warn` / `Error` diagnostic events), `TransitionEffects`, and `State`.
+- [ui-inspector](02_ui-inspector/index.md) — `UIThreadInspector` (the adapter's host) per platform, plus the `TransitionScheduler` / `TransitionInterpreter` adapter subclasses.

@@ -23,7 +23,7 @@ dotnet add package VeloxDev.Core
 dotnet add package VeloxDev.Core.Extension
 ```
 
-`VeloxDev.Core.Extension` 提供 `VeloxDev.MVVM.Serialization.ComponentModelEx`（`Serialize` / `Deserialize`），本指南在 [06 序列化](../06_序列化/index.md) 用到。
+`VeloxDev.Core.Extension` 提供 `VeloxDev.MVVM.Serialization.ComponentModelEx`（`Serialize` / `Deserialize`），本指南在 `06 序列化` 用到。
 
 **预期结果：** `.csproj` 的 `<ItemGroup>` 中出现对应 `PackageReference`；`dotnet restore` 成功。
 
@@ -44,4 +44,4 @@ dotnet add package VeloxDev.Core.Extension
 
 ## 下一步
 
-依赖就绪后，在 [02 定义组件](../02_定义组件/index.md) 声明 Tree / Slot / Node 与节点 Helper。
+依赖就绪后，在 `02 定义组件` 声明 Tree / Slot / Node 与节点 Helper。

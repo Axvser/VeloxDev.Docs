@@ -50,13 +50,13 @@ private static void ForceGc()
 }
 ```
 
-`WaitForPendingFinalizers` matters only if the objects have finalizers (the sample `Payload` does not); the second `Collect` then reclaims anything the finalizer pass released. Run with `dotnet run -c Release` and without an attached debugger.
+`WaitForPendingFinalizers` matters only if the objects have finalizers (the sample `Payload` does not); the second `Collect` then reclaims anything the finalizer pass released. Run with `dotnet run -c Release` and without an attached debugger when you can; the transcript on the [Complete Code](../08_verify-and-complete-code/) page was produced with `-c Debug` because this repository's `Release` build of `VeloxDev.Core` currently fails on an unrelated file (see the note in its run declaration). Creating the doomed objects inside helpers keeps the result stable in either configuration.
 
-**Expected result:** the same items are collected on every `Release` run — the recorded transcript in the [Complete Code](../08_verify-and-complete-code/) page is stable.
+**Expected result:** the same items are collected on every run — the recorded transcript in the [Complete Code](../08_verify-and-complete-code/) page is stable.
 
 ## 5. Debug vs Release and other caveats
 
-- **Debug / attached debugger.** Under a debugger, or in a Debug build, the JIT can keep local variables alive until the end of their enclosing scope, so objects you *think* are dead may still be reported live. That is why GC demonstrations are run in `Release`.
+- **Debug / attached debugger.** Under a debugger, or in a Debug build, the JIT can keep local variables alive until the end of their enclosing scope, so objects you *think* are dead may still be reported live. That is why GC demonstrations prefer a `Release` build with no debugger attached; the sample program sidesteps the difference by creating every doomed object inside a helper whose frame has already returned.
 - **Interned strings.** String literals are interned by the runtime and stay reachable for the whole process. `WeakCacheTests.cs` uses keys such as `"key1"`, so those entries are never evicted; the tests assert API behaviour, not GC eviction. Use freshly allocated object keys (like the `Payload` in this Quick Start) to observe eviction.
 - **Weak list still needs a rebuild trigger.** In `WeakDelegate<TDelegate>` the cached combined delegate strongly references every handler merged into it. A subscriber is only collected once it is not part of the current cache — add it with `CanUpdateCache: false`, or ensure a later rebuild/`Clone` drops it (see [WeakDelegate](../03_weak-delegate/)).
 - **Do not build correctness on GC timing.** Use weak collections to *avoid leaks*, never to implement "fire exactly once after a delay" logic — collection timing is an implementation detail of the runtime.

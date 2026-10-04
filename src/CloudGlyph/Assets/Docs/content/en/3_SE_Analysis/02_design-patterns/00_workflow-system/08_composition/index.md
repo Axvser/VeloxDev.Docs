@@ -2,7 +2,7 @@
 
 `IWorkflowNodeViewModel.Slots` owns `IWorkflowSlotViewModel` instances; links are not stored on the nodes — each link is a derived edge `sender.Targets` / `receiver.Sources`, and the spatial manager re-derives them as **node-pair bounds** (`NodePairBoundsProvider`) so a long link crossing the viewport keeps both endpoint nodes visible:
 
-> Source: `Src/Core/VeloxDev.Core/WorkflowSystem/GUI/Virtualization/WorkflowSpatialManager.cs`, lines 146-180
+> Source: `Src/Core/VeloxDev.Core/WorkflowSystem/GUI/Virtualization/WorkflowSpatialManager.cs`, lines 150-184
 
 ```csharp
 private void InsertLink(IWorkflowLinkViewModel link)

@@ -9,6 +9,6 @@
 | `WorkflowSlotEx` | `GetStandardCommands`、`StandardSetChannel`、`StandardUpdateState`、`StandardApplyConnection`、`StandardReceiveConnection`、`StandardCanBeSender`、`StandardCanBeReceiver`、`StandardDelete` |
 | `WorkflowLinkEx` | `GetStandardCommands`、`StandardDelete` |
 | `WorkflowCommandEx` | `StandardClosing`、`StandardClosingAsync`、`StandardClose`、`StandardCloseAsync`、`StandardClosed`、`StandardClosedAsync` |
-| `WorkflowSpatialEx` | 见上文空间系统 |
+| `WorkflowSpatialEx` | 见上文空间系统。它与其余类同属 `StandardEx` 命名空间，但文件位于 `WorkflowSystem/GUI/Virtualization/WorkflowSpatialEx.cs`（不在 `StandardEx/` 下） |
 
-*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/`。*
+*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/`（`WorkflowSpatialEx` 除外，位于 `Src/Core/VeloxDev.Core/WorkflowSystem/GUI/Virtualization/WorkflowSpatialEx.cs`）。*

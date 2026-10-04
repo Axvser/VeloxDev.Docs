@@ -53,9 +53,33 @@ Console.WriteLine(context.Data);          // tick->bias->print
 foreach (var line in context.Logs) Console.WriteLine(line);
 ```
 
-`RuntimeEngine` (`Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/Runtime/RuntimeEngine.cs`) drives each segment: a `ChainSegment` drives its nodes one by one, a `BranchSegment` drives the router then the selected sub-graph, a `ParallelSegment` executes its branches in order. Each node is driven through its helper's `ReceiveAsync` with the *same* `RuntimeContext` session (nodes implementing `IRuntimeAware` also get the session injected). The node's return value is written back to `context.Data`, so the next node in the chain receives the previous node's output — which is exactly why `Bias` sees `"tick"` and `Printer` sees `"tick->bias"`.
+`RuntimeEngine` (`Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/Runtime/RuntimeEngine.cs`) drives each segment: a `ChainSegment` drives its nodes one by one, a `BranchSegment` drives the router then the selected sub-graph, a `ParallelSegment` runs its branches concurrently (interleaved async work, not thread parallelism). Each node is driven through its helper's `ReceiveAsync` with the *same* `RuntimeContext` session (nodes implementing `IRuntimeAware` also get the session injected). The node's return value is written back to `context.Data`, so the next node in the chain receives the previous node's output — which is exactly why `Bias` sees `"tick"` and `Printer` sees `"tick->bias"`.
 
 **Expected result:** `context.Status == "Completed"`, `context.Data == "tick->bias->print"`, `context.Attempt == 1`, and `context.IsRunning` is `false` when `RunAsync` returns. Cancelling the token (or a non-redirectable node error) yields `Status == "Stopped"` instead.
+
+Read `Outcome` rather than parsing `Status`: it is the precise reading of `Status` + `EndedWithError`, because that one word `"Stopped"` has to cover both a failure and a cancellation.
+
+```csharp
+Console.WriteLine($"{context.Status} {context.Outcome}");   // Completed Completed
+```
+
+| `Outcome` | When |
+|---|---|
+| `Unknown` | the run has not ended — never started, or still going |
+| `Completed` | every entry was walked (a terminal branch that ends the run early is a completion) |
+| `Cancelled` | `Status == "Stopped"` and `EndedWithError == false` — the host's token ended it |
+| `Failed` | `Status == "Stopped"` and `EndedWithError == true` — a failure ended the flow |
+
+**Expected result:** `Completed Completed` for this graph.
+
+The compiled graph can also be flattened into one bindable list, which is handy for a tree view:
+
+```csharp
+foreach (var row in CompiledOutline.Of(graph))
+    Console.WriteLine($"{new string(' ', row.Depth * 2)}{row.Kind} | {row.Label}");
+```
+
+**Expected result:** `Execute | TickerNode → BiasNode → PrinterNode` — one row, because a linear chain is one `ChainSegment`. Each row carries `Depth`, `Kind` (`Execute` / `Branch` / `Parallel`), `Label` and the nodes it names.
 
 ## 4. The three execution entry points
 
@@ -81,4 +105,4 @@ An edge whose `AccessAsync` rejects the payload is treated as unconnected and sk
 
 **Chain level (compiled).** The engine in step 3 owns downstream dispatch: it drives nodes only via `Helper.ReceiveAsync` and never triggers a node's `ReceiveCommand` / `BroadcastCommand`.
 
-Go to [Compile a result (Terminal)](../05_terminal-compile/index.md).
+Go to `Compile a result (Terminal)`.

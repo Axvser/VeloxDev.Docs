@@ -85,7 +85,7 @@ A single-file, self-contained WPF program (no XAML): create an empty project (`d
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="VeloxDev.WPF" Version="9.0.0" />
+        <PackageReference Include="VeloxDev.WPF" Version="10.0.0" />
     </ItemGroup>
 
 </Project>
@@ -171,6 +171,12 @@ Every identifier is defined above or in the referenced packages: the two `[Theme
 
 ## 5. Run declaration
 
+- ✅ **Re-verified on 2026-10-01.** All four demos build and both test files pass, re-run against the current source:
+    - `dotnet build "Examples/Theme/WPF Trimmed/Demo/Demo.csproj" -c Debug` — `已成功生成。 0 个警告 0 个错误` (`Demo -> bin/Debug/net9.0-windows/Demo.dll`).
+    - `dotnet build "Examples/Theme/WPF/Demo/Demo.csproj" -c Debug` — `已成功生成。 0 个警告 0 个错误` (`Demo -> bin/Debug/net9.0-windows/Demo.dll`).
+    - `dotnet build "Examples/Theme/Avalonia Trimmed/Demo/Demo.csproj" -c Debug` — `已成功生成。 0 个警告 0 个错误` (`Demo -> bin/Debug/net9.0/Demo.dll`).
+    - `dotnet build "Examples/Theme/Avalonia/Demo/Demo.csproj" -c Debug` — `已成功生成。 0 个警告 0 个错误`.
+    - `dotnet test Src/Core/VeloxDev.Core.Test/VeloxDev.Core.Test.csproj --filter "FullyQualifiedName~DynamicTheme"` — `已通过! - 失败: 0，通过: 15，已跳过: 0，总计: 15` on `net10.0`.
 - ✅ **Built and measured on 2026-09-13.** Recorded outputs:
     - `dotnet build "Examples/Theme/WPF Trimmed/Demo/Demo.csproj" -c Debug` — `已成功生成。 0 个警告 0 个错误`.
     - `dotnet build "Examples/Theme/Avalonia Trimmed/Demo/Demo.csproj" -c Debug` — same, 0 warnings / 0 errors.

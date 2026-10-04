@@ -16,7 +16,7 @@ The suite lives in a WPF project with `UseWPF` enabled and a package reference t
         <UseWPF>true</UseWPF>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="VeloxDev.WPF" Version="9.0.0" />
+        <PackageReference Include="VeloxDev.WPF" Version="10.0.0" />
     </ItemGroup>
 </Project>
 ```
@@ -28,11 +28,25 @@ Sub-pages (one page per source file):
 - [00 WorkflowView — the surface host](00_workflow-view/index.md)
 - [01 NodeView — the node card](01_node-view/index.md)
 - [02 SlotView — the connector](02_slot-view/index.md)
-- [03 LinkView — the polyline link](03_link-view/index.md)
+- [03 LinkView — the curve link](03_link-view/index.md)
 - [04 GridDecorator — grid + rulers](04_grid-decorator/index.md)
 - [05 MinimapOverlay — the minimap](05_minimap-overlay/index.md)
 - [06 TemplateSelector — the DataTemplate selector](06_template-selector/index.md)
 
 ## Run declaration
 
-- ⚠️ Not actually run — statically verified only. Each code block was produced from the real template sources under `Src/Templates/VeloxDev.WPF.Templates/working/content` (symbols substituted with their default values) and cross-checked against the adapter API surface in `Src/Adapters/VeloxDev.WPF`; the files compile against that surface but were not compiled or executed in this environment, so treat the scaffold as verified-by-inspection rather than proven-by-run.
+- ✅ Generated and diffed on 2026-10-01. The seven `dotnet new wpf-v-*` commands on the [Setup](../02_setup/index.md) page were actually run against the installed `VeloxDev.WPF.Templates` pack; they produced exactly **11 files** under `Views/`:
+
+```text
+已成功创建模板“VeloxDev WPF Workflow Tree View”。
+已成功创建模板“VeloxDev WPF Workflow Node View”。
+已成功创建模板“VeloxDev WPF Workflow Slot View”。
+已成功创建模板“VeloxDev WPF Workflow Link View”。
+已成功创建模板“VeloxDev WPF Workflow Template Selector”。
+已成功创建模板“VeloxDev WPF Workflow Grid Decorator”。
+已成功创建模板“VeloxDev WPF Workflow Minimap Overlay”。
+```
+
+  The code blocks on the seven sub-pages were then byte-compared against the generated files: **9 of 11 match verbatim**; the two that did not (`WorkflowView.xaml` missing `CornerRadius="3"`, and a mangled comment in `NodeView.xaml`) were corrected to match.
+- ✅ The demo that hosts this view layer built on the same date: `dotnet build Examples/Workflow/WPF/Demo/Demo.csproj` succeeded with 0 warnings / 0 errors (see the [Verification](../04_verification/index.md) run declaration).
+- ⚠️ The generated scaffold was not compiled *in isolation* (it was emitted into a scratch folder, not a WPF project) and the assembled app was not launched — treat it as verified-by-generation plus verified-by-build of the equivalent in-repo demo, not as a proven end-to-end run of this exact scaffold.

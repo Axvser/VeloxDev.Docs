@@ -20,10 +20,10 @@ dotnet new wpf-v-minimap  -n MinimapOverlay    -ns Demo.Views.Workflow -o Views
 
 | File | Template | Role |
 |---|---|---|
-| `WorkflowView.xaml(.cs)` | `wpf-v-tree` | Surface host: `WorkflowSurfaceBehavior` (with `ZoomEnabled`), named parts `PART_ScrollViewer` / `PART_Canvas` / `PART_GridDecorator` / `PART_SurfaceBorder` / `PART_MinimapOverlay`, `ViewPool` bound to `Helper.VisibleItems`, and the `NodeTemplate` / `LinkTemplate` `DataTemplate`s plus `TemplateSelector` |
+| `WorkflowView.xaml(.cs)` | `wpf-v-tree` | Surface host: `WorkflowSurfaceBehavior` (with `ZoomEnabled`), named parts `PART_ScrollViewer` / `PART_Canvas` / `PART_GridDecorator` / `PART_SurfaceBorder` / `PART_MinimapOverlay`, `ViewPool` bound to `Helper.VisibleItems`, the `NodeTemplate` / `LinkTemplate` `DataTemplate`s plus `TemplateSelector`, and the link context menu (`LinkMenuKey="LinkContextMenu"` pointing at a keyed `ContextMenu` whose entries bind the link they act on) |
 | `NodeView.xaml(.cs)` | `wpf-v-node` | Node card: `WorkflowSlotLayoutBehavior` (`PART_InputSlot`, `PART_OutputSlots`, `CoordinateHostName="PART_Canvas"`) and `WorkflowNodeDragBehavior` on the header |
 | `SlotView.xaml(.cs)` | `wpf-v-slot` | Connector: `WorkflowSlotConnectionBehavior.IsEnabled="True"` plus pointer handlers that run `SendConnectionCommand` / `ReceiveConnectionCommand`; `SlotState` drives the color |
-| `LinkView.xaml(.cs)` | `wpf-v-link` | Passive orthogonal polyline link that draws when `CanRender` and the link is render-ready |
+| `LinkView.xaml(.cs)` | `wpf-v-link` | Paint-only cubic Bézier link that draws when `CanRender` and the link is render-ready, publishes its curve for hit testing, and implements `ILinkHighlight` for hover |
 | `TemplateSelector.cs` | `wpf-v-selector` | `DataTemplateSelector` mapping `IWorkflowLinkViewModel` / `IWorkflowSlotViewModel` / `IWorkflowNodeViewModel` / `IWorkflowTreeViewModel` to the four `DataTemplate` properties |
 | `GridDecorator.cs` | `wpf-v-decorator` | `Grid`-based decorator implementing `IWorkflowGridDecorator` (grid layer + floating rulers), fed by the surface behavior |
 | `MinimapOverlay.cs` | `wpf-v-minimap` | Subclass of `WorkflowMinimapOverlay` applying the color template symbols |

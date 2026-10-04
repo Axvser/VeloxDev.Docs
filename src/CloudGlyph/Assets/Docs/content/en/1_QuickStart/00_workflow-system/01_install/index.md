@@ -12,7 +12,7 @@ cd WorkflowQuickStart
 
 ## 2. Reference the core engine
 
-The engine lives in `Src/Core/VeloxDev.Core`. Add it as a project reference — the build pulls in the `VeloxDev.Core.Generator` source generator (version `9.0.0`) that emits the component plumbing:
+The engine lives in `Src/Core/VeloxDev.Core`. Add it as a project reference — the build pulls in the `VeloxDev.Core.Generator` source generator (version `10.0.0`) that emits the component plumbing:
 
 ```bash
 dotnet add reference ..\Src\Core\VeloxDev.Core\VeloxDev.Core.csproj
@@ -33,7 +33,7 @@ Make sure the project file enables nullable and implicit usings so it matches th
 
 **Expected result:** `dotnet restore` completes without errors, and a component file can `using VeloxDev.WorkflowSystem;` and `using VeloxDev.Core.WorkflowSystem.CompilerEx;`.
 
-**Whole-tree JSON serialization** (used on the [Serialize & rebuild](../06_serialization/index.md) page) lives in the `VeloxDev.Core.Extension` project. Reference it the same way when you get to that step:
+**Whole-tree JSON serialization** (used on the `Serialize & rebuild` page) lives in the `VeloxDev.Core.Extension` project. Reference it the same way when you get to that step:
 
 ```bash
 dotnet add reference ..\Src\Core\VeloxDev.Core.Extension\VeloxDev.Core.Extension.csproj

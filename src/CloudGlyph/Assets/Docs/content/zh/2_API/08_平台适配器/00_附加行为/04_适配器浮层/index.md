@@ -4,7 +4,7 @@
 
 ## 类：`WorkflowLinkOverlay`（MAUI）
 
-MAUI 把工作流连接渲染成专用图形层，而非每条连接独立的视觉元素。源码：`Src/Adapters/VeloxDev.MAUI/Attached/Workflow/WorkflowLinkOverlay.cs`。
+MAUI 在一个视口大小的 `GraphicsView` 里绘制那些**没有自己视图**的连接 —— 立即模式宿主，以及池化连接视图尚未实例化出来的那几帧。已经把自己的曲线连同绘制它的控件一起发布的连接由那个控件绘制，这里跳过。源码：`Src/Adapters/VeloxDev.MAUI/Attached/Workflow/WorkflowLinkOverlay.cs`。
 
 ```csharp
 public sealed class WorkflowLinkOverlay : GraphicsView
@@ -21,49 +21,52 @@ public sealed class WorkflowLinkOverlay : GraphicsView
 | `LinkLineColor` | `Color?` | 实线连接描边。 |
 | `VirtualLineColor` | `Color?` | 虚拟 / 超出可达范围连接段所用描边。 |
 | `StrokeWidth` | `double` | 连接描边宽度。 |
+| `LinkFlowEnabled` | `bool` | 开关沿曲线流动的光带动画。 |
+| `InteractionSource` | `View?` | 已在表面输入路径上的视图，用来把悬停/按下转发给命中测试（覆盖层自身保持 `InputTransparent`）。 |
+| `SelectedLinkColor` | `Color?` | 悬停/选中连接的描边。 |
 
-覆盖层用 MAUI 图形 `IDrawable` 模型绘制连接折线（`Draw(ICanvas canvas, RectF dirtyRect)`），包括箭头。它是 XAML 适配器挂到各连接视图上的连接视觉在 MAUI 上的转发表面。*确切的拖拽/重排语义属 `*推断所得*` —— 未经自动化 Demo 驱动。*
+覆盖层用 MAUI 图形 `IDrawable` 模型（`Draw(ICanvas canvas, RectF dirtyRect)`）把每条连接画成一条三次贝塞尔曲线；流动的光带是按弧长从该曲线上裁出来的，而不是沿折线映射。它是纯绘制层（`VisualElement.InputTransparent` 恒为 `true`，视口大小的视图因此不会吞掉画布手势）；交互经 `InteractionSource` 驱动 —— 悬停一条连接即选中它，`Delete` 删除它，右键（非 Windows 上是长按）转发给 `LinkInteraction`，由宿主表面弹出自己的菜单。*确切的拖拽/重排语义属 `*推断所得*` —— 未经自动化 Demo 驱动。*
 
 ## 类：`WorkflowGridDecorator`（Jalium）
 
-Jalium 提供现成的网格/标尺装饰元素（WPF/Avalonia/WinUI 改由 `*-v-decorator` 模板获得）。源码：`Src/Adapters/VeloxDev.Jalium/Attached/Workflow/WorkflowGridDecorator.cs`。
+Jalium 提供现成的网格/标尺装饰层（WPF/Avalonia/WinUI/WinForms 改由 `*-v-decorator` 模板或各角色基类获得）。源码：`Src/Adapters/VeloxDev.Jalium/Attached/Workflow/WorkflowGridDecorator.cs`。它是一个纯绘制/配置类（无基类型，**也不实现** `IWorkflowGridDecorator`）；复合控件 `WorkflowTreeView` 经自身的 `GridDecorator` 属性持有它。Razor 有同名组件（`WorkflowGridDecorator.razor` + `.razor.cs`）。
 
 ```csharp
-public class WorkflowGridDecorator : Decorator, IWorkflowGridDecorator
-```
-
-依赖属性：
-
-| 属性 | 类型 | 说明 |
-|---|---|---|
-| `RulerThickness` | `double` | 标尺带厚度。 |
-| `GridSpacing` | `double` | 次要网格间距。 |
-| `MajorLineEvery` | `int` | 每 N 条次要线为一条主线。 |
-| `ScrollOffsetX` / `ScrollOffsetY` / `ContentOffsetX` / `ContentOffsetY` | `double` | `IWorkflowGridDecorator` 偏移。 |
-
-它还暴露 `RulerBand => RulerThickness`（接口的只读带厚度，用于虚拟化内缩）。
-
-## 类：`WorkflowTreeView`（Jalium）
-
-现成的整个工作流编辑器复合宿主控件。源码：`Src/Adapters/VeloxDev.Jalium/Attached/Workflow/WorkflowTreeView.cs`。
-
-```csharp
-public class WorkflowTreeView : Grid
+public class WorkflowGridDecorator
 ```
 
 | 成员 | 类型 | 说明 |
 |---|---|---|
-| `PART_SurfaceBorder` | `Border`（get） | 表面边框。 |
-| `PART_ScrollViewer` | `ScrollViewer`（get） | 内部滚动查看器（自动滚动条、透明背景）。 |
-| `PART_Canvas` | `Canvas`（get） | 节点/连接画布。 |
-| `PART_GridDecorator` | `FrameworkElement`（get） | 活动网格装饰层。 |
-| `PART_MinimapOverlay` | `FrameworkElement?`（get） | 活动小地图覆盖层。 |
-| `TemplateSelector` | `IWorkflowTemplateSelector?` | 节点/连接视图工厂；须在赋值 `ViewModel` 前设置。 |
-| `ViewModel` | `IWorkflowTreeViewModel?` | 工作流树；设置它也会设置 `DataContext`。 |
-| `GridDecorator`（set） | `IWorkflowGridDecorator?` | 换入带样式的网格装饰层。 |
-| `MinimapOverlay`（set） | `IWorkflowMinimapOverlay?` | 添加带样式的小地图覆盖层。 |
+| `RulerThickness` | `const double`（36） | 标尺带厚度。 |
+| `MinorGridColor` / `MajorGridColor` / `AxisColor` | `Color` | 网格配色。 |
+| `RulerBackground` / `RulerLabelColor` / `RulerTickColor` / `RulerDividerColor` | `Color` | 标尺配色。 |
+| `GridStep` | `double` | 次要网格间距。 |
+| `MajorLineEvery` | `int` | 每 N 条次要线为一条主线。 |
+| `MajorStep` | `double`（get） | `GridStep * Math.Max(1, MajorLineEvery)`。 |
 
-它还承载表面行为：内部接线把 `WorkflowSurfaceBehavior` 应用到命名的 `PART_*` 部件上，使平移、缩放与视口数据推送只需一个控件。
+## 类：`WorkflowTreeView`（Jalium）
+
+整个工作流编辑器的复合宿主控件，也是 Jalium 的**全部**表面 —— Jalium 没有独立的 `WorkflowSurfaceBehavior`。源码：`Src/Adapters/VeloxDev.Jalium/Attached/Workflow/WorkflowTreeView.cs`。
+
+```csharp
+public class WorkflowTreeView : Canvas
+```
+
+| 成员 | 类型 | 说明 |
+|---|---|---|
+| `Tree` | `IWorkflowTreeViewModel?`（get） | 当前挂上的工作流树。 |
+| `PortLayout` | `WorkflowPortLayout` | 各角色基类共用的设计期端口布局。 |
+| `GridDecorator` | `WorkflowGridDecorator` | 网格/标尺装饰层。 |
+| `TemplateSelector` | `IWorkflowTemplateSelector?` | 节点/连接视图工厂；须在 `SetTree` 前设置。 |
+| `OriginX` / `OriginY` | `double`（get） | 世界原点加上标尺带。 |
+| `ContentOriginX` / `ContentOriginY` | `double`（get） | 世界原点（`Layout.ActualOffset`）。 |
+| `AttachScrollViewer(ScrollViewer)` | 方法 | 接线驱动平移的滚动查看器。 |
+| `SetTree(IWorkflowTreeViewModel?)` | 方法 | 挂上树并接好视图池。 |
+| `NotifyZoomCommitted(hx, vy)` | 方法 | 宿主处理完捏合/滚轮后施加缩放枢轴。 |
+| `NavigateToWorld(wx, wy)` | 方法 | 滚动到某个世界点可见。 |
+| `OnBuildLinkMenu` | `protected virtual void` | 每次右键时构建连线右键菜单；基类只加一个 **Delete** 条目 —— 重写它来增删条目。 |
+
+与另外六家不同，Jalium 不按名字解析 `PART_*` 部件，也不施加静态表面行为：它从模型算端口几何、给视图定位（不做视觉测量），因此树视图本身就是表面。
 
 ## 接口：`IWorkflowTemplateSelector`（WinForms / Jalium）
 

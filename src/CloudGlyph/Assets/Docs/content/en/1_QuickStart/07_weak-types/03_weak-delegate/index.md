@@ -34,7 +34,7 @@ changed.Invoke(["nobody"]);
 Console.WriteLine($"counter: {counter.Value}");   // still 1
 ```
 
-**Expected result:** after removal the invoke does not call the handler, matching `RemoveHandler_RemovesFromHandlerList`.
+**Expected result:** after removal the invoke does not call the handler, matching `RemoveHandler_StopsInvoking` (which additionally asserts `GetInvocationList()` is `null` once the last handler is gone).
 
 ## 3. The cached combined delegate (read this before relying on GC)
 
@@ -70,4 +70,4 @@ var snapshot = changed.Clone();             // rebuilds from live handlers only
 snapshot.Invoke(["second"]);
 ```
 
-**Expected result:** a collected subscriber's handler is not invoked through the clone. This mirrors the tests `Clone_ReturnsIndependentCopy` and `MultipleHandlers_CloneInvokesAll` (the latter fires `h1` and `h2` and asserts a combined counter of `11`).
+**Expected result:** a collected subscriber's handler is not invoked through the clone. This mirrors the tests `Clone_ReturnsIndependentCopy` (the clone invokes its copied handler exactly once) and `MultipleHandlers_InvokeInRegistrationOrder` (two handlers fire in the order they were added).

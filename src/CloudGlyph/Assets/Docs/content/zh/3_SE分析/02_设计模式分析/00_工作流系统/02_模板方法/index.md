@@ -1,6 +1,6 @@
 # Workflow System — 设计模式 — 模板方法
 
-每个组件的 Helper 定义了生命周期骨架——`Install` 订阅集合事件、`Uninstall` 退订、`Closing/CloseAsync/Closed` 走完整命令集——并暴露可覆写的钩子。`TreeHelper<T>` 在 `Install` 中装配（订阅 `Nodes`/`Links` 的 `CollectionChanged`）；若以格子尺寸构造（启用虚拟化）还会调用 `EnableMap` 打开空间索引，并以 10 fps 的 MonoBehaviour 循环在树变脏时重跑虚拟化：
+每个组件的 Helper 定义了生命周期骨架——`Install` 订阅集合事件、`Uninstall` 退订、`Closing/CloseAsync/Closed` 走完整命令集——并暴露可覆写的钩子。`TreeHelper<T>` 在 `Install` 中装配（订阅 `Nodes`/`Links` 的 `CollectionChanged`）；若以格子尺寸构造（启用虚拟化）还会调用 `EnableMap` 打开空间索引，并以 10 fps 的 Tickable 循环在树变脏时重跑虚拟化：
 
 > 源码：`Src/Core/VeloxDev.Core/WorkflowSystem/Templates/Helpers/TreeHelper.cs`，第 109-124 行
 
@@ -19,7 +19,7 @@ public virtual void Install(IWorkflowTreeViewModel tree)
     {
         Debug.Fail("EnableMap did not return a non-negative value as expected. Please check the implementation of EnableMap in the IWorkflowTreeViewModel.");
     }
-    InitializeMonoBehaviour();
+    InitializeTickable();
 }
 ```
 
@@ -46,4 +46,4 @@ public override async Task<object?> ReceiveAsync(ITaskContext ctx, CancellationT
 }
 ```
 
-编译运行不会经由节点的命令进入这些 Helper——引擎直接调用 `Helper.ReceiveAsync`（详见[数据流分析](../../../03_数据流分析/00_工作流系统/index.md)）。
+编译运行不会经由节点的命令进入这些 Helper——引擎直接调用 `Helper.ReceiveAsync`（详见`数据流分析`）。

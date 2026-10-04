@@ -6,7 +6,9 @@
 
 `Transition<T>` (`T` is the target's type) is three things at once: the static entry point (`Create`), the fluent builder (`Property`, `Effect`) and the executor (`Execute`). One instance describes one **animation segment** — a set of explicitly declared property paths, each with the value it should reach, plus one effect (duration / easing / FPS / loop).
 
-Nothing is discovered or recorded from the target. `Property(lambda, value)` stores the *target* value; the engine reads the property's **current** value when the run starts (`InterpolatorCore.Prepare`), which is what makes one builder safe to store in a static field and reuse on any number of targets. Because a builder is just data, it can be built once and executed many times (see [Execute & Control](../05_execute-and-control/index.md)).
+Nothing is discovered or recorded from the target. `Property(lambda, value)` stores the *target* value; the engine reads the property's **current** value when the run starts (`InterpolatorCore.Prepare`), which is what makes one builder safe to store in a static field and reuse on any number of targets. Because a builder is just data, it can be built once and executed many times (see [Execute & Control](../05_execute-and-control/index.md)) — and against a timeline the caller supplies, so several animations can share one transport.
+
+Under the adapter's `Transition<T>` sits the Core builder `TransitionCore<T, State, TransitionEffect, Interpolator, UIThreadInspector, TransitionInterpreter, TPriorityCore>` — one segment plus a `next` link to the segment after it. Its three declarations are `.Property(...)` (a target value), `.Effect(...)` (timing) and the `Repeat(count)` chaining extension (how many further times this segment's loop runs; see [Sequence & Repeat](../04_sequence-and-repeat/index.md)).
 
 ## 2. Build one segment
 
@@ -34,7 +36,7 @@ public static class QuickStart
 }
 ```
 
-This is the exact shape of `Animation0` in `Examples/Transition/WPF/Demo/MainWindow.xaml.cs` (there it is a `static readonly` member of the window's partial class). The generic `Property<TValue>` overload accepts any value type; each adapter adds typed overloads for the platform's value types (`Brush`, `Transform` collections, `Color`, `Point`, `CornerRadius`, `Thickness`, `Size`, ... and the numerics `int` / `double` / `float` / `decimal`), so the target value is stored already typed.
+This is the exact shape of `Animation0` in `Examples/Transition/WPF/Demo/MainWindow.xaml.cs` (there it is a `static readonly` member of the window's partial class). The generic `Property<TValue>` overload accepts any value type — every adapter declares it **except Razor**, which offers only typed overloads; each adapter adds typed overloads for the platform's value types (`Brush`, `Transform` collections, `Color`, `Point`, `CornerRadius`, `Thickness`, `Size`, ... and the numerics `int` / `double` / `float` / `decimal`), so the target value is stored already typed.
 
 **Expected result:** the fluent chain returns the same `Transition<Rectangle>` with three declared properties (`Opacity`, `RenderTransform.X`, `Fill`) and one 2-second auto-reverse effect. Nothing animates yet.
 

@@ -4,7 +4,7 @@
 
 Demo 把完整构建链写在一处（`AgentHelper.ProvideAgent`）：
 
-> 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`，第 155-183 行
+> 源码：`Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`，第 215-256 行
 
 ```csharp
 var scope = tree.AsAgentScope()

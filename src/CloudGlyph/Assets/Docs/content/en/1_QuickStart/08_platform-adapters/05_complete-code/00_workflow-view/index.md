@@ -1,6 +1,6 @@
 # Platform Adapters - `WorkflowView.xaml / WorkflowView.xaml.cs`
 
-Exact output of `dotnet new wpf-v-tree -n WorkflowView -ns Demo.Views.Workflow` (template default colors substituted). The surface host applies `WorkflowSurfaceBehavior` with zoom enabled and names the parts it resolves at load time: `PART_ScrollViewer`, `PART_Canvas`, `PART_GridDecorator`, `PART_SurfaceBorder`, and the minimap via `PART_MinimapOverlay`. Bind the `DataContext` to an `IWorkflowTreeViewModel`; the canvas virtualizes through `ViewPool` bound to `Helper.VisibleItems`.
+Exact output of `dotnet new wpf-v-tree -n WorkflowView -ns Demo.Views.Workflow` (template default colors substituted). The surface host applies `WorkflowSurfaceBehavior` with zoom enabled and names the parts it resolves at load time: `PART_ScrollViewer`, `PART_Canvas`, `PART_GridDecorator`, `PART_SurfaceBorder`, and the minimap via `PART_MinimapOverlay`. It also declares the **link context menu** — a `ContextMenu` keyed `LinkContextMenu` whose entries bind the link they act on — and points the behavior at it with `LinkMenuKey`; the behavior, not the code-behind, does the subscribing, positioning and showing. Bind the `DataContext` to an `IWorkflowTreeViewModel`; the canvas virtualizes through `ViewPool` bound to `Helper.VisibleItems`.
 
 ```xml
 <!-- VeloxDev customization: Generate the Node, Slot, Link, selector, minimap, and grid-decorator templates, then update the local type names below if you renamed them. -->
@@ -16,7 +16,8 @@ Exact output of `dotnet new wpf-v-tree -n WorkflowView -ns Demo.Views.Workflow` 
              behaviors:WorkflowSurfaceBehavior.CanvasName="PART_Canvas"
              behaviors:WorkflowSurfaceBehavior.GridDecoratorName="PART_GridDecorator"
              behaviors:WorkflowSurfaceBehavior.PointerPressSourceName="PART_SurfaceBorder"
-             behaviors:WorkflowSurfaceBehavior.MinimapOverlayName="PART_MinimapOverlay">
+             behaviors:WorkflowSurfaceBehavior.MinimapOverlayName="PART_MinimapOverlay"
+             behaviors:WorkflowSurfaceBehavior.LinkMenuKey="LinkContextMenu">
     <UserControl.Resources>
         <DataTemplate x:Key="NodeTemplate">
             <workflowViews:NodeView Width="{Binding Size.Width}"
@@ -41,12 +42,17 @@ Exact output of `dotnet new wpf-v-tree -n WorkflowView -ns Demo.Views.Workflow` 
         <workflowViews:TemplateSelector x:Key="WorkflowTemplateSelector"
                                         NodeTemplate="{StaticResource NodeTemplate}"
                                         LinkTemplate="{StaticResource LinkTemplate}" />
+        <!-- Right-click menu for a link; its DataContext is that link. Add or remove entries here. -->
+        <ContextMenu x:Key="LinkContextMenu">
+            <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />
+        </ContextMenu>
     </UserControl.Resources>
     <Grid>
         <Border x:Name="PART_SurfaceBorder"
                 Background="#1E1E1E"
                 BorderBrush="#33FFFFFF"
-                BorderThickness="1">
+                BorderThickness="1"
+                CornerRadius="3">
             <workflowViews:GridDecorator x:Name="PART_GridDecorator">
                 <ScrollViewer x:Name="PART_ScrollViewer"
                               HorizontalScrollBarVisibility="Auto"

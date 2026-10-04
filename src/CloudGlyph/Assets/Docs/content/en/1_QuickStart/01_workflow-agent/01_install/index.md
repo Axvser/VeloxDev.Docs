@@ -1,49 +1,52 @@
-# Workflow Agent — Install & Add Dependencies
+# 01 · Install & Add Dependencies
 
-Add the package that carries the agent surface, then the extra packages you need to actually talk to an LLM.
+## Option A — NuGet package
 
-## 1. Add `VeloxDev.Core.Extension`
+The agent lives in the optional companion package `VeloxDev.Core.Extension` (version `10.0.0`), which pulls the AI stack transitively.
+
+```xml
+<ItemGroup>
+    <PackageReference Include="VeloxDev.Core.Extension" Version="10.0.0" />
+</ItemGroup>
+```
 
 ```bash
-dotnet add package VeloxDev.Core.Extension
+dotnet add package VeloxDev.Core.Extension --version 10.0.0
 ```
 
-`VeloxDev.Core` (the workflow core and the `CompilerEx` engine) is referenced transitively in Debug builds; in Release the NuGet package is used instead. Reference it explicitly when you only need the core types without the agent:
+**Expected result:** the command exits `0` and `VeloxDev.Core.Extension` (plus its transitive AI packages) appears in the project's package list / `project.assets.json`. No source changes are needed yet — the package alone compiles.
 
-```bash
-dotnet add package VeloxDev.Core
+## Option B — Project reference (the repository itself)
+
+Inside this repository every demo and test references the source project directly, which is what makes the Debug build use the source generator instead of the published one:
+
+```xml
+<ItemGroup>
+    <ProjectReference Include="..\..\..\Src\Core\VeloxDev.Core.Extension\VeloxDev.Core.Extension.csproj" />
+</ItemGroup>
 ```
 
-**Expected result:** both packages appear in the `.csproj`; `dotnet restore` exits 0. `VeloxDev.Core.Extension` brings in `Microsoft.Extensions.AI`, `Microsoft.Agents.AI`, `ModelContextProtocol` (the MCP SDK), `CliWrap` and `Newtonsoft.Json` transitively (see `VeloxDev.Core.Extension.csproj`).
+Source: `Src/Core/VeloxDev.Core.Extension.Test/VeloxDev.Core.Extension.Test.csproj`.
 
-## 2. Add the LLM client packages (for a real conversation)
+The library's own `Description` still says "60+ function-calling tools" — that is the README's understated figure. The exact, verifiable count in the current source is **68 built-in tools** across the ten `WorkflowToolCategory` groups — 66 unconditional plus up to two `Interaction` tools registered only when handlers are configured — and `ResetToolCallLimit` is always added on top of that.
 
-To build the `IChatClient` exactly like the demo you need the OpenAI integration on top:
+## Namespaces you will use
 
-```bash
-dotnet add package Microsoft.Agents.AI.OpenAI
-dotnet add package OpenAI
-```
+| Namespace | Contains |
+|---|---|
+| `VeloxDev.AI` | attributes and reflection helpers, `AgentLanguages`, `AgentObjectToolkit`, `AgentEmbeddedResources`, `AgentTelemetryExtensions`, event args + notifier interfaces |
+| `VeloxDev.AI.Workflow` | `WorkflowAgentScope`, `AgentEx.AsAgentScope`, `WorkflowStateTracker`, `WorkflowAgentContextProvider`, `AgentContextCollector` |
+| `VeloxDev.AI.Workflow.Functions` | `WorkflowAgentToolkit`, `WorkflowToolCategory`, `CommandInvoker`, `ComponentPatcher`, `TypeIntrospector` |
+| `VeloxDev.AI.MCP` | `McpScope`, `McpServerConfiguration`, `McpServerRunMode`, `McpServerStatus`, `McpSelfServiceLevel`, status view-models, `McpAgentToolkit` |
+| `VeloxDev.AI.Skills` | `SkillScope`, `SkillAgentToolkit`, `SkillDescriptor`, `SkillState`, `SkillSourceKind`, `ISkillSource`, status view-models |
+| `VeloxDev.AI.SubAgents` | `SubAgentScope`, `SubAgentAgentToolkit`, `SubAgentAgentContextProvider`, `SubAgentState`/`SubAgentSummary`, the tree view-models |
+| `VeloxDev.AI.Pipelines` | `AgentPipeline`, `AgentEvent` (+ its subclasses), `AgentTranscript`, `AgentTranscriptEntry`, `ToolPipeline`, `AgentPipelineAgent` |
+| `VeloxDev.AI.Dashboard` | `AgentDashboardViewModel`, `AgentMemberViewModel` and its four concrete members |
 
-`Microsoft.Agents.AI.OpenAI` version 1.13.0 and `Microsoft.Bcl.AsyncInterfaces` are what `Examples/Workflow/Common/Lib/Lib.csproj` declares; use versions your chosen target framework supports. You also need an API key for an OpenAI-compatible endpoint (the demo reads `API_KEY_DEEPSEEK` and targets `https://api.deepseek.com`, model `deepseek-v4-flash`).
+Keys: **`VeloxDev.AI` is a single namespace shared by both `VeloxDev.Core` (attributes/reflection) and `VeloxDev.Core.Extension` (everything else).** The `Agent/` folder under `VeloxDev.Core.Extension` is an implementation detail; the public types it declares live in the namespaces above, not in a `VeloxDev.Core.Extension` namespace.
 
-**Expected result:** the packages are in the `.csproj`; restoring resolves them; the environment variable for your endpoint key is set when you later run a conversation.
-
-## 3. Reference in code
-
-The namespaces you will use in the next pages are:
-
-```csharp
-using Microsoft.Agents.AI;              // ChatClientAgent, ChatClientAgentRunOptions, AgentSession
-using Microsoft.Extensions.AI;          // IChatClient, AITool, ChatOptions
-using VeloxDev.AI;                      // AgentLanguages, AgentToolCallEventArgs
-using VeloxDev.AI.MCP;                  // McpScope, McpServerConfiguration, McpServerRunMode, McpAgentToolkit
-using VeloxDev.AI.Workflow;             // AsAgentScope(), WorkflowAgentScope
-using VeloxDev.WorkflowSystem;          // IWorkflowTreeViewModel
-```
-
-**Expected result:** a file with these usings compiles once the packages are restored.
+**Expected result:** a file that adds `using VeloxDev.AI.Workflow;` compiles.
 
 ## Run declaration
 
-- ⚠️ Statically verified only. Package names, versions and transitives come from `VeloxDev.Core.Extension.csproj` and `Examples/Workflow/Common/Lib/Lib.csproj`; no build was run in this documentation pass.
+- ⚠️ Not actually run — statically verified only. The package id/version and dependency versions are read from `Src/Core/VeloxDev.Core.Extension/VeloxDev.Core.Extension.csproj`; the `dotnet add package` / build were not executed from this page.

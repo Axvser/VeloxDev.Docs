@@ -9,6 +9,6 @@ Static extension classes implementing the standard behavior invoked by generated
 | `WorkflowSlotEx` | `GetStandardCommands`, `StandardSetChannel`, `StandardUpdateState`, `StandardApplyConnection`, `StandardReceiveConnection`, `StandardCanBeSender`, `StandardCanBeReceiver`, `StandardDelete` |
 | `WorkflowLinkEx` | `GetStandardCommands`, `StandardDelete` |
 | `WorkflowCommandEx` | `StandardClosing`, `StandardClosingAsync`, `StandardClose`, `StandardCloseAsync`, `StandardClosed`, `StandardClosedAsync` |
-| `WorkflowSpatialEx` | See Spatial System above |
+| `WorkflowSpatialEx` | See Spatial System above. It shares the `StandardEx` namespace, but its file lives in `WorkflowSystem/GUI/Virtualization/WorkflowSpatialEx.cs` (not under `StandardEx/`) |
 
-*Source: `Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/`.*
+*Source: `Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/` (except `WorkflowSpatialEx`, at `Src/Core/VeloxDev.Core/WorkflowSystem/GUI/Virtualization/WorkflowSpatialEx.cs`).*

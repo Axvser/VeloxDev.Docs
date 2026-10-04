@@ -2,7 +2,7 @@
 
 Hands-on guides for every VeloxDev feature. Each page takes you from an empty project to a **working program**, step by step, with the exact SDK/runtime versions, an observable **Expected result** under every step, and an honest **Run Declaration** at the end.
 
-VeloxDev is a set of .NET libraries for building **AI-controllable workflow editors** on any .NET GUI. Start with the core workflow engine, then layer on MVVM, animation, theming, AOP, the MonoBehaviour loop, and the AI agent.
+VeloxDev is a set of .NET libraries for building **AI-controllable workflow editors** on any .NET GUI. Start with the core workflow engine, then layer on MVVM, animation, theming, AOP, the Tickable loop, and the AI agent.
 
 | Feature | What you will build |
 |---|---|
@@ -12,7 +12,7 @@ VeloxDev is a set of .NET libraries for building **AI-controllable workflow edit
 | [03 Transition](03_transition) | Fluent property interpolation and easing |
 | [04 Dynamic Theme](04_dynamic-theme) | Runtime theme switching with animated transitions |
 | [05 AOP](05_aop) | Compile-time aspect proxies |
-| [06 MonoBehaviour](06_monobehaviour) | Frame-driven lifecycle loop |
+| [06 Tickable](06_tickable) | Frame-driven lifecycle loop |
 | [07 Weak Types](07_weak-types) | Weak collections and delegates |
 | [08 Platform Adapters](08_platform-adapters) | GUI adapters and `dotnet new` view templates |
 

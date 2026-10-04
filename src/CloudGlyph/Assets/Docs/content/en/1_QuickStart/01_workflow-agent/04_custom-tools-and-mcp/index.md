@@ -1,88 +1,92 @@
-# Workflow Agent — Custom Tools & MCP
+# 04 · Custom Tools & MCP
 
-On top of the built-in toolkit you can register your own tools, and you can extend the agent with Model Context Protocol servers whose tools are merged into every conversation.
-
-## 1. Register custom tools
-
-`WithTools` and `WithQueryTools` append extra `AITool`s to the surface returned by `ProvideTools()`. Both accept a `promptContext` string that becomes a "Custom Tools" system-prompt section and a params array of tools:
+## 1. Developer-registered tools
 
 ```csharp
-AITool serverStatus = AIFunctionFactory.Create(
-    () => $"workflow nodes: {scope.Tree.Nodes.Count}", "ServerStatus");
+using Microsoft.Extensions.AI;
 
-AITool readOnlyClock = AIFunctionFactory.Create(
-    () => DateTimeOffset.Now.ToString("O"), "ReadOnlyClock");
+AIFunction ping = AIFunctionFactory.Create(() => "pong", "Ping");
 
-scope.WithTools("ServerStatus reports the current number of workflow nodes.", serverStatus);
-scope.WithQueryTools("ReadOnlyClock returns the current time; it never mutates the tree.", readOnlyClock);
+scope.WithTools("Use Ping to check connectivity.", ping);     // mutation-capable custom tool
+scope.WithQueryTools(null, lookupTool);                        // read-only custom tool
 ```
 
-`AITool` and `AIFunctionFactory` come from `Microsoft.Extensions.AI`; `scope` is the `WorkflowAgentScope` built on the previous page.
+| Member | Signature | Effect |
+|---|---|---|
+| `WithTools` | `WithTools(string? promptContext, params AITool[] tools)` | Registers mutation-capable custom tools; always included in `ProvideTools()`. |
+| `WithQueryTools` | `WithQueryTools(string? promptContext, params AITool[] tools)` | Registers read-only custom tools — never auto-marked dirty, never counted as a write. |
 
-- `WithTools` registers mutation-capable tools: `AIFunction`s get a **tracked wrapper** (UI-thread marshalling, budget accounting, the tool-call callback and auto-dirty). `WithQueryTools` registers read-only tools with identical behaviour except they never trigger auto-dirty marking and count against the read budget.
-- Non-`AIFunction` tools (for example a raw MCP client tool) are added as-is, without the tracked wrapper.
+- An `AIFunction` custom tool is wrapped with `TrackedAIFunction`, so it gets the same UI-thread marshalling, budget accounting, `ToolCalled` callback and auto-dirty treatment as a built-in. A non-`AIFunction` tool is added as-is and gets none of that.
+- The optional `promptContext` is injected as a "Custom Tools" section in the prompt. Registration is remembered per group, so a **sub-agent spawn can grant a subset** with the matching guidance — never the guidance for a tool the child did not receive.
 
-**Expected result:** after registration `scope.ProvideTools()` contains `ServerStatus` and `ReadOnlyClock`; a `ReadOnlyClock` call never marks the tree dirty.
+**Expected result:** `scope.ProvideTools()` contains your tool names alongside the 68 built-ins.
 
-## 2. Load MCP servers with `McpScope`
+## 2. Attach MCP servers
 
-`McpScope` (`VeloxDev.AI.MCP`) loads servers and exposes their tools as `AITool`s. Each server is described by an `McpServerConfiguration` whose `RunMode` picks the launch strategy:
+`McpScope` loads Model Context Protocol servers and merges their tools into the agent. A host attaches the subsystem with one call; the subsystem contributes its own tools and prompt text per turn.
 
 ```csharp
-var mcp = new McpScope()                          // installs into ".evn/mcp" by default
-    .WithMcpRoot(".evn/mcp")                      // override the install root if you like
-    .WithConnectionTimeout(TimeSpan.FromSeconds(30));
+using VeloxDev.AI.MCP;
 
-McpServerConfiguration[] servers =
-[
-    new()                                          // remote Streamable HTTP: no local runtime
-    {
-        Name = "Microsoft Learn",
-        Description = "Microsoft docs retrieval (remote Streamable HTTP)",
-        RunMode = McpServerRunMode.Http,
-        Endpoint = "https://learn.microsoft.com/api/mcp",
-        Options = new { connectionTimeout = 30 },
-    },
-    new()                                          // local npx server
-    {
-        Name = "Filesystem",
-        RunMode = McpServerRunMode.Npx,
-        Package = "@modelcontextprotocol/server-filesystem",
-        Arguments = [AppContext.BaseDirectory],
-        Options = new { env = new { FILESYSTEM_ROOT = AppContext.BaseDirectory } },
-    },
-];
+var mcp = new McpScope();
+mcp.WithServers(new McpServerConfiguration
+{
+    Name = "Filesystem",
+    RunMode = McpServerRunMode.Npx,
+    Package = "@modelcontextprotocol/server-filesystem",
+    Arguments = [AppContext.BaseDirectory],
+});
 
-AITool[] mcpTools = await mcp.LoadAsync(servers);
+scope.WithMcps(mcp);                 // wire the subsystem into the scope
+await mcp.LoadAsync(mcp.RegisteredServers);
 ```
 
-- `McpServerConfiguration` fields: `Name`, `Description`, `RunMode`, `Package`, `Version`, `Arguments` (string array), `Endpoint`, and an arbitrary `Options` object. `McpServerRunMode` members: `Npm`, `Npx`, `Uvx`, `Dotnet`, `Pip`, `Exe`, `Http`.
-- `Http` connects over Streamable HTTP using `Endpoint` + `Options` (headers, OAuth, `connectionTimeout`, `transportMode`, `ownsSession`). The stdio modes (`Npx`, …) install the `Package` (npm/pip/dotnet/uvx as appropriate) into `McpRootRelative` and connect over stdio using `Package`/`Version`/`Arguments`/`Options.env`/`Options.workingDirectory`.
-- `McpScope` also offers `WithSynchronizationContext` (marshal load/status callbacks onto the UI thread) and `WithOAuthAuthorizationRedirect((authUri, redirectUri, ct) => ...)` for HTTP OAuth. After loading, `mcp.LoadedTools` holds the connected servers' tools, `mcp.GetServerTools(name)` per-server tools, `mcp.UnloadServer(name)` removes one mid-session, and `mcp.Status` is a live `McpStatusViewModel` (per-server state, connected/error counts).
+Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs` (`Mcp`, `McpServers`, `LoadMcpServersAsync`).
 
-**Expected result:** `LoadAsync` returns the connected servers' tools as `AITool[]`; each tool name is prefixed with its server; a server that fails to connect does not throw but is tracked in `mcp.Status` with state `Error`.
+`WithMcps` does four things at once: it sets the MCP scope's confirmation handler to the workflow scope's `ResolveConfirmationAsync` (so an approval is configured once), hands it the UI `SynchronizationContext`, and composes `mcp.CreateContextProvider(SharedTools, Pipeline)` so MCP-sourced tools join the **same** budgets, gates and callbacks as the built-in tools.
 
-## 3. Hand MCP servers to the agent via `McpAgentToolkit`
+**Expected result:** after `LoadAsync` the connected server's tools appear in the next turn's tool list; unloading a server removes them from the next turn.
 
-Two different design points exist: you can merge *server* tools into the conversation yourself (the next page), or you can let the *agent* manage host pre-registered servers with `McpAgentToolkit`:
+## 3. The MCP management tools
+
+`McpAgentToolkit` exposes server management to the model. Registration is conditional:
+
+| Tool | Registered when |
+|---|---|
+| `ListMcpServers` | always — pure query |
+| `LoadMcpServers` | `!IsGrantedView` (i.e. the host owns the scope, not a narrowed sub-agent view) |
+| `UnloadMcpServer` | `!IsGrantedView` |
+| `AddMcpServer` | `SelfServiceLevel != McpSelfServiceLevel.Closed` **and** `!IsGrantedView` |
+
+`McpSelfServiceLevel` is a ladder: `Closed = 0` (the demo's choice — the agent may load/unload/inspect only the host's pre-registered servers), `RemoteConfirmed = 1`, `AllConfirmed = 2`, `Unrestricted = 3`. Raise it with `McpScope.WithSelfService(level)`.
+
+**Expected result:** at `Closed`, `ListMcpServers` / `LoadMcpServers` / `UnloadMcpServer` / `DescribeMcpServer` are offered and no `AddMcpServer`; raising the level adds `AddMcpServer`.
+
+## 4. Run modes and configuration
+
+| `McpServerRunMode` | Command model |
+|---|---|
+| `Npm` | `npm install` into `{root}/node/{package}/`, then `node {entry} {args}`. |
+| `Npx` | `npx -y {package} {args}` (temporary download, no install). |
+| `Uvx` | `uvx {package} {args}`. |
+| `Dotnet` | `dotnet {dll} {args}` (the user pre-publishes under `{root}/dotnet/`). |
+| `Pip` | Creates a venv, `pip install`, then `python -m {module} {args}`. |
+| `Exe` | Executes `{root}/exe/{package}` directly. |
+| `Http` | Connects to a remote server at `Endpoint` (Streamable HTTP, SSE fallback). |
+
+`McpServerConfiguration.Options` is an anonymous-object blob: for `Http` — `headers`, `oauth`, `connectionTimeout`, `transportMode`, `ownsSession`; for stdio — `env`, `workingDirectory`. Unknown keys are rejected.
+
+**Expected result:** a bad configuration (unknown `Options` key, missing `Package` for a local mode) fails that server alone — its status becomes `Error`, `ServerError` fires, and it contributes zero tools; the rest of the batch loads.
+
+## 5. Looking at it all together
 
 ```csharp
-var mcp = new McpScope();                          // one shared loader
-McpServerConfiguration[] hostConfigs = [...];      // fixed once by the host at load time
-
-scope.WithTools(
-    "MCP server management tools: ListMcpServers reports each server's state; " +
-    "DescribeMcpServer exports a connected server's tool-capability prompt; " +
-    "LoadMcpServers loads host pre-registered servers (installing and connecting when needed); " +
-    "UnloadMcpServer removes a server mid-session. Configuration is fixed by the host " +
-    "and cannot be changed afterwards.",
-    [.. new McpAgentToolkit(mcp, hostConfigs).CreateTools()]);
+scope.WithTools("Use Ping to check connectivity.", ping)
+     .WithMcps(mcp);
 ```
 
-`McpAgentToolkit.CreateTools()` returns four agent-facing tools — `ListMcpServers`, `DescribeMcpServer`, `LoadMcpServers`, `UnloadMcpServer`. Because they are registered through `WithTools`, the agent can inspect and load servers mid-session, but **cannot reconfigure them**: server configuration is fixed once at load time. Loading a local server installs npm/pip runtimes and can be slow, so the prompt instructs the agent to confirm with the user first.
-
-**Expected result:** `ProvideTools()` contains the four `Mcp*` management tools; after the agent calls `LoadMcpServers`, the corresponding server tools appear in `mcp.LoadedTools` and on the next conversation's tool set.
+**Expected result:** the next turn's tool list is the built-ins plus `Ping` plus every loaded server's tools, and the prompt carries the custom-tool guidance and the MCP inventory block.
 
 ## Run declaration
 
-- ⚠️ Statically verified only. API names, `McpServerConfiguration` fields, `McpServerRunMode` members and behaviour are taken from `Src/Core/VeloxDev.Core.Extension/Agent/MCP/*` and the demo `AgentHelper.cs`; no server was actually loaded in this documentation pass.
+- ⚠️ Not actually run — statically verified only. The wiring and the conditional tool registration are read from `WorkflowAgentScope.WithMcps` and `McpAgentToolkit.CreateTools`; no MCP server was loaded from this page. (The deterministic `Agent/**` test suite passed — see the Tool Budgets page — but that suite does not launch a real MCP server.)

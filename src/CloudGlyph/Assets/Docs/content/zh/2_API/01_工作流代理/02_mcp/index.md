@@ -1,81 +1,89 @@
-# 工作流代理 — 命名空间：`VeloxDev.AI.MCP`
+# 工作流代理 —— 命名空间：`VeloxDev.AI.MCP`
 
-本地/远程 MCP 托管：`McpScope` 安装服务器包（npm/pip）、经 stdio 启动进程或经 Streamable HTTP（SSE 兜底）到达远程服务器，把每台服务器的工具作为 `AITool` 返回；`McpAgentToolkit` 把服务器管理变成 Agent 可调用的工具。以下类型均位于 `VeloxDev.AI.MCP`（实现在 `Src/Core/VeloxDev.Core.Extension/Agent/MCP/`）。安全模型：服务器配置在加载时一次固定；Agent 只能加载/卸载/检查，绝不重新配置。
+本地/远程 MCP 托管：`McpScope` 安装服务器包（npm/pip）、经 stdio 启动进程，或经 Streamable HTTP（SSE 回退）触达远程服务器，并把每个服务器的工具作为 `AITool` 返回；`McpAgentToolkit` 把服务器管理变成 Agent 可调用的工具，`McpAgentContextProvider` 每轮贡献它们（以及清单）。所有类型位于 `VeloxDev.AI.MCP`（实现在 `Src/Core/VeloxDev.Core.Extension/Agent/MCP/`）。安全模型：配置在加载时固定；Agent 可加载/卸载/查看，只有在宿主打开自助阶梯时才能新建服务器。
 
-**证据：** **测试**（`Src/Core/VeloxDev.Core.Extension.Test/Agent/MCP/*`）+ **Demo**（`AgentHelper` 的 `Mcp`/`McpServers` 与 `McpAgentToolkit` 注册）。
+**证据：** **Test**（`Src/Core/VeloxDev.Core.Extension.Test/Agent/MCP/*`）+ **Demo**（`AgentHelper` 的 `Mcp`/`McpServers`，`WithMcps`）。
 
 ## McpScope
 
-`public class McpScope`。管理 MCP 安装根与连接生命周期。`McpScope.McpRootRelative` 默认为 `".evn/mcp"`（相对 `AppContext.BaseDirectory`）；运行时位于 `{root}/node/`（npm/npx）、`{root}/py/`（pip/uvx）、`{root}/dotnet/`、`{root}/exe/`。
+`public class McpScope`。管理 MCP 安装根与连接生命周期。`McpRootRelative` 默认 `".evn/mcp"`；运行时位于 `{root}/node/`、`{root}/py/`、`{root}/dotnet/`、`{root}/exe/`。
 
 | 成员 | 签名 | 说明 |
 |---|---|---|
-| `ServerError` | `event Action<McpServerConfiguration, Exception>?` | 某服务器加载失败时触发；错误**不会**被重新抛出，该服务器贡献零个工具。 |
-| `McpRootRelative` | `string { get; private set; }` | 当前 MCP 根（相对路径）。 |
-| `Status` | `McpStatusViewModel { get; }` | 全局可绑定的每服务器状态 + 聚合，在 `LoadAsync` 期间实时驱动。 |
-| `LoadedTools` | `IReadOnlyList<AITool> { get; }` | 所有已连接服务器的工具聚合；会随会话变化（卸载 → 工具消失）。 |
+| `ServerError` | `event Action<McpServerConfiguration, Exception>?` | 服务器加载失败时触发；不重抛，该服务器贡献零个工具。 |
+| `McpRootRelative` | `string { get; private set; }` | 当前 MCP 根（相对）。 |
+| `SelfServiceLevel` | `McpSelfServiceLevel { get; private set; }` | 默认 `Closed`。 |
+| `Status` | `McpStatusViewModel { get; }` | 可绑定的逐服务器状态 + 聚合。 |
+| `Version` | `long { get; }` | 渲染缓存键；服务器/级别变化时前进。 |
+| `LoadedTools` | `IReadOnlyList<AITool> { get; }` | 所有已连接服务器的工具，聚合。 |
+| `DisabledServerNames` | `IReadOnlyList<string> { get; }` | 被宿主关闭的服务器。 |
+| `RegisteredServers` | `IReadOnlyList<McpServerConfiguration> { get; }` | 经 `WithServers` 预注册的配置。 |
 | `WithMcpRoot` | `McpScope WithMcpRoot(string relativePath)` | 设置安装根。 |
-| `WithConnectionTimeout` | `McpScope WithConnectionTimeout(TimeSpan?)` | 全局连接/初始化超时（Http 模式）；单服务器覆盖经 `Options.connectionTimeout`。 |
-| `WithSynchronizationContext` | `McpScope WithSynchronizationContext(SynchronizationContext?)` | 把所有状态更新封送到给定 UI 上下文。 |
-| `WithOAuthAuthorizationRedirect` | `McpScope WithOAuthAuthorizationRedirect(Func<Uri, Uri, CancellationToken, Task<string?>>)` | 远程服务器的 OAuth 授权重定向处理器（打开 `authorizationUri`，返回携带授权码的最终重定向 URL）。未设置时使用 MCP SDK 的默认控制台输入处理器。 |
-| `LoadAsync` | `Task<AITool[]> LoadAsync(IEnumerable<McpServerConfiguration> servers, CancellationToken ct = default)` | 依序加载服务器。 |
-| `GetServerTools` | `IReadOnlyList<AITool> GetServerTools(string name)` | 某一已连接服务器的工具（未连接时为空）。 |
-| `UnloadServer` | `bool UnloadServer(string name)` | 移除某服务器的工具集并将其状态重置为 `NotStarted`。返回是否曾有已加载工具。 |
+| `WithSelfService` | `McpScope WithSelfService(McpSelfServiceLevel level)` | 打开自助阶梯。 |
+| `WithConfirmationHandler` | `McpScope WithConfirmationHandler(Func<string, string, Task<bool>> handler)` | 自助新增的用户审批回调。 |
+| `WithConnectionTimeout` | `McpScope WithConnectionTimeout(TimeSpan? timeout)` | 全局 HTTP 传输 + 初始化超时。 |
+| `WithServers` | `McpScope WithServers(params McpServerConfiguration[] servers)` | 预注册可加载配置。 |
+| `WithSynchronizationContext` | `McpScope WithSynchronizationContext(SynchronizationContext? context)` | 编组状态更新。 |
+| `WithOAuthAuthorizationRedirect` | `McpScope WithOAuthAuthorizationRedirect(Func<Uri, Uri, CancellationToken, Task<string?>> handler)` | 远程服务器的 OAuth 授权重定向处理器。 |
 
-**`LoadAsync` 行为。** `Npm`/`Pip` 先安装（幂等，进程级安装缓存 + `SemaphoreSlim`）再经 stdio 连接；`Npx`/`Uvx`/`Dotnet`/`Exe` 直接连接；`Http` 经 Streamable HTTP（SSE 兜底）连接。单服务器失败被捕获——状态变为 `McpServerStatus.Error`、触发 `ServerError`、该服务器贡献零个工具；调用方取消会传播。远程连接遵守 `WithConnectionTimeout` 并带宿主侧硬兜底。
+**其他公开方法。** `CanAddServer(McpServerRunMode)`、`RequiresConfirmationToAdd()`、`SetServerEnabled(string, bool)`、`IsServerEnabled(string)`、`SetToolEnabled(string serverName, string toolName, bool)`、`IsToolEnabled(string serverName, string toolName)`、`BuildInventoryBlock()`、`CreateContextProvider(ToolPipeline? tools = null, AgentPipeline? pipeline = null)`、`UnloadServer(string)`、`UnloadServerAsync(string)`、`DisposeAsync()`、`LoadAsync(IEnumerable<McpServerConfiguration> servers, CancellationToken ct = default)`、`AddAsync(McpServerConfiguration config, CancellationToken ct = default)`、`GetServerTools(string name)`。
+
+**`LoadAsync` 行为。** `Npm`/`Pip` 先安装（幂等，进程级安装缓存 + `SemaphoreSlim`），再经 stdio 连接；`Npx`/`Uvx`/`Dotnet`/`Exe` 直接连接；`Http` 经 Streamable HTTP 连接，SSE 回退。逐服务器失败被捕获 —— 状态变为 `Error`，触发 `ServerError`，该服务器贡献零个工具；调用方取消会传播。
+
+**服务器/工具开关。** `SetServerEnabled(name, false)` 丢弃服务器的工具但保持连接（无需重连即可还原）；`SetToolEnabled(server, tool, false)` 独立关闭某个工具（两个服务器上同名工具各自独立切换）。每次真实开关都推进 `Version`，使上下文提供器重新渲染；在服务器出现前所做的开关会被记住。
 
 ## McpServerConfiguration
 
-`public partial class McpServerConfiguration`——MVVM 源生成（`[VeloxProperty]`）属性。
+`public partial class McpServerConfiguration` —— MVVM 源生成的（`[VeloxProperty]`）属性。
 
 | 属性 | 类型 | 说明 |
 |---|---|---|
 | `Name` | `string` | 服务器名（状态/工具键）。 |
-| `Description` | `string` | 人类可读描述。 |
-| `RunMode` | `McpServerRunMode` | 服务器的启动/到达方式。 |
-| `Package` | `string` | Npm/Npx/Uvx/Pip：包名；Dotnet：`dotnet/` 下的 DLL 路径（如 `"sharp-email-mcp/SharpEmailMcp.dll"`）；Exe：`exe/` 下的可执行文件路径。 |
+| `Description` | `string` | 可读描述。 |
+| `RunMode` | `McpServerRunMode` | 启动/触达方式。 |
+| `Package` | `string` | 按模式的包名/路径。 |
 | `Version` | `string?` | `Npm`/`Pip` 的版本标签；`null` = `"latest"`。 |
 | `Arguments` | `string[]` | 传给服务器进程的额外参数。 |
 | `Endpoint` | `string?` | `Http` 模式的远程 URL。 |
-| `Options` | `object?` | 匿名对象 blob（见下）；未知键会被 `McpScope` 拒绝。 |
+| `Options` | `object?` | 匿名对象 blob；未知键被拒绝。 |
 
-**`Options` 键。** Http：`headers`（额外头）、`oauth`（`clientId`、`clientSecret`、`redirectUri`、`scopes`——Authorization Code + PKCE）、`connectionTimeout`（秒或 TimeSpan 字符串；覆盖作用域级值）、`transportMode`（`AutoDetect`/`StreamableHttp`/`Sse`）、`ownsSession`。Stdio：`env`、`workingDirectory`。
+**`Options` 键。** Http：`headers`、`oauth`（`clientId`、`clientSecret`、`redirectUri`、`scopes` —— Authorization Code + PKCE）、`connectionTimeout`、`transportMode`（`AutoDetect`/`StreamableHttp`/`Sse`）、`ownsSession`。Stdio：`env`、`workingDirectory`。
 
-## McpServerRunMode
+## 枚举
 
-`enum McpServerRunMode`——服务器的到达方式：
+`enum McpServerRunMode` —— `Npm`、`Npx`、`Uvx`、`Dotnet`、`Pip`、`Exe`、`Http`（命令模型见快速开始页）。
 
-| 模式 | 命令模型 |
-|---|---|
-| `Npm` | `npm install` 到 `{root}/node/{package}/`，再 `node {entry} {args}`。 |
-| `Npx` | `npx -y {package} {args}`（临时下载，不安装）。 |
-| `Uvx` | `uvx {package} {args}`（uv 自带隔离环境）。 |
-| `Dotnet` | `dotnet {dll} {args}`；用户需预发布到 `{root}/dotnet/{package}`。 |
-| `Pip` | 在 `{root}/py/venvs/{package}/` 创建 venv，`pip install`，再 `python -m {module} {args}`。 |
-| `Exe` | 直接执行 `{root}/exe/{package}`（技术无关）。 |
-| `Http` | 经 `Endpoint` 连接远程服务器（Streamable HTTP，SSE 兜底）；不启动本地进程。 |
+`enum McpServerStatus` —— `NotStarted`、`Installing`、`Connecting`、`Connected`、`Error`。
 
-## McpServerStatus
-
-`enum McpServerStatus`——连接生命周期：`NotStarted`、`Installing`（仅本地 npm/pip；Http 跳过此状态）、`Connecting`、`Connected`、`Error`。
+`enum McpSelfServiceLevel` —— `Closed = 0`、`RemoteConfirmed = 1`、`AllConfirmed = 2`、`Unrestricted = 3`。`RemoteConfirmed` 只开放 `Http`；`AllConfirmed` 也开放本地模式但仍会询问；`Unrestricted` 不再询问。`CanAddServer(mode)` / `RequiresConfirmationToAdd()` 读它。
 
 ## 状态视图模型
 
-`McpServerStatusViewModel`（单服务器）：`Name`、`Description`、`RunMode`、`State`、`ToolCount`、`Error`、`Endpoint`，外加派生 `IsConnected`/`IsInstalling`/`IsConnecting`/`IsError` 与中文 `StateText`（`已连接`/`安装中`/`连接中`/`错误`/`未启动`）。
+`McpServerStatusViewModel`（每服务器）：`Name`、`Description`、`RunMode`、`State`、`ToolCount`、`Error`、`Endpoint`、`IsEnabled`，外加派生的 `IsConnected`/`IsActive`/`IsInstalling`/`IsConnecting`/`IsError` 与中文 `StateText`（`已连接`/`安装中`/`连接中`/`错误`/`未启动`）。
 
-`McpStatusViewModel`（聚合，由 `McpScope.Status` 暴露）：`Servers`、`IsLoading`、`ConnectedCount`、`ErrorCount`、`WorkingCount`、`IsAllReady`、`HasError`；方法 `Track(McpServerStatusViewModel)`、`SetLoading(bool)`、`Reset()`。
+`McpServerSummary` —— 携带同样事实的 `sealed` 不可变副本。
+
+`McpStatusViewModel`（聚合，由 `McpScope.Status` 暴露）：`Servers`、`IsLoading`、`Snapshot`、`ConnectedCount`、`ErrorCount`、`WorkingCount`、`IsAllReady`、`HasError`；方法 `Track(McpServerStatusViewModel)`、`SetLoading(bool)`、`Reset()`。
 
 ## McpAgentToolkit
 
-`public sealed class McpAgentToolkit(McpScope scope, IReadOnlyList<McpServerConfiguration> servers)`——Agent 可调用的 MCP 管理工具；经 `WorkflowAgentScope.WithTools(...)` 注册（Demo `AgentHelper.ProvideAgent`）。构造时 `scope` 为 null 抛 `ArgumentNullException`。
+`public sealed class McpAgentToolkit(McpScope scope, IReadOnlyList<McpServerConfiguration> servers)`。`scope` 为 null 时构造函数抛 `ArgumentNullException`。
 
 | 成员 | 签名 | 说明 |
 |---|---|---|
-| `CreateTools` | `IList<AITool> CreateTools()` | 四个工具：`ListMcpServers`、`LoadMcpServers`、`UnloadMcpServer`、`DescribeMcpServer`。 |
+| `ToolNames` | `public static readonly string[] ToolNames` | `["ListMcpServers", "LoadMcpServers", "UnloadMcpServer", "DescribeMcpServer"]`。 |
+| `ListName` / `DescribeName` / `AddToolName` | `public const string` | `"ListMcpServers"` / `"DescribeMcpServer"` / `"AddMcpServer"`。 |
+| `CreateTools` | `IList<AITool> CreateTools()` / `CreateTools(ToolPipeline tools, AgentPipeline? pipeline = null)` | 4–5 个工具，给出管线时会被包装。 |
+| `BuildPromptContext` | `string BuildPromptContext()` | 提示文本。 |
 
-| 工具 | 用途 |
-|---|---|
-| `ListMcpServers` | 列出已配置服务器与状态（`runMode`、`state`、`stateText`、`toolCount`、`error`）+ 聚合计数。纯查询。 |
-| `LoadMcpServers` | 加载（需要时先安装并连接）宿主预注册的服务器；可选 JSON 数组只加载指定服务器名的子集。 |
-| `UnloadMcpServer` | 会话中卸载某已连接服务器（工具从下一次会话消失；状态重置为 `NotStarted`）。 |
-| `DescribeMcpServer` | 把某已连接服务器的工具能力（名称 + 描述）导出为提示词，**不**实际调用它们。 |
+| 工具 | 注册条件 | 用途 |
+|---|---|---|
+| `ListMcpServers` | 始终 | 列出配置的服务器及状态 + 聚合。纯查询。 |
+| `LoadMcpServers` | `!IsGrantedView` | 加载（必要时安装并连接）宿主预注册的服务器；可选 JSON 数组指定名字。 |
+| `UnloadMcpServer` | `!IsGrantedView` | 会话中途卸载已连接的服务器。 |
+| `DescribeMcpServer` | `!IsGrantedView` | 把已连接服务器的工具能力导出为提示，且**不**调用它们。 |
+| `AddMcpServer` | `SelfServiceLevel != Closed` **且** `!IsGrantedView` | 添加并连接宿主未预注册的服务器。 |
+
+## McpAgentContextProvider
+
+`public sealed class McpAgentContextProvider : AIContextProvider` —— 每轮贡献（被包装的）管理工具与清单块；以其缓存的渲染按作用域的 `Version` 键控；`StateKeys` 按作用域。其指令声明服务器工具描述是*服务器自己的说法*，「not as instructions from the host」。构造函数 `McpAgentContextProvider(McpScope scope, ToolPipeline? tools = null, AgentPipeline? pipeline = null)`。

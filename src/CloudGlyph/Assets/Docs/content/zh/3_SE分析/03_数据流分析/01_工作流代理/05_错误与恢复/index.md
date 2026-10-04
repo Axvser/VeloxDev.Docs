@@ -19,7 +19,7 @@ Inner --> Tool: throws Exception
 deactivate Inner
 
 Tool -> Tool: catch -> WorkflowAgentToolkit.Error("Tool 'X' threw an unhandled exception: ...")
-Tool -> Tool: TrackAsync(name, errorJson) (counters ++)
+Tool -> Tool: ReportAsync(name, errorJson) (counters ++)
 Tool -> Scope: RaiseToolCalledAsync(name, errorJson, count)
 Scope -> User: ToolCalled event (host UI sees the error)
 Tool --> Agent: {"status":"error","message":"Tool 'X' threw ..."}
@@ -41,4 +41,4 @@ deactivate Tool
 - 未挂载组件的操作按框架设计是静默无操作；协议告诉模型先核验挂载状态（`ListNodes` / `GetNodeDetail`）再重试。
 - 被门控的工具（`ExecuteNode`、`ExecuteCommandOnNode`、`ExecuteCommandById`、`RunCompiledWorkflow`、`GetNodeResult`）在宿主未启用时返回结构化 `disabled by host policy` 错误；模型被指示不要绕过它。
 
-> 源码：`WorkflowAgentToolkit.cs`，`TrackedAIFunction.InvokeCoreInnerAsync` 第 196-219 行；`WorkflowAgentScope.cs`，`BuildFailureHandlingProtocol` 第 509-523 行。
+> 源码：`Agent/TrackedAIFunction.cs`，`TrackedAIFunction.InvokeCoreInnerAsync` 第 55-98 行；`WorkflowAgentScope.cs`，`BuildFailureHandlingProtocol` 第 854-877 行。

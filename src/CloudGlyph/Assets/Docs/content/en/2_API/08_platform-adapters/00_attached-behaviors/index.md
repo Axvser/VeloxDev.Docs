@@ -16,16 +16,17 @@ So a XAML view binds e.g. `behaviors:WorkflowSurfaceBehavior.IsEnabled="True"`, 
 
 | Type | Role | Adapters |
 |---|---|---|
-| `WorkflowSurfaceBehavior` | The surface host behavior: panning, zoom hook, scroll/viewport feed, named-control resolution | all seven |
-| `WorkflowCanvasTransformBehavior` | Owns the canvas render transform / translate offset applied to node and link views | WPF, Avalonia, WinUI, WinForms, Jalium, Razor (not MAUI) |
+| `WorkflowSurfaceBehavior` | The surface host behavior: panning, zoom hook, scroll/viewport feed, named-control resolution | all **but Jalium** (Jalium's composite `WorkflowTreeView` owns the surface) |
+| `WorkflowCanvasTransformBehavior` | Owns the canvas render transform / translate offset applied to node and link views | WPF, Avalonia, WinUI, WinForms, Razor (not MAUI, not Jalium) |
 | `ViewPool` / `ViewManager` | Object-pooled view container over an items collection | all seven (Razor as components) |
 | `WorkflowNodeDragBehavior` | Makes a node draggable (executes `MoveCommand`) | all seven |
 | `WorkflowSlotConnectionBehavior` | Connects slots on press/release (executes `SendConnectionCommand` / `ReceiveConnectionCommand`) | all seven |
 | `WorkflowSlotLayoutBehavior` | Keeps slot anchors in sync with node layout | all seven |
 | `WorkflowMinimapOverlay` | Thumbnail of nodes/links with a draggable viewport indicator | all seven |
-| `WorkflowLinkOverlay` | MAUI-only: link polyline overlay that also owns a drag geometry | MAUI |
-| `WorkflowGridDecorator` | Jalium-only grid/ruler decorator element | Jalium |
-| `WorkflowTreeView` | Jalium-only composite host control (`PART_*` named parts) | Jalium |
+| `WorkflowLinkOverlay` | MAUI-only: viewport-sized paint layer for the links that have no view of their own (the immediate-mode hosts and the frames before a pooled link view materializes) | MAUI |
+| `WorkflowGridDecorator` | Grid/ruler decorator element shipped as source (the other XAML adapters get it from the `*-v-decorator` template instead) | WinForms (`.cs`), Jalium (`.cs`), Razor (`.razor`) |
+| `WorkflowTreeView` | Composite host control the generated tree-view item derives from (WinForms: `PART_*` named parts; Jalium: `PortLayout` / `GridDecorator` / `TemplateSelector` properties) | WinForms, Jalium |
+| `WorkflowNodeView` / `WorkflowSlotView` / `WorkflowLinkView` / `WorkflowTemplateSelector` | Per-role base classes a generated item template derives from (the "no-markup platforms get a base class per role" standard) | WinForms, Jalium |
 | `IWorkflowTemplateSelector` | Factory contract mirroring a `DataTemplateSelector` | WinForms, Jalium |
 | `IWorkflowGridDecorator` / `IWorkflowMinimapOverlay` | Data-exchange contracts the overlays implement; **now defined in Core**, namespace `VeloxDev.WorkflowSystem` | all seven (implemented by overlays) |
 

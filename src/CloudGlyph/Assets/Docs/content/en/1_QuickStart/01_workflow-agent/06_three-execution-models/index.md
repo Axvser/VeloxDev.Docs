@@ -1,83 +1,84 @@
-# Workflow Agent — Three Execution Models
+# 06 · The Three Execution Models
 
-The agent can drive your workflow at three distinct levels, and for each level there is a **run** tool (Execution category) plus a **compile-only plan** tool (Query category) that validates the graph without running node code. The run tools all rest on the current engine — `CompilerViewModel.CompileAsync(component, CompileRole)` plus `RuntimeEngine.RunAsync(graph, context)` in `VeloxDev.Core.WorkflowSystem.CompilerEx`. The old `CompilerEngine` / `CompileToAsync` API no longer exists in code.
+The agent can run a workflow at three levels. They are **not** alternatives to each other — each answers a different question, and each has a compile-only plan tool beside its run tool.
 
-## 1. The execution-entry table
+| Level | Plan tool | Run tool | What it drives |
+|---|---|---|---|
+| Node | — | `ExecuteNode` / `ExecuteNodes`, `BroadcastNode`, `ReverseBroadcastNode` | one node's `ReceiveCommand` / broadcast commands (not compiled) |
+| Chain (Root) | `CompileWorkflow` | `RunCompiledWorkflow` | the whole chain reachable from a start node |
+| Result (Terminal) | `CompileNodeResult` | `GetNodeResult` | one node's value, from its ancestor cone |
 
-| Level | Run tool (Execution) | Compile-only plan tool (Query) | Role | What it drives |
-|---|---|---|---|---|
-| Node | `ExecuteNode` / `ExecuteNodes` | — | — | One node's `ReceiveCommand` (or many), un-compiled |
-| Node (broadcast) | `BroadcastNode` / `ReverseBroadcastNode` | — | — | Push downstream / upstream along links, un-compiled |
-| Chain (Root) | `RunCompiledWorkflow(startNodeIndex, seed?)` | `CompileWorkflow(startNodeIndex)` | `CompileRole.Root` | The forward chain reachable from a controller |
-| Result (Terminal) | `GetNodeResult(nodeIndex, seed?)` | `CompileNodeResult(nodeIndex)` | `CompileRole.Terminal` | One node's value, computed from its ancestor cone |
+## 1. Node level — `ExecuteNode` and friends
 
-`CompileRole.Root` compiles the execution graph reachable from the node downstream along `Targets`; `CompileRole.Terminal` walks backward along `Sources` to collect the node's ancestor cone and compiles only what is needed to produce that node.
-
-## 2. Node-level entry points
-
-Node-level tools call the node's commands directly — they never compile, so no `Order`/`CompileContext` is involved:
-
-- `ExecuteNode(nodeIndex, parameter?)` waits for `ReceiveCommand` to actually finish and reports completion (or cancellation/failure) — it does not merely dispatch.
-- `ExecuteNodes(nodeIndicesJson, parameter?)` does the same for a JSON array of indices and returns a summary `{status, completed, errors}`.
-- `BroadcastNode(nodeIndex, parameter?)` triggers `BroadcastCommand` (downstream dispatch is fire-and-forget); `ReverseBroadcastNode(nodeIndex, parameter?)` triggers `ReverseBroadcastCommand` (upstream `ReceiveCommand`).
-
-The optional `parameter` becomes the node's `ITaskContext.Data`.
-
-**Expected result:** `ExecuteNode` on a node whose command returns normally reports completion; a throwing node reports the failure message instead of hanging the tool call.
-
-## 3. Chain level (Root) — compile then run
-
-`RunCompiledWorkflow(startNodeIndex, seed?)` compiles the sub-graph downstream of a controller and drives it with the execution engine in one step. Its result JSON looks like:
-
-```json
-{ "status": "ok", "role": "Root", "runStatus": "Completed",
-  "endedWithError": false, "attempts": 1,
-  "data": "<the last node's output>", "logs": "[...]" }
+```text
+ExecuteNode(nodeIndex: 3, parameter: null)
+→ {"status":"ok","message":"... completed ..."}
 ```
 
-The optional `seed` becomes the runtime session's `Data` (the first node receives it). To inspect the plan before running, `CompileWorkflow(startNodeIndex)` returns:
+Runs `ReceiveCommand` on one node and **waits** until the node actually completes; returns `ok` only after real completion. `ExecuteNodes` does the same for a JSON array of indices (`nodeIndicesJson`), returning `completed` plus an `errors` array for any that failed. `BroadcastNode` runs `BroadcastCommand` and `ReverseBroadcastNode` runs `ReverseBroadcastCommand` (upstream `ReceiveCommand`); both wait for their own command, though the downstream/upstream dispatch itself is fire-and-forget.
 
-```json
-{ "status": "ok", "role": "Root", "graphCount": 1,
-  "entries": ["Ticker"], "nodeOrders": { "Ticker": 1, "Bias": 2, "Printer": 3 } }
+All four require `WithAllowNodeExecution(true)`; without it they return `... is disabled by host policy. The host must enable node execution via WithAllowNodeExecution(true).` Source: `WorkflowLifecycleFidelityTests.ExecuteNode_WaitsForCommandCompletion`, `GetNodeResult_WithoutAllowNodeExecution_IsRejectedByPolicy`.
+
+**Expected result:** on a single-node tree, `ExecuteNode(0)` returns `status:"ok"` with a message containing `completed`.
+
+## 2. Chain level — `RunCompiledWorkflow`
+
+```text
+RunCompiledWorkflow(startNodeIndex: 0, seed: "42")
 ```
 
-## 4. Result level (Terminal) — compute one node's value
+Compiles the sub-graph reachable from the start node (typically a controller) and drives the whole chain through the execution engine — the same entry the demo's **Run** button uses. Nodes execute their `ReceiveAsync` with an `IRuntimeContext` (compiled-step semantics: **no** auto-broadcast — the engine owns downstream dispatch). `CompileWorkflow(startNodeIndex)` performs the compile only and returns the plan.
 
-`GetNodeResult(nodeIndex, seed?)` reverse-compiles the node's ancestor cone and runs it from the cone's own entry frontier. It behaves exactly like a forward run that reaches the node, and adds a Terminal-only field:
+The result shape:
 
-```json
-{ "status": "ok", "role": "Terminal", "runStatus": "Completed",
-  "endedWithError": false, "attempts": 1,
-  "data": "<the result node's output>", "targetReached": true,
-  "logs": "[...]" }
+| Field | Meaning |
+|---|---|
+| `role` | `"Root"` |
+| `runStatus` | `"Completed"` or `"Stopped"` |
+| `outcome` | `Completed` / `Cancelled` / `Failed` — the precise reading, since `runStatus` shares `"Stopped"` between a failure and a cancellation |
+| `endedWithError` | `true` when a node reported an error and the flow ended |
+| `attempts` | how many node attempts the run made |
+| `data` | the run's final data |
+| `failures` | the failures as records (`phase` / `level` / `message` / `attempt` / `order`) |
+| `logs` | the run-session log |
+| `logFile` | an absolute path when the host sent the lines to a file, else `null` |
+
+`RunCompiledWorkflow` waits for the end. For a run the agent must hold, let go or stop, use the run-handle family on the next page.
+
+## 3. Result level — `GetNodeResult`
+
+```text
+GetNodeResult(nodeIndex: 4, seed: null)
 ```
 
-`CompileNodeResult(nodeIndex)` is the plan-only twin and returns the same shape as `CompileWorkflow` but with `"role": "Terminal"`. Both Terminal tools never fabricate a result — see the next page for the exact `was NOT reached` contract.
+Discovers the node's **ancestor cone** (all upstream producers feeding it, traced backward from its input slots) and drives it from the cone's own entry frontier, so **no controller/start node is needed**. Routers inside the cone keep *real* branch selection — only the branch leading to this node is compiled, so the result exactly matches a normal run that took that branch. `CompileNodeResult(nodeIndex)` performs the compile only.
 
-**Expected result:** for a single node whose cone is only itself, `GetNodeResult` runs the cone to completion, reports `targetReached: true` and `endedWithError: false` (this exact case is pinned by the lifecycle test `GetNodeResult_SingleNodeTree_RunsToCompletionWithTerminalRole`).
+`GetNodeResult` adds `targetReached` to the result shape (`true` when the node was actually driven). Its error contract is the subject of the next page.
 
-## 5. The engine underneath
+## 4. The engine underneath
 
-The tools are thin wrappers over the same engine the Workflow System Quick Start drives directly:
+Both run tools share `RunCompiledRoleAsync` (`WorkflowAgentToolkit.cs`), which does:
 
 ```csharp
-using VeloxDev.Core.WorkflowSystem.CompilerEx;
-
-var controller = tree.Nodes.First();                       // IWorkflowNodeViewModel from your tree
-var seed = "start value";                                  // optional first-node payload
-var ct = CancellationToken.None;                            // or a real cancellation token
-
-var compiler = new CompilerViewModel();
-var graphs = await compiler.CompileAsync(controller, CompileRole.Root); // or CompileRole.Terminal
-var context = new RuntimeContext { Data = seed };
+var graphs = await new CompilerViewModel().CompileAsync(node, role);   // role = Root | Terminal
 await new RuntimeEngine().RunAsync(graphs[0], context, ct);
 ```
 
-For a Terminal run the toolkit additionally sets `context.Target = node`, which makes the engine track `context.TargetReached`. Because the engine treats a run as a session with `Data`/`Status`/`Attempt`/logs, all node outputs chain through one shared `RuntimeContext`.
+Namespaces `VeloxDev.Core.WorkflowSystem.CompilerEx`. `CompileRole.Root` compiles the downstream sub-graph from a start node; `CompileRole.Terminal` reverse-compiles a single node's cone and sets `context.Target` to that node. There is no `CompilerEngine` / `CompileToAsync` anymore.
 
-**Expected result:** compiling the same controller twice produces the same graph; running it leaves `context.Data` as the final node's output.
+`RunCompiledRoleAsync` builds the session through `NewSession(seed, target, run)`, which applies the host's `WithSessionConfiguration`, then fills in only what is still unset (`CheckpointStore`, the execution gate, the error sink).
+
+## 5. Read the plan afterwards
+
+| Tool | Signature | Returns |
+|---|---|---|
+| `GetCompileStatus` | `GetCompileStatus()` | every compile-aware node's identity (`Order` / `ChainIndex` / `Offset`; `isStopped = Order == -1`) **without recompiling** |
+| `GetExecutionLog` | `GetExecutionLog()` | the tree's aggregate **direct** (non-compiler) execution log (a convention-named `ExecutionLog` property) |
+
+Use the run tool's `logs` field for the compiler run-session log (which carries sequence numbers and `[Warning]` / `[Error]` markers); `GetExecutionLog` is the direct-execution log only.
+
+**Expected result:** after `CompileWorkflow(0)`, `GetCompileStatus()` lists the compiled nodes with non-negative `Order`; the start node is not `isStopped`.
 
 ## Run declaration
 
-- ⚠️ Statically verified only. Tool names, parameter lists, roles and JSON shapes are taken from `WorkflowAgentToolkit.cs` (`CompileRoleAsync`, `RunCompiledRoleAsync`) and the CompilerEx sources; nothing here was compiled or executed.
+- ✅ Actually built and ran — the deterministic agent test suite was executed on 2026-10-01 (`已通过! 失败: 0，通过: 387`). It covers `WorkflowLifecycleFidelityTests` (`CompileNodeResult_SingleNodeTree_ProducesTerminalCompilePlan`, `GetNodeResult_SingleNodeTree_RunsToCompletionWithTerminalRole`, `GetNodeResult_WithoutAllowNodeExecution_IsRejectedByPolicy`) and `CompiledRunControlTests`, all of which drive the compiler path against the demo graph with a stubbed interpreter. Running a conversation against a model was not part of that run.

@@ -1,4 +1,4 @@
-# 00 · File Structure
+﻿# 00 · File Structure
 
 ## Repository Layout
 
@@ -13,7 +13,7 @@ VeloxDev/
 │   │   │   ├── MVVM/                      ← VeloxProperty/VeloxCommand runtime + IVeloxCommand
 │   │   │   ├── AspectOriented/            ← AOP proxies (#if NET)
 │   │   │   ├── AI/                        ← Agent attributes + reflection utilities
-│   │   │   ├── TimeLine/                  ← MonoBehaviour frame loop (MonoBehaviourManager)
+│   │   │   ├── TimeLine/                  ← Tickable frame loop (TickManager)
 │   │   │   ├── WeakTypes/                 ← WeakQueue/WeakStack/WeakCache/WeakDelegate
 │   │   │   └── Interfaces/                ← Public API contracts (WorkflowSystem, TransitionSystem, ...)
 │   │   ├── VeloxDev.Core.Extension/       ← Workflow Agent (AI.Workflow), MCP, ComponentModelEx serialization
@@ -27,7 +27,7 @@ VeloxDev/
 │   │   ├── VeloxDev.WinForms/             ← Windows Forms
 │   │   └── VeloxDev.Razor/                ← Razor / Blazor
 │   ├── Generators/
-│   │   └── VeloxDev.Core.Generator/       ← Roslyn source generators (WorkflowBuilder, MVVM, Command, AOP, Theme, MonoBehaviour)
+│   │   └── VeloxDev.Core.Generator/       ← Roslyn source generators (WorkflowBuilder, MVVM, Command, AOP, Theme, Tickable)
 │   └── Templates/                         ← dotnet new item templates (WPF/Avalonia/WinUI/MAUI/WinForms/Razor)
 ├── Examples/                              ← Demos (primary evidence)
 │   ├── Workflow/   WPF · Avalonia · WinUI · MAUI · WinForms · Blazor + Common/Lib
@@ -35,7 +35,7 @@ VeloxDev/
 │   ├── Theme/      WPF · Avalonia
 │   ├── MVVM/       WPF · Avalonia
 │   ├── AOP/        WPF · Avalonia
-│   └── MonoBehaviour/ WPF
+│   └── Tickable/ WPF
 ├── Docs/
 │   └── VeloxDev.Docs/                     ← CloudGlyph Wiki repository (content, skills, app)
 ├── Assets/                                ← Shared assets

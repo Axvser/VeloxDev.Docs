@@ -60,4 +60,4 @@ deactivate Mtool
 - `Http` 模式不安装任何运行时，直连 `Endpoint`（Streamable HTTP，SSE 兜底）；可选 `headers`/`oauth`/`connectionTimeout`/`transportMode`/`ownsSession` 来自 `McpServerConfiguration.Options`（未知键被拒绝）。
 - 取消以 `OperationCanceledException` 传播（不被单服务器处理器捕获）。配置了 `WithSynchronizationContext` 时状态更新 marshal 到 UI 上下文。
 
-> 源码：`Src/Core/VeloxDev.Core.Extension/Agent/MCP/McpScope.cs`，`LoadAsync` 第 167-191 行、`LoadOneAsync` 第 193-230 行、`EnsureNpmPackageAsync` 第 300-332 行、`ConnectServerAsync` 第 382-418 行；`McpAgentToolkit.cs`，`LoadServers` 第 120-162 行。
+> 源码：`Src/Core/VeloxDev.Core.Extension/Agent/MCP/McpScope.cs`，`LoadAsync` 第 743-771 行、`LoadOneAsync` 第 843-888 行、`EnsureNpmPackageAsync` 第 971-1003 行、`ConnectServerAsync` 第 1053-1097 行；`McpAgentToolkit.cs`，`LoadServers` 第 322-364 行。

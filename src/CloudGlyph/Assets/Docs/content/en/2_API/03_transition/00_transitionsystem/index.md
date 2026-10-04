@@ -4,18 +4,20 @@ This section documents the core, UI-agnostic contracts of the animation engine. 
 
 ## Roles
 
-The engine separates five concerns, each expressed as interfaces:
+The engine separates six concerns, each expressed as interfaces:
 
 - **Sampling** — `ISampler` interpolates one property per normalized time; `ISampleable` lets a **value type** declare its own animatable members (struct assembly) without registering a sampler.
 - **Property addressing** — `ITransitionProperty` names a (possibly nested) property path; `IFrameState` is the bag of declared values / samplers / options for one transition.
-- **Timing** — `IEaseCalculator`, `ITransitionEffectCore` / `ITransitionEffect<TPriorityCore>` describe how a single animation pass behaves.
-- **Execution** — `ITransitionSchedulerCore` serializes animations per target; `ITransitionInterpreter<TPriorityCore>` runs the sampling loop. Adapters whose host has no dispatcher priority fill `TPriorityCore` with `NonPriority`.
-- **UI marshaling** — `IUIThreadInspectorCore` answers thread questions and marshals reads/writes to the UI thread; `IUIThreadInspector<TPriorityCore>` adds the priority-taking dispatch.
+- **Timing descriptor** — `IEaseCalculator`, `ITransitionEffectCore` / `ITransitionEffect<TPriorityCore>` describe how a single animation pass behaves.
+- **Execution** — `ITransitionSchedulerCore` serializes animations per target; `ITransitionInterpreter<TPriorityCore>` runs the sampling loop; `FramePacerCore` decides when the loop's next frame happens. Adapters whose host has no dispatcher priority fill `TPriorityCore` with `NonPriority`.
+- **Host / UI marshaling** — `ITransitionHost<TPriorityCore>` is everything the engine asks of a host: which thread a target belongs to (`IThreadAffinity`), how to carry work there (`IThreadDispatcher<TPriorityCore>`) and whether the host is still running (`IApplicationState`). It is a *composition*, not a new contract — it adds no member.
+- **Clock** — the engine reads time from `VeloxDev.Timing`'s `ITimeSource`, not from a framework clock. That layer has its own section: [timing](../05_timing/index.md).
 
 The remaining members of this namespace — the `RotationDirection` enum and the `Eases` factory / concrete ease classes — are listed with the sampling contracts.
 
 ## Sub-pages
 
-- [sampling-capture](00_sampling-capture/index.md) — `ISampler`, `ISampleable`, `ITransitionProperty`, `IFrameState` (sampling + property addressing contracts), plus the two path exceptions.
-- [effect-engine](01_effect-engine/index.md) — `ITransitionEffectCore` / `ITransitionEffect<TPriorityCore>`, the scheduler and interpreter interfaces, and the UI-thread inspector interfaces.
+- [sampling-capture](00_sampling-capture/index.md) — `ISampler`, `ISampleable`, `ITransitionProperty`, `IFrameState` (sampling + property addressing contracts), the `BoundedProgress` group helper, plus the two path exceptions.
+- [effect-engine](01_effect-engine/index.md) — `ITransitionEffectCore` / `ITransitionEffect<TPriorityCore>`, the scheduler and interpreter interfaces, and the `FramePacerCore` pacing base.
 - [eases](02_eases/index.md) — `RotationDirection`, `Eases`, and the 31 concrete ease classes.
+- [host](03_host/index.md) — the host-thread contracts: `ITransitionHost<TPriorityCore>`, `IThreadAffinity`, `IThreadDispatcher<TPriorityCore>`, `ThreadRef`, `NonPriority`, `IApplicationState`, and the `ThreadDispatcherBase<TPriorityCore>` base.

@@ -1,10 +1,10 @@
 # MVVM — 定义可观察属性
 
-`[VeloxProperty]` 是标记特性（`AttributeTargets.Field | AttributeTargets.Property`），没有参数。生成器把被标记的成员改写为公开可观察属性加 `partial` 钩子声明，并且只合成类层级里尚不存在的通知基础设施。
+`[VeloxProperty]` 是一个无参数的标记特性（`AttributeTargets.Field | AttributeTargets.Property`）。生成器把被标注的成员改写成公开可观察属性并声明 `partial` 钩子，且只补齐该类层级中尚不存在的通知基础设施。
 
-## 1. 字段写法（每个支持目标都可用）
+## 1. 字段写法（在所有支持目标上可用）
 
-标记私有字段即可；属性名由字段名首字母大写派生（`_count` → `Count`、`_greeting` → `Greeting`）：
+标注一个私有字段；属性名由字段名去掉前导 `_` 并把下一个字符大写得到（`_count` → `Count`）：
 
 ```csharp
 using VeloxDev.MVVM;
@@ -17,45 +17,44 @@ public partial class CounterViewModel
 }
 ```
 
-生成器（`MVVMWriter`）把属性与钩子声明写入同一类的另一个 partial 部分。对于上述字段，生成的 setter 体是：
+下面这段就是**该成员真实生成的代码**（产出方式见运行声明）：
 
 ```csharp
-public int Count
+public System.Int32 Count
 {
-    get => _count;
+    get => this._count;
     set
     {
-        if (global::System.Object.Equals(_count, value)) return;
-        var old = _count;
+        if (global::System.Object.Equals(this._count, value)) return;
+        var old = this._count;
         OnPropertyChanging(nameof(Count));
         OnCountChanging(old, value);
-        _count = value;
+        this._count = value;
         OnCountChanged(old, value);
         OnPropertyChanged(nameof(Count));
     }
 }
-
-partial void OnCountChanging(int oldValue, int newValue);
-partial void OnCountChanged(int oldValue, int newValue);
+partial void OnCountChanging(System.Int32 oldValue, System.Int32 newValue);
+partial void OnCountChanged(System.Int32 oldValue, System.Int32 newValue);
 ```
 
-然后你在自己的文件里用相同签名的 `partial` 方法实现钩子：
+钩子由你在类的另一半实现；声明由生成器产出，所以签名写错是编译错误，而不是一个被悄悄忽略的方法：
 
 ```csharp
 public partial class CounterViewModel
 {
     partial void OnCountChanged(int oldValue, int newValue)
     {
-        System.Console.WriteLine($"[hook] Count {oldValue} -> {newValue}");
+        System.Console.WriteLine($"[count] {oldValue} -> {newValue}");
     }
 }
 ```
 
-**预期结果：** `_count` 以 `public int Count` 暴露；执行 `Count = 5` 依次 (1) 调 `OnPropertyChanging(nameof(Count))` → 触发 `PropertyChanging`，(2) `partial OnCountChanging(old, new)`，(3) 字段赋值，(4) `partial OnCountChanged(old, new)` → 打印 `[hook] Count 0 -> 5`，(5) `OnPropertyChanged(nameof(Count))` → 触发 `PropertyChanged`。再次赋相同的值会在 `Object.Equals` 守卫处短路 —— 没有事件、没有钩子调用。
+**预期结果：** `_count` 以 `public int Count` 暴露。执行 `Count = 3` 会按顺序触发：(1) `OnPropertyChanging(nameof(Count))` → 触发 `PropertyChanging`；(2) `partial OnCountChanging(old, new)` 钩子；(3) 字段赋值；(4) `partial OnCountChanged(old, new)` 钩子 → 打印 `[count] 0 -> 3`；(5) `OnPropertyChanged(nameof(Count))` → 触发 `PropertyChanged`。再次赋相同值会在 `Object.Equals` 守卫处短路：无事件、无钩子。
 
 ## 2. partial 属性写法（C# 13）
 
-用 C# 13 partial 属性代替字段。生成器补上实现访问器与名为 `_<名称>` 的后备字段：
+改用 C# 13 的 partial 属性声明。生成器补齐实现访问器以及一个后备字段：
 
 ```csharp
 using VeloxDev.MVVM;
@@ -68,26 +67,35 @@ public partial class CounterViewModel
 }
 ```
 
-这是真实用法 —— `Src/Core/VeloxDev.Core.Extension/Agent/MCP/McpServerConfiguration.cs` 用这种方式标注了它所有配置成员，没有基类、没有任何样板代码。
+仓库中就有真实用法 —— `Src/Core/VeloxDev.Core.Extension/Agent/MCP/McpServerConfiguration.cs` 用这种方式标注了它的全部配置成员，既无基类也无样板代码。
 
-**预期结果：** 生成同样的公开属性、后备字段与 `OnGreetingChanging` / `OnGreetingChanged` 钩子；类无需手动实现 `INotifyPropertyChanged`。
+**预期结果：** 会生成同样的公开属性与 `OnGreetingChanging` / `OnGreetingChanged` 钩子；该类依然不需要手写 `INotifyPropertyChanged` 实现。
 
-## 3. 通知基础设施按类自动探测
+## 3. 通知基础设施按类检测
 
-`MVVMWriter` 在生成前检查整个层级：
+MVVM writer 在生成前会遍历该类及其基类，只补缺失的部分（上面那份生成文件就展示了裸 `partial class` 的情况）：
 
-- **基类未提供** → 生成器给类加上 `INotifyPropertyChanging` / `INotifyPropertyChanged`，并发出 `public event PropertyChangingEventHandler? PropertyChanging;`、`public event PropertyChangedEventHandler? PropertyChanged;`、`public virtual void OnPropertyChanging(string propertyName)`、`public virtual void OnPropertyChanged(string propertyName)`（事件由这两个方法触发）。
-- **基类已提供事件/方法**（例如演示自带、实现接口并声明 `OnPropertyChanging(string)` / `OnPropertyChanged(string)` 的 `ObservableViewModelBase`）→ 生成器复用它们，**不再重复生成**。
-- **探测到知名的 MVVM 基类** → 生成的 setter 委托给该框架自己的通知器而不是直接拨动事件：CommunityToolkit.Mvvm 的 `ObservableObject`/`[ObservableObject]` 与 Prism 的 `BindableBase` → `SetProperty(...)`，ReactiveUI 的 `ReactiveObject` → `RaiseAndSetIfChanged(...)`，Caliburn.Micro 的 `PropertyChangedBase` → `NotifyOfPropertyChange(...)`。这让 VeloxDev 属性能够活在你已经在用的 MVVM 视图模型基类里。
+- **基类没有提供** → 生成器把 `INotifyPropertyChanging` / `INotifyPropertyChanged` 加到该 partial 类上，并生成 `public event PropertyChangingEventHandler? PropertyChanging;`、`public event PropertyChangedEventHandler? PropertyChanged;`、`public virtual void OnPropertyChanging(string propertyName)` 与 `public virtual void OnPropertyChanged(string propertyName)`。
+- **基类已经提供事件与方法**（例如演示自带的 `ObservableViewModelBase`）→ 生成器复用之，不产生重复成员。
+- **识别出已知 MVVM 基类**（CommunityToolkit.Mvvm、Prism、ReactiveUI、Caliburn.Micro）→ 生成的 setter 改为委托给该框架自己的通知方法（`SetProperty`、`RaiseAndSetIfChanged`、`NotifyOfPropertyChange`），而不是直接触发本地事件。
 
-**预期结果：** 裸 `partial class` 编译成满足 `INotifyPropertyChanging` 与 `INotifyPropertyChanged` 的类型；继承自已实现它们的基类的类只新增被标注的属性与钩子 —— 两种情况订阅事件的观察行为一致。
+**预期结果：** 裸 `partial class` 编译出的类型同时满足两个通知接口；从已实现它们的基类派生的类只多出被标注的属性与钩子。两种情况下订阅事件的行为完全一致。
 
-## 4. 生成代码的去向
+## 4. 生成代码落在哪里
 
-每个被标注的类一个 `.g.cs` 文件，命名为 `{类名}_{下划线命名空间}_MVVM.g.cs`，例如 `CounterViewModel_QuickStart_Mvvm_MVVM.g.cs`（`Src/Generators/VeloxDev.Core.Generator/Writers/MVVMWriter.cs` 里的方法 `GetFileName()`）。同一命名空间里两个类产生两个文件 —— 按类逐个生成。
+每个被标注的类一个文件，文件名来自 `Src/Generators/VeloxDev.Core.Generator/Writers/MVVMWriter.cs` 的 `GetFileName()`，形如 `{类名}_{命名空间下划线化}_MVVM.g.cs`。生成是**按类**进行的：同一命名空间里的两个类产生两个文件。
 
-**预期结果：** 构建后文件出现在 `obj/<配置>/<目标框架>/generated/` 下；在 IDE 里双击可看到上述属性、钩子以及（仅在需要时）通知成员。
+**预期结果：** 用 `-p:EmitCompilerGeneratedFiles=true` 构建后，文件出现在 `obj/<配置>/<目标框架>/generated/VeloxDev.Core.Generator/VeloxDev.Generators.MVVM/` 下。不加该开关时代码仍会被编译进去，只是只能通过 IDE 的生成文件节点查看。
 
 ## 运行声明
 
-- ⚠️ 仅静态核验 —— 编写本页时未编译或运行任何内容。生成的形态转录自 `Src/Generators/VeloxDev.Core.Generator/Base/Analizer.cs`（`MVVMPropertyFactory.GenerateViewModel`、setter 体构造器）与 `MVVMWriter.cs`；partial 属性示例取自 `McpServerConfiguration.cs` 的真实代码。
+- ✅ 2026-10-01 实际构建并运行过。在一个临时目录的控制台项目中引用了 `VeloxDev.Core.csproj`，并以 analyzer 方式（Debug）引用 `VeloxDev.Core.Generator.csproj`，声明了 `[VeloxProperty] private int _count;`、`[VeloxProperty] private ObservableCollection<string> _items = [];` 以及一个负责打印的 `partial void OnCountChanged` 钩子，用 `dotnet run -c Debug` 运行。录制输出（前三行来自本页的成员）：
+
+  ```text
+  [collection] added: ready
+  initial: Count=0, CanExecute(Decrement)=False
+  Items: ready
+  [count] 0 -> 3
+  ```
+
+- 第 1、3 节引用的生成代码逐字抄自同一次构建产出的 `obj/Debug/net9.0/generated/VeloxDev.Core.Generator/VeloxDev.Generators.MVVM/CounterViewModel_QuickStart_Mvvm_MVVM.g.cs`，并非手工还原。第 2 节的 `partial` 属性写法本次**没有**编译（需要 C# 13 语言级别），其结论来源于 `McpServerConfiguration.cs`。

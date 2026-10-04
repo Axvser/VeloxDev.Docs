@@ -36,7 +36,7 @@ MAUI uses color-typed bindable properties instead of brushes (`MinimapBackground
 ### Behavior (verified, WPF)
 
 - Subscribes to the tree's node/link collections for dirty tracking and re-measures the world bounds.
-- **Viewport drag:** pressing inside the viewport rect keeps it in place and aligns it to the cursor; pressing elsewhere moves the viewport block center to the cursor, clamped inside the minimap.
+- **Viewport drag:** a press anywhere on the minimap makes the clicked point the new **viewport center** — `NavigateToWorld(pt.X, pt.Y)` is called unconditionally, with no inside/outside branch and no grab-anchor on the indicator block. The WPF source states it outright: "the clicked point always becomes the viewport center — no grab-anchor on the indicator block, so pressing anywhere recenters the view." The identical call repeats on every pointer move while pressed, so the view pans with the drag; the resulting scroll offset is clamped (`WorkflowSurfaceMath.ClampScrollOffset`) so the viewport block stays inside the minimap. Avalonia, WinUI and MAUI implement the same rule — each carries a "Match the Jalium adapter" comment.
 - **Navigate-to-world:** converts minimap space back to world coordinates and scrolls the `ScrollViewer`, growing `Layout.NegativeOffset` / `PositiveOffset` at the edges.
 - Surface behavior pushes `ScrollOffset*`, `ContentOffset*`, `ViewportWidth/Height`, `WorkflowTree`, and `IsMinimapVisible` before each render pass.
 

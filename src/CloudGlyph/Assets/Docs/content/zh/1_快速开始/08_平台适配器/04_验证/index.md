@@ -25,4 +25,15 @@ dotnet run --project Examples/Workflow/WPF/Demo
 
 ## 运行声明
 
-- ⚠️ 本环境未实际运行——页面内容对照适配器与模板源码（`Src/Adapters/*`、`Src/Templates/*`）以及演示调用形态（`Examples/Workflow/WPF/Demo`、`Examples/Transition/WPF`、`Examples/Theme/WPF`）做了静态核验，此处没有启动任何 GUI。
+- ✅ 已于 2026-10-01 构建：`dotnet build Examples/Workflow/WPF/Demo/Demo.csproj`（Debug，`net9.0-windows`）把 WPF 适配器及其工作流行为针对本仓库的 Core 引擎编译通过，**0 警告 / 0 错误**：
+
+```text
+  VeloxDev.WPF -> ...\Src\Adapters\VeloxDev.WPF\bin\Debug\net5.0-windows\VeloxDev.WPF.dll
+  Demo -> ...\Examples\Workflow\WPF\Demo\bin\Debug\net9.0-windows\Demo.dll
+
+已成功生成。
+    0 个警告
+    0 个错误
+```
+
+- ⚠️ 未启动 GUI：本环境没有打开任何图形界面，因此第 1 节的交互结果（平移 / 缩放 / 拖拽 / 连线 / 小地图）是依据适配器源码（`Src/Adapters/*`）与演示调用形态（`Examples/Workflow/WPF/Demo`、`Examples/Transition/WPF`、`Examples/Theme/WPF`）做的静态核验——并未在屏幕上实际观察。

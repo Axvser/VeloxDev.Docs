@@ -1,54 +1,90 @@
-# Data Flow — Agent Tool Call
+# Data Flow — A Tool Call, End to End
 
-A user message is passed to the agent. On a tool call, `TrackedAIFunction.InvokeCoreAsync` marshals onto the UI context if configured, `InvokeCoreInnerAsync` pre-flights the call limits and runs the underlying `AIFunction`. The tool body mutates the tree through exactly one component command and awaits real completion; afterwards `TrackAsync` raises `ToolCalled` and optionally marks the tree dirty. The framework's undo/redo stack is the single source of truth — the toolkit never submits its own gestures.
+Every tool call — built-in, developer-registered, MCP-sourced, skill-sourced or a sub-agent spawn — travels the same path: the model calls a `TrackedAIFunction`, which marshals onto the host's context and hands the call to the scope's **one shared `ToolPipeline`**, which applies the budget/host-policy refusal and the human approval gate before the tool body runs. The body dispatches a component command, and the completion event is counted by the accounting stage.
 
 ```plantuml
 @startuml
-actor User
-participant "IAIAgent" as Agent
-participant "TrackedAIFunction" as Tool
-participant "AIFunction (tool body)" as Inner
-participant "Component command" as Cmd
-participant "IWorkflowTreeViewModel" as Tree
-participant "WorkflowAgentScope" as Scope
+!theme plain
 
-User -> Agent: RunAsync(message, session, runOptions)
+actor "Host UI" as Host
+participant "AIAgent\n(AgentPipelineAgent)" as Agent
+participant "WorkflowAgentContextProvider" as Provider
+participant "TrackedAIFunction" as Tracked
+participant "ToolPipeline\n(SharedTools)" as Gate
+participant "Tool body" as Tool
+participant "IWorkflowTreeViewModel\n(component commands)" as Tree
+participant "AccountingStage" as Acct
+participant "ToolCallLedger" as Ledger
+
+Host -> Agent: RunAsync(prompt, session)
 activate Agent
+Agent -> Provider: ProvideAIContextAsync(invocation)
+activate Provider
+Provider -> Provider: BuildContext() — cached on ContextKey
+note right of Provider
+  Unchanged turn: no lock, no allocation,
+  the very same AIContext instance returns.
+end note
+Provider --> Agent: AIContext(instructions, tools)
+deactivate Provider
 
-Agent -> Tool: InvokeAsync(tool, args)
-activate Tool
-Tool -> Tool: InvokeCoreAsync: marshal body onto UI context (when configured)
-Tool -> Tool: InvokeCoreInnerAsync: reject when Max/Read/Write call limit hit
-Tool -> Inner: base.InvokeCoreAsync(args)
-activate Inner
+Agent -> Agent: model decides to call a tool
+Agent -> Tracked: InvokeCoreAsync(name, args)
+activate Tracked
+Tracked -> Tracked: marshal onto SynchronizationContext
+Tracked -> Gate: OnEventAsync(AgentToolCallStarted)
+activate Gate
 
-Inner -> Cmd: WaitForExitedAsync(cmd, ct) subscribes Exited/Failed
-Inner -> Cmd: cmd.Execute(param)  (e.g. SetAnchorCommand / CreateNodeCommand / SendConnectionCommand)
-activate Cmd
-Cmd -> Cmd: Standard* mutation + Submit only when the command is undoable
-Cmd --> Inner: Exited / Failed
-deactivate Cmd
+Gate -> Gate: Refuse(name)  — CheckBudget / IsToolEnabled
+alt refused (limit reached, or tool switched off)
+    Gate --> Tracked: refusal message
+    Tracked -> Agent: AgentToolCallCompleted(name, msg, Refused)
+    note right of Tracked
+      The body never ran and the call is NOT counted.
+    end note
+else allowed
+    Gate -> Gate: Confirm(name)  — only when WithToolApproval(true)
+    alt denied, or no handler (an unanswerable prompt denies)
+        Gate --> Tracked: "not approved by the user" message
+        Tracked -> Agent: AgentToolCallCompleted(name, msg, Refused)
+    else approved
+        Gate -> Tool: run the tool body
+        activate Tool
+        Tool -> Tree: dispatch exactly one component command
+        activate Tree
+        Tree --> Tool: command result
+        deactivate Tree
+        Tool --> Gate: compact JSON result
+        deactivate Tool
+        Gate --> Tracked: result
+        Tracked -> Agent: AgentToolCallCompleted(name, result, Succeeded)
+        deactivate Tracked
 
-Inner --> Tool: compact JSON result (Formatting.None)
-deactivate Inner
-
-Tool -> Tool: TrackAsync(name, result)  (counters ++)
-Tool -> Scope: RaiseToolCalledAsync(name, result, count)
-Scope -> User: ToolCalled event + WithToolCallCallback handler
-alt AutoMarkDirty enabled AND tool not a query tool
-    Tool -> Tree: Tree.GetHelper().MarkDirty()
+        Agent -> Acct: OnEventAsync(Completed: Succeeded)
+        activate Acct
+        Acct -> Ledger: Spend(isQuery)
+        activate Ledger
+        Ledger -> Ledger: increment total/read/write
+        Ledger -> Ledger: Outer?.Spend(isQuery)  — the whole chain
+        deactivate Ledger
+        Acct -> Host: RaiseToolCalledAsync(name, result, count)
+        Acct -> Tree: MarkDirty()  — only when AutoMarkDirty && !query
+        deactivate Acct
+    end
+    deactivate Gate
 end
-Tool --> Agent: JSON result (status ok/error/rejected)
-deactivate Tool
 
-Agent --> User: response text (uses GetChangesSinceSnapshot diffs to observe change)
+Agent --> Host: AgentResponse
 deactivate Agent
 @enduml
 ```
 
-Notes:
+Source: `WorkflowAgentToolkit.cs` (`CreateTools`, `CheckBudget`, `ConfirmMutationAsync`, `AccountAsync`, `CreateAccountingStage`), `TrackedAIFunction.cs`, `ToolPipeline.cs`, `WorkflowAgentContextProvider.cs`.
 
-- Awaiting command completion (`WaitForExitedAsync`, `WaitForCommandAsync`, `WaitForNDispatchesAsync`, `SendReceiveAsync`) means the next tool call never observes a stale-state window.
-- Query tools never trigger auto-dirty; a state-observation tool (`TakeSnapshot` / `GetChangesSinceSnapshot`) is a separate, opt-in call.
+## What the diagram pins down
 
-> Source: `Src/Core/VeloxDev.Core.Extension/Agent/Workflow/Functions/WorkflowAgentToolkit.cs`, `TrackedAIFunction` lines 178-242, `TrackAsync` lines 264-281, wait helpers lines 2672-2767; `WorkflowAgentScope.cs`, `RaiseToolCalledAsync` lines 444-450.
+- **The model never sees a tool the gate would refuse.** `CreateTools` filters the switched-off tools out of the list *and* `CheckBudget` refuses them at call time — the test `SwitchedOffTool_IsRefusedAtCallTime_NotJustHidden` captures the `AIFunction` before the switch and calls it after, pinning the refusal rather than the omission.
+- **Refusal happens before the body.** A refused or failed call never runs its body, so it is not counted: `AccountingStage` counts only `AgentToolOutcome.Succeeded`. The test `ARefusedTool_IsReportedToTheModel_AndDoesNotCountAsACall` asserts `CallCount == 0`.
+- **One policy, every slice.** The gate instance is shared with the MCP and skill providers, so an MCP-sourced tool is charged to the same ledger and refused by the same switches as a built-in.
+- **`ResetToolCallLimit` is exempt.** It passes the refusal hook (the escape hatch survives the gate it exists to open), clears the *whole* ledger chain on the user's agreement, and is never itself counted.
+- **Spending walks the chain.** For a spawned child the `Spend` call recurses to `Outer`, so the root ledger's total is the number of calls made anywhere in the tree.

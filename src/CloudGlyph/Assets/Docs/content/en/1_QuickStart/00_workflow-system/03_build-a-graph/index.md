@@ -66,6 +66,6 @@ helper.SendConnection(bias.OutputSlot!);
 helper.ReceiveConnection(printer.InputSlot!);
 ```
 
-**Expected result:** `tree.Links.Count == 2`; `tree.LinksMap[ticker.OutputSlot][bias.InputSlot]` and `tree.LinksMap[bias.OutputSlot][printer.InputSlot]` are set; `bias.InputSlot.Sources` contains `ticker.OutputSlot` and `bias.OutputSlot.Targets` contains `printer.InputSlot`. `tree.UndoCommand.Execute(null)` removes both links; `tree.RedoCommand.Execute(null)` restores them.
+**Expected result:** `tree.Links.Count == 2`; `tree.LinksMap[ticker.OutputSlot][bias.InputSlot]` and `tree.LinksMap[bias.OutputSlot][printer.InputSlot]` are set; `bias.InputSlot.Sources` contains `ticker.OutputSlot` and `bias.OutputSlot.Targets` contains `printer.InputSlot`. each connection is one `WorkflowActionPair`, so `tree.UndoCommand.Execute(null)` removes the most recently created link and a second undo removes the other one (`tree.RedoCommand.Execute(null)` restores them the same way).
 
-The topology the compiler consumes is exactly these slot `Targets` / `Sources` edges. Go to [Compile & run forward](../04_compile-and-run/index.md).
+The topology the compiler consumes is exactly these slot `Targets` / `Sources` edges. Go to `Compile & run forward`.

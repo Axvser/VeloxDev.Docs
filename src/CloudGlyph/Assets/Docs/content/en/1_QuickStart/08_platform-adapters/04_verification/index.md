@@ -25,4 +25,15 @@ Open the workflow tree on the left panel ("Load Workflow Demo"), then compare th
 
 ## Run declaration
 
-- ⚠️ Not actually executed in this environment — the pages were statically verified against the adapter and template sources (`Src/Adapters/*`, `Src/Templates/*`) and the demo call shapes (`Examples/Workflow/WPF/Demo`, `Examples/Transition/WPF`, `Examples/Theme/WPF`). No GUI was launched here.
+- ✅ Built on 2026-10-01: `dotnet build Examples/Workflow/WPF/Demo/Demo.csproj` (Debug, `net9.0-windows`) compiled the WPF adapter and its workflow behaviors against the Core engine from this repository with **0 warnings / 0 errors**:
+
+```text
+  VeloxDev.WPF -> ...\Src\Adapters\VeloxDev.WPF\bin\Debug\net5.0-windows\VeloxDev.WPF.dll
+  Demo -> ...\Examples\Workflow\WPF\Demo\bin\Debug\net9.0-windows\Demo.dll
+
+已成功生成。
+    0 个警告
+    0 个错误
+```
+
+- ⚠️ Not launched: no GUI was started in this environment, so the interactive results in section 1 (pan / zoom / drag / connect / minimap) are statically verified against the adapter source (`Src/Adapters/*`) and the demo call shapes (`Examples/Workflow/WPF/Demo`, `Examples/Transition/WPF`, `Examples/Theme/WPF`) — they were not observed on screen.

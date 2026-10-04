@@ -1,57 +1,51 @@
-# Workflow Agent — Terminal Result Semantics
+# 07 · Terminal Result Semantics
 
-`GetNodeResult` / `CompileNodeResult` are the agent's way to ask *"what is the value of this one node?"* They differ from a forward root run in one crucial respect: the answer is **never fabricated**. The compile keeps real routing semantics and only compiles the branch that can actually reach the node, and the run reports honestly when that branch was not taken.
+`GetNodeResult` (run) and `CompileNodeResult` (plan) use `CompileRole.Terminal`. The terminal role answers a different question from the chain role: *"what value does **this** node produce?"* — with no controller or start node required.
 
-## 1. Ancestor-cone compilation keeps real routing
+## 1. The ancestor cone
 
-To compute node `X`, the compiler walks **backward along `Sources`** and collects `X`'s ancestor cone, then forward-compiles the cone from its own entry frontier. Routers on the way keep their real `BranchSegment` semantics:
-
-- Only the router branches whose targets lie **inside the cone** are compiled; sibling branches are *absent* from the plan (not present as `Order = -1` stubs).
-- At runtime the router still resolves its branch normally (statically from the compile-locked key, or dynamically via `ResolveRouteKey(context)`), and the engine drives only the chosen subgraph.
-
-So the compiled artifact is not a flattened guess — it is the cone's own forward decomposition.
-
-**Expected result:** `CompileNodeResult` on a target that sits behind one branch of a router returns a Terminal plan whose graph contains only the in-cone branch.
-
-## 2. When a sibling branch is selected: `was NOT reached`
-
-Because only the in-cone branch is compiled, a router that actually decides on a **sibling** branch at runtime cannot reach the target. The run then ends before the target and the tool reports the truth:
-
-```json
-{ "status": "error", "role": "Terminal",
-  "message": "Target node 'BiasNode' (id 2) was NOT reached in this run: the router selected a branch that does not lead to it, so its condition was not satisfied. No result was produced." }
-```
-
-The `targetReached` field is emitted **only by Terminal runs**: `true` when the target node was actually driven, `false` when its branch was not taken — the tool never invents a value. (A Root chain run has no target, so it does not report `targetReached`.) This mirrors the engine-level contract: a run's `RuntimeContext` carries an optional `Target`, and the engine sets `TargetReached` only once the matching node is driven.
-
-**Expected result:** requesting a result for a node behind a branch that the router will not select returns `status:"error"` with the `was NOT reached ... No result was produced.` message and no `data`.
-
-## 3. Recovery: switch the branch, then retry
-
-The not-reached outcome is not a dead end. The router's selection is a normal runtime value (for a dynamic router, whatever `ResolveRouteKey` returns from the payload):
-
-1. Inspect the router (for example a `SlotEnumerator`-driven enum selector) and its current selection.
-2. Change the selection so it points at the branch that leads to the target node (the agent uses the enum/slot mutation tools, e.g. `SetEnumSlotChannel`).
-3. Call `GetNodeResult` again — with the corrected branch the cone compiles and the target is driven, returning `targetReached: true` and the value.
-
-A real router to experiment with is `EnumSelectorNodeViewModel` (`Examples/Workflow/Common/Lib/ViewModels/Workflow/EnumSelectorNodeViewModel.cs`), whose `ResolveRouteKey` picks the branch from the data payload.
-
-**Expected result:** after switching the router to the branch that reaches the target, a retried `GetNodeResult` returns `status:"ok"` with `targetReached: true`.
-
-## 4. Ambiguous cone: more than one branch reaches the target
-
-If **more than one route key of the same router** reaches the target node, there is no single honest answer, and the compile refuses rather than guessing:
+Given a node, the compiler traces **backward from its input slots** to find every upstream producer feeding it — the node's *ancestor cone* — and drives the run from the cone's own entry frontier. A node high in the graph gets a large cone; a node with no inputs gets a cone of just itself. The run cost therefore scales with the cone, not the whole tree.
 
 ```text
-CompileAsync(CompileRole.Terminal): the router 'EnumSelectorNodeViewModel' has more than one
-branch reaching the terminal node. A single forward run can only take one branch, so this
-target cannot be computed; no result is fabricated.
+CompileNodeResult(nodeIndex: 4)   → {"status":"ok","role":"Terminal","graphCount":1}
+GetNodeResult(nodeIndex: 4)       → {"status":"ok","role":"Terminal","runStatus":"Completed","targetReached":true,...}
 ```
 
-This surfaces from the toolkit as a `Compile failed: ...` error. Ask for a node on one specific branch instead.
+Source: `WorkflowLifecycleFidelityTests.CompileNodeResult_SingleNodeTree_ProducesTerminalCompilePlan`, `GetNodeResult_SingleNodeTree_RunsToCompletionWithTerminalRole`.
 
-**Expected result:** `CompileNodeResult` on such a node returns an error explaining that a single forward run can only take one branch; it never fabricates a combined result.
+**Expected result:** on a single-node tree, both return `role:"Terminal"`; the run returns `runStatus:"Completed"`, `targetReached:true`, `endedWithError:false`.
+
+## 2. Routers stay real
+
+Unlike the Root role — which prunes statically, giving a downstream node on no live branch `Order = -1` — the Terminal role keeps **real** branch selection. Only the branch leading to the target node is compiled, so the result *exactly matches* a normal run that took that branch. (A consequence: if more than one route key of the same router reaches the node, compilation cannot produce a single forward run and returns an error.)
+
+## 3. The error contract
+
+If a router on the cone actually selects a **sibling** branch at runtime, the target is never driven. The tool then returns:
+
+```text
+status: "error"
+message: "Target node '<Type>' (id <id>) was NOT reached in this run: the router selected a
+          branch that does not lead to it, so its condition was not satisfied. No result was produced."
+```
+
+with **no data**. The check is `if (role == CompileRole.Terminal && !context.TargetReached)` after the run — the run's own `TargetReached` flag, so no value is ever fabricated from another branch's payload.
+
+**Never treat another branch's final payload as this node's result.** To recover: point the router at the branch leading to the node first (`PatchNodeProperties` or `SetEnumSlotCollection` to set `CompileMode`/`Selection`), then retry — or ask for a node that sits on the actually-selected branch.
+
+**Expected result:** a target node on a branch the router did not select yields `status:"error"` naming the node and `"was NOT reached"`, and no `data`; retargeting the router makes the same call return `targetReached:true`.
+
+## 4. Which level to use
+
+| You want to… | Use |
+|---|---|
+| run the whole flow from its controller | `RunCompiledWorkflow` (Root) |
+| run one node and read its value, without a controller | `GetNodeResult` (Terminal) |
+| inspect the plan without running anything | `CompileWorkflow` / `CompileNodeResult` |
+| hold / follow / stop a long chain run | the run-handle family (next page) |
+
+`GetNodeResult` is gated by `WithAllowNodeExecution`; the compile-only plan tools are not. Without the gate, `GetNodeResult` returns `... is disabled by host policy. The host must enable node execution via WithAllowNodeExecution(true).`
 
 ## Run declaration
 
-- ⚠️ Statically verified only. The error strings and `targetReached` contract are quoted from `WorkflowAgentToolkit.cs` and the compiler's `RestrictRouteToCone`; no terminal run was executed in this documentation pass.
+- ✅ Actually built and ran — the deterministic agent test suite (2026-10-01, `已通过! 失败: 0，通过: 387`) covers the Terminal path through `WorkflowLifecycleFidelityTests`. The sibling-branch error contract and its recovery steps are read from `WorkflowAgentToolkit.RunCompiledRoleAsync`, which the suite does not exercise on a branching graph (the demo graphs it drives have no sibling router on a cone).

@@ -2,14 +2,14 @@
 
 ## 1. 用自动化测试验证
 
-行为证据位于 `Src/Core/VeloxDev.Core.Test/WeakTypes/` 下的 MSTest 套件。2026-09-07 只跑弱类型测试、对应当前 `master`，得到：
+行为证据位于 `Src/Core/VeloxDev.Core.Test/WeakTypes/` 下的 MSTest 套件。2026-10-01 只跑弱类型测试、对应当前 `master`，得到：
 
 ```text
 总共 1 个测试文件与指定模式相匹配。
-已通过! - 失败:     0，通过:    33，已跳过:     0，总计:    33，持续时间: 39 ms - VeloxDev.Core.Test.dll (net10.0)
+已通过! - 失败:     0，通过:    35，已跳过:     0，总计:    35，持续时间: 55 ms - VeloxDev.Core.Test.dll (net10.0)
 ```
 
-这是对 `VeloxDev.Core.Test` 项目（目标 `net10.0`）执行 `dotnet test --filter "FullyQualifiedName~WeakTypes" -c Release`：跨 `WeakDelegateTests`（6）、`WeakQueueTests`（10）、`WeakStackTests`（10）与 `WeakCacheTests`（7）共 33 个测试，全部通过。测试固定的是 API 表面与顺序规则，但刻意不断言 GC 驱逐（测试里的字符串键与短命条目在各自的测试期间都被钉住）—— 见 [GC行为与注意](../07_GC行为与注意/) 页。
+这是对 `VeloxDev.Core.Test` 项目（目标 `net10.0`）执行 `dotnet test --filter "FullyQualifiedName~WeakTypes"`：跨 `WeakDelegateTests`（8）、`WeakQueueTests`（10）、`WeakStackTests`（10）与 `WeakCacheTests`（7）共 35 个测试，全部通过。测试固定的是 API 表面与顺序规则，但刻意不断言 GC 驱逐（测试里的字符串键与短命条目在各自的测试期间都被钉住）—— 见 [GC行为与注意](../07_GC行为与注意/) 页。
 
 **预期结果：** 对 `VeloxDev.Core.Test` 执行 `dotnet test` 会绿色通过 `WeakTypes` 测试。
 
@@ -142,7 +142,7 @@ namespace WeakTypesQuickStart
 
 ## 3. 记录到的输出
 
-下面是某次 `Release` 运行的控制台输出逐字转写（见运行声明）。它稳定，是因为每个死对象都在辅助方法内部创建，而辅助方法的栈帧在 GC 运行前就已返回：
+下面是某次运行的控制台输出逐字转写（见运行声明）。它稳定，是因为每个死对象都在辅助方法内部创建，而辅助方法的栈帧在 GC 运行前就已返回：
 
 ```text
 == WeakQueue ==
@@ -173,4 +173,5 @@ TryGetCache(key1) after Remove: False
 
 ## 5. 运行声明
 
-- ✅ 已于 2026-09-07 实际构建并运行（`dotnet run -c Release`，目标 `net10.0`，项目引用本仓库的 `VeloxDev.Core`）。记录到的输出见第 3 节逐字转写；连续三次运行输出完全一致。同日还完整执行了 `WeakTypes` MSTest 套件（33/33 通过，见第 1 节）。
+- ✅ 已于 2026-10-01 实际构建并运行（`dotnet run -c Debug`，目标 `net10.0`，项目引用本仓库的 `VeloxDev.Core`）。记录到的输出见第 3 节逐字转写；多次运行输出完全一致。同日还完整执行了 `WeakTypes` MSTest 套件（35/35 通过，见第 1 节）。
+- 关于配置的说明：程序在 `Debug` 下运行，因为 `VeloxDev.Core` 的 `Release` 还原当前在编译之前就失败。它的 `VeloxDev.Core.Generator` 包引用固定在 `10.0.0`，而该版本尚未发布到 nuget.org（`NU1102`；那里当前最高只到 `9.0.153`），所以 `-c Release` 无法还原。弱类型源码两个配置都会编译；只有工作流系统的生成器路径在 `Release` 下被挡住。

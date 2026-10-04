@@ -179,3 +179,38 @@ M -> SV : ClampScrollOffset + ScrollToHorizontal/VerticalOffset
 SV -> B : ScrollChanged (feedback loop closes)
 @enduml
 ```
+
+## (g) The minimal-host ("Trimmed") build path
+
+Every platform ships a `* Trimmed` sibling demo (`Examples/Workflow/<Platform> Trimmed`) that carries only what a real host needs — the same seven views plus the tree view model, without the extra editor chrome. The WPF one is the authoritative minimal path: `App → MainWindow → MainView → TreeView`, targeting `net10.0-windows`, with the view models under `ViewModels/Workflow/` and one handwritten copy of each generated view under `Views/Workflow/`.
+
+```plantuml
+@startuml
+!theme plain
+
+participant "App (StartupUri)" as App
+participant "MainWindow" as MW
+participant "MainView (UserControl)" as MV
+participant "TreeView (UserControl)" as TV
+participant "WorkflowSurfaceBehavior" as B
+participant "TreeViewModel\\n[WorkflowBuilder.Tree]" as VM
+
+App -> MW : StartupUri = MainWindow.xaml
+MW -> MV : <views:MainView />
+MV -> TV : <local:TreeView />
+TV -> B : named PART_* parts + IsEnabled="True"
+TV -> VM : DataContext = TreeViewModel
+B -> VM : Helper.Viewport <- visible region
+VM --> TV : VisibleItems materialized into node/slot/link views
+
+note over App, VM
+  dotnet build (Debug) against VeloxDev.WPF
+  Demo -> bin/Debug/net10.0-windows/Demo.dll
+  0 warnings / 0 errors
+end note
+@enduml
+```
+
+Build evidence: `dotnet build "Examples/Workflow/WPF Trimmed/Demo/Demo.csproj"` succeeded on 2026-10-01 (Debug, `net10.0-windows`) with 0 warnings / 0 errors. The full (non-trimmed) `Examples/Workflow/WPF/Demo` builds the same way; both build records live in the QuickStart feature's Verification page's Run Declaration.
+
+> **Trim/AOT probe.** The feature inventory lists `Src/Verification/VeloxDev.TrimProbe` as further evidence, but that project has **no source in this repository** — only `bin/`/`obj/` build output; it is absent from `git ls-files Src/Verification/` and from `VeloxDev.slnx`, so its verification line runs elsewhere. This page therefore makes no claim about an AOT/publish-trimmed path beyond the plain `dotnet build` above.

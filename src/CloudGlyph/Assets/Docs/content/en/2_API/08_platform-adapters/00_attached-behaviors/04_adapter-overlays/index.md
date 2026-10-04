@@ -4,7 +4,7 @@ Beyond the shared behavior set, some adapters ship additional workflow view type
 
 ## Class: `WorkflowLinkOverlay` (MAUI)
 
-MAUI renders workflow links as a dedicated graphics layer rather than per-link visuals. `Src/Adapters/VeloxDev.MAUI/Attached/Workflow/WorkflowLinkOverlay.cs`.
+MAUI draws, in one viewport-sized `GraphicsView`, the links that have **no view of their own** — the immediate-mode hosts and the frames before a pooled link view has materialized. A link that published its curve together with the control that drew it is painted by that control and skipped here. `Src/Adapters/VeloxDev.MAUI/Attached/Workflow/WorkflowLinkOverlay.cs`.
 
 ```csharp
 public sealed class WorkflowLinkOverlay : GraphicsView
@@ -21,49 +21,52 @@ Bindable properties / CLR properties:
 | `LinkLineColor` | `Color?` | Solid link stroke. |
 | `VirtualLineColor` | `Color?` | Stroke used for virtual/out-of-reach link segments. |
 | `StrokeWidth` | `double` | Link stroke width. |
+| `LinkFlowEnabled` | `bool` | Toggles the travelling-light animation along each curve. |
+| `InteractionSource` | `View?` | The view already on the surface's input path that forwards hover/press to the hit test (the overlay itself stays `InputTransparent`). |
+| `SelectedLinkColor` | `Color?` | Stroke for the hovered/selected link. |
 
-The overlay draws link polylines with the MAUI graphics `IDrawable` model (`Draw(ICanvas canvas, RectF dirtyRect)`), including arrowheads. It is the MAUI forwarding surface for the link visuals that the XAML adapters attach to individual link views. *Exact drag/reroute semantics `*inferred*` — not exercised by an automated demo.*
+The overlay draws each link as one cubic Bézier with the MAUI graphics `IDrawable` model (`Draw(ICanvas canvas, RectF dirtyRect)`); the travelling light is cut out of that curve by arc length rather than mapped along a polyline. It is paint-only (`VisualElement.InputTransparent` stays `true`, so a viewport-sized view cannot swallow the canvas gestures); interaction is driven through `InteractionSource` — hovering a link selects it, `Delete` removes it, and a right press (or, off Windows, a long press) is forwarded to `LinkInteraction` so the host surface can open its own menu. *Exact drag/reroute semantics `*inferred*` — not exercised by an automated demo.*
 
 ## Class: `WorkflowGridDecorator` (Jalium)
 
-Jalium ships a ready-made grid/ruler decorator element (WPF/Avalonia/WinUI instead get it from the `*-v-decorator` templates). `Src/Adapters/VeloxDev.Jalium/Attached/Workflow/WorkflowGridDecorator.cs`.
+Jalium ships a ready-made grid/ruler decorator (WPF/Avalonia/WinUI/WinForms instead get one from the `*-v-decorator` template or a per-role base class). `Src/Adapters/VeloxDev.Jalium/Attached/Workflow/WorkflowGridDecorator.cs`. It is a plain drawing/configuration class (no base type and **no** `IWorkflowGridDecorator` implementation); the composite `WorkflowTreeView` owns it through its `GridDecorator` property. Razor ships a component by the same name (`WorkflowGridDecorator.razor` + `.razor.cs`).
 
 ```csharp
-public class WorkflowGridDecorator : Decorator, IWorkflowGridDecorator
+public class WorkflowGridDecorator
 ```
 
-Dependency properties:
-
-| Property | Type | Notes |
+| Member | Type | Notes |
 |---|---|---|
-| `RulerThickness` | `double` | Ruler band thickness. |
-| `GridSpacing` | `double` | Minor grid spacing. |
+| `RulerThickness` | `const double` (36) | Ruler band thickness. |
+| `MinorGridColor` / `MajorGridColor` / `AxisColor` | `Color` | Grid palette. |
+| `RulerBackground` / `RulerLabelColor` / `RulerTickColor` / `RulerDividerColor` | `Color` | Ruler palette. |
+| `GridStep` | `double` | Minor grid spacing. |
 | `MajorLineEvery` | `int` | Every N-th minor line is major. |
-| `ScrollOffsetX` / `ScrollOffsetY` / `ContentOffsetX` / `ContentOffsetY` | `double` | The `IWorkflowGridDecorator` offsets. |
-
-It also exposes `RulerBand => RulerThickness` (the interface's read-only band thickness, used for virtualization inset).
+| `MajorStep` | `double` (get) | `GridStep * Math.Max(1, MajorLineEvery)`. |
 
 ## Class: `WorkflowTreeView` (Jalium)
 
-A ready-made composite host control for the whole workflow editor. `Src/Adapters/VeloxDev.Jalium/Attached/Workflow/WorkflowTreeView.cs`.
+The composite host control for the whole workflow editor, and Jalium's entire surface — Jalium ships no standalone `WorkflowSurfaceBehavior`. `Src/Adapters/VeloxDev.Jalium/Attached/Workflow/WorkflowTreeView.cs`.
 
 ```csharp
-public class WorkflowTreeView : Grid
+public class WorkflowTreeView : Canvas
 ```
 
 | Member | Type | Description |
 |---|---|---|
-| `PART_SurfaceBorder` | `Border` (get) | Surface border. |
-| `PART_ScrollViewer` | `ScrollViewer` (get) | Inner scroll viewer (auto scrollbars, transparent background). |
-| `PART_Canvas` | `Canvas` (get) | Node/link canvas. |
-| `PART_GridDecorator` | `FrameworkElement` (get) | The active grid decorator. |
-| `PART_MinimapOverlay` | `FrameworkElement?` (get) | The active minimap overlay. |
-| `TemplateSelector` | `IWorkflowTemplateSelector?` | Factory for node/link views; set before assigning `ViewModel`. |
-| `ViewModel` | `IWorkflowTreeViewModel?` | The workflow tree; setting it also sets `DataContext`. |
-| `GridDecorator` (set) | `IWorkflowGridDecorator?` | Swaps in a styled grid decorator. |
-| `MinimapOverlay` (set) | `IWorkflowMinimapOverlay?` | Adds a styled minimap overlay. |
+| `Tree` | `IWorkflowTreeViewModel?` (get) | The workflow tree currently attached. |
+| `PortLayout` | `WorkflowPortLayout` | The design-time port layout shared by the per-role base classes. |
+| `GridDecorator` | `WorkflowGridDecorator` | The grid/ruler decorator. |
+| `TemplateSelector` | `IWorkflowTemplateSelector?` | Factory for node/link views; set it before `SetTree`. |
+| `OriginX` / `OriginY` | `double` (get) | World origin plus the ruler band. |
+| `ContentOriginX` / `ContentOriginY` | `double` (get) | The world origin (`Layout.ActualOffset`). |
+| `AttachScrollViewer(ScrollViewer)` | method | Wires the scroll viewer that drives panning. |
+| `SetTree(IWorkflowTreeViewModel?)` | method | Attaches a tree and hooks the view pool. |
+| `NotifyZoomCommitted(hx, vy)` | method | Applies a zoom pivot after the host handled a pinch/wheel. |
+| `NavigateToWorld(wx, wy)` | method | Scrolls so a world point is visible. |
+| `OnBuildLinkMenu` | `protected virtual void` | Builds the link context menu on each right press; the base adds a single **Delete** item — override to add or remove entries. |
 
-It also hosts the surface behavior: internal wiring applies `WorkflowSurfaceBehavior` over the named `PART_*` parts so panning, zoom, and viewport feed work from one control.
+Unlike the other six adapters, Jalium names no `PART_*` controls and applies no static surface behavior: it computes port geometry and positions views from the model rather than measuring visuals, so the tree view itself is the surface.
 
 ## Interface: `IWorkflowTemplateSelector` (WinForms / Jalium)
 

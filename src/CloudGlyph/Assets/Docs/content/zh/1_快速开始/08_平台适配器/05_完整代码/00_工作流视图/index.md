@@ -1,6 +1,6 @@
 # 平台适配器 - `WorkflowView.xaml / WorkflowView.xaml.cs`
 
-`dotnet new wpf-v-tree -n WorkflowView -ns Demo.Views.Workflow` 的精确输出（模板默认颜色已替换）。表面宿主应用 `WorkflowSurfaceBehavior` 并启用缩放，同时命名了它在加载时解析的部件：`PART_ScrollViewer`、`PART_Canvas`、`PART_GridDecorator`、`PART_SurfaceBorder`，以及通过 `PART_MinimapOverlay` 命名的小地图。把 `DataContext` 绑定到 `IWorkflowTreeViewModel`；画布通过绑定 `Helper.VisibleItems` 的 `ViewPool` 实现虚拟化。
+`dotnet new wpf-v-tree -n WorkflowView -ns Demo.Views.Workflow` 的精确输出（模板默认颜色已替换）。表面宿主应用 `WorkflowSurfaceBehavior` 并启用缩放，同时命名了它在加载时解析的部件：`PART_ScrollViewer`、`PART_Canvas`、`PART_GridDecorator`、`PART_SurfaceBorder`，以及通过 `PART_MinimapOverlay` 命名的小地图。它还声明了**连线的右键菜单** —— 一个键为 `LinkContextMenu` 的 `ContextMenu`，其条目绑定它们作用于的那条连线 —— 并用 `LinkMenuKey` 让行为指向它；订阅、定位与弹出都由行为完成，而非代码后置。把 `DataContext` 绑定到 `IWorkflowTreeViewModel`；画布通过绑定 `Helper.VisibleItems` 的 `ViewPool` 实现虚拟化。
 
 ```xml
 <!-- VeloxDev customization: Generate the Node, Slot, Link, selector, minimap, and grid-decorator templates, then update the local type names below if you renamed them. -->
@@ -16,7 +16,8 @@
              behaviors:WorkflowSurfaceBehavior.CanvasName="PART_Canvas"
              behaviors:WorkflowSurfaceBehavior.GridDecoratorName="PART_GridDecorator"
              behaviors:WorkflowSurfaceBehavior.PointerPressSourceName="PART_SurfaceBorder"
-             behaviors:WorkflowSurfaceBehavior.MinimapOverlayName="PART_MinimapOverlay">
+             behaviors:WorkflowSurfaceBehavior.MinimapOverlayName="PART_MinimapOverlay"
+             behaviors:WorkflowSurfaceBehavior.LinkMenuKey="LinkContextMenu">
     <UserControl.Resources>
         <DataTemplate x:Key="NodeTemplate">
             <workflowViews:NodeView Width="{Binding Size.Width}"
@@ -41,12 +42,17 @@
         <workflowViews:TemplateSelector x:Key="WorkflowTemplateSelector"
                                         NodeTemplate="{StaticResource NodeTemplate}"
                                         LinkTemplate="{StaticResource LinkTemplate}" />
+        <!-- Right-click menu for a link; its DataContext is that link. Add or remove entries here. -->
+        <ContextMenu x:Key="LinkContextMenu">
+            <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />
+        </ContextMenu>
     </UserControl.Resources>
     <Grid>
         <Border x:Name="PART_SurfaceBorder"
                 Background="#1E1E1E"
                 BorderBrush="#33FFFFFF"
-                BorderThickness="1">
+                BorderThickness="1"
+                CornerRadius="3">
             <workflowViews:GridDecorator x:Name="PART_GridDecorator">
                 <ScrollViewer x:Name="PART_ScrollViewer"
                               HorizontalScrollBarVisibility="Auto"

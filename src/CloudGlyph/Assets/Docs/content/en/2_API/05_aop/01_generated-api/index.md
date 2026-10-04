@@ -50,11 +50,11 @@ Real contract from `Writers/AopWriter.cs`:
 ```csharp
 public override string[] GenerateBaseInterfaces() =>
 [
-    $"{NAMESPACE_VELOX_AOP}.{Syntax?.Identifier.Text}_{Symbol?.ContainingNamespace.ToDisplayString().Replace('.', '_')}_Aop"
+    $"{NAMESPACE_VELOX_AOP}.{Syntax?.Identifier.Text}_{NamespaceFileSegment()}_Aop"
 ];
 ```
 
-where `NAMESPACE_VELOX_AOP = "global::VeloxDev.AopInterfaces"` (`Writers/WriterBase.cs`). Effect: the compiler sees the class implement its generated interface, so the members living in the user's own `partial` part satisfy the interface contract — the model never has to declare the interface itself.
+where `NAMESPACE_VELOX_AOP = "global::VeloxDev.AopInterfaces"` and `NamespaceFileSegment()` are defined in `Writers/WriterBase.cs`. `NamespaceFileSegment()` returns the containing namespace with `.` replaced by `_`, or the placeholder `"Global"` when the class sits in the global namespace — `ToDisplayString()` would hand back the illegal `<global namespace>` for that case. Effect: the compiler sees the class implement its generated interface, so the members living in the user's own `partial` part satisfy the interface contract — the model never has to declare the interface itself.
 
 ## Generated extension: `Aop(this T)` in `{Class}_{Ns}_AopExtensions`
 

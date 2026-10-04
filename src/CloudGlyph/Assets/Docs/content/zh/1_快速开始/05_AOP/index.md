@@ -31,7 +31,21 @@ dotnet add package VeloxDev.Core
 dotnet add reference ..\..\..\..\Src\Core\VeloxDev.Core\VeloxDev.Core.csproj
 ```
 
-**预期结果：** 命令以退出码 0 结束；`.csproj` 中出现 `PackageReference`（或 `ProjectReference`）且还原完成。此后构建工程即会运行 AOP 生成器（`VeloxDev.Generators.AopInterface` 与 `VeloxDev.Generators.AopProxy`，程序集 `VeloxDev.Core.Generator`）。
+`ProjectReference` **不会**传递分析器，因此生成器需要再作为 analyzer 添加一次——随附的 `Examples/AOP/WPF/Demo/Demo.csproj` 正是这么做的（其自带注释写着「analyzer 不随 ProjectReference 传递」）：
+
+```xml
+<ItemGroup>
+    <ProjectReference Include="..\..\..\..\Src\Core\VeloxDev.Core\VeloxDev.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\Src\Generators\VeloxDev.Core.Generator\VeloxDev.Core.Generator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="VeloxDev.Core.Generator" Version="10.0.0"
+                      Condition="'$(Configuration)' != 'Debug'" />
+</ItemGroup>
+```
+
+**预期结果：** 命令以退出码 0 结束；`.csproj` 中出现 `PackageReference`（或 `ProjectReference`）且还原完成。此后构建工程即会运行 AOP 生成器（`VeloxDev.Generators.AopInterface` 与 `VeloxDev.Generators.AopProxy`，程序集 `VeloxDev.Core.Generator`）——走包的 analyzer 资产，或在仓库内经上面显式的 analyzer 引用。
 
 ## 3. 基础设置 / 注册
 
@@ -255,4 +269,8 @@ original.Total = 0
 
 ## 7. 运行声明
 
-- ⚠️ 未实际运行 — 仅做了静态验证。本会话完整阅读了 `Examples/AOP/{WPF,Avalonia}/Demo` 下的 WPF 与 Avalonia demo 作为证据（其 `bin/` 产物表明此前构建成功），并把上面的控制台程序与运行时（`Src/Core/VeloxDev.Core/AspectOriented/*.cs`）及生成器（`Src/Generators/VeloxDev.Core.Generator/AopInterface.cs`、`AopProxy.cs`）源码逐一对照，但并未在本会话中编译并运行任何调用 AOP 代理的控制台工程，因此上面的控制台输出是静态推导而非实际录制的结果。
+- ✅ **随附 demo 已于 2026-10-01 构建。** 录制输出：
+    - `dotnet build "Examples/AOP/WPF/Demo/Demo.csproj" -c Debug` —— `已成功生成。 0 个警告 0 个错误`（`Demo -> bin/Debug/net9.0-windows/Demo.dll`）；构建该 demo 时两个 AOP 生成器会作用于 `TeamViewModel` 的 `[AspectOriented]` 成员。
+    - `dotnet build "Examples/AOP/Avalonia/Demo/Demo.csproj" -c Debug` —— `已成功生成。 0 个警告 0 个错误`（`Demo -> bin/Debug/net9.0/Demo.dll`）。
+- ⚠️ **AOP 没有任何单元测试。** 特性清单把该特性的证据记为**仅 Demo**；`Src/Core/VeloxDev.Core.Test` 下没有 `AOP` 测试套件，因此正确性依据是两个 demo 与运行时／生成器源码（[API 参考](../../2_API/05_AOP/index.md) 页也已注明）。
+- ⚠️ **上面的控制台程序未编译、未运行。** 它已与运行时（`Src/Core/VeloxDev.Core/AspectOriented/*.cs`）及生成器（`Src/Generators/VeloxDev.Core.Generator/AopInterface.cs`、`AopProxy.cs`）源码逐一对照，因此「预期控制台输出」是静态推导而非实际录制；demo 也未被手动点击。

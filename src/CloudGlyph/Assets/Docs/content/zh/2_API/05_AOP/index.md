@@ -12,7 +12,7 @@
 - Demo：`Examples/AOP/WPF/Demo`、`Examples/AOP/Avalonia/Demo`。
 - 运行时源码：`Src/Core/VeloxDev.Core/AspectOriented/*.cs` 与 `Src/Core/VeloxDev.Core/Interfaces/AspectOriented/IAspectOriented.cs`。
 - 生成器源码：`Src/Generators/VeloxDev.Core.Generator/AopInterface.cs`、`AopProxy.cs`、`Writers/AopWriter.cs`。
-- **测试说明：** 刷新时 `VeloxDev.Core.Test` 下尚无 AOP 专项套件（Feature Inventory 中该功能的 `Demo + Test` 条目在 Test 一半上已过期）。以下公开面已对照 Demo 与运行时 / 生成器源码核验。
+- **测试说明：** `VeloxDev.Core.Test` 下没有 AOP 专项套件 —— `Src/Core/VeloxDev.Core.Test/` 中不存在 `AspectOriented` 目录。本特性的证据只有 Demo，与 Feature Inventory 的记录一致。以下公开面已对照 Demo 与运行时 / 生成器源码核验。
 
 ## API — 章节
 

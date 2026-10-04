@@ -50,11 +50,11 @@ public interface TeamViewModel_Demo_Aop : global::VeloxDev.AspectOriented.IAspec
 ```csharp
 public override string[] GenerateBaseInterfaces() =>
 [
-    $"{NAMESPACE_VELOX_AOP}.{Syntax?.Identifier.Text}_{Symbol?.ContainingNamespace.ToDisplayString().Replace('.', '_')}_Aop"
+    $"{NAMESPACE_VELOX_AOP}.{Syntax?.Identifier.Text}_{NamespaceFileSegment()}_Aop"
 ];
 ```
 
-其中 `NAMESPACE_VELOX_AOP = "global::VeloxDev.AopInterfaces"`（`Writers/WriterBase.cs`）。效果：编译器因此看到该类实现了它的生成接口，从而由用户自己 `partial` 部分提供的成员满足接口契约 —— 模型源码无需自行声明该接口。
+其中 `NAMESPACE_VELOX_AOP = "global::VeloxDev.AopInterfaces"` 与 `NamespaceFileSegment()` 都定义在 `Writers/WriterBase.cs`。`NamespaceFileSegment()` 返回把 `.` 替换为 `_` 后的所属命名空间；当类位于全局命名空间时，返回占位符 `"Global"` —— 因为此时 `ToDisplayString()` 给出的是非法的 `<global namespace>`。效果：编译器因此看到该类实现了它的生成接口，从而由用户自己 `partial` 部分提供的成员满足接口契约 —— 模型源码无需自行声明该接口。
 
 ## 生成的扩展：`{Class}_{Ns}_AopExtensions` 中的 `Aop(this T)`
 

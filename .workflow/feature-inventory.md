@@ -4,24 +4,26 @@
 > The feature set is **FROZEN** after discovery. Steps 3–5 only mark the Coverage Status column;
 > they never add, remove, or rename features.
 > Regenerated each run — a future template sync removing it is expected.
+>
+> **Re-derived 2026-10-01** (discovery order: README → Examples → Tests → source). Supersedes the 2026-09-07 set.
 
 ## Feature Inventory
 
-| Feature | Owning Project | Public API Surface | Dependencies | Evidence | Coverage Status |
-|---|---|---|---|---|---|
-| workflow-system (工作流系统) | `VeloxDev.Core` (+ `VeloxDev.Core.Extension` for `ComponentModelEx` serialization) | `[WorkflowBuilder.Tree/Node/Slot/Link<T>]`; interfaces `IWorkflowViewModel`, `IWorkflowTreeViewModel(Helper)`, `IWorkflowNodeViewModel(Helper)`, `IWorkflowSlotViewModel(Helper)`, `IWorkflowLinkViewModel(Helper)`, `IWorkflowActionPair`, `IWorkflowIdentifiable`, `ISlotProvider`, `ISpatialMap`, `ISpatialBoundsProvider`; value types `Anchor`, `Size`, `Offset`, `Viewport`, `CanvasLayout`, `CellKey`, `TaskContext`, `WorkflowActionPair`; enums `SlotChannel`, `SlotState`; defaults `TreeDefaultViewModel`/`TreeHelper<T>` etc.; `SelectorEx` (`SlotEnumerator<T>`, `ConditionalSlot<T>`, `SlotDefinition`); `SpatialGridHashMap<T>`, `WorkflowSpatialManager`, `WorkflowSpatialEx`; `StandardEx` (`WorkflowTreeEx`, `WorkflowNodeEx`, `WorkflowSlotEx`, `WorkflowLinkEx`, `WorkflowCommandEx`); `CompilerEx` (`CompilerViewModel.CompileAsync(node, CompileRole{Root,Terminal})`, `CompiledGraph.Entries` of `CompileSegment`/`ChainSegment`/`BranchSegment`/`ParallelSegment`, `BranchOption`, `RuntimeEngine`, `CompileContext`, `RuntimeContext` (incl `Target`/`TargetReached`), `ICompileTimeRouter`, `IRedirectable`, `ICompileTimeAware`, `IRuntimeAware`, `ICompileContext`, `IRuntimeContext`, `RouterCompileMode`, `CompileRole`); `VeloxDev.MVVM.Serialization.ComponentModelEx` | Roslyn source generator (`VeloxDev.Core.Generator`); no third-party runtime deps | **Demo** (`Examples/Workflow/*`) + **Test** (`VeloxDev.Core.Test/WorkflowSystem`, `VeloxDev.Core.Extension.Test/.../Functions`) | QS ✓ / API ✓ / SE ✓ |
-| workflow-agent (工作流代理) | `VeloxDev.Core.Extension` (+ `VeloxDev.Core` AI utilities) | `AgentEx.AsAIAgent` / `tree.AsAgentScope()` → `WorkflowAgentScope` (fluent `With*`); `WorkflowAgentToolkit` (~60 `AITool`s; groups: query / mutation / state-diff / slot-collection / traversal / connection / execution(node/broadcast/`RunCompiledWorkflow`/`GetNodeResult`) / compile(`CompileWorkflow`/`CompileNodeResult`) / interaction; `AllowNodeExecution` gate); `WorkflowStateTracker` (JSON diffs); `McpScope`, `McpServerConfiguration`, `McpServerRunMode`, `McpServerStatus`; `VeloxDev.AI` (`AgentContextAttribute`, `AgentCommandParameterAttribute`, `SlotSelectorsAttribute`, `AgentLanguages`, `AgentContextReader`, `AgentCommandDiscoverer`, `AgentMethodInvoker`, `AgentPropertyAccessor`, `AgentTypeResolver`, `AgentSelectionEventArgs`, `AgentConfirmationEventArgs`, `AgentConfirmationResult`, `AgentToolCallEventArgs`) | `Microsoft.Extensions.AI` (`AITool`, `ChatClient`), `ModelContextProtocol` | **Test** (`VeloxDev.Core.Extension.Test/Agent/*`, `VeloxDev.Core.Test/AI/*`) + README + Demo agent pane (`Examples/Workflow/WinForms`) | QS ✓ / API ✓ / SE ✓ |
-| mvvm (MVVM) | `VeloxDev.Core` | `VeloxPropertyAttribute`, `VeloxCommandAttribute`, `IVeloxCommand`, `VeloxCommand` (+ static factories), `CommandEventArgs`, `CommandEventType`, `CommandEventHandler`, `ObservableCollectionTracker`; generator `VeloxDev.Generators.MVVM` / `.Command` | Roslyn source generator | **Demo** (`Examples/MVVM/WPF`, `Examples/MVVM/Avalonia`) + **Test** (`VeloxDev.Core.Test/MVVM/VeloxCommandTests.cs`) | QS ✓ / API ✓ / SE ✓ |
-| transition (过渡动画) | `VeloxDev.Core` + all seven adapters (WPF · Avalonia · WinUI · MAUI · WinForms · Razor · Jalium) | engine in `VeloxDev.Core/TransitionSystem` under `VeloxDev.TransitionSystem(.Abstractions)`: `ISampler` (`NormalizeStart`/`NormalizeEnd`/`InsertFrame`), `ISampleable` (`GetAnimatableMembers`/`CreateFrameValue`), `NativeInterpolators` (registry `ConcurrentDictionary<Type, ISampler>` + sampler classes), `IEaseCalculator`, `Eases` (+ `Ease*`), `TransitionCore`/`TransitionCore<T,TSnapshot>`, `StateCore`/`StateSnapshotCore<T,…>`, `InterpolatorCore`, `TransitionEffectCore(TPriorityCore)`, `TransitionSchedulerCore`, `TransitionInterpreterCore`, `UIThreadInspectorCore`, `TransitionProperty`, `TransitionSnapshotHelper`, `StructAssembler`, enum `RotationDirection`; per-adapter derivations in each adapter `PlatformAdapters` (`Interpolator`, `Transition`/`Transition<T>`, `State`/`StateSnapshot`, `TransitionEffect`, `TransitionEffects`, `TransitionInterpreter`, `TransitionScheduler`, `UIThreadInspector`) — all in `VeloxDev.TransitionSystem` | `System.Numerics`, `System.Drawing` (netstandard2.0-guarded) | **Demo** (`Examples/Transition/*`) + **Test** (`VeloxDev.Core.Test/TransitionSystem/*`) | QS ✓ / API ✓ / SE ✓ |
-| dynamic-theme (动态主题) | `VeloxDev.Core` + adapters | `ThemeManager` (static: `Current`, `StartModel`, `SetPlatformInterpolator`, `SetCurrent`, `Register/Unregister`, `Transition<T>`, `Jump<T>`), `ThemeCache`, `ThemeConfigAttribute<TConverter, TTheme...>` (6 arities), enum `StartModel`, `Dark`/`Light`, `ITheme`, `IThemeObject`, `IThemeValueConverter`, platform converters (`BrushConverter`, `ColorConverter`, `ThicknessConverter`, `DoubleConverter`, `PointConverter`, `CornerRadiusConverter`, `ObjectConverter`) | `VeloxDev.Core` TransitionSystem engine + adapter `Interpolator` | **Demo** (`Examples/Theme/*`) + **Test** (`VeloxDev.Core.Test/DynamicTheme/ThemeBasicsTests.cs`) | QS ✓ / API ✓ / SE ✓ |
-| aop (AOP) | `VeloxDev.Core` (`#if NET`) | `AspectOrientedAttribute`, `IAspectOriented`, enum `ProxyMembers`, delegate `ProxyHandler`, static `ProxyEx` (`CreateProxy`, `SetProxy`), `ProxyInstance : DispatchProxy`, static `Aop` (`Map`, `GetTarget`), `AopCache.Resolve<TClass,TInterface>`; source generator emits `VeloxDev.AopInterfaces.{Class}_{Ns}_Aop` interface + `{Class}_{Ns}_AOP.g.cs` partial glue + `Aop(this T)` extension (`…_AopExt.g.cs`) | `System.Reflection.DispatchProxy`; Roslyn source generator | **Demo** (`Examples/AOP/WPF`, `Examples/AOP/Avalonia`); **no AOP unit-test suite** exists under `VeloxDev.Core.Test` | QS ✓ / API ✓ / SE ✓ |
-| monobehaviour (MonoBehaviour) | `VeloxDev.Core` | `MonoBehaviourAttribute(channel, fps)`, static `MonoBehaviourManager` (lifecycle: `Start/StopAsync/Pause/Resume/RestartAsync/TogglePause`; registration: `RegisterBehaviour/UnregisterBehaviour/SetTargetFPS/SetFixedUpdateInterval/SetTimeScale/ExecuteOnMainThread/SetUseAsyncLoop`; status: `IsRunning/IsPaused/CurrentFPS/TargetFPS/TotalTime/TotalFrames/ActiveBehaviorCount/SystemStatus`; events `OnChannel*`), `IMonoBehaviour`, `TimeLineEventArgs`, `FrameEventArgs`, `ThreadSafeFrameEventArgs`, `MonoBehaviourChannelEventArgs`, `TransitionEventArgs` | Roslyn source generator | **Demo** (`Examples/MonoBehaviour/WPF`) + **Test** (`VeloxDev.Core.Test/TimeLine/*`) | QS ✓ / API ✓ / SE ✓ |
-| weak-types (弱引用类型) | `VeloxDev.Core` | `WeakDelegate<TDelegate>`, `WeakQueue<T>`, `WeakStack<T>`, `WeakCache<TTargetKey, TCacheKey>` | — | **Test** (`VeloxDev.Core.Test/WeakTypes/*`) | QS ✓ / API ✓ / SE ✓ |
-| platform-adapters (平台适配器) | `VeloxDev.WPF` / `VeloxDev.Avalonia` / `VeloxDev.WinUI` / `VeloxDev.MAUI` / `VeloxDev.WinForms` / `VeloxDev.Razor` / `VeloxDev.Jalium` + `Src/Templates` | shared Core contracts (`IWorkflowGridDecorator`, `IWorkflowMinimapOverlay : IWorkflowGridDecorator` incl `RulerBand`, in `VeloxDev.WorkflowSystem`); attached workflow behaviors in `VeloxDev.WorkflowSystem.AttachedBehaviors` per adapter (`WorkflowSurfaceBehavior` (+`ZoomEnabled`/`PointerPressSourceName`), `WorkflowCanvasTransformBehavior`, `ViewPool`/`ViewManager`, `WorkflowNodeDragBehavior`, `WorkflowSlotConnectionBehavior`, `WorkflowSlotLayoutBehavior`, `WorkflowMinimapOverlay`, MAUI `WorkflowLinkOverlay`, Razor behavior components); per-adapter Transition/Theme wiring under `VeloxDev.TransitionSystem` / `VeloxDev.DynamicTheme` (`Interpolator`, `TransitionEffects`, `UIThreadInspector`, `ThemeValueConverters` — none in Jalium); 7 `dotnet new` template packs × 7 item templates (`*-v-node/slot/link/tree/selector/decorator|grid/minimap`) | Per-framework SDK (`UseWPF`, `UseWinUI`, `UseMaui`, `UseWindowsForms`, Avalonia/Razor SDK, Jalium.UI) | README + **Demo** (`Examples/Workflow/<Platform>`, `Trimmed` authoritative) + **Source** (per-platform detail partly *inferred* from source where demos don't exercise it) | QS ✓ / API ✓ (with *inferred* labels) / SE ✓ |
+| # | Feature | Owning Project | Evidence | Coverage Status |
+|---|---|---|---|---|
+| 00 | workflow-system | `VeloxDev.Core` (`WorkflowSystem/`) + `VeloxDev.Core.Extension` (`ComponentModelEx`, `CompiledGraphEx`, `CheckpointEx`) | Demo (`Examples/Workflow/*`, 7 platforms + Trimmed) + Test (`VeloxDev.Core.Test/WorkflowSystem/` ≈35 files) | QS ✓ / API ✓ / SE ✓ |
+| 01 | workflow-agent | `VeloxDev.Core.Extension` (`Agent/`) + `VeloxDev.Core` (`AI/`) | Demo (Agent pane in all 7 platform demos, via `Examples/Workflow/Common/Lib/.../AgentHelper.cs`) + Test (`VeloxDev.Core.Extension.Test/Agent/**` 25 files, `VeloxDev.Core.Test/AI/*` 7 files) | QS ✓ / API ✓ / SE ✓ |
+| 02 | mvvm | `VeloxDev.Core` (`MVVM/`, `Interfaces/MVVM/`) | Demo (`Examples/MVVM/WPF`, `Examples/MVVM/Avalonia`) + Test (`VeloxDev.Core.Test/MVVM/` 22 files) | QS ✓ / API ✓ / SE ✓ |
+| 03 | transition | `VeloxDev.Core` (`TransitionSystem/`) + 7 adapters | Demo (`Examples/Transition/*` 7 platforms + `AUTO TEST` conformance harness) + Test (`VeloxDev.Core.Test/TransitionSystem/` 28 files) | QS ✓ / API ✓ / SE ✓ |
+| 04 | dynamic-theme | `VeloxDev.Core` (`DynamicTheme/`) + adapters | Demo (`Examples/Theme/*`) + Test (`VeloxDev.Core.Test/DynamicTheme/` 2 files) | QS ✓ / API ✓ / SE ✓ |
+| 05 | aop | `VeloxDev.Core` (`AspectOriented/`, `#if NET`) | Demo (`Examples/AOP/WPF`, `Examples/AOP/Avalonia`) — **no unit tests** | QS ✓ / API ✓ / SE ✓ |
+| 06 | **tickable** *(was `monobehaviour`)* | `VeloxDev.Core` (`TimeLine/`, `Interfaces/Tickable/`) | Demo (`Examples/Tickable/WPF`) + Test (`VeloxDev.Core.Test/TimeLine/` 4 files) | QS ✓ / API ✓ / SE ✓ |
+| 07 | weak-types | `VeloxDev.Core` (`WeakTypes/`) | Test only (`VeloxDev.Core.Test/WeakTypes/` 4 files) — **no demo** | QS ✓ / API ✓ / SE ✓ |
+| 08 | platform-adapters | `Src/Adapters/VeloxDev.{WPF,Avalonia,WinUI,MAUI,WinForms,Razor,Jalium}` + `Src/Templates` | Demo (`Examples/Workflow/<Platform>`, `Examples/Transition/<Platform>`) + `Src/Verification/VeloxDev.TrimProbe` — per-platform detail partly *inferred* | QS ✓ / API ✓ / SE ✓ |
 
 ## Feature → Directory Name Map (frozen)
 
-| # | EN directory (QuickStart / API / SE feature sub-dirs) | ZH directory |
+| # | EN directory | ZH directory |
 |---|---|---|
 | 00 | `00_workflow-system` | `00_工作流系统` |
 | 01 | `01_workflow-agent` | `01_工作流代理` |
@@ -29,26 +31,101 @@
 | 03 | `03_transition` | `03_过渡动画` |
 | 04 | `04_dynamic-theme` | `04_动态主题` |
 | 05 | `05_aop` | `05_AOP` |
-| 06 | `06_monobehaviour` | `06_MonoBehaviour` |
+| 06 | `06_tickable` | `06_Tickable` |
 | 07 | `07_weak-types` | `07_弱引用类型` |
 | 08 | `08_platform-adapters` | `08_平台适配器` |
 
 > Cross-dimension rule: the SAME name is used in `1_QuickStart`, `2_API`, and `3_SE_Analysis` feature sub-directories.
-> SE page-group overview dirs: `00_file-structure`, `01_functional-structure`, `02_design-patterns`, `03_data-flow`, `04_complexity`
-> (ZH: `00_文件结构`, `01_功能结构`, `02_设计模式分析`, `03_数据流分析`, `04_复杂度分析`).
+> **2026-10-01 change: `06_monobehaviour` → `06_tickable` / `06_MonoBehaviour` → `06_Tickable`.** Entries 00–05 and 07–08 unchanged.
 
-## Coverage Reconciliation Matrix (filled in step 8)
+## Decisions taken during discovery
+
+1. **No 10th feature.** `VeloxDev.Timing` (`Src/Core/VeloxDev.Core/Timing/` + `Interfaces/Timing/`, first added 2026-09-14) is keyword-level *infrastructure* shared by transition / dynamic-theme / tickable, not a user-facing capability. It is documented as a sub-module **under `03_transition`**, and referenced from `04` and `06`. (`TickManager.Bus` exposes the channel's `ITimeSourceControl`.)
+2. **`platform-adapters` keeps its `*inferred*` labelling** where demos do not exercise the detail.
+3. The wiki's existing **localized top-level dimension names** (`0_欢迎` / `1_快速开始` / `3_SE分析` / `4_版权`) are **preserved** — the skill's Review step must not treat them as untracked entries to prune.
+
+## What changed since the 2026-09-07 generation
+
+| Feature | Change |
+|---|---|
+| workflow-system | **A whole new layer.** `CompilerEx/Runtime/Contracts` (`IExecutionCheckpointStore`, `IExecutionCompensation`, `IExecutionErrorSink`, `IExecutionGate`, `IExecutionObserver`, `ILogWriter`, `INodeRetryPolicy`, `RunOutcome`) + `Runtime/Model` implementations + `BranchRuntimeContext`, all **first added 2026-09-27**. `RuntimeContext` gained `Target`/`TargetReached`/`RedirectRequested`/`EndedWithError`/`MaxParallelBranches`/`ErrorSink`/`Compensation`/`CheckpointStore`/`Observer`/`RetryPolicy`/`ExecutionGate`/`LogWriter`/`MaxRetainedLogs` and `SnapshotLogs()`. `Compile/Model` gained `CompiledOutline`, `CompileKeyNormalizer`. |
+| workflow-agent | 66 tools (README says "60+"). New subsystems: `Skills/`, `SubAgents/`, `Pipelines/`, `Dashboard/`, `MCP/`. New run-handle family: `StartCompiledWorkflow` / `ContinueCompiledWorkflow` / `GetCompiledRunStatus` / `PauseCompiledRun` / `ResumeCompiledRun` / `StopCompiledRun`. `PauseCompiledRun`/`ResumeCompiledRun` now **error** when the host brought its own execution gate. |
+| mvvm | +2 interfaces (`IVeloxCommandCompletion`, `IVeloxCommandStatus`), +3 types (`CommandOutcome`, `CommandCompletion`, `VeloxCommandExtensions`). `VeloxCommand` gained `ExecuteAndWaitAsync`, `EventContext`, `IsBusy`/`ActiveCount`/`PendingCount`, `static HandlerException`, `IDisposable`, ValueTask factories (`#if` guarded). `UnLock` → `Unlock`. `CommandEventArgs.Cts` and the completion plumbing are now **`internal`**. Generator accepts `ValueTask`/`ValueTask<T>` and a single typed parameter, and reports **`VELOXCMD001`** for unsupported signatures. |
+| tickable | Full rename; namespace `VeloxDev.TimeLine` unchanged. |
+| transition / dynamic-theme | Now built on `VeloxDev.Timing`. |
+
+## Coverage Reconciliation Matrix (step 8)
 
 | Feature | Evidence | QuickStart | API | SE Analysis | Status |
 |---|---|---|---|---|---|
 | workflow-system | Demo + Test | ✅ | ✅ | ✅ | PASS |
-| workflow-agent | Test + README + Demo | ✅ | ✅ | ✅ | PASS |
+| workflow-agent | Demo + Test | ✅ | ✅ | ✅ | PASS |
 | mvvm | Demo + Test | ✅ | ✅ | ✅ | PASS |
 | transition | Demo + Test | ✅ | ✅ | ✅ | PASS |
 | dynamic-theme | Demo + Test | ✅ | ✅ | ✅ | PASS |
 | aop | Demo | ✅ | ✅ | ✅ | PASS |
-| monobehaviour | Demo + Test | ✅ | ✅ | ✅ | PASS |
+| tickable | Demo + Test | ✅ | ✅ | ✅ | PASS |
 | weak-types | Test | ✅ | ✅ | ✅ | PASS |
-| platform-adapters | README + Demo + Source | ✅ | ✅ (per-platform detail partly *inferred*, labeled on pages) | ✅ | PASS |
+| platform-adapters | Demo + Source | ✅ | ✅ | ✅ | PASS (residual) |
 
-> Review (step 8) note: All features are fully covered across the three dimensions and all language trees pass the links/structure validators. `platform-adapters` per-platform detail is partly *inferred* from source where demos do not exercise it and is labeled `*inferred*` on the QS/API/SE pages. Reproducibility spot-check (2026-09-07): `06_monobehaviour`, `07_weak-types`, `02_mvvm`, `04_dynamic-theme` QuickStarts carry ✅ (built & ran with recorded output); remaining QuickStarts declare ⚠️ (statically verified). Wiki tree was fully reworked feature-by-feature (00–08, QS/API/SE × en/zh) in the 2026-09-07 session.
+**Residual (platform-adapters only):** the per-adapter detail is marked *inferred* wherever no demo exercises it,
+because no single demo covers every adapter's surface. Every other dimension of that feature is Demo/Test-backed.
+
+No feature carries `TODO`. No Demo/Test feature has a ❌, so the quality gate passes.
+
+## Review record — 2026-10-01
+
+### Gates run (all zero errors)
+
+| Gate | Command | Result |
+|---|---|---|
+| Structure | `python scripts/validate-structure.py` | 0 errors, 0 warnings |
+| Titles | `python scripts/validate-titles.py` | 0 errors, 0 warnings |
+| Links | `python scripts/validate-links.py` | 0 errors |
+| Plot | `python scripts/validate-plot.py` | 0 errors, 0 warnings |
+| KaTeX (real renderer) | `node scripts/validate-katex.js content` | 1454 expressions, 0 errors |
+| Mermaid (real parser) | `node scripts/validate-mermaid.js content` | 55 blocks, 0 errors |
+| PlantUML (real engine) | `python scripts/validate-plantuml.py content --engine java --jar <plantuml.jar>` | 115 blocks, 0 errors |
+| Navigation | `python scripts/gen_tree.py --strict` | 0 directories missing index.md |
+| Build | `dotnet build src/CloudGlyph/CloudGlyph.csproj` | 0 warnings, 0 errors |
+
+### Code-authenticity audit
+
+Every code claim in the English tree was audited against `Src/` and `Examples/`, one agent per feature group.
+Findings were re-verified against source before any edit, and every fix was applied to both trees.
+
+| Feature | Defects found | Representative examples |
+|---|---|---|
+| workflow-system | 26 | residual `[MonoBehaviour(...)]` / `InitializeMonoBehaviour()` left by the tickable rename; `WorkflowSpatialEx.cs` cited at a path that does not exist; `Error()` and `Warn()` conflated as redirect requests |
+| workflow-agent | 22 | `MoveNode` documented as dispatching `SetAnchorCommand` when it deliberately dispatches `MoveCommand`; two wait helpers that do not exist; a tool total of 66 contradicting its own 68-item list |
+| transition | 10 | eased time described as clamped when it is deliberately unclamped; Razor credited with a generic `Property<TValue>` it does not declare; `SetRate(0)` described as a pause |
+| aop / tickable / weak-types / platform-adapters | 17 | `CloseTickable` claimed absent when `ITickable` declares it; wrong async-loop default TFM split; `TickManager` surface miscounted |
+| mvvm / dynamic-theme | 3 | a test-file count of 22 where the directory holds 20; "four `TriggerAttributes`" where the array has ten |
+
+Also corrected: the seeded tree's stale `title-allowlist.json` entries for the removed `MonoBehaviour*` types,
+replaced with the `Tickable*` names, the `VeloxDev.AI.{Skills,Pipelines,Dashboard}` namespaces and `VeloxDev.Timing`.
+
+### One audit finding was rejected
+
+The tickable audit concluded that the recorded test run (`--filter "FullyQualifiedName~TimeLine"` → 46 passed)
+could not be genuine, because only 31 `[TestMethod]`s live in `Src/Core/VeloxDev.Core.Test/TimeLine/`. The claim
+was re-run: the filter is a **substring** match on the fully-qualified name, so it also selects 15 timing and
+TransitionSystem tests whose method name contains `Timeline` (`Timeline_*`, `SharedTimeline_*`,
+`Switch_EveryTargetIsAnchoredToTheSameTimeline`). 31 + 15 = 46, and the suite was executed again on 2026-10-01:
+`已通过! - 失败: 0，通过: 46，已跳过: 0，总计: 46`. The original declaration was right and was restored; the
+page now also explains why the filter over-matches.
+
+### Known limits of this pass
+
+- The authenticity audit covered the **English** tree. The Chinese tree was corrected in step with every fix,
+  but its prose has not been independently audited.
+- The demo-coverage pre-check was satisfied by the per-page evidence citations and the recorded run
+  declarations; no exhaustive per-demo-file sweep was performed.
+
+## API points that MUST be documented correctly
+
+- `CommandEventArgs.Cts`, `TakeCts()`, `Completion`, `TryMarkCancelReported()`, `Complete()` are **`internal`** — not part of the public surface.
+- `FrameEventArgs` setters (`DeltaTime`/`TotalTime`/`CurrentFPS`/`TargetFPS`) are **`internal`**.
+- `CommandOutcome.Refused` deliberately has **no** `CommandEventType` counterpart — refusal is observable only through `ExecuteAndWaitAsync`.
+- `TickManager.LoopChannel`, `BehaviorWrapper`, `ObjectPool<T>`, `GetOrCreateChannel` are **private**.
+- The `CreateTaskOnlyWithValueTask*` factories exist only under `#if !NETSTANDARD2_0 && !NETFRAMEWORK`.

@@ -10,6 +10,6 @@
 | [03 过渡动画](03_过渡动画) | 执行链 → 每目标调度器（互斥/非互斥）→ Prepare → FPS 限速采样循环 → UI 线程应用 → 生命周期事件 |
 | [04 动态主题](04_动态主题) | `InitializeTheme` 注册 + 转换器管线 → 带动画/即时切换（`Transition`/`Jump`）→ 运行时覆盖（`SetThemeValue`/`RestoreThemeValue`） |
 | [05 AOP](05_AOP) | CreateProxy → 设置钩子 → 调用 → 开始/覆盖/结束链 |
-| [06 MonoBehaviour](06_MonoBehaviour) | 启动通道 → 更新/晚更新/固定更新 tick → 停止 |
+| [06 Tickable](06_Tickable) | 启动与注册 → 每帧 Update/LateUpdate + 固定步批次 → 暂停/恢复 → 停止 |
 | [07 弱引用类型](07_弱引用类型) | 入队/压栈 → 访问时清扫 → 出队/出栈 |
 | [08 平台适配器](08_平台适配器) | 附加与接线 → 平移/指针 → 缩放折叠 → 节点拖拽 → 槽连线 → 小地图导航 |

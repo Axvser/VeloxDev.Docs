@@ -10,6 +10,6 @@ Time and space complexity analysis of each feature's core operations, using KaTe
 | [03 Transition](03_transition) | Property-path parse, sampler prepare, per-frame interpolation, scheduler fan-out, path validation |
 | [04 Dynamic Theme](04_dynamic-theme) | Theme lookup, per-instance active cache, switch preparation `O(N·P·depth)`, scheduler fan-out `O(N)`, switch wall time independent of `N` |
 | [05 AOP](05_aop) | Proxy invocation dispatch, `AopCache` resolution |
-| [06 MonoBehaviour](06_monobehaviour) | Behavior dispatch per frame, fixed-update interval |
+| [06 Tickable](06_tickable) | Frame dispatch O(N), compensating sampler with debt caps, pooled frame args |
 | [07 Weak Types](07_weak-types) | Sweep-on-access, adaptive cleanup threshold |
 | [08 Platform Adapters](08_platform-adapters) | View pool reuse, spatial virtualization, zoom collapse, minimap projection |

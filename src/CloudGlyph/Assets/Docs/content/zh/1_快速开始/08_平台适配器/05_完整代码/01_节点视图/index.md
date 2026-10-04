@@ -17,7 +17,7 @@
              Foreground="#DD1E1E1E">
     <!-- Viewbox scales the card content to the node's current size (which the Core Anchor/Size getters
          collapse toward the world origin), so the content scales adaptively instead of cramping. The
-         child is pinned to the DESIGN size (260/Height) so the scale factor is 1/scale. -->
+         child is pinned to the DESIGN size (260x180) so the scale factor is 1/scale. -->
     <Viewbox Stretch="Uniform">
     <Grid Width="260" Height="180" ClipToBounds="False">
         <Grid.RowDefinitions>
@@ -64,7 +64,7 @@
                                    Margin="0,0,10,0"
                                    HorizontalAlignment="Right"
                                    VerticalAlignment="Center" />
-                        <local:SlotView DataContext="{Binding Slot}" SlotState="{Binding Slot.State}"
+                        <local:SlotView DataContext="{Binding Slot}" SlotState="{Binding State}"
                                                 Grid.Column="1"
                                                 Width="14"
                                                 Height="14"

@@ -68,4 +68,4 @@ public bool TrySelect(object value, out TSlot? slot)
 }
 ```
 
-运行期引擎查询同一接口：对 `BranchSegment`，`key = branch.IsDynamic ? await router.ResolveRouteKey(context) : branch.CompileKey`，再驱动所选 option 的子图。完整驱动序列见[数据流分析](../../../03_数据流分析/00_工作流系统/index.md)。
+运行期引擎查询同一接口：对 `BranchSegment`，`key = branch.IsDynamic ? await router.ResolveRouteKey(context) : branch.CompileKey`，再驱动所选 option 的子图。完整驱动序列见`数据流分析`。

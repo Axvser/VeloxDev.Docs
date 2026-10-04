@@ -1,49 +1,52 @@
-# 工作流代理 — 安装依赖
+# 01 · 安装依赖
 
-先添加承载代理表面的包，再添加你真正与 LLM 对话所需的额外包。
+## 方案 A —— NuGet 包
 
-## 1. 添加 `VeloxDev.Core.Extension`
+agent 位于可选伴随包 `VeloxDev.Core.Extension`（版本 `10.0.0`）中，它会传递引入 AI 技术栈。
+
+```xml
+<ItemGroup>
+    <PackageReference Include="VeloxDev.Core.Extension" Version="10.0.0" />
+</ItemGroup>
+```
 
 ```bash
-dotnet add package VeloxDev.Core.Extension
+dotnet add package VeloxDev.Core.Extension --version 10.0.0
 ```
 
-`VeloxDev.Core`（工作流核心与 `CompilerEx` 引擎）在 Debug 下传递引用；Release 下改用 NuGet 包。当只需要核心类型而不需要代理时显式引用：
+**预期结果：** 命令以 `0` 退出，`VeloxDev.Core.Extension`（及其传递 AI 包）出现在项目包列表 / `project.assets.json` 中。此时无需任何源码改动 —— 仅该包即可编译通过。
 
-```bash
-dotnet add package VeloxDev.Core
+## 方案 B —— 项目引用（本仓库自身）
+
+在本仓库内，每个 demo 与测试都直接引用源码项目，这也是让 Debug 构建使用源码生成器而非发布版的途径：
+
+```xml
+<ItemGroup>
+    <ProjectReference Include="..\..\..\Src\Core\VeloxDev.Core.Extension\VeloxDev.Core.Extension.csproj" />
+</ItemGroup>
 ```
 
-**预期结果：** 两个包出现在 `.csproj` 中；`dotnet restore` 退出码为 0。`VeloxDev.Core.Extension` 会传递引入 `Microsoft.Extensions.AI`、`Microsoft.Agents.AI`、`ModelContextProtocol`（MCP SDK）、`CliWrap` 与 `Newtonsoft.Json`（见 `VeloxDev.Core.Extension.csproj`）。
+来源：`Src/Core/VeloxDev.Core.Extension.Test/VeloxDev.Core.Extension.Test.csproj`。
 
-## 2. 添加 LLM 客户端包（进行真实对话时）
+本库自身的 `Description` 仍写着「60+ function-calling tools」，那是 README 低估的数字。当前源码中精确、可核验的数量是 **68 个内置工具**，覆盖十个 `WorkflowToolCategory` 分组 —— 其中 66 个无条件注册，另加仅在配置了处理器时才注册的至多两个 `Interaction` 工具 —— 而 `ResetToolCallLimit` 始终在其之上追加。
 
-要像演示那样构建 `IChatClient`，需要在其上加一层 OpenAI 集成：
+## 你会用到的命名空间
 
-```bash
-dotnet add package Microsoft.Agents.AI.OpenAI
-dotnet add package OpenAI
-```
+| 命名空间 | 内容 |
+|---|---|
+| `VeloxDev.AI` | 特性与反射辅助、`AgentLanguages`、`AgentObjectToolkit`、`AgentEmbeddedResources`、`AgentTelemetryExtensions`、事件参数与通知接口 |
+| `VeloxDev.AI.Workflow` | `WorkflowAgentScope`、`AgentEx.AsAgentScope`、`WorkflowStateTracker`、`WorkflowAgentContextProvider`、`AgentContextCollector` |
+| `VeloxDev.AI.Workflow.Functions` | `WorkflowAgentToolkit`、`WorkflowToolCategory`、`CommandInvoker`、`ComponentPatcher`、`TypeIntrospector` |
+| `VeloxDev.AI.MCP` | `McpScope`、`McpServerConfiguration`、`McpServerRunMode`、`McpServerStatus`、`McpSelfServiceLevel`、状态视图模型、`McpAgentToolkit` |
+| `VeloxDev.AI.Skills` | `SkillScope`、`SkillAgentToolkit`、`SkillDescriptor`、`SkillState`、`SkillSourceKind`、`ISkillSource`、状态视图模型 |
+| `VeloxDev.AI.SubAgents` | `SubAgentScope`、`SubAgentAgentToolkit`、`SubAgentAgentContextProvider`、`SubAgentState`/`SubAgentSummary`、树视图模型 |
+| `VeloxDev.AI.Pipelines` | `AgentPipeline`、`AgentEvent`（及其子类）、`AgentTranscript`、`AgentTranscriptEntry`、`ToolPipeline`、`AgentPipelineAgent` |
+| `VeloxDev.AI.Dashboard` | `AgentDashboardViewModel`、`AgentMemberViewModel` 及四个具体成员 |
 
-`Microsoft.Agents.AI.OpenAI` 1.13.0 与 `Microsoft.Bcl.AsyncInterfaces` 正是 `Examples/Workflow/Common/Lib/Lib.csproj` 声明的依赖；请使用你的目标框架支持的版本。此外需要一个 OpenAI 兼容端点的 API key（演示读取 `API_KEY_DEEPSEEK`，目标是 `https://api.deepseek.com`，模型 `deepseek-v4-flash`）。
+要点：**`VeloxDev.AI` 是由 `VeloxDev.Core`（特性/反射）与 `VeloxDev.Core.Extension`（其余全部）共用的单一命名空间。** `VeloxDev.Core.Extension` 下的 `Agent/` 文件夹是实现细节；它声明的公开类型位于上述命名空间，而非某个 `VeloxDev.Core.Extension` 命名空间。
 
-**预期结果：** 包出现在 `.csproj` 中；还原成功；稍后运行对话时已设置好端点 key 的环境变量。
-
-## 3. 在代码中引用
-
-后续页面会用到的命名空间如下：
-
-```csharp
-using Microsoft.Agents.AI;              // ChatClientAgent、ChatClientAgentRunOptions、AgentSession
-using Microsoft.Extensions.AI;          // IChatClient、AITool、ChatOptions
-using VeloxDev.AI;                      // AgentLanguages、AgentToolCallEventArgs
-using VeloxDev.AI.MCP;                  // McpScope、McpServerConfiguration、McpServerRunMode、McpAgentToolkit
-using VeloxDev.AI.Workflow;             // AsAgentScope()、WorkflowAgentScope
-using VeloxDev.WorkflowSystem;          // IWorkflowTreeViewModel
-```
-
-**预期结果：** 还原完成后，含这些 using 的文件可以编译。
+**预期结果：** 一个添加了 `using VeloxDev.AI.Workflow;` 的文件可以编译。
 
 ## 运行声明
 
-- ⚠️ 仅静态核验。包名、版本与传递依赖取自 `VeloxDev.Core.Extension.csproj` 与 `Examples/Workflow/Common/Lib/Lib.csproj`；本次文档编写未做任何构建。
+- ⚠️ 未实际运行 —— 仅静态核验。包 id/版本与依赖版本读自 `Src/Core/VeloxDev.Core.Extension/VeloxDev.Core.Extension.csproj`；未从本页执行 `dotnet add package` / 构建。

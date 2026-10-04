@@ -45,7 +45,7 @@ public static class QuickStart
 }
 ```
 
-**Expected result:** an effect whose `Ease` is `Eases.Back.Out`; the `Back` curve overshoots the target then settles, and the frame sampler clamps `t` to `[0,1]` before writing a value.
+**Expected result:** an effect whose `Ease` is `Eases.Back.Out`; the `Back` curve overshoots the target then settles — the interpreter hands the eased value to the sampler **unclamped**, so each sampler decides whether it can extrapolate (the numeric ones can) or has to pin to its endpoint.
 
 ## 2. Define a custom easing
 
@@ -84,7 +84,7 @@ While `Ease` reshapes *time*, a sampler (`ISampler`) reshapes the *value* betwee
 - `NormalizeEnd(start, end, options)` — value written at `t >= 1` (default: `end` as-is).
 - `InsertFrame(target, property, ref working, start, end, options, t)` — interpolate `start → end` at eased time `t` and write it. Implementations must never mutate `start` / `end` (they are shared with the transition declaration that recorded them).
 
-The engine-core registrations live in `InterpolatorCore` (the `NativeInterpolators` dictionary) and cover `double`, `float`, `int`, `long`, `Point`, `PointF`, `Size`, `SizeF`, `Color`, `Rectangle`, `RectangleF` and — off `netstandard2.0` — `Vector2/3/4`, `Quaternion`. Each GUI adapter registers its own framework samplers (e.g. WPF adds `Brush`, `Thickness`, `CornerRadius`, `Transform`, `DropShadowEffect`, `Point3D`, `Vector3D`). A custom sampler is registered or removed with the static registry API:
+The engine-core registrations live in `InterpolatorCore`'s static constructor (the registry itself is private; only `RegisterInterpolator` / `UnregisterInterpolator` / `TryGetInterpolator` reach it) and cover `double`, `float`, `int`, `long`, `Point`, `PointF`, `Size`, `SizeF`, `Color`, `Rectangle`, `RectangleF` and — off `netstandard2.0` — `Vector2/3/4`, `Quaternion`. Each GUI adapter registers its own framework samplers (e.g. WPF adds `Brush`, `Thickness`, `CornerRadius`, `Transform`, `Effect`, `Point3D`, `Vector3D`). A custom sampler is registered or removed with the static registry API:
 
 ```csharp
 using VeloxDev.TransitionSystem;

@@ -1,24 +1,41 @@
 # Workflow System — Design Patterns — Strategy (runtime)
 
-Redirect is the runtime counterpart of the compile-time routing strategy: an in-node `Error()`/`Warn()`/exception during `ReceiveAsync` is treated as a *redirect request*, and the node — through `IRedirectable` — selects the strategy for recovering. If it implements `IRedirectable`, `RuntimeEngine.RunExecuteAsync` calls `ResolveRedirectAsync`; a returned predecessor `Order` makes the engine **re-run the whole graph toward that compile state** (nodes with `Order < target` are skipped, possibly cross-chain). If the target is the router itself, the engine only re-routes without recomputing it. If the node does **not** implement `IRedirectable`, the whole flow ends with the absolute-stop status `-1`.
+Redirect is the runtime counterpart of the compile-time routing strategy: an in-node `Error()` — or an exception the node did not catch, during `ReceiveAsync` — is treated as a *redirect request*, and the node — through `IRedirectable` — selects the strategy for recovering. (`Warn()` is not: it is a note, and the run carries on with whatever the node returned.) If it implements `IRedirectable`, `RuntimeEngine.RunExecuteAsync` calls `ResolveRedirectAsync`; a returned predecessor `Order` makes the engine **re-run the whole graph toward that compile state** (nodes with `Order < target` are skipped, possibly cross-chain). If the target is the router itself, the engine only re-routes without recomputing it. If the node does **not** implement `IRedirectable`, the whole flow ends with the absolute-stop status `-1`.
 
-> Source: `Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/Runtime/RuntimeEngine.cs`, lines 136-157
+> Source: `Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/Runtime/RuntimeEngine.cs`, lines 204-244
 
 ```csharp
-if (!context.RedirectRequested) continue;
+if (reported is null or ExecutionReportLevel.Warning) continue;
 
 // Node errored but does not implement IRedirectable → the whole flow ends with status -1.
 if (node is not IRedirectable redirectable)
 {
     context.CurrentOrder = -1;
     context.EndedWithError = true;
-    context.Error("Node reported an error but does not implement IRedirectable; the flow ends (status -1).");
+    await ReportErrorAsync(session, context, ExecutionFailurePhase.Node, node,
+        "Node reported an error but does not implement IRedirectable; the flow ends (status -1).", null, ct);
     return true;
 }
 
 // With IRedirectable → its interface decides the redirect target (possibly cross-chain).
 // Only a predecessor state (Order < current) is accepted.
-var target = await redirectable.ResolveRedirectAsync(context, ct);
+int? target;
+try
+{
+    target = await redirectable.ResolveRedirectAsync(context, ct);
+}
+catch (OperationCanceledException)
+{
+    throw;
+}
+catch (Exception ex)
+{
+    context.CurrentOrder = -1;
+    context.EndedWithError = true;
+    await ReportErrorAsync(session, context, ExecutionFailurePhase.Redirect, node, ex.Message, ex, ct);
+    return true;
+}
+
 if (target is { } targetOrder && targetOrder < order)
 {
     context.PendingRedirectTarget = targetOrder;

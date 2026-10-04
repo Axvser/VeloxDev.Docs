@@ -98,7 +98,7 @@ Assert.AreEqual(42, result);
 
 **说明：**
 - 在锁内遍历存储的处理器，只复制目标仍然存活者，随后计算副本的组合缓存。
-- 由 `WeakDelegateTests.Clone_ReturnsIndependentCopy` 与 `MultipleHandlers_CloneInvokesAll` 验证。
+- 由 `WeakDelegateTests.Clone_ReturnsIndependentCopy` 验证。
 
 ## 源文件
 

@@ -2,7 +2,7 @@
 
 Two execution mechanisms drive the **same** single entry point. The **Compiler** is engine-driven: `CompilerViewModel.CompileAsync` pre-compiles the reachable sub-graph (forward from a `CompileRole.Root` starter, or reverse from a `CompileRole.Terminal` result), then `RuntimeEngine.RunAsync` walks it and drives each node in order. The **non-Compiler** path is node-driven and stateless: a run starts at a node and the node (or its helper) forwards the result over its output edges, each delivery triggering the next node. Both land in the identical method — a node tells them apart only by the **context type** it receives.
 
-> This page is the "how does data actually move" guide. For the CompilerEx type reference see [compilerex](../02_compilerex); for the core interface tables see [workflowsystem](../00_workflowsystem); for the full sequence diagrams see [data-flow](../../../3_SE_Analysis/03_data-flow/00_workflow-system).
+> This page is the "how does data actually move" guide. For the CompilerEx type reference see `compilerex`; for the core interface tables see `workflowsystem`; for the full sequence diagrams see `data-flow`.
 
 ---
 
@@ -46,7 +46,7 @@ A node detects which path it is on from the context. The demo `EnumSelectorHelpe
 | **Context per node** | The shared `IRuntimeContext` session; the engine writes `Data` after each node to chain | A fresh `TaskContext` per delivery edge |
 | **`AccessAsync` gate** | Compile-time static only (`ICompileContext`, `Data = null`) prunes invalid edges *out of the graph* | Runtime gate per edge (`TaskContext`, `Data = payload`) before each delivery |
 | **Error / redirect** | `IRedirectable` → `RuntimeEngine` re-runs the whole graph from a target `CompileContext.Order` (possibly cross-chain) | No re-run; an error just ends the step |
-| **Fan-out / join** | `ParallelSegment` (sequential fan-out, source payload restored) + `IGroupData` join injection at multi-input nodes | Pure per-edge fan-out; no join aggregation |
+| **Fan-out / join** | `ParallelSegment` (concurrent fan-out, source payload restored) + `IGroupData` join injection at multi-input nodes | Pure per-edge fan-out; no join aggregation |
 | **Result reachability** | `IRuntimeContext.Target` / `TargetReached` track whether a result node was actually driven (Terminal runs) | Not tracked |
 | **When to use** | Multi-input joins, routing, fan-out, reverse/result-driven runs, deterministic whole-chain runs (the demo's Run) | Manual single-step EXEC, simple linear feeds, GUI-driven stepping |
 
@@ -111,7 +111,7 @@ RunAsync(graph, context, ct)
                          join point?   context.Data = new GroupData(CollectGroupedInputs(inputs)) BEFORE driving
        BranchSegment   → drive router; pick key (locked CompileKey static | ResolveRouteKey dynamic);
                          terminal branch or no match → run ends; else drive the chosen sub-graph
-       ParallelSegment → restore Data = sourceData, then drive each branch graph in order
+       ParallelSegment → restore Data = sourceData, then drive every branch graph concurrently
   └─ on a node Error()/Warn()/exception:
        IRedirectable → re-run the whole graph toward ResolveRedirectAsync's Order (skip prefix; re-route-only at a router)
        else          → Status "Stopped", CurrentOrder = -1, EndedWithError = true
@@ -120,7 +120,7 @@ RunAsync(graph, context, ct)
 - The node does **not** broadcast; the engine takes the return value and drives the next node.
 - The engine sets `TargetReached = true` when the node it drives matches `context.Target` — the reachability signal a result/terminal run reads after `RunAsync` returns.
 
-Sequence (graphic): see [data-flow — Compile + Run](../../../3_SE_Analysis/03_data-flow/00_workflow-system).
+Sequence (graphic): see `data-flow — Compile + Run`.
 
 ### 4.2 non-Compiler path (node-driven broadcast chain reaction)
 
@@ -180,7 +180,52 @@ Timing is a **node-driven depth-first chain**: the run starts at one node, and e
 
 ---
 
-## 5. Which mechanism to use
+## 5. The capability pipeline around each drive
+
+Since 2026-09-27 the engine's per-node drive is wrapped in seven optional host seams. Every one is read off the **concrete** `RuntimeContext` (never off `IRuntimeContext`), every one is resolved through a private `Session()` helper so it also works inside a fan-out, and every one left unset reproduces the pre-2026-09-27 behavior exactly. The order they run in is the contract:
+
+```
+consult ExecutionGate.WaitAsync(ct)        → closed ⇒ Status = "Paused" until released
+   ↓
+Observer.OnObservedAsync(NodeStarted)      → a throwing observer only logs
+   ↓
+IRuntimeAware.AttachRuntimeContext(context) → inside the failure discipline: a throw ends the run
+   ↓
+inject GroupData when InputNodes.Count > 1
+   ↓
+Helper.ReceiveAsync(context, ct)
+   ├─ returned                 → RegisterOutput; Data = result; Observer(NodeSucceeded)
+   │                              CheckpointStore.SaveAsync(CheckpointStore ? Snapshot() : null)
+   └─ threw                    → Observer(NodeFailed)
+                                 RetryPolicy.NextRetryAsync(NodeFailure)
+                                   ├─ delay ⇒ log [Retry n]; Observer(NodeRetried); Task.Delay; re-drive from the SAME input
+                                   └─ null  ⇒ ErrorSink.OnErrorAsync(Node phase); RegisterOutput(node, null); Data = null; rethrow
+   ↓
+reported Error and not IRedirectable       → ErrorSink.OnErrorAsync(Node phase); CurrentOrder = -1; EndedWithError; Status = "Stopped"
+reported Error and IRedirectable           → ResolveRedirectAsync  (a throw ⇒ ErrorSink at phase Redirect, run ends)
+reported Warning                           → the value still flows; nothing is redirected
+   ↓
+RunEnded observation; RunOutcome computed; Compensation.CompensateAsync in reverse drive order
+   (only when the outcome is Failed or Cancelled)
+```
+
+| Seam | Consulted at | Never able to change the run's data |
+|---|---|---|
+| `IExecutionGate` | before every node | yes — it only delays |
+| `IExecutionObserver` | 7 kinds, at their points | yes — a throw is logged and dropped |
+| `INodeRetryPolicy` | only after a **thrown** exception | it only answers "when", not "what" |
+| `IExecutionErrorSink` | on every recorded failure | yes — a throw is swallowed |
+| `IExecutionCompensation` | once, at the end, only on Failed/Cancelled | yes — a throw is logged, the rest still run |
+| `IExecutionCheckpointStore` | after each success | yes — a throw is logged, the run carries on |
+| `ILogWriter` | inside `AppendLog`, before retention | no — but only because the line is also kept in `Logs`; a throw is reported on `LogWriteFailed` |
+
+Two rules hold across all of them: **the engine writes no log line for a cancellation** (a host stopping its own run is not a failure, and an `[Error]` line would make a later reader think one happened), and **a report never fails the run that made it**.
+
+> For the sequence diagrams of these paths see `data-flow — host capabilities` and `data-flow — resume from checkpoint`.
+
+---
+
+## 6. Which mechanism to use
 
 - **Compiler** — any run that needs a deterministic whole-chain sequence: multi-input joins (`IGroupData`), routing (`ICompileTimeRouter`), fan-out with a shared source payload, redirects (`IRedirectable`), result-driven reverse runs (`CompileRole.Terminal` + `Target`/`TargetReached`), and the demo's Run path (`ControllerViewModel` → `Compiler.CompileAsync(this, CompileRole.Root)` → `RuntimeEngine.RunAsync`).
 - **non-Compiler** — manual single-step execution (`ReceiveCommand.Execute(data)`), simple linear feeds where each node auto-forwards, and GUI/AI step-by-step driving. It has no join, redirect, or reachability model.
@@ -189,4 +234,4 @@ They are **not mutually exclusive**: a workflow can be built and stepped manuall
 
 ---
 
-*Sources: `Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/CompilerViewModel.cs`, `CompilerViewModel.Reverse.cs`, `Runtime/RuntimeEngine.cs`, `Runtime/Model/RuntimeContext.cs`, `Runtime/Model/GroupData.cs`; `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IContext.cs`, `IAccessContext.cs`, `ITaskContext.cs`, `IWorkflowNodeViewModel.cs`; `Src/Core/VeloxDev.Core/WorkflowSystem/Templates/ViewModels/NodeDefaultViewModel.cs`, `StandardEx/WorkflowNodeEx.cs`; `Examples/Workflow/Common/Lib/ViewModels/Workflow/ControllerViewModel.cs`, `EnumSelectorNodeViewModel.cs`, `Helper/EnumSelectorHelper.cs`, `Helper/PythonHelper.cs`, `Helper/TimerHelper.cs`, `NetworkFlowContext.cs`.*
+*Sources: `Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/CompilerViewModel.cs`, `CompilerViewModel.Reverse.cs`, `Runtime/RuntimeEngine.cs`, `Runtime/Model/RuntimeContext.cs`, `Runtime/Model/BranchRuntimeContext.cs`, `Runtime/Model/GroupData.cs`, `Runtime/Contracts/*.cs`; `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IContext.cs`, `IAccessContext.cs`, `ITaskContext.cs`, `IWorkflowNodeViewModel.cs`; `Src/Core/VeloxDev.Core/WorkflowSystem/Templates/ViewModels/NodeDefaultViewModel.cs`, `StandardEx/WorkflowNodeEx.cs`; `Examples/Workflow/Common/Lib/ViewModels/Workflow/WorkflowDemoSession.cs`, `ControllerViewModel.cs`, `EnumSelectorNodeViewModel.cs`, `Helper/EnumSelectorHelper.cs`, `Helper/PythonHelper.cs`, `Helper/TimerHelper.cs`, `NetworkFlowContext.cs`.*

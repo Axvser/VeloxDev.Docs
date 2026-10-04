@@ -31,7 +31,21 @@ Or, when working inside this repository, add a project reference instead — the
 dotnet add reference ..\..\..\..\Src\Core\VeloxDev.Core\VeloxDev.Core.csproj
 ```
 
-**Expected result:** the command exits `0`; a `PackageReference` (or `ProjectReference`) appears in the `.csproj` and restore completes. From here on, building the project also runs the AOP generators (`VeloxDev.Generators.AopInterface` and `VeloxDev.Generators.AopProxy`, in assembly `VeloxDev.Core.Generator`).
+A `ProjectReference` does **not** carry an analyzer transitively, so the generator must be added a second time as an analyzer — exactly what the shipped `Examples/AOP/WPF/Demo/Demo.csproj` does (its own comment reads "analyzer 不随 ProjectReference 传递"):
+
+```xml
+<ItemGroup>
+    <ProjectReference Include="..\..\..\..\Src\Core\VeloxDev.Core\VeloxDev.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\Src\Generators\VeloxDev.Core.Generator\VeloxDev.Core.Generator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="VeloxDev.Core.Generator" Version="10.0.0"
+                      Condition="'$(Configuration)' != 'Debug'" />
+</ItemGroup>
+```
+
+**Expected result:** the command exits `0`; a `PackageReference` (or `ProjectReference`) appears in the `.csproj` and restore completes. From here on, building the project also runs the AOP generators (`VeloxDev.Generators.AopInterface` and `VeloxDev.Generators.AopProxy`, in assembly `VeloxDev.Core.Generator`) — via the package's analyzer assets, or (in-repo) via the explicit analyzer reference above.
 
 ## 3. Basic Setup / Registration
 
@@ -255,4 +269,8 @@ original.Total = 0
 
 ## 7. Run Declaration
 
-- ⚠️ Not actually run — statically verified only. The WPF and Avalonia demos under `Examples/AOP/{WPF,Avalonia}/Demo` were read in full as evidence (their `bin/` artifacts show successful prior builds), and the console program above was cross-checked against the runtime (`Src/Core/VeloxDev.Core/AspectOriented/*.cs`) and generator (`Src/Generators/VeloxDev.Core.Generator/AopInterface.cs`, `AopProxy.cs`) sources, but no console project exercising the AOP proxy was compiled and executed in this session, so the console output above is a static derivation rather than a recorded transcript.
+- ✅ **The shipped demos were built on 2026-10-01.** Recorded outputs:
+    - `dotnet build "Examples/AOP/WPF/Demo/Demo.csproj" -c Debug` — `已成功生成。 0 个警告 0 个错误` (`Demo -> bin/Debug/net9.0-windows/Demo.dll`); building the demo also runs both AOP generators over the `[AspectOriented]` members of `TeamViewModel`.
+    - `dotnet build "Examples/AOP/Avalonia/Demo/Demo.csproj" -c Debug` — `已成功生成。 0 个警告 0 个错误` (`Demo -> bin/Debug/net9.0/Demo.dll`).
+- ⚠️ **No AOP unit tests exist.** The feature inventory lists this feature's evidence as **Demo only**; there is no `AOP` suite under `Src/Core/VeloxDev.Core.Test`, so correctness rests on the two demos and the runtime/generator sources (stated on the [API Reference](../../2_API/05_aop/index.md) page too).
+- ⚠️ **The console program above was not compiled and executed.** It was cross-checked against the runtime (`Src/Core/VeloxDev.Core/AspectOriented/*.cs`) and generator (`Src/Generators/VeloxDev.Core.Generator/AopInterface.cs`, `AopProxy.cs`) sources, so its "Expected console output" is a static derivation rather than a recorded transcript; the demos were not interactively clicked either.

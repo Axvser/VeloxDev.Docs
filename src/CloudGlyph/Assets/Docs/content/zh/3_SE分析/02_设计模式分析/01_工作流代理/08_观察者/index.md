@@ -6,7 +6,7 @@
 - **`McpScope.ServerError`**（`Action<McpServerConfiguration, Exception>`）—— 单服务器加载失败时触发；错误**不**重抛，一台坏服务器不会中止整批。
 - **`IAgentToolCallNotifier` / `IAgentSelectionNotifier` / `IAgentConfirmationNotifier`** —— 事件与交互交接所依托的通知者契约（见 `VeloxDev.Core` 中的 `VeloxDev.AI` 类型）。
 
-> 源码：`WorkflowAgentScope.cs`，第 24 与 444-450 行（`ToolCalled`、`RaiseToolCalledAsync`）；`McpScope.cs`，第 35-38 与 220-229 行（`ServerError`、失败路径）。
+> 源码：`WorkflowAgentScope.cs`，第 30 与 789-795 行（`ToolCalled`、`RaiseToolCalledAsync`）；`McpScope.cs`，第 41 与 875-887 行（`ServerError`、失败路径）。
 
 ```csharp
 internal async Task RaiseToolCalledAsync(string toolName, string result, int callCount)

@@ -68,7 +68,6 @@ classDiagram
     AspectOrientedAttribute ..> TeamViewModel : 标记 [AspectOriented] 成员
     TeamViewModel ..> TeamViewModel_Demo_Aop : partial 实现
     TeamViewModel_Demo_Aop ..|> IAspectOriented
-    ProxyInstance ..|> IAspectOriented
     AopExtensions ..> TeamViewModel_Demo_Aop : Aop() 返回代理
     AopExtensions ..> AopCache : Resolve(instance, factory)
     AopExtensions ..> Aop : Map(proxy, target)
@@ -215,7 +214,7 @@ public static TTarget? GetTarget<TTarget>(IAspectOriented proxy) where TTarget :
 
 ## 5. 标记接口与分类
 
-`IAspectOriented` 是空标记接口，同时充当 `CreateProxy` / `SetProxy` / `AopCache.Resolve` 的泛型约束。生成的代理接口、`ProxyInstance`，以及任何交给 `GetTarget` 的对象都继承自它：
+`IAspectOriented` 是空标记接口，同时充当 `CreateProxy` / `SetProxy` / `AopCache.Resolve` 的泛型约束。生成的代理接口实现了它，`GetTarget` 则通过 `IAspectOriented` 形参接收代理（`ProxyInstance : DispatchProxy` 本身并不实现该标记）：
 
 ```csharp
 // Src/Core/VeloxDev.Core/Interfaces/AspectOriented/IAspectOriented.cs（第 5-8 行）

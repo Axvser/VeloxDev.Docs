@@ -32,4 +32,4 @@
 
 ## 证据说明
 
-WPF、Avalonia、WinUI、WinForms、MAUI、Blazor/Razor 与 Jalium 在 `Examples/Workflow/<平台>` 下都有工作流演示（各自带 `Trimmed` 变体），`Examples/Transition/*` 与 `Examples/Theme/*` 下还有过渡/主题演示。由于本编写环境无法启动 GUI，以下内容全部为静态核验（见「完整代码」页的运行声明）。
+WPF、Avalonia、WinUI、WinForms、MAUI、Blazor/Razor 与 Jalium 在 `Examples/Workflow/<平台>` 下都有工作流演示（各自带 `Trimmed` 变体），`Examples/Transition/*` 与 `Examples/Theme/*` 下还有过渡/主题演示。WPF 演示已于 2026-10-01 **构建通过**（`dotnet build Examples/Workflow/WPF/Demo/Demo.csproj`，0 警告 / 0 错误），七个 `dotnet new wpf-v-*` 模板也**实际生成**过；由于本编写环境无法启动 GUI，下文的交互行为是依据源码与该次构建核验的，并非在屏幕上观察——详见[验证](../04_验证/index.md)页与[完整代码](../05_完整代码/index.md)页的运行声明。

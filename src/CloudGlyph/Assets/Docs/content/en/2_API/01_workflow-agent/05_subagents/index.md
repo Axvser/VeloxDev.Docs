@@ -29,4 +29,4 @@ The subsystem is reached from the workflow feature's own scope (`VeloxDev.AI.Wor
 
 The three capability sources a spawn narrows against are the parent scope's own subsystems: `Skills` (`SkillScope`, narrowed through its internal `GrantableNames` / `CreateNarrowed`), `Mcp` (`McpScope`, narrowed through its internal `GrantableNames` / `CreateGrantedView`), and the tool switches `IsToolEnabled` / `WithToolEnabled` / `SetToolEnabled` / `DisabledToolNames`.
 
-> Source: `WorkflowAgentScope.cs` lines 251-296 (grant helpers), 1385-1397 (ledger + toolkit), 1452 (`SubAgents`), 1659-1673 (`WithSubAgents` body); `SkillScope.cs` lines 353-378 (`GrantableNames` / `CreateNarrowed`); `McpScope.cs` lines 429-500 (`GrantableNames` / `CreateGrantedView`).
+> Source: `WorkflowAgentScope.cs` lines 251-296 (grant helpers), 1514-1526 (ledger + toolkit), 1581 (`SubAgents`), 1788-1804 (`WithSubAgents` body); `SkillScope.cs` lines 353-378 (`GrantableNames` / `CreateNarrowed`); `McpScope.cs` lines 429-500 (`GrantableNames` / `CreateGrantedView`).

@@ -10,7 +10,7 @@ ThemeManager.SetPlatformInterpolator(new Interpolator());
 
 这次调用**对带动画的切换是强制项，而且只对带动画的切换是强制项**。不安装它，切换依然会发生 —— 只是会立刻应用、没有动画、也不报错（未安装插值器时 `ThemeManager.RunSwitch` 退化为 `ApplyImmediately`）。`Jump<T>()` 从不需要它（见[带动画与即时切换](../01_带动画与即时切换/index.md)）。
 
-`Interpolator` 是适配器类型，位于 `VeloxDev.TransitionSystem` 命名空间（`VeloxDev.WPF`、`VeloxDev.Avalonia`）。它的静态构造函数注册该框架的采样器 —— WPF 注册 `Brush`、`Thickness`、`Point`、`CornerRadius`、`Transform`、`Size`、`Rect`、`Vector`、`Color`、`DropShadowEffect`、`Point3D` 与 `Vector3D`；它的 `CreateScheduler` 只在收到的 effect 恰好是该平台自己的 `TransitionEffect` 时返回平台 scheduler，否则返回 `null`。只要有一个目标得到 `null`，整场切换就退化为瞬时应用。
+`Interpolator` 是适配器类型，位于 `VeloxDev.TransitionSystem` 命名空间（`VeloxDev.WPF`、`VeloxDev.Avalonia`）。它的静态构造函数注册该框架的采样器 —— WPF 注册 `Brush`、`Thickness`、`Point`、`CornerRadius`、`Transform`、`Size`、`Rect`、`Vector`、`Color`、`Effect`（WPF 的抽象类型，由 `DropShadowEffectSampler` 采样；注册的是基类，这样声明为 `UIElement.Effect` 的属性才查得到）、`Point3D` 与 `Vector3D`；它的 `CreateScheduler` 只在收到的 effect 恰好是该平台自己的 `TransitionEffect` 时返回平台 scheduler，否则返回 `null`。只要有一个目标得到 `null`，整场切换就退化为瞬时应用。
 
 该设置全局生效，所以两个规模示例都在 `App` 里设置一次（WPF 在 `OnStartup`、Avalonia 在 `OnFrameworkInitializationCompleted`），以保证任何元素注册之前它就已经就位。
 

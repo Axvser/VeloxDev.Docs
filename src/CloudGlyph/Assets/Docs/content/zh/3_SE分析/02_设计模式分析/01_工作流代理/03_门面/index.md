@@ -8,7 +8,7 @@
 
 ```csharp
 AITool T(Delegate method, string name)
-    => new TrackedAIFunction(AIFunctionFactory.Create(method, name), this);
+    => new TrackedAIFunction(AIFunctionFactory.Create(method, name), Tools, _scope.Pipeline);
 
 var tools = new List<AITool>();
 void Add(WorkflowToolCategory category, params AITool[] items)
@@ -20,4 +20,4 @@ void Add(WorkflowToolCategory category, params AITool[] items)
 
 每个类别块注册其工具，例如查询块以 `Add(WorkflowToolCategory.Query, T(ListNodes, nameof(ListNodes)), T(GetNodeDetail, nameof(GetNodeDetail)), ... )` 开头——完整列表从 `ListNodes` 一直到 `GetExecutionLog`。
 
-门面是 agent 宿主使用的唯一公开入口：`scope.ProvideTools()` → `CreateToolkit().CreateTools()`。开发者注册的自定义工具（经 `WithTools` / `WithQueryTools`）在末尾并入；当它们是 `AIFunction` 时同样包上 `TrackedAIFunction` 装饰器，原始 MCP 客户端工具则原样追加（`WorkflowAgentToolkit.cs`，第 154-164 行）。
+门面是 agent 宿主使用的唯一公开入口：`scope.ProvideTools()` → `CreateToolkit().CreateTools()`。开发者注册的自定义工具（经 `WithTools` / `WithQueryTools`）在末尾并入；当它们是 `AIFunction` 时同样包上 `TrackedAIFunction` 装饰器，原始 MCP 客户端工具则原样追加（`WorkflowAgentToolkit.cs`，第 213-216 行与第 230-231 行）。

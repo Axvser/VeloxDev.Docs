@@ -35,7 +35,7 @@ Terminal entries=1 first=ChainSegment
 Terminal status=Completed targetReached=True data=4
 ```
 
-对比 [04 编译与正向运行](../04_编译与运行/index.md) 的输出：**打印里少了 `[Discard]` 一行** —— 旁支既未被本次编译纳入，也未被驱动。
+对比 `04 编译与正向运行` 的输出：**打印里少了 `[Discard]` 一行** —— 旁支既未被本次编译纳入，也未被驱动。
 
 ## 2. 目标追踪：Target / TargetReached
 
@@ -54,4 +54,4 @@ Terminal status=Completed targetReached=True data=4
 
 ## 下一步
 
-图画、编译、运行都已跑通，最后做 [06 序列化](../06_序列化/index.md) 持久化整棵树。
+图画、编译、运行都已跑通，最后做 `06 序列化` 持久化整棵树。

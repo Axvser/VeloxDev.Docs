@@ -68,7 +68,6 @@ classDiagram
     AspectOrientedAttribute ..> TeamViewModel : marks [AspectOriented] members
     TeamViewModel ..> TeamViewModel_Demo_Aop : partial implements
     TeamViewModel_Demo_Aop ..|> IAspectOriented
-    ProxyInstance ..|> IAspectOriented
     AopExtensions ..> TeamViewModel_Demo_Aop : Aop() returns proxy
     AopExtensions ..> AopCache : Resolve(instance, factory)
     AopExtensions ..> Aop : Map(proxy, target)
@@ -215,7 +214,7 @@ Both tables are `ConditionalWeakTable`s. (The keys are weak; see the [complexity
 
 ## 5. Marker Interface & classification
 
-`IAspectOriented` is an empty marker interface that doubles as the generic constraint for `CreateProxy` / `SetProxy` / `AopCache.Resolve`. The generated proxy interface, `ProxyInstance`, and any object handed to `GetTarget` all derive from it:
+`IAspectOriented` is an empty marker interface that doubles as the generic constraint for `CreateProxy` / `SetProxy` / `AopCache.Resolve`. The generated proxy interface implements it, and `GetTarget` accepts its proxy through an `IAspectOriented` parameter (`ProxyInstance : DispatchProxy` itself does not implement the marker):
 
 ```csharp
 // Src/Core/VeloxDev.Core/Interfaces/AspectOriented/IAspectOriented.cs (lines 5-8)

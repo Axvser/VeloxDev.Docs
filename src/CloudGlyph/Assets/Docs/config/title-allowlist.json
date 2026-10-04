@@ -32,10 +32,15 @@
     "VeloxCommandAttribute",
     "VeloxCommand",
     "IVeloxCommand",
+    "IVeloxCommandCompletion",
+    "IVeloxCommandStatus",
+    "VeloxCommandExtensions",
     "Command",
     "CommandEventType",
     "CommandEventHandler",
     "CommandEventArgs",
+    "CommandOutcome",
+    "CommandCompletion",
     "ObservableCollectionTracker",
 
     "TransitionSystem",
@@ -52,15 +57,20 @@
     "ProxyEx",
     "ProxyInstance",
 
-    "MonoBehaviour",
-    "MonoBehaviourAttribute",
-    "MonoBehaviourManager",
-    "MonoBehaviourChannelEventArgs",
-    "IMonoBehaviour",
+    "Tickable",
+    "TickableAttribute",
+    "TickManager",
+    "ITickable",
+    "TickChannelEventArgs",
     "FrameEventArgs",
     "TimeLineEventArgs",
     "ThreadSafeFrameEventArgs",
     "TransitionEventArgs",
+
+    "Skills",
+    "Pipelines",
+    "Dashboard",
+    "Timing",
 
     "WeakDelegate",
     "WeakQueue",
@@ -85,7 +95,11 @@
     "`Src/Core/VeloxDev.Core/MVVM/*.cs`": [
       "VeloxPropertyAttribute", "VeloxCommandAttribute", "VeloxCommand",
       "IVeloxCommand", "Command", "CommandEventType", "CommandEventHandler",
-      "CommandEventArgs", "ObservableCollectionTracker"
+      "CommandEventArgs", "CommandOutcome", "CommandCompletion",
+      "VeloxCommandExtensions", "ObservableCollectionTracker"
+    ],
+    "`Src/Core/VeloxDev.Core/Interfaces/MVVM/IVeloxCommand{Completion,Status}.cs`": [
+      "IVeloxCommandCompletion", "IVeloxCommandStatus"
     ],
     "`VeloxDev.TransitionSystem` namespace / `Transition` class": [
       "TransitionSystem", "Transition"
@@ -98,10 +112,20 @@
       "ThemeManager", "ThemeCache", "ThemeConfigAttribute"
     ],
     "`Src/Core/VeloxDev.Core/AspectOriented/*.cs`": ["ProxyEx", "ProxyInstance"],
-    "`Src/Core/VeloxDev.Core/Interfaces/MonoBehaviour/`, `Src/Core/VeloxDev.Core/TimeLine/`": [
-      "MonoBehaviour", "MonoBehaviourAttribute", "MonoBehaviourManager",
-      "MonoBehaviourChannelEventArgs", "IMonoBehaviour", "FrameEventArgs",
-      "TimeLineEventArgs", "ThreadSafeFrameEventArgs", "TransitionEventArgs"
+    "`TickableAttribute` (Src/Core/VeloxDev.Core/TimeLine/TickableAttribute.cs:7), `ITickable` (Src/Core/VeloxDev.Core/Interfaces/Tickable/ITickable.cs:5)": [
+      "Tickable", "TickableAttribute", "ITickable"
+    ],
+    "`TickManager` / `TickChannelEventArgs` (Src/Core/VeloxDev.Core/TimeLine/TickManager.cs:8, :1159)": [
+      "TickManager", "TickChannelEventArgs"
+    ],
+    "`Src/Core/VeloxDev.Core/TimeLine/`, `Src/Core/VeloxDev.Core/Interfaces/Tickable/`": [
+      "FrameEventArgs", "TimeLineEventArgs", "ThreadSafeFrameEventArgs", "TransitionEventArgs"
+    ],
+    "`VeloxDev.AI.Skills` / `VeloxDev.AI.Pipelines` / `VeloxDev.AI.Dashboard` namespaces (Src/Core/VeloxDev.Core.Extension/Agent/{Skills,Pipelines,Dashboard}/)": [
+      "Skills", "Pipelines", "Dashboard"
+    ],
+    "`VeloxDev.Timing` namespace (Src/Core/VeloxDev.Core/Timing/, Src/Core/VeloxDev.Core/Interfaces/Timing/)": [
+      "Timing"
     ],
     "`Src/Core/VeloxDev.Core/WeakTypes/*.cs`": [
       "WeakDelegate", "WeakQueue", "WeakStack", "WeakCache"

@@ -1,6 +1,6 @@
 # Transition — Rotation Direction & Eases
 
-Namespace `VeloxDev.TransitionSystem`. The remaining members of the core namespace: the `RotationDirection` flag enum steering angular interpolation, and the `Eases` factory plus its 31 concrete ease classes (all implementing `IEaseCalculator`).
+Namespace `VeloxDev.TransitionSystem`. The remaining members of the core namespace besides the contracts: the `RotationDirection` flag enum steering angular interpolation, and the `Eases` factory plus its 31 concrete ease classes (all implementing `IEaseCalculator`).
 
 ### Enum: `RotationDirection`
 
@@ -34,7 +34,7 @@ public interface IEaseCalculator
 }
 ```
 
-**Notes:** `t` is the normalized time in `[0, 1]`. Standard curves return a value in `[0, 1]`; `Back` and `Elastic` may overshoot, and the sampling loop clamps the eased result back to `[0, 1]`.
+**Notes:** `t` is the normalized time in `[0, 1]`. Standard curves return a value in `[0, 1]`; `Back` and `Elastic` deliberately leave it — the interpreter hands the eased value to the sampler **unclamped**, and each sampler decides whether it can extrapolate (the numeric ones can) or has to pin to its endpoint. Clamping here would flatten both curves. The SE Analysis of this feature works out what an overshoot means per sampler class.
 
 ### Static Class: `Eases`
 
@@ -67,7 +67,7 @@ public static class Eases
 }
 ```
 
-**Notes:** The factory properties construct a fresh ease instance on every access (computed getters), so they are cheap but not singletons. All factories and the concrete classes are public.
+**Notes:** The factory properties construct a fresh ease instance on every access (computed getters), so they are cheap but not singletons. All factories and the concrete classes are public. The one place that must **not** go through a property is the sampling loop's hot path — `EaseInBounce` / `EaseInOutBounce` hold a `private static readonly EaseOutBounce` rather than calling `Eases.Bounce.Out`, because that property allocates.
 
 ### Concrete Ease Classes
 
@@ -77,12 +77,14 @@ Each concrete class implements `IEaseCalculator` with a single `double Ease(doub
 
 **Notes:**
 - `EaseDefault.Ease(t) => t` (linear). The standard easing formula set (Robert Penner style) is implemented in `Eases.cs` (`Src/Core/VeloxDev.Core/TransitionSystem/Eases.cs`).
-- *Verified by:* `EasesTests` (`Default_AtZero_ReturnsZero`, `Default_AtOne_ReturnsOne`, `AllStandardEases_AtBoundaries_ReturnExpected`, `QuadIn_IsMonotonicallyIncreasing`, `InOutQuad_Symmetry_AtHalf`, `*_FactoryProperties_ReturnNonNull`).
+- *Verified by:* `EasesTests` (`Default_AtZero_ReturnsZero`, `Default_AtOne_ReturnsOne`, `AllStandardEases_AtBoundaries_ReturnExpected`, `QuadIn_IsTickabletonicallyIncreasing`, `InOutQuad_Symmetry_AtHalf`, `Sine_FactoryProperties_ReturnNonNull` and one such test per factory group), `EaseOvershootTests`.
 
 ### Other Members of `VeloxDev.TransitionSystem`
 
-Two more public members of this namespace are documented with the builder / adapter surfaces they belong to:
+Three more public members of this namespace are documented with the surfaces they belong to:
 
-- `TransitionCoreEx` — static extension methods (`Await`, `Then`, `AwaitThen`, `Interpolator`) that chain `StateSnapshotCore` segments → [abstractions](../../01_abstractions/index.md).
-- `NonPriority` — the empty struct a priority-free adapter passes as the priority type argument → [abstractions](../../01_abstractions/index.md).
+- `TransitionCoreEx` — static extension methods (`Await`, `Then`, `AwaitThen`, `Repeat`, `Interpolator`) that chain `StateSnapshotCore` segments → [abstractions](../../01_abstractions/index.md).
+- `NonPriority` — the empty struct a priority-free adapter passes as the priority type argument → [host](../03_host/index.md) (it is declared in `VeloxDev.Threading`, not here).
+- `ITransitionHost<TPriorityCore>` — the host composition the engine asks for → [host](../03_host/index.md).
+- `TransitionHostBase<TPriorityCore>` — the base an adapter's host derives from → [host](../03_host/index.md).
 - Per-adapter `Transition`, `Transition<T>` → [adapter-provided](../../03_adapter-provided/index.md).

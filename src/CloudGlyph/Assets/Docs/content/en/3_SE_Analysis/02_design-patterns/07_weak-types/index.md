@@ -132,7 +132,7 @@ Two details worth noting. First, `WeakStack.Prune` additionally calls `activeRef
 `WeakDelegate` backs the lifecycle events of the transition engine: `TransitionEffectCore` declares each event as a `WeakDelegate<EventHandler<TransitionEventArgs>>` field and routes the C# `event` accessors through it.
 
 ```csharp
-// Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs (lines 51-55)
+// Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs (lines 60-64)
 public virtual event EventHandler<TransitionEventArgs> Awaked
 {
     add => _awaked.AddHandler(value);
@@ -140,7 +140,7 @@ public virtual event EventHandler<TransitionEventArgs> Awaked
 }
 ```
 
-Invocation goes through the combined delegate, which `TransitionEffectCore` invokes in a **typed** (reflection-free) way (`Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs`, lines 87-90):
+Invocation goes through the combined delegate, which `TransitionEffectCore` invokes in a **typed** (reflection-free) way (`Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs`, lines 106-109):
 
 ```csharp
 public virtual void InvokeAwake(object sender, TransitionEventArgs e)

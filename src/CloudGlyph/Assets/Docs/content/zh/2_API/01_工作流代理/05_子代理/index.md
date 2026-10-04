@@ -29,4 +29,4 @@
 
 spawn 用来做收窄的三个能力源，就是父作用域自己的子系统：`Skills`（`SkillScope`，经其 internal 的 `GrantableNames` / `CreateNarrowed` 收窄）、`Mcp`（`McpScope`，经其 internal 的 `GrantableNames` / `CreateGrantedView` 收窄），以及工具开关 `IsToolEnabled` / `WithToolEnabled` / `SetToolEnabled` / `DisabledToolNames`。
 
-> 源码：`WorkflowAgentScope.cs` 第 251-296 行（授予辅助）、1385-1397 行（账本 + 工具包）、1452 行（`SubAgents`）、1659-1673 行（`WithSubAgents` 主体）；`SkillScope.cs` 第 353-378 行（`GrantableNames` / `CreateNarrowed`）；`McpScope.cs` 第 429-500 行（`GrantableNames` / `CreateGrantedView`）。
+> 源码：`WorkflowAgentScope.cs` 第 251-296 行（授予辅助）、1514-1526 行（账本 + 工具包）、1581 行（`SubAgents`）、1788-1804 行（`WithSubAgents` 主体）；`SkillScope.cs` 第 353-378 行（`GrantableNames` / `CreateNarrowed`）；`McpScope.cs` 第 429-500 行（`GrantableNames` / `CreateGrantedView`）。

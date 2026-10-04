@@ -2,7 +2,7 @@
 
 `IWorkflowNodeViewModel.Slots` 拥有 `IWorkflowSlotViewModel` 实例；连接不存储在节点上——每条连接是派生边 `sender.Targets` / `receiver.Sources`，空间管理器把连接再派生为**节点对边界**（`NodePairBoundsProvider`），使横穿视口的长连接保持两个端点节点都可见：
 
-> 源码：`Src/Core/VeloxDev.Core/WorkflowSystem/GUI/Virtualization/WorkflowSpatialManager.cs`，第 146-180 行
+> 源码：`Src/Core/VeloxDev.Core/WorkflowSystem/GUI/Virtualization/WorkflowSpatialManager.cs`，第 150-184 行
 
 ```csharp
 private void InsertLink(IWorkflowLinkViewModel link)

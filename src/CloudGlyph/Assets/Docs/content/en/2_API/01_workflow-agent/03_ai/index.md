@@ -107,7 +107,20 @@ Tested by `AgentToolCallEventArgsTests`; host dialogs in `Examples/Workflow/WinF
 
 | Member | Signature |
 |---|---|
+| `ToLanguageCode` | `string ToLanguageCode(AgentLanguages language)` — `"zh"` only for `Chinese`, else `"en"` (only zh/en folders are embedded) |
 | `ReadSkill` / `ListSkills` / `ReadAllSkills` | `string?` / `IEnumerable<string>` / `string`, param `(string system, string name, AgentLanguages language = English)` |
+| `ListSkillsExact` | `IEnumerable<string> ListSkillsExact(string system, AgentLanguages language)` — exact language only, no fallback |
 | `ReadReference` / `ListReferences` / `ReadAllReferences` | Same shape over the `References/` category |
 | `ReadSafety` / `ReadSafetyFiles` | Same shape over the `Safety/` category; `ReadSafetyFiles(system, language, params string[] names)` concatenates in order |
 | `ReadScript` / `ListScripts` / `ReadAllScripts` | Same shape over the language-neutral `Scripts/` category |
+
+### `AgentTelemetryExtensions`
+
+`public static class AgentTelemetryExtensions` — turns on the Agent Framework's OpenTelemetry instrumentation.
+
+| Member | Signature | Notes |
+|---|---|---|
+| `UseAgentTelemetry` | `static AIAgentBuilder UseAgentTelemetry(this AIAgentBuilder builder, string? sourceName = null, bool enableSensitiveData = false)` | Recommended form; `sourceName ?? OpenTelemetryAgent.DefaultSourceName`. |
+| `WithAgentTelemetry` | `static AIAgent WithAgentTelemetry(this AIAgent agent, string? sourceName = null, bool enableSensitiveData = false)` | Wrapping form: `agent.AsBuilder().UseAgentTelemetry(...).Build()`. |
+
+Prompt text is kept out of the spans unless `enableSensitiveData` is `true`. Tested by `AgentTelemetryExtensionsTests` (which is `[DoNotParallelize]` — it attaches a process-wide `ActivitySource` listener).

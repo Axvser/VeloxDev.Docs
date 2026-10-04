@@ -1,4 +1,4 @@
-# 00 · 文件结构
+﻿# 00 · 文件结构
 
 ## 仓库布局
 
@@ -13,7 +13,7 @@ VeloxDev/
 │   │   │   ├── MVVM/                      ← VeloxProperty/VeloxCommand 运行时 + IVeloxCommand
 │   │   │   ├── AspectOriented/            ← AOP 代理（#if NET）
 │   │   │   ├── AI/                        ← 代理属性 + 反射工具
-│   │   │   ├── TimeLine/                  ← MonoBehaviour 帧循环（MonoBehaviourManager）
+│   │   │   ├── TimeLine/                  ← Tickable 帧循环（TickManager）
 │   │   │   ├── WeakTypes/                 ← WeakQueue/WeakStack/WeakCache/WeakDelegate
 │   │   │   └── Interfaces/                ← 公共 API 契约（WorkflowSystem、TransitionSystem、...）
 │   │   ├── VeloxDev.Core.Extension/       ← 工作流代理（AI.Workflow）、MCP、ComponentModelEx 序列化
@@ -27,7 +27,7 @@ VeloxDev/
 │   │   ├── VeloxDev.WinForms/             ← Windows Forms
 │   │   └── VeloxDev.Razor/                ← Razor / Blazor
 │   ├── Generators/
-│   │   └── VeloxDev.Core.Generator/       ← Roslyn 源生成器（WorkflowBuilder、MVVM、Command、AOP、Theme、MonoBehaviour）
+│   │   └── VeloxDev.Core.Generator/       ← Roslyn 源生成器（WorkflowBuilder、MVVM、Command、AOP、Theme、Tickable）
 │   └── Templates/                         ← dotnet new 项模板（WPF/Avalonia/WinUI/MAUI/WinForms/Razor）
 ├── Examples/                              ← 示例（主要证据）
 │   ├── Workflow/   WPF · Avalonia · WinUI · MAUI · WinForms · Blazor + Common/Lib
@@ -35,7 +35,7 @@ VeloxDev/
 │   ├── Theme/      WPF · Avalonia
 │   ├── MVVM/       WPF · Avalonia
 │   ├── AOP/        WPF · Avalonia
-│   └── MonoBehaviour/ WPF
+│   └── Tickable/ WPF
 ├── Docs/
 │   └── VeloxDev.Docs/                     ← CloudGlyph Wiki 仓库（内容、技能、应用）
 ├── Assets/                                ← 共享资源

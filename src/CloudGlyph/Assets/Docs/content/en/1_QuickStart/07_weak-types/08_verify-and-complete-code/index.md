@@ -2,14 +2,14 @@
 
 ## 1. Verify with the automated tests
 
-The behavioural evidence lives in the MSTest suite under `Src/Core/VeloxDev.Core.Test/WeakTypes/`. Running only the weak-types tests on 2026-09-07 against the current `master` produced:
+The behavioural evidence lives in the MSTest suite under `Src/Core/VeloxDev.Core.Test/WeakTypes/`. Running only the weak-types tests on 2026-10-01 against the current `master` produced:
 
 ```text
 总共 1 个测试文件与指定模式相匹配。
-已通过! - 失败:     0，通过:    33，已跳过:     0，总计:    33，持续时间: 39 ms - VeloxDev.Core.Test.dll (net10.0)
+已通过! - 失败:     0，通过:    35，已跳过:     0，总计:    35，持续时间: 55 ms - VeloxDev.Core.Test.dll (net10.0)
 ```
 
-That is `dotnet test --filter "FullyQualifiedName~WeakTypes" -c Release` on the `VeloxDev.Core.Test` project (target `net10.0`): 33 tests across `WeakDelegateTests` (6), `WeakQueueTests` (10), `WeakStackTests` (10) and `WeakCacheTests` (7), all green. The tests pin the API surface and ordering rules but deliberately avoid asserting GC eviction (the string keys and short-lived items in the tests are rooted for the duration of each test) — see the [GC Behavior](../07_gc-behavior/) page.
+That is `dotnet test --filter "FullyQualifiedName~WeakTypes"` on the `VeloxDev.Core.Test` project (target `net10.0`): 35 tests across `WeakDelegateTests` (8), `WeakQueueTests` (10), `WeakStackTests` (10) and `WeakCacheTests` (7), all green. The tests pin the API surface and ordering rules but deliberately avoid asserting GC eviction (the string keys and short-lived items in the tests are rooted for the duration of each test) — see the [GC Behavior](../07_gc-behavior/) page.
 
 **Expected result:** `dotnet test` on `VeloxDev.Core.Test` runs the `WeakTypes` tests green.
 
@@ -142,7 +142,7 @@ namespace WeakTypesQuickStart
 
 ## 3. Recorded output
 
-The transcript below is the verbatim console output of one `Release` run (see the run declaration). It is stable because every dead object is created inside a helper method whose frame has already returned before the GC runs:
+The transcript below is the verbatim console output of one run (see the run declaration). It is stable because every dead object is created inside a helper method whose frame has already returned before the GC runs:
 
 ```text
 == WeakQueue ==
@@ -173,4 +173,5 @@ TryGetCache(key1) after Remove: False
 
 ## 5. Run declaration
 
-- ✅ Actually built and ran on 2026-09-07 (`dotnet run -c Release`, target `net10.0`, against a project reference to `VeloxDev.Core` from this repository). Recorded output is shown verbatim in section 3; three consecutive runs produced identical output. The complete `WeakTypes` MSTest suite (33/33) was also executed green on the same date (section 1).
+- ✅ Actually built and ran on 2026-10-01 (`dotnet run -c Debug`, target `net10.0`, against a project reference to `VeloxDev.Core` from this repository). Recorded output is shown verbatim in section 3; consecutive runs produced identical output. The complete `WeakTypes` MSTest suite (35/35) was also executed green on the same date (section 1).
+- Note on configuration: the program is run in `Debug` because a `Release` restore of `VeloxDev.Core` currently fails before compilation. Its `VeloxDev.Core.Generator` package reference is pinned to `10.0.0`, and that version is not yet published to nuget.org (`NU1102`; the highest listed there is `9.0.153`), so `-c Release` cannot restore. The weak-types sources are compiled by both configurations; only the workflow-system generator path is blocked in `Release`.

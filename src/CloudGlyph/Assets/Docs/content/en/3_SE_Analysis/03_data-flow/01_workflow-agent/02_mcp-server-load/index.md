@@ -60,4 +60,4 @@ Notes:
 - The `Http` run mode performs no install and connects to `Endpoint` (Streamable HTTP with SSE fallback); optional `headers`/`oauth`/`connectionTimeout`/`transportMode`/`ownsSession` come from `McpServerConfiguration.Options` (unknown keys are rejected).
 - Cancellation propagates as `OperationCanceledException` (not caught by the per-server handler). Status updates marshal to the UI context when `WithSynchronizationContext` is registered.
 
-> Source: `Src/Core/VeloxDev.Core.Extension/Agent/MCP/McpScope.cs`, `LoadAsync` lines 167-191, `LoadOneAsync` lines 193-230, `EnsureNpmPackageAsync` lines 300-332, `ConnectServerAsync` lines 382-418; `McpAgentToolkit.cs` `LoadServers` lines 120-162.
+> Source: `Src/Core/VeloxDev.Core.Extension/Agent/MCP/McpScope.cs`, `LoadAsync` lines 743-771, `LoadOneAsync` lines 843-888, `EnsureNpmPackageAsync` lines 971-1003, `ConnectServerAsync` lines 1053-1097; `McpAgentToolkit.cs` `LoadServers` lines 322-364.

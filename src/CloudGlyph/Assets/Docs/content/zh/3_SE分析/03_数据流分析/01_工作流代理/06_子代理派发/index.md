@@ -73,7 +73,7 @@ deactivate Tool
 
 note over Model, Pool
   派发加轮询，而不是调用即等待：这份回复被渲染时，孩子可能还在网络上。
-end
+end note
 
 == 孩子自己那次运行 ==
 
@@ -117,4 +117,4 @@ Tool --> Model: {"status":"ok","timedOut":…,"agents":[…,"result"（截断到
 - **被拒绝的 spawn 不留下任何行。** 拒绝是一个 JSON 对象，且期望模型去读 `message`；没有任何半成品被留在那里。
 - **孩子自己的名册一开始是空的**，只有它自己去派发时才会被填；这里没有任何一步让兄弟的句柄变得可达。
 
-> 源码：`SubAgentScope.cs`（`TrySpawn` 387-606、`RunAsync` 781-806、`Finish` 815-839、`WaitAsync` 891-906）；`SubAgentAgentToolkit.cs`（五个工具，85-229）；`WorkflowAgentScope.cs`（`GrantInteractionTo` 283-296、`GrantCustomToolsTo` 251-268、`WithSubAgents` 1659-1673）；`ToolCallLedger.cs`。测试：`SubAgentDispatchTests`、`SubAgentBudgetTests`、`SubAgentHierarchyTests`、`SubAgentCapabilityGrantTests`。
+> 源码：`SubAgentScope.cs`（`TrySpawn` 387-606、`RunAsync` 781-806、`Finish` 815-839、`WaitAsync` 891-906）；`SubAgentAgentToolkit.cs`（五个工具，85-229）；`WorkflowAgentScope.cs`（`GrantInteractionTo` 283-296、`GrantCustomToolsTo` 251-264、`WithSubAgents` 1788-1804）；`ToolCallLedger.cs`。测试：`SubAgentDispatchTests`、`SubAgentBudgetTests`、`SubAgentHierarchyTests`、`SubAgentCapabilityGrantTests`。

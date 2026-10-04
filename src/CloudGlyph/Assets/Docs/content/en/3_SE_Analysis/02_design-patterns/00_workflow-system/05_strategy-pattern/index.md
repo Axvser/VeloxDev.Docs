@@ -66,4 +66,4 @@ public bool TrySelect(object value, out TSlot? slot)
 }
 ```
 
-At runtime the engine consults the same interface: for a `BranchSegment` it resolves `key = branch.IsDynamic ? await router.ResolveRouteKey(context) : branch.CompileKey` and runs the chosen option's sub-graph. See the [Data Flow page](../../../03_data-flow/00_workflow-system/index.md) for the full drive sequence.
+At runtime the engine consults the same interface: for a `BranchSegment` it resolves `key = branch.IsDynamic ? await router.ResolveRouteKey(context) : branch.CompileKey` and runs the chosen option's sub-graph. See the `Data Flow page` for the full drive sequence.

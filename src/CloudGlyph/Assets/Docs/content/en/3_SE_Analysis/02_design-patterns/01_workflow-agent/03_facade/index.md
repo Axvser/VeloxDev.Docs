@@ -8,7 +8,7 @@
 
 ```csharp
 AITool T(Delegate method, string name)
-    => new TrackedAIFunction(AIFunctionFactory.Create(method, name), this);
+    => new TrackedAIFunction(AIFunctionFactory.Create(method, name), Tools, _scope.Pipeline);
 
 var tools = new List<AITool>();
 void Add(WorkflowToolCategory category, params AITool[] items)
@@ -20,4 +20,4 @@ void Add(WorkflowToolCategory category, params AITool[] items)
 
 Each category block registers its tools, for example the query block begins `Add(WorkflowToolCategory.Query, T(ListNodes, nameof(ListNodes)), T(GetNodeDetail, nameof(GetNodeDetail)), ... )` — the full list runs from `ListNodes` to `GetExecutionLog`.
 
-The facade is the single public entry an agent host uses: `scope.ProvideTools()` → `CreateToolkit().CreateTools()`. Developer-registered custom tools (via `WithTools` / `WithQueryTools`) are merged in at the end and, when they are `AIFunction`s, wrapped with the same `TrackedAIFunction` decorator; raw MCP client tools are appended as-is (`WorkflowAgentToolkit.cs`, lines 154-164).
+The facade is the single public entry an agent host uses: `scope.ProvideTools()` → `CreateToolkit().CreateTools()`. Developer-registered custom tools (via `WithTools` / `WithQueryTools`) are merged in at the end and, when they are `AIFunction`s, wrapped with the same `TrackedAIFunction` decorator; raw MCP client tools are appended as-is (`WorkflowAgentToolkit.cs`, lines 213-216 and 230-231).

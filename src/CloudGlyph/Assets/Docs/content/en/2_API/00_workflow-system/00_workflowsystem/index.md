@@ -11,7 +11,7 @@ Partial classes decorated with these attributes receive generated properties, co
 | `[WorkflowBuilder.Slot<T>]` | class | `T : IWorkflowSlotViewModelHelper, new()` | — |
 | `[WorkflowBuilder.Link<T>(slotType = null)]` | class | `T : IWorkflowLinkViewModelHelper, new()` | `slotType` = initial slot type |
 
-**Examples** (shared demo lib, `Examples/Workflow/Common/Lib/ViewModels/Workflow/`) — `[WorkflowBuilder.Tree<AgentHelper>]` on `TreeViewModel.cs` (line 14); `[WorkflowBuilder.Node<NodeHelper>]` on `ControllerViewModel.cs` (line 10); `[WorkflowBuilder.Node<EnumSelectorHelper>(workSemaphore: 1)]` on `EnumSelectorNodeViewModel.cs` (line 12).
+**Examples** (shared demo lib, `Examples/Workflow/Common/Lib/ViewModels/Workflow/`) — `[WorkflowBuilder.Tree<AgentHelper>]` on `TreeViewModel.cs` (line 17); `[WorkflowBuilder.Node<NodeHelper>]` on `ControllerViewModel.cs` (line 10); `[WorkflowBuilder.Node<EnumSelectorHelper>(workSemaphore: 1)]` on `EnumSelectorNodeViewModel.cs` (line 12).
 
 *Source: `Src/Core/VeloxDev.Core/WorkflowSystem/Templates/WorkflowBuilder.cs`.*
 
@@ -110,7 +110,7 @@ Events: `SlotAdded` / `SlotRemoved` (`EventHandler<IWorkflowSlotViewModel>`).
 
 *Source: `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowNodeViewModel.cs`.*
 
-> `ReceiveAsync` is the single execution entry shared by the Compiler (engine-driven) and the non-Compiler (node-driven broadcast) paths — each path reaches it with a different context. Entry points, parameters, and timing: see [Execution Mechanism](../05_execution-mechanism).
+> `ReceiveAsync` is the single execution entry shared by the Compiler (engine-driven) and the non-Compiler (node-driven broadcast) paths — each path reaches it with a different context. Entry points, parameters, and timing: see `Execution Mechanism`.
 
 #### `IWorkflowSlotViewModel : IWorkflowViewModel`
 
@@ -158,13 +158,13 @@ Events: `SlotAdded` / `SlotRemoved` (`EventHandler<IWorkflowSlotViewModel>`).
 
 *Sources: `Interfaces/WorkflowSystem/IWorkflowActionPair.cs`, `IWorkflowIdentifiable.cs`, `IContext.cs`, `ITaskContext.cs`, `ISlotProvider.cs`, `ISpatialMap.cs`, `ISpatialBoundsProvider.cs`.*
 
-### Value Types and Enums
+### Value Types, Geometry Classes and Enums
 
 | Type | Description |
 |---|---|
-| `Anchor(left, top, layer)` | Position; `ICloneable`, `IEquatable<Anchor>`, `ISampleable`, `ISampler` (`Update` mutates the live `start` instance in place); `==`/`!=`/`+`/`-` operators |
-| `Size(width, height)` | Dimensions; `ICloneable`, `IEquatable<Size>`, `ISampleable`, `ISampler` (`Update` mutates the live `start` instance in place) |
-| `Offset(left, top)` | Delta vector; `ICloneable`, `IEquatable<Offset>`, `ISampleable`, `ISampler` (`Update` mutates the live `start` instance in place) |
+| `Anchor(left, top, layer)` | Geometry class (`sealed partial class`); position. `ICloneable`, `IEquatable<Anchor>`; `==`/`!=`/`+`/`-` operators |
+| `Size(width, height)` | Geometry class (`sealed partial class`); dimensions. `ICloneable`, `IEquatable<Size>`; `==`/`!=`/`+`/`-` operators |
+| `Offset(left, top)` | Geometry class (`sealed partial class`); delta vector. `ICloneable`, `IEquatable<Offset>`; `==`/`!=`/`+`/`-` operators |
 | `Viewport(left, top, width, height)` | `readonly struct`; `Empty`, `Right`, `Bottom`, `IsEmpty`, `Contains`, `IntersectsWith`, `Union`, `==`/`!=` |
 | `CanvasLayout` | `OriginSize`, `PositiveOffset`, `NegativeOffset`, `ActualSize`, `ActualOffset`, `ViewportOffset`; `AdaptTo(Size)`; `UpdateCommand` |
 | `CellKey(x, y)` | `readonly struct` grid cell coordinate; `==`/`!=` |
@@ -173,7 +173,7 @@ Events: `SlotAdded` / `SlotRemoved` (`EventHandler<IWorkflowSlotViewModel>`).
 | `SlotChannel` | `[Flags] int`: `None=0`, `OneTarget=1`, `OneSource=2`, `OneBoth=3`, `MultipleTargets=4`, `MultipleSources=8`, `MultipleBoth=12` |
 | `SlotState` | `[Flags] int`: `StandBy=1`, `PreviewSender=2`, `PreviewReceiver=4`, `Sender=8`, `Receiver=16` |
 
-*Sources: `Anchor.cs`, `Size.cs`, `Offset.cs`, `Viewport.cs`, `CanvasLayout.cs`, `CellKey.cs`, `TaskContext.cs`, `WorkflowActionPair.cs`, `Enums/Slot.cs` in `Src/Core/VeloxDev.Core/WorkflowSystem/`.*
+*Sources: `GUI/GeometryModels/Anchor.cs`, `GUI/GeometryModels/Size.cs`, `GUI/GeometryModels/Offset.cs`, `GUI/GeometryModels/Viewport.cs`, `GUI/GeometryModels/CanvasLayout.cs`, `GUI/Virtualization/CellKey.cs`, `TaskContext.cs`, `WorkflowActionPair.cs`, `Enums/Slot.cs` in `Src/Core/VeloxDev.Core/WorkflowSystem/`.*
 
 ### Default ViewModels and Helpers
 
@@ -186,7 +186,7 @@ Events: `SlotAdded` / `SlotRemoved` (`EventHandler<IWorkflowSlotViewModel>`).
 
 Notes:
 
-- `TreeHelper()` disables virtualization; `TreeHelper(double cellSize)` enables it. The type is annotated `[MonoBehaviour(channel: nameof(TreeHelper), fps: 10)]` and calls `tree.EnableMap(CellSize, VisibleItems)` on `Install`. `CellSize` defaults to `200`.
+- `TreeHelper()` disables virtualization; `TreeHelper(double cellSize)` enables it. The type is annotated `[Tickable(channel: nameof(TreeHelper), fps: 10)]` and calls `tree.EnableMap(CellSize, VisibleItems)` on `Install`. `CellSize` defaults to `200`.
 - `NodeHelper.SetAnchor/SetSize/Move` call `Component.Parent.GetHelper().MarkDirty()` after mutating.
 - `NodeDefaultViewModel`'s generated `Receive` handler (the body behind `ReceiveCommand`, lines 115-120) passes the parameter through when it is already an `ITaskContext`, else wraps it as `new TaskContext(parameter)`, and calls `Helper.ReceiveAsync(ctx, ct)` — a single receive path carrying nullable data/sender/receiver.
 - All four default ViewModels implement `IWorkflowIdentifiable` (`RuntimeId = Guid.NewGuid().ToString("N")`).
@@ -226,7 +226,7 @@ Notes:
 | `WorkflowSpatialEx` | Extensions: `EnableMap(tree, cellSize, observable)`, `Virtualize(tree, viewport)`, `QueryNodes(tree, viewport)`, `ClearMap(tree)`. |
 | `ISpatialMap<T>` / `ISpatialBoundsProvider` | Spatial abstractions (see "Other interfaces" above). |
 
-*Sources: `WorkflowSystem/SpatialGridHashMap.cs`, `WorkflowSystem/WorkflowSpatialManager.cs`, `WorkflowSystem/NodeBoundsProvider.cs`, `WorkflowSystem/NodePairBoundsProvider.cs`, `StandardEx/WorkflowSpatialEx.cs`, `Interfaces/WorkflowSystem/ISpatialMap.cs`, `Interfaces/WorkflowSystem/ISpatialBoundsProvider.cs`.*
+*Sources: `WorkflowSystem/GUI/Virtualization/SpatialGridHashMap.cs`, `WorkflowSystem/GUI/Virtualization/WorkflowSpatialManager.cs`, `WorkflowSystem/GUI/Virtualization/NodeBoundsProvider.cs`, `WorkflowSystem/GUI/Virtualization/NodePairBoundsProvider.cs`, `WorkflowSystem/GUI/Virtualization/WorkflowSpatialEx.cs`, `Interfaces/WorkflowSystem/ISpatialMap.cs`, `Interfaces/WorkflowSystem/ISpatialBoundsProvider.cs`.*
 
 ### Render-readiness helpers (core, GUI-agnostic)
 
@@ -237,3 +237,20 @@ Notes:
 | `WorkflowGuard` | `[Conditional("DEBUG")] Fail(message)` — debug-only contract guard throwing `InvalidOperationException` |
 
 *Sources: `WorkflowSlotUpdateGate.cs`, `WorkflowLinkRenderEx.cs`, `WorkflowGuard.cs`.*
+
+### Link interaction (`LinkInteraction`)
+
+The hub every GUI forwards link input into, one instance per tree. `LinkInteraction.For(IWorkflowTreeViewModel)` returns the shared instance; a host publishes translated input with `Publish(PointerEvent)`, `Publish(KeyEvent)`, and — when its own menu opens or closes — `Publish(ContextMenuEvent)`, then subscribes to the outcome instead of re-deriving hit testing per platform.
+
+| Member | Kind | Description |
+|---|---|---|
+| `For(tree)` | static | The one hub for a tree (kept as long as the tree lives). |
+| `HoveredLink`, `HitRadius` | property | The link under the pointer; reach either side of a drawn curve. |
+| `AutoHighlight`, `AutoDelete`, `IsSuspended` | property | Hover highlight and Delete-to-remove are on by default; `IsSuspended` is set while a host menu is open, so pointer movement over the menu does not clear the selection. |
+| `HoverChanged`, `LinkPressed`, `LinkDeleteRequested` | event | Outcome events; Delete is requested, not performed, unless `AutoDelete` is on. |
+| `PreviewHoverChanged`, `PreviewLinkPressed`, `PreviewLinkDeleteRequested` | event | Preview phase, refusable per event through `WorkflowEventHandle.PreventDefault`. |
+| `ContextMenuRequesting`, `ContextMenuRequested` | event | Right-press phases for whoever shows the menu; refusing in `Requesting` suppresses `Requested` by construction. |
+| `ContextMenuOpened`, `ContextMenuClosed` | event | Raised after `Publish(ContextMenuEvent)` reports a menu on screen / gone; hover suspension tracks them. |
+| `ContextMenuDismissRequested` | event | Raised when the link an open menu was about leaves the tree, asking the host to take that menu down — so a menu never outlives its link. The host closes it and reports `ContextMenuPhase.Closed`. |
+
+*Sources: `WorkflowSystem/GUI/Events/LinkInteraction.cs`, `WorkflowSystem/GUI/Events/Link/*.cs`, `WorkflowSystem/GUI/Events/Menu/*.cs`.*

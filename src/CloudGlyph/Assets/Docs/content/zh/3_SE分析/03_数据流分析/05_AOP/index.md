@@ -49,7 +49,7 @@ deactivate E
 @enduml
 ```
 
-随后 `SetProxy` 用 `ProxyMembers` 对成员分类，并通过 `ProxyIDs` → `ProxyInstances`（均为 `ProxyEx.cs` 中的静态字典）解析出存活的 `ProxyInstance`。当键已存在时，整个 `(start, coverage, end)` 三元组会被覆盖：
+随后 `SetProxy` 用 `ProxyMembers` 对成员分类，并通过 `ProxyIDs` → `ProxyInstances`（这两个静态字典都声明在 `ProxyInstance.cs` 中；`ProxyEx.cs` 只是读取它们）解析出存活的 `ProxyInstance`。当键已存在时，整个 `(start, coverage, end)` 三元组会被覆盖：
 
 | 成员种类（`ProxyMembers`） | 写入的字典 | 访问器键 |
 |---|---|---|

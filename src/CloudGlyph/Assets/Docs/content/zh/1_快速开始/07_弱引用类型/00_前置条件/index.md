@@ -32,7 +32,7 @@ NuGet / `dotnet` CLI。后续页面所有示例都使用 `dotnet` 命令与 `.cs
 
 ## 5. 行为证据所在位置
 
-弱类型**没有专用 GUI 示例**（`Examples/` 树里只有 Workflow、MVVM、Theme、Transition、AOP 与 MonoBehaviour 的示例）。权威的行为证据是 `Src/Core/VeloxDev.Core.Test/WeakTypes/` 下的 MSTest 套件：
+弱类型**没有专用 GUI 示例**（`Examples/` 树里只有 Workflow、MVVM、Theme、Transition、AOP 与 Tickable 的示例）。权威的行为证据是 `Src/Core/VeloxDev.Core.Test/WeakTypes/` 下的 MSTest 套件：
 
 - `WeakDelegateTests.cs` —— 订阅/调用、移除、克隆、组合委托缓存与 null 处理器的容忍。
 - `WeakQueueTests.cs` —— FIFO 顺序、窥视不移除、`Clear`、`EnqueueRange`、null 防护、枚举与 `TrimExcess`。

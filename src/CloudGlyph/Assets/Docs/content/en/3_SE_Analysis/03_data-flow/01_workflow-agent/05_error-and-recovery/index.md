@@ -19,7 +19,7 @@ Inner --> Tool: throws Exception
 deactivate Inner
 
 Tool -> Tool: catch -> WorkflowAgentToolkit.Error("Tool 'X' threw an unhandled exception: ...")
-Tool -> Tool: TrackAsync(name, errorJson) (counters ++)
+Tool -> Tool: ReportAsync(name, errorJson) (counters ++)
 Tool -> Scope: RaiseToolCalledAsync(name, errorJson, count)
 Scope -> User: ToolCalled event (host UI sees the error)
 Tool --> Agent: {"status":"error","message":"Tool 'X' threw ..."}
@@ -41,4 +41,4 @@ Notes:
 - Unmounted-component operations are silent no-ops by framework design; the protocol tells the model to verify mount state (`ListNodes` / `GetNodeDetail`) before retrying.
 - Gated tools (`ExecuteNode`, `ExecuteCommandOnNode`, `ExecuteCommandById`, `RunCompiledWorkflow`, `GetNodeResult`) return a structured `disabled by host policy` error when the host has not enabled them; the model is instructed not to bypass it.
 
-> Source: `WorkflowAgentToolkit.cs`, `TrackedAIFunction.InvokeCoreInnerAsync` lines 196-219; `WorkflowAgentScope.cs`, `BuildFailureHandlingProtocol` lines 509-523.
+> Source: `Agent/TrackedAIFunction.cs`, `TrackedAIFunction.InvokeCoreInnerAsync` lines 55-98; `WorkflowAgentScope.cs`, `BuildFailureHandlingProtocol` lines 854-877.

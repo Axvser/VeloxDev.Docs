@@ -1,28 +1,55 @@
-# Workflow Agent — Prerequisites
+# 00 · Prerequisites
 
-The workflow-agent layer is a library surface you add on top of a **running workflow tree**. It has no GUI of its own, so everything below is usable from a headless console host as well as from a desktop demo.
+## Supported targets
 
-## 1. Supported targets & tooling
+`VeloxDev.Core.Extension` (the project that holds `Agent/`) declares a single target framework:
 
-- **Supported target** (from `Src/Core/VeloxDev.Core.Extension/VeloxDev.Core.Extension.csproj`): `netstandard2.0`. The package is consumable from .NET Framework 4.6.1+, .NET Core 3.0+ and .NET 5+ consumers.
-- **SDK / runtime:** a modern .NET SDK. The in-repo demos run on `net10.0-windows` — a *tested* configuration, not a requirement. Pick a target the LLM/HTTP client libraries you use support (the OpenAI-compatible demo packages require a recent runtime).
-- **Package manager:** NuGet / the `dotnet` CLI.
-- **LLM client libraries:** `Microsoft.Extensions.AI` and `Microsoft.Agents.AI` arrive transitively with the package; an OpenAI-compatible `IChatClient` additionally needs `Microsoft.Agents.AI.OpenAI` and the `OpenAI` SDK (see the demo `Examples/Workflow/Common/Lib/Lib.csproj`).
+```
+<TargetFramework>netstandard2.0</TargetFramework>
+```
 
-**Expected result:** `dotnet --version` prints a version; a NuGet feed is reachable.
+Source: `Src/Core/VeloxDev.Core.Extension/VeloxDev.Core.Extension.csproj`.
 
-## 2. Services you must supply
+The library therefore drops into anything that consumes `netstandard2.0`. Its AI dependencies, however, are modern-only, so a host should target a current .NET. The shipped demo (`Examples/Workflow/*`, which share the agent pane through `Examples/Workflow/Common/Lib`) and the tests build with:
 
-- **A running workflow tree** — an `IWorkflowTreeViewModel` holding the graph you want the agent to control, exactly the object produced by the Workflow System Quick Start (compile & run forward, terminal compile, serialization). The demo builds one via a `TreeViewModel` and mounts it on a canvas.
-- **An AI chat client** — an `IChatClient` from `Microsoft.Extensions.AI`. The demo builds one over the DeepSeek-compatible OpenAI endpoint (`Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`) using an `API_KEY_DEEPSEEK` environment variable, `OpenAIClient(...).GetChatClient("deepseek-v4-flash").AsIChatClient()`.
-- **Optional: an MCP runtime** — only needed when you load Model Context Protocol servers. A local `npx` server requires Node.js; other run modes select their own runtime (`McpServerRunMode.Npm/Npx/Uvx/Dotnet/Pip/Exe/Http`). A remote `Http` server requires no local runtime at all.
+```
+<TargetFramework>net10.0</TargetFramework>
+```
 
-**Expected result:** `tree` is non-null and its helper is installed; a chat client can be constructed from your key/endpoint (or is already injected for the tests).
+Source: `Src/Core/VeloxDev.Core.Extension.Test/VeloxDev.Core.Extension.Test.csproj`.
 
-## 3. What is out of scope here
+That `net10.0` build is only the *tested* configuration, not the minimum — it is what the demo and tests were compiled against. Treat "a modern .NET that satisfies `Microsoft.Extensions.AI` 10.x" as the requirement.
 
-This Quick Start covers the **agent control surface**: building the scope, hardening it, loading MCP tools, running a conversation, and driving the three execution models. Defining workflow components, connecting nodes and compiling graphs headlessly is the Workflow System Quick Start's job; this feature consumes that tree as given.
+## SDK / runtime and packages
+
+- **.NET SDK 10.0** (the toolchain the demo and tests were built with; `dotnet --version` on the reference machine reports `10.0.401`).
+- The packages `VeloxDev.Core.Extension` pulls transitively (Source: `VeloxDev.Core.Extension.csproj`):
+
+| Package | Version | Why it is here |
+|---|---|---|
+| `Microsoft.Agents.AI` | 1.22.0 | `AIAgent`, `AIContextProvider`, `ChatClientAgent`, the pipeline middlewares |
+| `Microsoft.Extensions.AI` | 10.10.0 | `AITool`, `AIFunction`, `AIFunctionFactory`, `IChatClient` |
+| `ModelContextProtocol` | 2.2.0 | the MCP client / stdio + HTTP transports |
+| `Newtonsoft.Json` | 13.0.4 | every tool's compact JSON output |
+| `CliWrap` | 3.10.5 | launching `npm` / `pip` / `npx` for local MCP servers |
+
+- **`IChatClient` implementation** — the agent runs over `Microsoft.Extensions.AI`. The demo constructs an OpenAI-compatible client (`OpenAIClient` → `AsIChatClient()`) pointed at `https://api.deepseek.com`; any `IChatClient` works.
+
+## Services you must supply
+
+| Service | Needed for | How to obtain / start it |
+|---|---|---|
+| A live `IWorkflowTreeViewModel` | everything — the scope binds one tree | build it with the workflow-system feature; the tools operate on this object |
+| An `IChatClient` | running any conversation | construct an OpenAI-compatible client; the demo reads the key from the environment variable `API_KEY_DEEPSEEK` |
+| `node` / `npm` (npx mode) or `python` / `pip` (pip mode) on `PATH` | local MCP servers only | install Node.js or Python; remote (`Http`) MCP servers need none |
+| `SynchronizationContext` | hosts whose components are UI-bound | pass `SynchronizationContext.Current` from the UI thread to `WithSynchronizationContext` |
+
+## What does **not** need a model
+
+Building the scope (`tree.AsAgentScope()` … `ProvideProgressiveContextPrompt()`), enumerating the tool set (`ProvideTools()` / `CreateAllTools()`), and attaching subsystems (MCP / Skills / Sub-agents) are all offline. **Only actually running a conversation** — calling `agent.RunAsync(...)` — reaches the model. The Run Declaration on the verification page states honestly which of the two was done.
+
+**Expected result:** you have a `.NET 10` host project, an `IChatClient`, a live workflow tree, and (optionally) Node or Python on `PATH` for local MCP servers.
 
 ## Run declaration
 
-- ⚠️ Statically verified only — no compilation or execution was run while writing this page. Prerequisite claims come from the project files (`VeloxDev.Core.Extension.csproj`, `Examples/Workflow/Common/Lib/Lib.csproj`) and the demo source.
+- ⚠️ Not actually run — statically verified only. The target framework and package versions above are read from `VeloxDev.Core.Extension.csproj` and `VeloxDev.Core.Extension.Test.csproj`; no host project was built from this page.

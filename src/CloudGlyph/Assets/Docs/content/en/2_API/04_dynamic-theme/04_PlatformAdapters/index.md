@@ -19,7 +19,7 @@ ThemeManager.SetPlatformInterpolator(new Interpolator());
 
 | Adapter | Registered property types |
 |---|---|
-| WPF (`VeloxDev.WPF`) | `Brush`, `Thickness`, `Point`, `CornerRadius`, `Transform`, `Size`, `Rect`, `Vector`, `Color`, `DropShadowEffect`, `Point3D`, `Vector3D` |
+| WPF (`VeloxDev.WPF`) | `Brush`, `Thickness`, `Point`, `CornerRadius`, `Transform`, `Size`, `Rect`, `Vector`, `Color`, `Effect` (abstract base, sampled by `DropShadowEffectSampler`), `Point3D`, `Vector3D` |
 | Avalonia (`VeloxDev.Avalonia`) | `IBrush`, `ITransform`, `Thickness`, `Point`, `CornerRadius`, `Size`, `PixelPoint`, `PixelSize`, `PixelRect`, `RelativePoint`, `RelativeRect`, `Color`, `BoxShadows`, `GridLength` |
 
 #### Interpolator.CreateScheduler

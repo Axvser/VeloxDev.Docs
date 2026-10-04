@@ -124,4 +124,4 @@ Notes on what is real:
 
 **Expected result:** the project compiles. Each node exposes generated `InputSlot` / `OutputSlot` (registered into its `Slots` collection) and `GetHelper()` returning its typed helper; the compile step later fills each node's `CompileContext`.
 
-Go to [Build the graph](../03_build-a-graph/index.md).
+Go to `Build the graph`.

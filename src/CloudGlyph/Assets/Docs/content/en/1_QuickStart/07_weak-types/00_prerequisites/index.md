@@ -32,7 +32,7 @@ None. The types are plain .NET collections inside `VeloxDev.Core`; they need no 
 
 ## 5. Where the behavioural evidence lives
 
-There is **no dedicated GUI demo** for the weak types (the `Examples/` tree has demos only for Workflow, MVVM, Theme, Transition, AOP and MonoBehaviour). The authoritative behavioural evidence is the MSTest suite under `Src/Core/VeloxDev.Core.Test/WeakTypes/`:
+There is **no dedicated GUI demo** for the weak types (the `Examples/` tree has demos only for Workflow, MVVM, Theme, Transition, AOP and Tickable). The authoritative behavioural evidence is the MSTest suite under `Src/Core/VeloxDev.Core.Test/WeakTypes/`:
 
 - `WeakDelegateTests.cs` — subscribe/invoke, remove, clone, the combined-delegate cache and null-handler tolerance.
 - `WeakQueueTests.cs` — FIFO order, peek-without-remove, `Clear`, `EnqueueRange`, null guards, enumeration and `TrimExcess`.

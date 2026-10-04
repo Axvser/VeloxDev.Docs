@@ -15,6 +15,7 @@ behaviors:WorkflowSurfaceBehavior.CanvasName="PART_Canvas"
 behaviors:WorkflowSurfaceBehavior.GridDecoratorName="PART_GridDecorator"
 behaviors:WorkflowSurfaceBehavior.PointerPressSourceName="PART_SurfaceBorder"
 behaviors:WorkflowSurfaceBehavior.MinimapOverlayName="PART_MinimapOverlay"
+behaviors:WorkflowSurfaceBehavior.LinkMenuKey="LinkContextMenu"
 ```
 
 Supply a workflow tree as the `DataContext` — an instance of an `IWorkflowTreeViewModel` produced by the `[WorkflowBuilder.Tree]` source generator (see the workflow-system Quick Start for building the tree):
@@ -129,3 +130,21 @@ ThemeManager.Transition<Light>(TransitionEffects.Theme);
 ```
 
 **Expected result:** theme switches animate through the platform interpolator on the correct UI thread. The per-platform marshaling is: WPF via `Application.Current.Dispatcher` / the target `DispatcherObject`'s `Dispatcher`; Avalonia via `Dispatcher.UIThread`; WinUI via `DispatcherQueue` (captured on the UI thread, or taken from the target `DependencyObject`); MAUI via `Application.Current.Dispatcher`; WinForms/Razor via the captured `SynchronizationContext` (WinForms also prefers `Control.Invoke` / `BeginInvoke`); Jalium via `Dispatcher.MainDispatcher` / `Application.Current.Dispatcher`. WPF and Avalonia are exercised by the Transition/Theme demos; the remaining adapters' wiring is `*inferred*` from source.
+
+## 7. Link context menu
+
+The generated `WorkflowView` declares a right-press menu for links and points the surface behavior at it by resource key:
+
+```xml
+behaviors:WorkflowSurfaceBehavior.LinkMenuKey="LinkContextMenu"
+
+<!-- ... -->
+
+<ContextMenu x:Key="LinkContextMenu">
+    <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />
+</ContextMenu>
+```
+
+The behavior resolves the resource, subscribes to Core's `LinkInteraction` hub, positions the popup at the press, sets the menu's own context to the link under it, and reports open/close back to the hub (which suspends hover while a menu is open). Entries therefore bind straight to that link — `{Binding DeleteCommand}` above is a new action, added or removed inside the template alone. On WinForms and Jalium the same menu is built in `WorkflowTreeView.OnBuildLinkMenu(menu, link)` instead (the base adds "Delete"), and on Razor the tree view passes a `<LinkMenu Context="link"> … </LinkMenu>` fragment.
+
+**Expected result:** right-pressing a link opens the menu and "Delete" removes that link. While the menu is open the link stays selected even though the pointer is over the menu; if the link leaves the tree while its menu is open, the hub raises `ContextMenuDismissRequested` and the host dismisses the menu.

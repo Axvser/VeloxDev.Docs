@@ -49,4 +49,4 @@ deactivate Tool
 - 引擎拥有下游派发，因此编译步节点不会自动广播；分支选择在运行时经编译期路由器完成，结果与 GUI 运行同一张图一致。
 - `GetNodeResult` 是孪生的 *Terminal* 入口，从其祖先锥计算单节点结果——参见 [Terminal 结果](../04_Terminal结果执行/index.md)。
 
-> 源码：`WorkflowAgentToolkit.cs`，`RunCompiledWorkflow` 第 1789-1794 行及共享 `RunCompiledRoleAsync` 第 1804-1861 行；`WorkflowLifecycleFidelityTests` 覆盖门控与 terminal 运行契约。
+> 源码：`WorkflowAgentToolkit.cs`，`RunCompiledWorkflow` 第 2184-2188 行及共享 `RunCompiledRoleAsync` 第 2338-2401 行；`WorkflowLifecycleFidelityTests` 覆盖门控与 terminal 运行契约。

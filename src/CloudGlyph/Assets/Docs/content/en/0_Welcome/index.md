@@ -189,7 +189,7 @@
       <a class="feat-link" href="../1_QuickStart/05_aop/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌀</span> AOP<br><span style="opacity: 0.6;">Aspect proxies · Start/Coverage/End</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.3s;">
-      <a class="feat-link" href="../1_QuickStart/06_monobehaviour/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">⚙️</span> MonoBehaviour<br><span style="opacity: 0.6;">Frame-driven loop · Tick-based</span></a>
+      <a class="feat-link" href="../1_QuickStart/06_tickable/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">⚙️</span> Tickable<br><span style="opacity: 0.6;">Frame-driven loop · Tick-based</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.35s;">
       <a class="feat-link" href="../1_QuickStart/07_weak-types/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📎</span> Weak References<br><span style="opacity: 0.6;">WeakDelegate · WeakQueue · WeakStack · WeakCache</span></a>

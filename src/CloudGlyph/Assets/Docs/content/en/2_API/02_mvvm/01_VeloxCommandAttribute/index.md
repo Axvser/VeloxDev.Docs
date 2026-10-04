@@ -2,6 +2,8 @@
 
 `VeloxDev.MVVM.VeloxCommandAttribute` (`Src/Core/VeloxDev.Core/MVVM/VeloxCommandAttribute.cs`) marks a method; the Command source generator exposes it as a lazily-created `IVeloxCommand` property on the containing class.
 
+## Class: `VeloxCommandAttribute`
+
 **Signature**
 
 ```csharp
@@ -17,43 +19,65 @@ public sealed class VeloxCommandAttribute(
 }
 ```
 
-| Parameter | Meaning |
-|---|---|
-| `name` | Command property name. `"Auto"` (default) derives it from the method name with every `Async` substring removed, then appends `Command` — `Plus` → `PlusCommand`, `SaveAsync` → `SaveCommand`. |
-| `canValidate` | When `true`, the generator emits `private partial bool CanExecute{Name}Command(object? parameter)`, which the class must implement. |
-| `semaphore` | Maximum concurrent executions (effective value `Math.Max(1, semaphore)`); default `1` = serial execution with queueing. |
+- **Base type:** `System.Attribute`. `sealed`.
+- **Targets:** `Method` only. `AllowMultiple = false`, `Inherited = false`.
+- **Constructors:** the primary one; all three parameters are optional.
+
+##### Properties
+
+| Name | Type | Description |
+|---|---|---|
+| `Name` | `string` | Command-property name. `"Auto"` (default) derives it from the method name. |
+| `CanValidate` | `bool` | Whether executable validation is enabled for this command. Default `false`. |
+| `Semaphore` | `int` | Maximum concurrent executions. Default `1`. |
+| `AttributeUsage` | — | `AttributeTargets.Method`, `AllowMultiple = false`, `Inherited = false`. |
+
+## Parameter semantics
+
+| Parameter | Type | Description |
+|---|---|---|
+| `name` | `string` | The command property name. `"Auto"` derives it from the method name with **every** `Async` substring removed and `Command` appended: `Plus` → `PlusCommand`, `SaveAsync` → `SaveCommand`, `SumToAsync` → `SumToCommand`. Any other value is used verbatim (`name: "Add"` → `AddCommand`). |
+| `canValidate` | `bool` | When `true`, the generator emits the property with `canExecute: CanExecute{Name}Command` and declares `private partial bool CanExecute{Name}Command(object? parameter)`, which the class must implement. When `false`, the emitted predicate is `_ => true`. |
+| `semaphore` | `int` | Concurrency capacity. The writer stores `Math.Max(1, semaphore)` in the generated `VeloxCommand`, so the generated command's capacity is never below 1. Passing such a value to the `VeloxCommand` constructor directly *does* throw `ArgumentOutOfRangeException`. |
 
 ## Accepted method signatures
 
-From the attribute XML documentation, the annotated method must match one of these shapes (return `Task` or `void`):
+The annotated method's return type must be `Task`, `Task<T>`, `ValueTask`, `ValueTask<T>` or `void`, and its leading parameters may be zero or one, optionally followed by a trailing `CancellationToken`.
 
-- `Task M(object? parameter, CancellationToken ct)`
-- `Task M(object? parameter)`
-- `Task M(CancellationToken ct)`
-- `Task M()`
-- `void M(object? parameter)`
-- `void M()`
-
-## Factory selection (`CommandWriter.ParseConstructorType`)
-
-| Signature | Selected constructor / factory |
+| Signature | Emitted construction |
 |---|---|
-| `Task M(object?, CancellationToken)` | primary constructor — delegate `Func<object?, CancellationToken, Task>` |
-| `Task M(object?)` | `VeloxCommand.CreateTaskOnlyWithParameter` — delegate `Func<object?, Task>` |
-| `Task M(CancellationToken)` | `VeloxCommand.CreateTaskOnlyWithCancellationToken` — delegate `Func<CancellationToken, Task>` |
-| `Task M()` | `Func<Task>` constructor |
-| `void M(object?)` | `Action<object?>` constructor |
-| `void M()` | `Action` constructor |
+| `Task M()` | `VeloxCommand(Func<Task>)` |
+| `Task M(object? parameter)` | `VeloxCommand.CreateTaskOnlyWithParameter` |
+| `Task M(CancellationToken ct)` | `VeloxCommand.CreateTaskOnlyWithCancellationToken` |
+| `Task M(object? parameter, CancellationToken ct)` | primary constructor |
+| `Task<T> M(...)` | as the matching `Task M(...)` row (the result is discarded) |
+| `void M()` / `void M(object? parameter)` | `VeloxCommand(Action)` / `VeloxCommand(Action<object?>)` |
+| `ValueTask M()` | `() => M().AsTask()` thunk → `Func<Task>` |
+| `ValueTask M(CancellationToken ct)` | `ct => M(ct).AsTask()` thunk → `CreateTaskOnlyWithCancellationToken` |
+| `ValueTask<T> M(...)` | as the matching `ValueTask M(...)` row |
+| `Task M(T value)` / `ValueTask M(T value)` / `void M(T value)` | cast thunk `parameter => M((T)parameter!)` (plus `.AsTask()` for `ValueTask`) |
 
-The generator selects only the factory; which `VeloxCommand` constructor the remaining method groups bind to is resolved by C# overload resolution. See [VeloxCommand](../03_VeloxCommand/index.md) for the full constructor/factory list.
+### Rejected signatures — `VELOXCMD001`
 
-## `canValidate` naming contract (Demo-verified)
+| Signature | Diagnostic message fragment |
+|---|---|
+| `void M(CancellationToken ct)` | `void` — nothing a synchronous body could observe |
+| generic method `M<T>(...)` | `generic` |
+| more than one leading parameter | `more than one parameter` |
+| a return type outside the accepted set | `it returns '…'` |
 
-For `canValidate: true`, the emitted property uses the generated `partial` method as its `canExecute` predicate, so the class must implement `private partial bool CanExecute{Name}Command(object? parameter)`. Call `{Name}Command.Notify()` whenever the predicate result may change so `CanExecuteChanged` is raised.
-
-`Examples/MVVM/WPF/Demo/MainWindowViewModel.cs`, lines 70-81:
+## Example
 
 ```csharp
+// Source: Demo — Examples/MVVM/WPF/Demo/MainWindowViewModel.cs, lines 60-81
+[VeloxCommand(name: "Auto", canValidate: false, semaphore: 1)]
+private Task Plus(object? sender, CancellationToken ct)
+{
+    Index++;
+    Greeting = $"current index: {Index}";
+    return Task.CompletedTask;
+}
+
 [VeloxCommand(canValidate: true)]
 private Task Minus(object? sender, CancellationToken ct)
 {
@@ -61,15 +85,18 @@ private Task Minus(object? sender, CancellationToken ct)
     Greeting = $"current index: {Index}";
     return Task.CompletedTask;
 }
-/* This partial method must be implemented at this point */
+
 private partial bool CanExecuteMinusCommand(object? parameter)
 {
     return _index > 0;
 }
 ```
 
-The derived property name is `MinusCommand` (method name `Minus`, no `Async` suffix to strip). For `canValidate: false` the emitted `canExecute` predicate is `_ => true`.
+`PlusCommand` is built with `canExecute: _ => true`; `MinusCommand` with `canExecute: CanExecuteMinusCommand`. Both are lazy — the command object does not exist until something reads the property.
 
-## Lifecycle semantics
+**Notes:**
 
-Each generated command queues excess executions once the `semaphore` capacity is reached and raises the `IVeloxCommand` lifecycle events (`Created`, `Enqueued`, `Dequeued`, `Started`, `Completed`, `Failed`, `Canceled`, `Exited`) — see [IVeloxCommand](../02_IVeloxCommand/index.md). Cancelling the running method is only possible for signatures that receive a `CancellationToken` (`Task M(object?, CancellationToken)` / `Task M(CancellationToken)`); see the cancellation note in [VeloxCommand](../03_VeloxCommand/index.md).
+- The derived property name is `{Name}Command`; `Name` comes from the `name` argument or from the auto rule.
+- Call `{Name}Command.Notify()` after a change that may affect `CanExecute{Name}Command` so `CanExecuteChanged` is raised. The WPF demo does this from `partial void OnIndexChanged(...)`.
+- Only a `CancellationToken` parameter lets the command actually stop the body. The other shapes build a command whose body never receives a token, so an interrupted execution reports `Canceled` while the body runs on to completion.
+- The generated property is typed `IVeloxCommand`, not `VeloxCommand`; the extra capabilities (`ExecuteAndWaitAsync`, `IsBusy`, …) are reached through `VeloxCommandExtensions`.

@@ -1,118 +1,33 @@
-# Workflow System — Verify & Complete Code
+# Workflow System — Complete Code
 
-## 1. Verification against the real repository
+The program below is the whole core flow — build the canvas, compile forward, compile a result, serialize and rebuild — in one `Program.cs`. Everything it uses is defined on an earlier page of this Quick Start; nothing is elided.
 
-- **Compiler / runtime tests** — `Src/Core/VeloxDev.Core.Test/WorkflowSystem/CompilerEx/`:
-    `CompileDecompositionTests.cs` (segment shapes), `RuntimeEngineRunTests.cs` (chain data flow, dynamic router, fan-out, `IGroupData` joins, terminal branch, error stop), `RuntimeRedirectTests.cs` (redirect contract), `EntrySemanticsTests.cs` (the three entry points), `CompileToReverseTests.cs` (Terminal / ancestor-cone / no-fabrication rules). Their `ProbeGraph.cs` / `ProbeNodes.cs` show the minimal wiring the compiler and engine actually consume.
-- **Value-type / topology tests** — `Src/Core/VeloxDev.Core.Test/WorkflowSystem/` (`AnchorTests`, `SlotEnumeratorTests`, `WorkflowTreeExTests`, …).
-- **Serialization tests** — `Src/Core/VeloxDev.Core.Extension.Test/Serialization/ComponentModelExTests.cs` and `Src/Core/VeloxDev.Core.Extension.Test/Agent/Workflow/Functions/WorkflowSerializationTests.cs`.
-- **Demo** — the shared, framework-agnostic session builder `Examples/Workflow/Common/Lib/ViewModels/Workflow/WorkflowDemoSession.cs` builds the full voltage-analysis chain (`Controller → Timer → Generate Dataset → [Stats, Dist, Anomaly] → Merge Report (IGroupData) → Enum Selector → [Report High/Low/Zero]`). Per-platform demos (`Examples/Workflow/<WPF|Avalonia|WinUI|MAUI|WinForms|Blazor> Trimmed/Demo`) render it. The Workflow Agent feature (`01_workflow-agent`) and this feature's API/SE pages exercise the same compile & run APIs used here.
+| Identifier | Defined in |
+|---|---|
+| `QuickTree`, `QuickSlot`, `QuickLink` | `Components.cs` — see `02_define-components` |
+| `TickerNode` / `BiasNode` / `PrinterNode` and their helpers | `TickerNode.cs`, `BiasNode.cs`, `PrinterNode.cs` — see `02_define-components` |
+| `FlakyNode` / `FlakyHelper` | see `10_retry-and-compensate` |
+| `BoomNode` / `BoomHelper` | see `10_retry-and-compensate` |
+| `SourceNode`, `LeftNode`, `RightNode`, `BranchClock` | `FanOutNodes.cs` — see `12_parallel-and-outline` |
+| the project file (references, `net10.0`) | see `01_install` |
 
-## 2. Complete code — one self-contained `Program.cs`
+The component and node files are reproduced in full on those pages; each declares one component (or one node plus its helper). Create them in the `WorkflowQuickStart` project alongside `Program.cs`.
 
-The earlier pages defined the components and the build steps as separate files. This page consolidates the `QuickTree` / `QuickSlot` / `QuickLink` components, the `Ticker` / `Bias` / `Printer` nodes with their helpers ([Define the components](../02_define-components/index.md)), and the build/compile/run/serialize flow ([Build the graph](../03_build-a-graph/index.md), [Compile & run forward](../04_compile-and-run/index.md), [Compile a result (Terminal)](../05_terminal-compile/index.md), [Serialize & rebuild](../06_serialization/index.md)) into **one** file. Copy it into a console project that references `VeloxDev.Core` and `VeloxDev.Core.Extension` (see [Install & Create the Project](../01_install/index.md)); every identifier used below is defined in this file.
+`Program.cs`:
 
 ```csharp
+using System.Diagnostics;
 using VeloxDev.Core.WorkflowSystem.CompilerEx;
-using VeloxDev.MVVM;
 using VeloxDev.MVVM.Serialization;
 using VeloxDev.WorkflowSystem;
 
 namespace WorkflowQuickStart
 {
-    [WorkflowBuilder.Tree<TreeHelper>]
-    public partial class QuickTree
-    {
-        public QuickTree() => InitializeWorkflow();
-    }
-
-    [WorkflowBuilder.Slot<SlotHelper>]
-    public partial class QuickSlot
-    {
-        public QuickSlot() => InitializeWorkflow();
-    }
-
-    [WorkflowBuilder.Link<LinkHelper>]
-    public partial class QuickLink
-    {
-        public QuickLink() => InitializeWorkflow();
-
-        [VeloxProperty] private bool usePolyline = true;
-    }
-
-    [WorkflowBuilder.Node<TickerHelper>(workSemaphore: 1)]
-    public partial class TickerNode : ICompileTimeAware
-    {
-        public TickerNode() => InitializeWorkflow();
-
-        [VeloxProperty] public partial QuickSlot InputSlot { get; set; }
-        [VeloxProperty] public partial QuickSlot OutputSlot { get; set; }
-
-        public ICompileContext? CompileContext { get; private set; }
-
-        public void AttachCompileTimeContext(ICompileContext context) => CompileContext = context;
-    }
-
-    public class TickerHelper : NodeHelper<TickerNode>
-    {
-        public override Task<object?> ReceiveAsync(ITaskContext context, CancellationToken ct)
-        {
-            if (Component is null) return Task.FromResult<object?>(null);
-            return Task.FromResult<object?>("tick");
-        }
-    }
-
-    [WorkflowBuilder.Node<BiasHelper>(workSemaphore: 1)]
-    public partial class BiasNode : ICompileTimeAware
-    {
-        public BiasNode() => InitializeWorkflow();
-
-        [VeloxProperty] public partial QuickSlot InputSlot { get; set; }
-        [VeloxProperty] public partial QuickSlot OutputSlot { get; set; }
-
-        public ICompileContext? CompileContext { get; private set; }
-
-        public void AttachCompileTimeContext(ICompileContext context) => CompileContext = context;
-    }
-
-    public class BiasHelper : NodeHelper<BiasNode>
-    {
-        public override Task<object?> ReceiveAsync(ITaskContext context, CancellationToken ct)
-        {
-            if (Component is null) return Task.FromResult<object?>(null);
-            var value = context.Data as string ?? "none";
-            return Task.FromResult<object?>($"{value}->bias");
-        }
-    }
-
-    [WorkflowBuilder.Node<PrinterHelper>(workSemaphore: 1)]
-    public partial class PrinterNode : ICompileTimeAware
-    {
-        public PrinterNode() => InitializeWorkflow();
-
-        [VeloxProperty] public partial QuickSlot InputSlot { get; set; }
-        [VeloxProperty] public partial QuickSlot OutputSlot { get; set; }
-
-        public ICompileContext? CompileContext { get; private set; }
-
-        public void AttachCompileTimeContext(ICompileContext context) => CompileContext = context;
-    }
-
-    public class PrinterHelper : NodeHelper<PrinterNode>
-    {
-        public override Task<object?> ReceiveAsync(ITaskContext context, CancellationToken ct)
-        {
-            if (Component is null) return Task.FromResult<object?>(null);
-            var value = context.Data as string ?? "none";
-            return Task.FromResult<object?>($"{value}->print");
-        }
-    }
-
     internal static class Program
     {
         private static async Task Main()
         {
-            // 1. Build the graph on an editable canvas (tree + nodes + channels + links).
+            // 1. Build the graph on an editable canvas.
             var tree = new QuickTree();
             tree.Layout.OriginSize = new Size(2400, 850);
             var helper = tree.GetHelper();
@@ -133,38 +48,181 @@ namespace WorkflowQuickStart
             Connect(helper, ticker.OutputSlot!, bias.InputSlot!);
             Connect(helper, bias.OutputSlot!, printer.InputSlot!);
 
-            Console.WriteLine($"Nodes={tree.Nodes.Count} Links={tree.Links.Count}");
-            // Nodes=3 Links=2
+            Console.WriteLine($"[1] Nodes={tree.Nodes.Count} Links={tree.Links.Count}");
 
-            // 2. Forward (Root) compile + runtime run: compile everything reachable from Ticker.
+            // 2. Forward (Root) compile + runtime run.
             var compiler = new CompilerViewModel();
             var rootGraph = (await compiler.CompileAsync(
                 ticker, CompileRole.Root, CancellationToken.None))[0];
             var forward = new RuntimeContext();
             await new RuntimeEngine().RunAsync(rootGraph, forward, CancellationToken.None);
-            Console.WriteLine($"root:   {forward.Status}  data={forward.Data}");
-            // root:   Completed  data=tick->bias->print
+            Console.WriteLine($"[2] root: {forward.Status} data={forward.Data} attempt={forward.Attempt} outcome={forward.Outcome}");
+            Console.WriteLine($"[2] orders: {ticker.CompileContext!.Order},{bias.CompileContext!.Order},{printer.CompileContext!.Order}");
+            Console.WriteLine($"[2] entries={rootGraph.Entries.Count} first={rootGraph.Entries[0].GetType().Name}");
+            foreach (var row in CompiledOutline.Of(rootGraph))
+                Console.WriteLine($"[2] outline: {new string(' ', row.Depth * 2)}{row.Kind} | {row.Label}");
 
-            // 3. Terminal (result) compile + runtime run: compile only the ancestor cone of Bias.
+            // 3. Terminal (result) compile + runtime run.
             var resultGraph = (await compiler.CompileAsync(
                 bias, CompileRole.Terminal, CancellationToken.None))[0];
             var result = new RuntimeContext { Target = bias };
             await new RuntimeEngine().RunAsync(resultGraph, result, CancellationToken.None);
-            Console.WriteLine($"result: {result.Status}  data={result.Data}  reached={result.TargetReached}");
-            // result: Completed  data=tick->bias  reached=True
+            Console.WriteLine($"[3] result: {result.Status} data={result.Data} reached={result.TargetReached}");
 
-            // 4. Serialize the whole tree to JSON, then rebuild and re-run the copy.
+            // 4. Serialize the whole tree to JSON, rebuild, re-run.
             var json = tree.Serialize();
             var copy = json.Deserialize<QuickTree>();
-            Console.WriteLine($"copy Nodes={copy.Nodes.Count} Links={copy.Links.Count}");
-
             var tickerCopy = copy.Nodes.OfType<TickerNode>().Single();
             var copyGraphs = await new CompilerViewModel().CompileAsync(
                 tickerCopy, CompileRole.Root, CancellationToken.None);
             var copyCtx = new RuntimeContext();
             await new RuntimeEngine().RunAsync(copyGraphs[0], copyCtx, CancellationToken.None);
-            Console.WriteLine($"copy:   {copyCtx.Status}  data={copyCtx.Data}");
-            // copy:   Completed  data=tick->bias->print
+            Console.WriteLine($"[4] copy: Nodes={copy.Nodes.Count} Links={copy.Links.Count} {copyCtx.Status} data={copyCtx.Data}");
+
+            // 5. Execution gate: hold the run, then let it go.
+            var gate = new ManualExecutionGate();
+            gate.Pause();
+            var gated = new RuntimeContext { ExecutionGate = gate };
+            var gatedRun = new RuntimeEngine().RunAsync(rootGraph, gated, CancellationToken.None);
+            await Task.Delay(80);
+            Console.WriteLine($"[5] paused: status={gated.Status} isPaused={gate.IsPaused} running={gated.IsRunning} data={gated.Data ?? "<null>"}");
+            gate.Resume();
+            await gatedRun;
+            Console.WriteLine($"[5] resumed: status={gated.Status} data={gated.Data} outcome={gated.Outcome}");
+
+            // 6. Observer + error sink on a clean run.
+            var observed = new List<string>();
+            var sink = new List<string>();
+            var observedCtx = new RuntimeContext
+            {
+                Observer = new DelegateExecutionObserver(o =>
+                {
+                    if (o.Kind is ExecutionObservationKind.NodeStarted or ExecutionObservationKind.NodeSucceeded)
+                        observed.Add($"{o.Kind}:{o.Node?.GetType().Name}");
+                }),
+                ErrorSink = new DelegateExecutionErrorSink(e => sink.Add($"{e.Phase}:{e.Message}")),
+            };
+            await new RuntimeEngine().RunAsync(rootGraph, observedCtx, CancellationToken.None);
+            Console.WriteLine($"[6] observed: {string.Join(", ", observed)}");
+            Console.WriteLine($"[6] sink on a clean run: {sink.Count} records");
+
+            // 7. Checkpoint: stop after the first node, then resume from the saved place.
+            var store = new InMemoryCheckpointStore();
+            var cts = new CancellationTokenSource();
+            var partial = new RuntimeContext
+            {
+                CheckpointStore = store,
+                Observer = new DelegateExecutionObserver(o =>
+                {
+                    if (o.Kind == ExecutionObservationKind.NodeSucceeded) cts.Cancel();
+                }),
+            };
+            try
+            {
+                await new RuntimeEngine().RunAsync(rootGraph, partial, cts.Token, null);
+            }
+            catch (OperationCanceledException) { }
+            var saved = (await store.LoadAsync(CancellationToken.None))!;
+            Console.WriteLine($"[7] checkpoint: attempt={saved.Attempt} outputs={saved.Outputs.Count} shape=<three RuntimeId GUIDs>");
+
+            var resumed = new RuntimeContext();
+            await new RuntimeEngine().RunAsync(rootGraph, resumed, CancellationToken.None, saved);
+            Console.WriteLine($"[7] resume: status={resumed.Status} data={resumed.Data} outcome={resumed.Outcome}");
+
+            var refused = new RuntimeContext();
+            try
+            {
+                await new RuntimeEngine().RunAsync(copyGraphs[0], refused, CancellationToken.None, saved);
+                Console.WriteLine("[7] refused: NO (unexpected)");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Console.WriteLine($"[7] refused on a serialized copy: {ex.Message.Split(':')[0]} status={refused.Status}");
+            }
+
+            // 8. Retry policy on a flaky node.
+            var flakyTree = new QuickTree();
+            var flaky = new FlakyNode { Anchor = new Anchor(0, 0, 0) };
+            flakyTree.GetHelper().CreateNode(flaky);
+            var retryGraph = (await compiler.CompileAsync(
+                flaky, CompileRole.Root, CancellationToken.None))[0];
+            var retryCtx = new RuntimeContext
+            {
+                RetryPolicy = new ExponentialBackoffRetry(maxAttempts: 3, baseDelayMs: 1),
+            };
+            await new RuntimeEngine().RunAsync(retryGraph, retryCtx, CancellationToken.None);
+            Console.WriteLine($"[8] retry: status={retryCtx.Status} data={retryCtx.Data} drives={FlakyHelper.Attempts} attempt={retryCtx.Attempt}");
+            Console.WriteLine($"[8] retry logs: {string.Join(" | ", retryCtx.Logs)}");
+
+            // 9. Log writer + bounded log retention.
+            var logPath = Path.Combine(Path.GetTempPath(), "veloxqs-run.log");
+            if (File.Exists(logPath)) File.Delete(logPath);
+            RuntimeContext capped;
+            using (var writer = TextWriterLogWriter.For(logPath))
+            {
+                capped = new RuntimeContext { LogWriter = writer, MaxRetainedLogs = 2 };
+                await new RuntimeEngine().RunAsync(rootGraph, capped, CancellationToken.None);
+            }
+            var fileLines = File.ReadAllLines(logPath);
+            Console.WriteLine($"[9] logfile: fileLines={fileLines.Length} retained={capped.Logs.Count} snapshot={capped.SnapshotLogs().Length}");
+            Console.WriteLine($"[9] retained: {string.Join(" | ", capped.SnapshotLogs())}");
+            Console.WriteLine($"[9] file head: {fileLines[0]}");
+
+            // 10. Compensation on a failing run.
+            var boomTree = new QuickTree();
+            var boom = new BoomNode { Anchor = new Anchor(0, 0, 0) };
+            boomTree.GetHelper().CreateNode(boom);
+            var boomGraph = (await compiler.CompileAsync(
+                boom, CompileRole.Root, CancellationToken.None))[0];
+            var compensated = new List<string>();
+            var boomCtx = new RuntimeContext
+            {
+                Compensation = new DelegateExecutionCompensation(c => compensated.Add(c.Node.GetType().Name)),
+            };
+            try
+            {
+                await new RuntimeEngine().RunAsync(boomGraph, boomCtx, CancellationToken.None);
+            }
+            catch (InvalidOperationException) { }
+            Console.WriteLine($"[10] compensate: status={boomCtx.Status} outcome={boomCtx.Outcome} currentOrder={boomCtx.CurrentOrder} reversed=[{string.Join(", ", compensated)}]");
+
+            // 11. Parallel fan-out: concurrent by default, serialised when MaxParallelBranches = 1.
+            var fanTree = new QuickTree();
+            var fanHelper = fanTree.GetHelper();
+            var source = new SourceNode { Anchor = new Anchor(0, 0, 0) };
+            var left = new LeftNode { Anchor = new Anchor(200, 0, 0) };
+            var right = new RightNode { Anchor = new Anchor(400, 0, 0) };
+            fanHelper.CreateNode(source);
+            fanHelper.CreateNode(left);
+            fanHelper.CreateNode(right);
+            SetChannel(source.OutputSlot, SlotChannel.MultipleTargets);
+            SetChannel(left.InputSlot, SlotChannel.OneSource);
+            SetChannel(right.InputSlot, SlotChannel.OneSource);
+            Connect(fanHelper, source.OutputSlot!, left.InputSlot!);
+            Connect(fanHelper, source.OutputSlot!, right.InputSlot!);
+
+            var fanGraph = (await compiler.CompileAsync(
+                source, CompileRole.Root, CancellationToken.None))[0];
+            Console.WriteLine($"[11] segments: {string.Join(", ", fanGraph.Entries.Select(e => e.GetType().Name))}");
+
+            BranchClock.Starts.Clear(); BranchClock.Ends.Clear();
+            await new RuntimeEngine().RunAsync(fanGraph, new RuntimeContext(), CancellationToken.None);
+            Console.WriteLine($"[11] MaxParallelBranches=null: overlap={Overlap(BranchClock.Starts, BranchClock.Ends)}");
+
+            BranchClock.Starts.Clear(); BranchClock.Ends.Clear();
+            var oneAtATime = new RuntimeContext { MaxParallelBranches = 1 };
+            await new RuntimeEngine().RunAsync(fanGraph, oneAtATime, CancellationToken.None);
+            Console.WriteLine($"[11] MaxParallelBranches=1:    overlap={Overlap(BranchClock.Starts, BranchClock.Ends)}");
+        }
+
+        private static bool Overlap(List<(int Index, int Tick)> starts, List<(int Index, int Tick)> ends)
+        {
+            if (starts.Count < 2 || ends.Count < 2) return false;
+            var s0 = starts.First(s => s.Index == 0).Tick;
+            var s1 = starts.First(s => s.Index == 1).Tick;
+            var e0 = ends.First(e => e.Index == 0).Tick;
+            var e1 = ends.First(e => e.Index == 1).Tick;
+            return s0 < e1 && s1 < e0;
         }
 
         private static void SetChannel(QuickSlot slot, SlotChannel channel)
@@ -179,8 +237,8 @@ namespace WorkflowQuickStart
 }
 ```
 
-**Expected result:** the forward root run reports `data=tick->bias->print` (the whole chain); the terminal result run stops at the target and reports `data=tick->bias reached=True`; the deserialized copy re-runs the same chain. This is the same API surface the tests and the `WorkflowDemoSession` demo exercise.
+**Expected result:** steps 1–4 mirror the earlier pages (`Nodes=3 Links=2`, `Completed data=tick->bias->print`, `reached=True`, the rebuilt copy re-runs the same chain); steps 5–11 exercise the host-capability layer. The full recorded output is on `13_verify-and-run-declaration`.
 
-## 3. Run declaration
+No ellipses, and every identifier above is defined in this file or in one of the component files named in the table at the top. The `namespace WorkflowQuickStart` must match the one the component files use.
 
-- ⚠️ **Not actually built/run during documentation authoring — statically verified only.** Every type, member and signature above was cross-checked against the real sources: component patterns from `Examples/Workflow/Common/Lib/ViewModels/Workflow/` (`WorkflowDemoSession.cs`, `ControllerViewModel.cs`, `TimerNodeViewModel.cs`, `TreeViewModel.cs`, `Helper/TimerHelper.cs`); compile API `CompilerViewModel.CompileAsync(node, CompileRole, ct)` and model types `ChainSegment` / `BranchSegment` / `ParallelSegment` in `Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/`; runtime `RuntimeEngine.RunAsync` + `RuntimeContext` (`Target` / `TargetReached` / `Status` / `Data` / `Attempt`); helpers `NodeHelper<T>` / `IWorkflowNodeViewModelHelper`; serialization `VeloxDev.MVVM.Serialization.ComponentModelEx` in `Src/Core/VeloxDev.Core.Extension/ComponentModelEx.cs`. The sample targets `net10.0` and requires a .NET SDK 9.0+ (C# 13 partial properties). Build it inside a real console project to execute; the test and demo references in section 1 show where each behavior is exercised by the test suite.
+Go to `08_pause-and-resume` for the first capability, or `13_verify-and-run-declaration` for the recorded run.

@@ -1,153 +1,160 @@
-# 工作流代理 — 命名空间：`VeloxDev.AI.Workflow`
+# 工作流代理 —— 命名空间：`VeloxDev.AI.Workflow`
 
-Agent 作用域核心类型。宿主在一块活跃的 `IWorkflowTreeViewModel` 上构造 `WorkflowAgentScope`、以流式方式配置，并把产出的工具/上下文交给 AI 聊天客户端。以下类型均位于 `VeloxDev.AI.Workflow`，实现在 `Src/Core/VeloxDev.Core.Extension/Agent/Workflow/`（scope/tracker）与 `Agent/Workflow/AgentContextCollector.cs`。
+核心作用域类型：`WorkflowAgentScope`（流式构建器）、`WorkflowStateTracker`（快照/差异）、`WorkflowAgentContextProvider`（每轮渲染）、`AgentContextCollector`（上下文块）。全部位于 `VeloxDev.AI.Workflow`，实现在 `Src/Core/VeloxDev.Core.Extension/Agent/Workflow/`。
 
-**证据：** **测试**（`Src/Core/VeloxDev.Core.Extension.Test/Agent/Workflow/Functions/*`）+ **Demo**（`Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`）。
+**证据：** **Test**（`Src/Core/VeloxDev.Core.Extension.Test/Agent/Workflow/**`）+ **Demo**（`Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`）。
 
-> 入口点是 `AgentEx.AsAgentScope(this IWorkflowTreeViewModel)` 扩展方法——见 [agentex](../04_agentex/index.md)。
+> 入口点是 `AgentEx.AsAgentScope(this IWorkflowTreeViewModel)` —— 见 `agentex` 页。
 
-## WorkflowAgentScope
+## WorkflowAgentScope —— 属性
 
-`public class WorkflowAgentScope(IWorkflowTreeViewModel tree) : IAgentToolCallNotifier`。经由 `tree.AsAgentScope()` 获得。绑定一棵树，保存配置状态，暴露上下文提示词与工具产出，并在每次工具调用后触发 `ToolCalled` 通知。未密封——可直接使用或作为基类。
-
-| 成员 | 类型 / 签名 | 说明 |
-|---|---|---|
-| `Tree` | `IWorkflowTreeViewModel { get; }` | 被作用域绑定、所有工具操作的那棵树。 |
-| `MaxToolCalls` | `int? { get; private set; }` | 累计工具调用上限；`null` = 不限制。 |
-| `AutoMarkDirty` | `bool { get; private set; }` | 为 `true` 时，每次非查询工具调用都会自动把树标脏。 |
-| `ToolCalled` | `event EventHandler<AgentToolCallEventArgs>?` | `IAgentToolCallNotifier`——每次工具调用后触发（同时喂给 `WithToolCallCallback`）。 |
-
-**流式配置——以下方法均返回同一作用域以便链式调用。** 典型链（Demo `AgentHelper.ProvideAgent`，第 155–206 行）：
-
-```csharp
-var scope = tree.AsAgentScope()
-    .WithPromptLanguage(AgentLanguages.English)
-    .WithOutputLanguage(AgentLanguages.Chinese)
-    .WithAutoDiscovery(assemblyName: "VeloxDev.Core")
-    .WithAutoDiscovery(assemblyName: "Lib")
-    .WithAutoMarkDirty(false)
-    .WithMaxToolCalls(200)
-    .WithAllowNodeExecution(true)
-    .WithSynchronizationContext(SynchronizationContext.Current)
-    .WithToolCallCallback(args => { helper.ToolCalled?.Invoke(); return Task.CompletedTask; })
-    .WithSelectionHandler(args => helper.SelectionHandler is not null ? helper.SelectionHandler(args) : Task.CompletedTask)
-    .WithConfirmationHandler(args => helper.ConfirmationHandler is not null ? helper.ConfirmationHandler(args) : Task.CompletedTask);
-scope.WithInteractionSafety(helper.InteractionSafety);
-scope.WithTools(
-    "Manage MCP servers: ListMcpServers, LoadMcpServers, UnloadMcpServer, DescribeMcpServer.",
-    [.. new McpAgentToolkit(helper.Mcp, helper.McpServers).CreateTools()]);
-var contextPrompt = scope.ProvideProgressiveContextPrompt();
-helper.SetBaseTools(scope.ProvideTools());
-```
-
-### 语言与预算
-
-| 成员 | 签名 | 作用 |
-|---|---|---|
-| `WithPromptLanguage` | `WithPromptLanguage(AgentLanguages language)` | 全局默认语言，当单次调用的 `language` 参数为 `null` 时用于提示词/`[AgentContext]` 文档。应在链首调用。 |
-| `WithOutputLanguage` | `WithOutputLanguage(AgentLanguages language)` | 要求 LLM 的所有回复使用的语言（与提示词语言相互独立）。会注入 “Output Language” 指令。 |
-| `WithMaxToolCalls` | `WithMaxToolCalls(int maxCalls)` | 累计工具调用上限。 |
-| `WithMaxReadToolCalls` | `WithMaxReadToolCalls(int maxCalls)` | 只读（query）工具调用的独立上限。 |
-| `WithMaxWriteToolCalls` | `WithMaxWriteToolCalls(int maxCalls)` | 变更（非 query）工具调用的独立上限。 |
-
-### 类型注册与自动发现
-
-| 成员 | 签名 | 作用 |
-|---|---|---|
-| `WithEnums` | `WithEnums(Type[] enums, AgentLanguages? language = null)` | 注册枚举类型以进入客户上下文。 |
-| `WithInterfaces` | `WithInterfaces(Type[] interfaces, AgentLanguages? language = null)` | 注册接口类型。 |
-| `WithComponents` | `WithComponents(Type[] components, AgentLanguages? language = null)` | 注册具体工作流组件类。 |
-| `WithData` | `WithData(Type[] dataTypes, AgentLanguages? language = null)` | 注册值对象/数据类型（以纯数据呈现，而非可交互组件）。 |
-| `WithAutoDiscovery` | `WithAutoDiscovery(Assembly assembly, AgentLanguages? language = null)` | 两遍式程序集扫描（见下）。 |
-| `WithAutoDiscovery` | `WithAutoDiscovery(string assemblyName, AgentLanguages? language = null)` | 以简单程序集名调用；若当前 `AppDomain` 未加载该程序集则抛 `ArgumentException`。 |
-
-**`WithAutoDiscovery` 两遍扫描。** 第一遍注册具体工作流组件（实现 `IWorkflowTreeViewModel` / `IWorkflowNodeViewModel` / `IWorkflowSlotViewModel` / `IWorkflowLinkViewModel` 的类）、带 `[AgentContext]` 的枚举与数据类/结构体。第二遍深度扫描每个已注册组件的公开属性 + 非公开字段（后备字段）+ 方法，按语言推断：`[SlotSelectors]` 与成员类型引用的枚举、作为成员类型的接口、`[AgentCommandParameter]` 参数类型，以及非原始类型的值对象结构体。已注册类型与框架内置类型（命名空间 `System*`、`Microsoft*`、`VeloxDev.WorkflowSystem`、`VeloxDev.MVVM`、`VeloxDev.Core.WorkflowSystem`，以及 `FrameworkEnums`/`FrameworkInterfaces`/`FrameworkComponents`/`FrameworkData`）绝不重复加入。`assembly` 为 null 时抛 `ArgumentNullException`。
-
-### 自定义工具与 UI 封送
-
-| 成员 | 签名 | 作用 |
-|---|---|---|
-| `WithTools` | `WithTools(string? promptContext, params AITool[] tools)` | 注册可变能力的自定义工具（始终包含在 `ProvideTools` 结果中）。可选的 `promptContext` 文本作为 “Custom Tools” 小节注入。 |
-| `WithQueryTools` | `WithQueryTools(string? promptContext, params AITool[] tools)` | 注册只读自定义工具——即使开启 `WithAutoMarkDirty(true)` 也绝不自动标脏。 |
-| `WithAutoMarkDirty` | `WithAutoMarkDirty(bool enabled = false)` | `true` = 每次变更工具调用后由框架标脏。默认 `false`（提示词指导 Agent 在任务结束时调用一次 `MarkDirty`）。 |
-| `WithSynchronizationContext` | `WithSynchronizationContext(SynchronizationContext? context)` | 把每次工具调用封送到给定上下文（如 `SynchronizationContext.Current`）。工作流组件与 UI 绑定，变更必须运行在持有绑定的线程上。 |
-| `WithToolCallCallback` | `WithToolCallCallback(Func<AgentToolCallEventArgs, Task> handler)` | 每次工具调用后调用的异步处理器；会替换先前注册的处理器。 |
-
-注意：`WithTools`/`WithQueryTools` 的 `AIFunction` 工具会被同一套跟踪包装器包裹（UI 封送、调用计数、回调、自动标脏）；非 `AIFunction` 工具（如原始 MCP 客户端工具）原样加入。
-
-### 能力闸门——代码强制执行，而非仅靠提示词
-
-| 成员 | 签名 | 作用 |
-|---|---|---|
-| `WithAllowNodeExecution` | `WithAllowNodeExecution(bool enabled = false)` | 运行任意节点业务代码的 Execution 工具的可选闸门：`ExecuteNode`、`ExecuteNodes`、`BroadcastNode`、`ReverseBroadcastNode`、`RunCompiledWorkflow`、`GetNodeResult`。默认拒绝。 |
-| `WithAllowedGenericCommands` | `WithAllowedGenericCommands(params string[] commandNames)` | 为 `ExecuteCommandOnNode` / `ExecuteCommandById` 白名单化命令名；`"Command"` 后缀可省略。从未调用 → 泛型命令执行完全禁用（安全默认）。 |
-
-### 交互安全与处理器
-
-| 成员 | 签名 | 作用 |
-|---|---|---|
-| `WithInteractionSafety` | `WithInteractionSafety(int level)` | 0 静默、1 谨慎（默认）、2 均衡、3 严格；超出 0–3 的值会被钳制。 |
-| `WithInteractionSafetyPrompt` | `WithInteractionSafetyPrompt(int level, string promptBody)` | 为某挡（1–3）替换 “Interaction Safety Policy” 正文；第 0 挡始终使用内置静默规则、不可覆盖。 |
-| `WithSelectionHandler` | `WithSelectionHandler(Func<AgentSelectionEventArgs, Task> handler)` | 注册 `RequestSelection` 处理器；传 `null` 则移除该工具。处理器必须设置 `SelectedOption`（单选）/ `SelectedOptions`（多选）和/或 `FreeTextResponse`。 |
-| `WithConfirmationHandler` | `WithConfirmationHandler(Func<AgentConfirmationEventArgs, Task> handler)` | 注册 `RequestConfirmation` 处理器；传 `null` 则移除该工具。处理器必须设置 `Result`。 |
-
-**语义。** 第 0 挡不注册任何交互工具、也不发出任何策略。第 1–3 挡发出由内嵌 `Safety/Shared.md` + `Safety/Level{n}.md` 拼装、并可附加宿主覆盖文本的 “Interaction Safety Policy”。`AllowAlways` 批准按 `operationKey` 在会话内记忆（`ResolveConfirmationAsync`）。
-
-### 上下文提示词
-
-| 成员 | 签名 | 作用 |
-|---|---|---|
-| `ProvideAllContexts` | `string ProvideAllContexts()` / `ProvideAllContexts(AgentLanguages)` | 全量上下文：内置参考、框架上下文、框架数据类型、客户上下文、客户数据类型、失败处理协议、自定义工具、交互安全策略、技能、输出语言指令。 |
-| `ProvideProgressiveContextPrompt` | `string ProvideProgressiveContextPrompt()` / `ProvideProgressiveContextPrompt(AgentLanguages)` | 精简的分层式系统提示词（见下）。 |
-| `ProvideFrameworkContext` | `string ProvideFrameworkContext(AgentLanguages = English)` | 内置枚举（`SlotChannel`、`SlotState`、`RouterCompileMode`）、接口与组件的上下文块。 |
-| `ProvideCustomerContext` | `string ProvideCustomerContext(AgentLanguages = English)` | 已注册客户枚举/接口/组件的上下文块。 |
-| `ProvideFrameworkDataContext` | `string ProvideFrameworkDataContext(AgentLanguages = English)` | `Anchor`、`Offset`、`Size`、`IAccessContext`、`ITaskContext`、`TaskContext`、`ICompileContext`、`IRuntimeContext` 的数据类型上下文。 |
-| `ProvideCustomerDataContext` | `string ProvideCustomerDataContext(AgentLanguages = English)` | 已注册客户数据类型的数据类型上下文。 |
-
-**`ProvideProgressiveContextPrompt`** 保持初始提示词精简：关键行为约束、失败处理协议、内置参考、带一行摘要的已注册类型列表、自定义工具、交互安全策略、技能与输出语言指令。完整属性/命令表**故意不预载**——提示词要求 Agent 在对某类型操作前先以完整类型名调用 `GetComponentContext`。
-
-### 工具产出
-
-| 成员 | 签名 | 作用 |
-|---|---|---|
-| `CreateToolkit` | `WorkflowAgentToolkit CreateToolkit()` | 在该作用域上构造一个 `WorkflowAgentToolkit`（每个实例各自持有一个 `WorkflowStateTracker`）。 |
-| `ProvideTools` | `IList<AITool> ProvideTools()` | `CreateToolkit().CreateTools()`——全部工具。 |
-| `ProvideTools` | `IList<AITool> ProvideTools(WorkflowToolCategory categories)` | 仅返回给定类别标志下的工具；经 `WithTools`/`WithQueryTools` 注册的自定义工具始终包含。 |
-
-### `WorkflowAgentScope.SelectionResult`（内嵌）
-
-`public sealed class SelectionResult`——被 `WorkflowAgentToolkit.RequestSelection` 消费的低层结果对象。
+`public class WorkflowAgentScope(IWorkflowTreeViewModel tree) : IAgentToolCallNotifier`。经 `tree.AsAgentScope()` 获取。非 sealed。
 
 | 成员 | 类型 | 说明 |
 |---|---|---|
-| `SelectedOption` | `string?` | 单选：被选中的选项；取消时为 `null`。 |
-| `SelectedOptions` | `IReadOnlyList<string>` | 多选：选中的选项集（无选中则为空）。 |
-| `FreeTextResponse` | `string?` | 自由文本回答；未提供则为 `null`/空。 |
-| `Single(string? option)` | static | 构造单选结果。 |
-| `Multi(IReadOnlyList<string> options, string? freeText = null)` | static | 构造多选结果。 |
-| `FreeText(string text)` | static | 构造仅自由文本的结果。 |
+| `Tree` | `IWorkflowTreeViewModel { get; }` | 每个工具作用的树。 |
+| `MaxToolCalls` | `int? { get; private set; }` | 累计调用上限；`null` = 无限制。 |
+| `AutoMarkDirty` | `bool { get; private set; }` | `true` 时每个非查询调用自动标脏。 |
+| `ToolCalled` | `event EventHandler<AgentToolCallEventArgs>?` | `IAgentToolCallNotifier` —— 每次调用后触发。 |
+| `PromptLanguage` | `AgentLanguages { get; }` | `WithPromptLanguage` 设置的提示语言。 |
+| `Version` | `long { get; }` | 单调配置版本；每次真实变化前进。 |
+| `Changed` | `event EventHandler?` | `Version` 前进时触发。 |
+| `DisabledToolNames` | `IReadOnlyList<string> { get; }` | 已关闭的工具。 |
+| `Skills` | `SkillScope? { get; private set; }` | 已挂载的技能子系统（`WithSkills`）。 |
+| `Mcp` | `McpScope? { get; private set; }` | 已挂载的 MCP 子系统（`WithMcps`）。 |
+| `SubAgents` | `SubAgentScope? { get; private set; }` | 已挂载的子代理子系统（`WithSubAgents`）。 |
+| `Transcript` | `AgentTranscript? { get; }` | 已挂载的对话记录（`WithTranscript`）。 |
+| `Pipeline` | `AgentPipeline { get; }` | 组合出的阶段链。 |
+| `Todo` | `TodoProvider? { get; private set; }` | 框架 todo 提供器（`WithTodoTracking`）。 |
+| `AgentMode` | `AgentModeProvider? { get; private set; }` | 框架模式提供器（`WithAgentModes`）。 |
+| `CheckpointStore` | `IExecutionCheckpointStore? { get; private set; }` | 宿主检查点存储（`WithCheckpointStore`）。 |
+
+## WorkflowAgentScope —— 流式表面
+
+所有 `With*` 都返回同一作用域。按用途分组。
+
+### 语言与预算
+
+| 成员 | 签名 |
+|---|---|
+| `WithPromptLanguage` | `WithPromptLanguage(AgentLanguages language)` |
+| `WithOutputLanguage` | `WithOutputLanguage(AgentLanguages language)` |
+| `WithMaxToolCalls` | `WithMaxToolCalls(int maxCalls)` |
+| `WithMaxReadToolCalls` | `WithMaxReadToolCalls(int maxCalls)` |
+| `WithMaxWriteToolCalls` | `WithMaxWriteToolCalls(int maxCalls)` |
+
+### 类型注册
+
+| 成员 | 签名 |
+|---|---|
+| `WithEnums` / `WithInterfaces` / `WithComponents` / `WithData` | `(Type[] …, AgentLanguages? language = null)` |
+| `WithAutoDiscovery` | `WithAutoDiscovery(Assembly assembly, AgentLanguages? language = null)` |
+| `WithAutoDiscovery` | `WithAutoDiscovery(string assemblyName, AgentLanguages? language = null)` |
+
+### 自定义工具
+
+| 成员 | 签名 |
+|---|---|
+| `WithTools` | `WithTools(string? promptContext, params AITool[] tools)` |
+| `WithQueryTools` | `WithQueryTools(string? promptContext, params AITool[] tools)` |
+
+### 逐工具开关
+
+| 成员 | 签名 | 说明 |
+|---|---|---|
+| `WithToolEnabled` | `WithToolEnabled(string toolName, bool enabled = true)` | 流式；仅在真实移动时提升 `Version`。 |
+| `SetToolEnabled` | `bool SetToolEnabled(string toolName, bool enabled)` | 运行时；返回开关是否移动。 |
+| `IsToolEnabled` | `bool IsToolEnabled(string toolName)` | 读取当前状态。 |
+
+### 能力闸门
+
+| 成员 | 签名 | 说明 |
+|---|---|---|
+| `WithAllowNodeExecution` | `WithAllowNodeExecution(bool enabled = false)` | 运行代码的执行工具的选择性闸门。 |
+| `WithAllowedGenericCommands` | `WithAllowedGenericCommands(params string[] commandNames)` | `ExecuteCommandOnNode` / `ExecuteCommandById` 的白名单。 |
+| `WithAutoMarkDirty` | `WithAutoMarkDirty(bool enabled = false)` | 变更后自动标脏。 |
+
+### 交互与审批
+
+| 成员 | 签名 |
+|---|---|
+| `WithInteractionSafety` | `WithInteractionSafety(int level)` |
+| `WithInteractionSafetyPrompt` | `WithInteractionSafetyPrompt(int level, string promptBody)` |
+| `WithSelectionHandler` | `WithSelectionHandler(Func<AgentSelectionEventArgs, Task> handler)` |
+| `WithConfirmationHandler` | `WithConfirmationHandler(Func<AgentConfirmationEventArgs, Task> handler)` |
+| `WithToolApproval` | `WithToolApproval(bool enabled = true)` |
+
+### 宿主与管线
+
+| 成员 | 签名 | 说明 |
+|---|---|---|
+| `WithSynchronizationContext` | `WithSynchronizationContext(SynchronizationContext? context)` | 编组每次工具调用。 |
+| `WithToolCallCallback` | `WithToolCallCallback(Func<AgentToolCallEventArgs, Task> handler)` | 每次调用后的异步处理器。 |
+| `WithLogWriter` | `WithLogWriter(ILogWriter? writer)` | 路由编译运行的日志行；`LogFilePath` 暴露 `TextWriterLogWriter` 的路径。 |
+| `WithCheckpointStore` | `WithCheckpointStore(IExecutionCheckpointStore? store)` | `ContinueCompiledWorkflow` 的读取来源。 |
+| `WithSessionConfiguration` | `WithSessionConfiguration(Action<RuntimeContext> configure)` | 应用于每次编译运行的 `RuntimeContext`，早于运行工具填补未设之处。 |
+| `WithTranscript` | `WithTranscript(AgentTranscript transcript)` | 挂载对话记录；已挂载时抛 `InvalidOperationException`。 |
+| `WithContextProvider` | `WithContextProvider(Func<WorkflowAgentScope, AIContextProvider> factory)` | 添加宿主提供器工厂。 |
+
+### 子系统与框架脚手架
+
+| 成员 | 签名 |
+|---|---|
+| `WithSkills` | `WithSkills(string rootPath)` / `WithSkills(SkillScope skills)` |
+| `WithMcps` | `WithMcps(McpScope mcp)` |
+| `WithSubAgents` | `WithSubAgents(SubAgentScope subAgents)` |
+| `WithTodoTracking` | `WithTodoTracking(TodoProviderOptions? options = null)` |
+| `WithAgentModes` | `WithAgentModes(AgentModeProviderOptions options)` |
+| `WithContextCompaction` | `WithContextCompaction(int maxContextWindowTokens, int maxOutputTokens)` |
+
+### 提示、工具与提供器
+
+| 成员 | 签名 | 说明 |
+|---|---|---|
+| `ProvideProgressiveContextPrompt` | `string ProvideProgressiveContextPrompt()` / `(AgentLanguages)` | 精简提示。 |
+| `ProvideAllContexts` | `string ProvideAllContexts()` / `(AgentLanguages)` | 完整提示。 |
+| `ProvideFrameworkContext` / `ProvideCustomerContext` | `string …(AgentLanguages = English)` | 上下文块。 |
+| `ProvideFrameworkDataContext` / `ProvideCustomerDataContext` | `string …(AgentLanguages = English)` | 数据块。 |
+| `CreateToolkit` | `WorkflowAgentToolkit CreateToolkit()` | 每个作用域缓存一个实例。 |
+| `ProvideTools` | `IList<AITool> ProvideTools()` / `(WorkflowToolCategory)` | 工具集。 |
+| `CreateContextProvider` | `AIContextProvider CreateContextProvider()` | 单个 `WorkflowAgentContextProvider`。 |
+| `CreateContextProviders` | `IReadOnlyList<AIContextProvider> CreateContextProviders()` | 完整定序列表。 |
+| `CreateSkillToolkit` | `SkillAgentToolkit CreateSkillToolkit()` | 未挂载技能作用域时抛 `InvalidOperationException`。 |
+
+### 嵌套 `SelectionResult`
+
+`public sealed class SelectionResult` —— `RequestSelection` 工具消费的底层结果：`SelectedOption`（`string?`）、`SelectedOptions`（`IReadOnlyList<string>`）、`FreeTextResponse`（`string?`），外加 `static Single(string?)` / `Multi(IReadOnlyList<string>, string? freeText = null)` / `FreeText(string)`。
 
 ## WorkflowStateTracker
 
-`public sealed class WorkflowStateTracker(IWorkflowTreeViewModel tree)`。备忘录式 JSON 快照/差异辅助器，让 Agent 以最小上下文跟踪变化。由工具包自动构造；也可独立使用。
+`public sealed class WorkflowStateTracker(IWorkflowTreeViewModel tree)` —— 备忘式 JSON 快照/差异，让 agent 以最小上下文跟踪变化。由工具包自动构造，也可独立使用。
 
 | 成员 | 签名 | 说明 |
 |---|---|---|
-| `Version` | `long { get; }` | 单调递增的快照版本号。 |
-| `TakeSnapshot` | `string TakeSnapshot()` | 构造状态快照（缩进 JSON：`nodeCount`、`linkCount`、`nodes[]` 含 `index`/`id`/`type`/几何/标量属性/`slotIds`、`links[]`），存为上一次快照并使 `Version` +1。 |
-| `GetChangesSinceLastSnapshot` | `string GetChangesSinceLastSnapshot()` | 无上一快照 → `status = "full"` 返回全量状态。否则返回 `status = "diff"`，含按 `RuntimeId` 键控的 `addedNodes`/`removedNodes`/`modifiedNodes`（属性级 `from`/`to`）、`addedLinks`/`removedLinks`，外加前后节点/连接计数。 |
+| `Version` | `long { get; }` | 单调递增的快照版本。 |
+| `TakeSnapshot` | `string TakeSnapshot()` | 构建快照（缩进 JSON：`nodeCount`、`linkCount`、含 `index`/`id`/`type`/几何/标量属性/`slotIds` 的 `nodes[]`、`links[]`），存为最近快照并递增 `Version`。 |
+| `GetChangesSinceLastSnapshot` | `string GetChangesSinceLastSnapshot()` | 无上一快照 → `status = "full"` 返回全部状态；否则 `status = "diff"`，含按 `RuntimeId` 键控的 `addedNodes`/`removedNodes`/`modifiedNodes`（属性级 `from`/`to`）、`addedLinks`/`removedLinks`，以及前后计数。 |
 
-当某组件未实现 `IWorkflowIdentifiable`（无稳定 `RuntimeId`）时抛 `InvalidOperationException`。属性差异只比较标量（`string`/`int`/`double`/`bool`/`long`/`float`/`decimal`）与枚举类型属性。
+当组件未实现 `IWorkflowIdentifiable`（无稳定 `RuntimeId`）时抛 `InvalidOperationException`。属性差异只比较标量（`string`/`int`/`double`/`bool`/`long`/`float`/`decimal`）与枚举类型属性。
+
+## WorkflowAgentContextProvider
+
+`public sealed class WorkflowAgentContextProvider : AIContextProvider`。**每轮工具与指令的唯一来源。** 以其缓存的渲染按作用域 `ContextKey`（`Version` 加预算用量档）键控；未变化的一轮不加锁、不分配，返回同一个 `AIContext` 实例。其 `StateKeys` 按作用域（同一作用域两个提供器共享键，两个作用域绝不共享）。
+
+```csharp
+public WorkflowAgentContextProvider(WorkflowAgentScope scope)
+public override IReadOnlyList<string> StateKeys { get; }
+protected override ValueTask<AIContext> ProvideAIContextAsync(InvokingContext, CancellationToken)
+```
 
 ## AgentContextCollector
 
-`public static class AgentContextCollector`。生成嵌入提示词的人类可读上下文块。`GetAgentContext` 委托给 Core 的 `AgentContextReader`；上述 `Get*Context` 方法渲染 markdown 块，供框架/客户上下文提供方使用。
+`public static class AgentContextCollector` —— 产出内嵌于提示中的可读上下文块。`GetAgentContext` 委托给 Core 的 `AgentContextReader`；`Get*Context` 方法渲染框架/客户提供器所用的 markdown 块。
 
 | 成员 | 签名 | 说明 |
 |---|---|---|
-| `GetAgentContext` | `string[] GetAgentContext(Type, AgentLanguages)` | 某类型 + 语言的 `[AgentContext]` 值。 |
-| `GetAgentContext` | `string[] GetAgentContext(MemberInfo, AgentLanguages)` | 某成员（字段/属性/方法）+ 语言的 `[AgentContext]` 值。 |
+| `GetAgentContext` | `string[] GetAgentContext(Type, AgentLanguages)` / `(MemberInfo, AgentLanguages)` | 类型 / 成员 + 语言的 `[AgentContext]` 取值。 |
 | `GetEnumContext` | `string GetEnumContext(Type, AgentLanguages)` | 枚举块：底层类型 + 成员取值表。 |
-| `GetInterfaceContext` | `string GetInterfaceContext(Type, AgentLanguages)` | 接口块：基接口、非命令属性、`ICommand` 属性。若 `type` 非接口则抛 `ArgumentException`。 |
+| `GetInterfaceContext` | `string GetInterfaceContext(Type, AgentLanguages)` | 接口块；`type` 非接口时抛 `ArgumentException`。 |
 | `GetClassContext` | `string GetClassContext(Type, AgentLanguages)` | 类块：接口、开发者指令、`[VeloxProperty]`/槽枚举属性（含 `[SlotSelectors]` 允许类型）、`[VeloxCommand]` 命令。 |
-| `GetDataContext` | `string GetDataContext(Type, AgentLanguages)` | 值对象的数据类型块：仅带注解的字段与公开属性（不含命令/槽）。 |
+| `GetDataContext` | `string GetDataContext(Type, AgentLanguages)` | 值对象的数据块。 |

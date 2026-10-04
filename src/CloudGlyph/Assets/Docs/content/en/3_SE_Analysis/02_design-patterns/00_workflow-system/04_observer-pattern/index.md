@@ -40,7 +40,7 @@ private void OnNodesChanged(object? sender, NotifyCollectionChangedEventArgs e)
 
 On the value side, the demo `EnumSelectorNodeViewModel` observes its `SlotEnumerator<SlotViewModel>` and reacts to `SelectorTypeName` / `CurrentValue` property changes, deferring a re-bind of the selected value one frame so the UI's `ItemsSource` swap has generated new item containers first:
 
-> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/EnumSelectorNodeViewModel.cs`, lines 41-61
+> Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/EnumSelectorNodeViewModel.cs`, lines 41-62
 
 ```csharp
 private void OnOutputSlotsPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -61,4 +61,13 @@ private void OnOutputSlotsPropertyChanged(object? sender, PropertyChangedEventAr
 }
 ```
 
-Runtime instrumentation is the same pattern at the command layer: node helpers subscribe to `ReceiveCommand.Started/Exited/...` to track active work.
+Runtime instrumentation is the same pattern at the command layer: `IVeloxCommand` raises the eight `CommandEventType` stages, and a caller that needs to know how one dispatch ended awaits the completion instead of subscribing — `WorkflowAgentToolkit.WaitForCommandAsync` (`Src/Core/VeloxDev.Core.Extension/Agent/Workflow/Functions/WorkflowAgentToolkit.cs` lines 3215-3233) awaits `IVeloxCommandCompletion.ExecuteAndWaitAsync`, which is what lets it observe a call that was refused under lock and would never have raised `Exited`. No production code subscribes to the lifecycle events; only the tests do.
+
+**A third instance, at the run layer (2026-09-27).** `IExecutionObserver` watches the compiled run rather than the tree: the engine calls `OnObservedAsync` with an `ExecutionObservation(kind, node, detail, attempt, elapsed)` at seven points — `RunStarted`, `BranchStarted`, `NodeStarted`, `NodeSucceeded`, `NodeFailed`, `NodeRetried`, `RunEnded`. It is configured as `RuntimeContext.Observer` and, like the other host seams, is `null` by default.
+
+Two differences from the tree-side observers above are worth noting:
+
+- **One shape with a kind, not one method per event.** A new kind therefore does not break an existing observer — the same reasoning the library already applies elsewhere.
+- **A throwing observer changes nothing** (logged as `[Observer]`), which is the opposite of the log writer's contract: losing a log line is losing evidence, so that failure is reported on `RuntimeContext.LogWriteFailed`; losing an observation is not.
+
+The demo folds the whole timeline back into one summary line on `RunEnded` (`Examples/Workflow/Common/Lib/ViewModels/Workflow/WorkflowDemoSession.cs`), because a run drives twenty-odd nodes and one line each would drown the log.

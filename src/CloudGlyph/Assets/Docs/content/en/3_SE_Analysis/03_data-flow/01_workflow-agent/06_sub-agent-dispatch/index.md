@@ -73,7 +73,7 @@ deactivate Tool
 
 note over Model, Pool
   Dispatch and poll, not call and wait: the child may still be on the wire when this reply is rendered.
-end
+end note
 
 == the child's own run ==
 
@@ -117,4 +117,4 @@ Notes:
 - **A refused spawn leaves no row.** The refusal is a JSON object and the model is expected to read `message`; nothing is half-created.
 - **The child's own roster is empty at first** and is populated only if the child dispatches something itself; nothing here makes a sibling's handle reachable.
 
-> Source: `SubAgentScope.cs` (`TrySpawn` 387-606, `RunAsync` 781-806, `Finish` 815-839, `WaitAsync` 891-906); `SubAgentAgentToolkit.cs` (the five tools, 85-229); `WorkflowAgentScope.cs` (`GrantInteractionTo` 283-296, `GrantCustomToolsTo` 251-268, `WithSubAgents` 1659-1673); `ToolCallLedger.cs`. Tests: `SubAgentDispatchTests`, `SubAgentBudgetTests`, `SubAgentHierarchyTests`, `SubAgentCapabilityGrantTests`.
+> Source: `SubAgentScope.cs` (`TrySpawn` 387-606, `RunAsync` 781-806, `Finish` 815-839, `WaitAsync` 891-906); `SubAgentAgentToolkit.cs` (the five tools, 85-229); `WorkflowAgentScope.cs` (`GrantInteractionTo` 283-296, `GrantCustomToolsTo` 251-264, `WithSubAgents` 1788-1804); `ToolCallLedger.cs`. Tests: `SubAgentDispatchTests`, `SubAgentBudgetTests`, `SubAgentHierarchyTests`, `SubAgentCapabilityGrantTests`.
