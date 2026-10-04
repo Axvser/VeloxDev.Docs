@@ -8,7 +8,7 @@ VeloxDev/
 │   ├── Core/
 │   │   ├── VeloxDev.Core/                 ← 核心引擎（多目标框架）
 │   │   │   ├── WorkflowSystem/            ← 工作流编辑器：Templates、StandardEx、CompilerEx、SelectorEx
-│   │   │   ├── TransitionSystem/          ← 动画引擎 + NativeSamplers/
+│   │   │   ├── TransitionSystem/          ← 动画引擎，按职责分：Events/ Effects/ Binding/ Sampling/ State/ Runtime/ Enums/ NativeSamplers/
 │   │   │   ├── DynamicTheme/              ← 主题切换（ThemeManager、ThemeCache）
 │   │   │   ├── MVVM/                      ← VeloxProperty/VeloxCommand 运行时 + IVeloxCommand
 │   │   │   ├── AspectOriented/            ← AOP 代理（#if NET）

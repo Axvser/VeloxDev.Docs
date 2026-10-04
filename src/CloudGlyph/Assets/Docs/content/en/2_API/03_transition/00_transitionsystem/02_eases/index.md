@@ -76,7 +76,7 @@ Each concrete class implements `IEaseCalculator` with a single `double Ease(doub
 `EaseDefault`, `EaseInSine`, `EaseOutSine`, `EaseInOutSine`, `EaseInQuad`, `EaseOutQuad`, `EaseInOutQuad`, `EaseInCubic`, `EaseOutCubic`, `EaseInOutCubic`, `EaseInQuart`, `EaseOutQuart`, `EaseInOutQuart`, `EaseInQuint`, `EaseOutQuint`, `EaseInOutQuint`, `EaseInExpo`, `EaseOutExpo`, `EaseInOutExpo`, `EaseInCirc`, `EaseOutCirc`, `EaseInOutCirc`, `EaseInBack`, `EaseOutBack`, `EaseInOutBack`, `EaseInElastic`, `EaseOutElastic`, `EaseInOutElastic`, `EaseInBounce`, `EaseOutBounce`, `EaseInOutBounce`.
 
 **Notes:**
-- `EaseDefault.Ease(t) => t` (linear). The standard easing formula set (Robert Penner style) is implemented in `Eases.cs` (`Src/Core/VeloxDev.Core/TransitionSystem/Eases.cs`).
+- `EaseDefault.Ease(t) => t` (linear). The standard easing formula set (Robert Penner style) is implemented in `Eases.cs` (`Src/Core/VeloxDev.Core/TransitionSystem/Effects/Eases.cs`).
 - *Verified by:* `EasesTests` (`Default_AtZero_ReturnsZero`, `Default_AtOne_ReturnsOne`, `AllStandardEases_AtBoundaries_ReturnExpected`, `QuadIn_IsTickabletonicallyIncreasing`, `InOutQuad_Symmetry_AtHalf`, `Sine_FactoryProperties_ReturnNonNull` and one such test per factory group), `EaseOvershootTests`.
 
 ### Other Members of `VeloxDev.TransitionSystem`

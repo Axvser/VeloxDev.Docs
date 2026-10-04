@@ -1,6 +1,6 @@
 # 过渡动画 — 抽象层：属性路径
 
-命名空间 `VeloxDev.TransitionSystem.Abstractions`（源：`TransitionSystem/TransitionProperty.cs`、`PathSegment.cs`、`PathIndex.cs`）。一个可动画值如何被寻址、路径如何被用作字典身份，以及拒绝一条永远无法动画的路径的两个守卫。构建器与状态容器见 [builder](../00_构建器/index.md)，引擎见 [engine](../01_引擎/index.md)。
+命名空间 `VeloxDev.TransitionSystem.Abstractions`（源：`TransitionSystem/Binding/TransitionProperty.cs`、`Binding/PathSegment.cs`、`Binding/PathIndex.cs`）。一个可动画值如何被寻址、路径如何被用作字典身份，以及拒绝一条永远无法动画的路径的两个守卫。构建器与状态容器见 [builder](../00_构建器/index.md)，引擎见 [engine](../01_引擎/index.md)。
 
 ### 类：`TransitionProperty : ITransitionProperty, IEquatable<TransitionProperty>`
 

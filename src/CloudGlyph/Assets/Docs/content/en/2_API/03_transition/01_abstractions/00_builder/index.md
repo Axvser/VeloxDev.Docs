@@ -1,6 +1,6 @@
 # Transition — Abstractions: Builder & State
 
-Namespace `VeloxDev.TransitionSystem.Abstractions` in the `VeloxDev.Core` assembly (source: `Src/Core/VeloxDev.Core/TransitionSystem/Transition.cs`, `StateSnapshot.cs`, `State.cs`, `TransitionEx.cs`). These are the fluent builder, the segment-chain root and the declared-state bag. The rest of the namespace is on [engine](../01_engine/index.md) and [paths](../02_paths/index.md).
+Namespace `VeloxDev.TransitionSystem.Abstractions` in the `VeloxDev.Core` assembly (source: `Src/Core/VeloxDev.Core/TransitionSystem/Effects/Transition.cs`, `StateSnapshot.cs`, `State.cs`, `TransitionEx.cs`). These are the fluent builder, the segment-chain root and the declared-state bag. The rest of the namespace is on [engine](../01_engine/index.md) and [paths](../02_paths/index.md).
 
 ### Class: `TransitionCore`
 

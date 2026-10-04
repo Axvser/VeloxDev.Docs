@@ -129,10 +129,10 @@ Two details worth noting. First, `WeakStack.Prune` additionally calls `activeRef
 
 ## 3. Weak-Event usage and the one strong reference
 
-`WeakDelegate` backs the lifecycle events of the transition engine: `TransitionEffectCore` declares each event as a `WeakDelegate<EventHandler<TransitionEventArgs>>` field and routes the C# `event` accessors through it.
+`WeakDelegate` backs the events of the transition engine: `TransitionEffectCore` declares each of the seven lifecycle events as a `WeakDelegate<EventHandler<TransitionEventArgs>>` field, and the two diagnostics as `WeakDelegate<EventHandler<TransitionEventArgs<WarnStage, string>>>` (`Warn`) and `WeakDelegate<EventHandler<TransitionEventArgs<ErrorStage, Exception>>>` (`Error`), routing the C# `event` accessors through them.
 
 ```csharp
-// Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs (lines 60-64)
+// Src/Core/VeloxDev.Core/TransitionSystem/Effects/TransitionEffect.cs (lines 60-64)
 public virtual event EventHandler<TransitionEventArgs> Awaked
 {
     add => _awaked.AddHandler(value);
@@ -140,7 +140,7 @@ public virtual event EventHandler<TransitionEventArgs> Awaked
 }
 ```
 
-Invocation goes through the combined delegate, which `TransitionEffectCore` invokes in a **typed** (reflection-free) way (`Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs`, lines 106-109):
+Invocation goes through the combined delegate, which `TransitionEffectCore` invokes in a **typed** (reflection-free) way (`Src/Core/VeloxDev.Core/TransitionSystem/Effects/TransitionEffect.cs`, lines 106-109):
 
 ```csharp
 public virtual void InvokeAwake(object sender, TransitionEventArgs e)
@@ -157,4 +157,4 @@ The important caveat: `_combinedDelegate` is a **strong** reference. An `AddHand
 | `WeakDelegate` combined cache | A strong cache gives a lock-free read fast lane, but roots subscribed handlers until the next rebuild; `CanUpdateCache: false` opts out per handler for a genuinely weak subscription |
 | `WeakCache` tracking list | `_targets` is only weak and never roots keys, so lookup stays ephemeron-correct while enumeration stays possible |
 
-> Source references: `Src/Core/VeloxDev.Core/WeakTypes/{WeakDelegate,WeakQueue,WeakStack,WeakCache}.cs`; usage in `Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs`; behavior verified by `Src/Core/VeloxDev.Core.Test/WeakTypes/*.cs`.
+> Source references: `Src/Core/VeloxDev.Core/WeakTypes/{WeakDelegate,WeakQueue,WeakStack,WeakCache}.cs`; usage in `Src/Core/VeloxDev.Core/TransitionSystem/Effects/TransitionEffect.cs`; behavior verified by `Src/Core/VeloxDev.Core.Test/WeakTypes/*.cs`.

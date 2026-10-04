@@ -28,7 +28,7 @@ loop each prepared entry
     SET -> SM: InsertFrame(...)
     SM -> SM: throws (e.g. the framework rejects the value)
 end
-SET -> DG: Error("Sampling", exception)
+SET -> DG: Error(ErrorStage.Sampling, exception)
 activate DG
 DG -> DG: first time this stage -> report; subsequent -> false
 DG -> EF: InvokeError(target, args)
@@ -56,12 +56,12 @@ end note
 @enduml
 ```
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/SamplerSet.cs`（`ApplyCore`、`CancelQuietly`）、`TransitionDiagnostics.cs`、`TransitionInterpreter.cs`（`ExecuteSamplingLoopAsync`、`Report`、`ReleaseLoopResources`）。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Sampling/SamplerSet.cs`（`ApplyCore`、`CancelQuietly`）、`TransitionDiagnostics.cs`、`TransitionInterpreter.cs`（`ExecuteSamplingLoopAsync`、`Report`、`ReleaseLoopResources`）。
 
 两个细节值得说清：
 
 - **异常不外传，且 token 被*安静地*取消。** `CancelQuietly` 吞掉 `ObjectDisposedException`，因为动画或适配器可能已经释放了 token 源 —— 没有东西可取消，而那不是新的失败。
-- **`Error` 每个阶段报一次。** `TransitionDiagnostics` 保留一份逐实例的 `HashSet<string> _reported`；已报过的阶段返回 `false`。这就是一个逐帧发生的情况不会产出逐帧日志的原因，也是消息点名的是*阶段*而不是帧的原因。
+- **`Error` 每个阶段报一次。** `TransitionDiagnostics` 保留逐实例的 `HashSet<ErrorStage> _reported` / `HashSet<WarnStage> _warned`；已报过的阶段返回 `false`。这就是一个逐帧发生的情况不会产出逐帧日志的原因，也是报告点名的是*阶段*而不是帧的原因。
 
 ## (b) 一个抛异常的回调，以及入口处被中止的阶段
 
@@ -83,13 +83,13 @@ activate H
 H --> Sch: throws, or returns false (nothing was queued)
 deactivate H
 alt the Awake callback threw
-    Sch -> DG: Error("Awake", exception)
+    Sch -> DG: Error(ErrorStage.Awake, exception)
     note right of Sch
       A host callback that throws ends the animation here
       and leaves the host process untouched.
     end note
 else the dispatch was refused
-    Sch -> DG: Warn("Dropped", "the host's dispatch queue refused the animation's Awake")
+    Sch -> DG: Warn(WarnStage.Dropped, "the host's dispatch queue refused the animation's Awake")
     note right of Sch
       Nothing would be dispatched, frames included, so giving up
       is better than starting a run that cannot draw.
@@ -100,7 +100,7 @@ deactivate Sch
 
 == Run: a callback that throws inside the loop ==
 Sch -> Sch: newInterpreter.Execute(...)
-Sch -> DG: Error("Update" or "LateUpdate" or "Marshaling", exception)
+Sch -> DG: Error(ErrorStage.Update / ErrorStage.LateUpdate / ErrorStage.Marshaling, exception)
 activate DG
 DG -> EF: InvokeError(target, args)
 deactivate DG
@@ -114,7 +114,7 @@ note over Sch, EF
 end note
 
 == Last resort: anything that still escapes ==
-CE -> DG: Error("Run", exception)
+CE -> DG: Error(ErrorStage.Run, exception)
 note right of CE
   CoreExecute is async void, so an escaped exception has no caller
   and would be an unhandled exception in the host process. The catch
@@ -123,22 +123,23 @@ end note
 @enduml
 ```
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/TransitionScheduler.cs`（`ExecuteCore`）、`Transition.cs`（`CoreExecute`）、`TransitionInterpreter.cs`（`Report`、`ReportMarshaling`、`ExecuteSamplingLoopAsync` 的 catch 子句）。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Runtime/TransitionScheduler.cs`（`ExecuteCore`）、`Transition.cs`（`CoreExecute`）、`TransitionInterpreter.cs`（`Report`、`ReportMarshaling`、`ExecuteSamplingLoopAsync` 的 catch 子句）。
 
 ## (c) 运维实际看到的诊断
 
-每次报告都携带 `TransitionEventArgs.Stage`，因此一行日志点名失败阶段而不必重跑任何东西：
+每次报告都是一个带类型的 `TransitionEventArgs<TStage, TValue>`，其 `Stage` 是一个 `ErrorStage` 或 `WarnStage` 取值，因此一行日志点名失败步骤而不必重跑任何东西：
 
 | `Stage` | 以何形式抛出 | 含义 |
 |---|---|---|
-| `Awake` | `Error` | `Awaked` 处理器抛异常；该趟在准备前中止 |
-| `Prepare` | `Error` | 归一化抛异常；该趟中止 |
-| `Update` / `LateUpdate` | `Error` | effect 回调抛异常；该趟结束 |
-| `Marshaling` | `Error` | 宿主的写路径抛异常（`Apply`） |
-| `Sampling` | `Error` | `ISampler.InsertFrame` 抛异常；该趟被安静取消 |
-| `Run` | `Error` | 有东西逃出了循环自己的 catch —— `async void` 的最后兜底 |
-| `Dropped` | `Warn` | 宿主拒绝了一帧，或拒绝了一次 `Awake` 派发 |
-| `Unreadable` | `Warn` | 一条已声明路径不匹配目标运行时类型；被跳过 |
-| `Unsampled` | `Warn` | 一条已声明路径解析不出采样器；被跳过 |
+| `ErrorStage.Awake` | `Error` | `Awaked` 处理器抛异常；该趟在准备前中止 |
+| `ErrorStage.Prepare` | `Error` | 归一化抛异常；该趟中止 |
+| `ErrorStage.Update` / `ErrorStage.LateUpdate` | `Error` | effect 回调抛异常；该趟结束 |
+| `ErrorStage.Marshaling` | `Error` | 宿主的写路径抛异常（`Apply`） |
+| `ErrorStage.Sampling` | `Error` | `ISampler.InsertFrame` 抛异常；该趟被安静取消 |
+| `ErrorStage.Run` | `Error` | 有东西逃出了循环自己的 catch —— `async void` 的最后兜底 |
+| `ErrorStage.Start` / `Completed` / `Canceled` / `Finally` | `Error` | 该生命周期事件的某个订阅者抛异常 |
+| `WarnStage.Dropped` | `Warn` | 宿主拒绝了一帧，或拒绝了一次 `Awake` 派发 |
+| `WarnStage.Unreadable` | `Warn` | 一条已声明路径不匹配目标运行时类型；被跳过 |
+| `WarnStage.Unsampled` | `Warn` | 一条已声明路径解析不出采样器；被跳过 |
 
 `Warn` / `Error` 处理器像生命周期事件一样由 `WeakDelegate` 承载，在其中置 `Handled = true` 即要求终止该趟 —— 这是诊断被允许*改变*行为的唯一位置。没有处理器时报告仍会到 `Debug.WriteLine`，因此在调试器里静默降级的一次运行仍然可见。

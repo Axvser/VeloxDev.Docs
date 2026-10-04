@@ -56,7 +56,7 @@ classDiagram
     UIThreadInspector --|> TransitionHostBase~TPriorityCore~
 ```
 
-> 来源：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionHost.cs`、`Src/Core/VeloxDev.Core/Threading/{IThreadDispatcher,ThreadDispatcherBase,ThreadRef,NonPriority}.cs`、`Src/Core/VeloxDev.Core/Lifetime/IApplicationState.cs`、`Src/Core/VeloxDev.Core/TransitionSystem/TransitionHostBase.cs`、`Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`。
+> 来源：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionHost.cs`、`Src/Core/VeloxDev.Core/Threading/{IThreadDispatcher,ThreadDispatcherBase,ThreadRef,NonPriority}.cs`、`Src/Core/VeloxDev.Core/Lifetime/IApplicationState.cs`、`Src/Core/VeloxDev.Core/TransitionSystem/Runtime/TransitionHostBase.cs`、`Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`。
 
 ### 模式：用组合取代胖接口；用模板方法取代派生
 
@@ -98,4 +98,4 @@ classDiagram
 
 `TimerCore`（注册表）与 `InterpolatorCore`（采样器注册表）被刻意塑造成同一形状：一个私有字典、一个公开的 register/unregister/try-get 三元组、原子的后写胜出，以及调用方永远看不到的键。两者存在都是为了让平台在**契约**之下替换实现，且两者都不外发自己的字典。
 
-来源：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionHost.cs`、`Src/Core/VeloxDev.Core/Threading/*.cs`、`Src/Core/VeloxDev.Core/Lifetime/IApplicationState.cs`、`Src/Core/VeloxDev.Core/TransitionSystem/{TransitionHostBase,FramePacerCore,ReusableTimerWait,TransitionInterpreter,TransitionRun}.cs`、`Src/Core/VeloxDev.Core/Timing/*.cs`、`Src/Core/VeloxDev.Core/Interfaces/Timing/*.cs`、`Src/Adapters/*/PlatformAdapters/{UIThreadInspector,TransitionInterpreter}.cs`。
+来源：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionHost.cs`、`Src/Core/VeloxDev.Core/Threading/*.cs`、`Src/Core/VeloxDev.Core/Lifetime/IApplicationState.cs`、`Src/Core/VeloxDev.Core/TransitionSystem/Runtime/{TransitionHostBase,FramePacerCore,ReusableTimerWait,TransitionInterpreter,TransitionRun}.cs`、`Src/Core/VeloxDev.Core/Timing/*.cs`、`Src/Core/VeloxDev.Core/Interfaces/Timing/*.cs`、`Src/Adapters/*/PlatformAdapters/{UIThreadInspector,TransitionInterpreter}.cs`。

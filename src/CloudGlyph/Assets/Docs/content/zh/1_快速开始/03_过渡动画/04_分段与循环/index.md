@@ -85,7 +85,7 @@ Reset.Effect(TransitionEffects.Empty).Execute(rect);
 
 没有捕获步骤，所以重置列表是源码的一部分，必须与该动画自身声明的目标保持一致。
 
-一个 effect 会触发生命周期事件（都是 `EventHandler<TransitionEventArgs>`，其中 `TransitionEventArgs` 携带 `Handled` —— 置 `true` 可停止当前趟）：
+一个 effect 会触发生命周期事件（都是 `EventHandler<TransitionEventArgs>`；连同其基类 `TimeLineEventArgs`，该实参携带 `Handled` —— 置 `true` 可停止当前趟 —— 以及该帧的 `DeltaTime` / `TotalTime`，而 `Loop` / `Cycle` 说明运行到了哪里）：
 
 - `Awaked` —— 一次，在调度器开始时（值归一化之前）。
 - `Start` —— 每次解释器运行一次，在采样循环开始时。
@@ -106,8 +106,8 @@ effect.Start += (_, _) => Console.WriteLine("start");
 effect.Completed += (_, _) => Console.WriteLine("completed");
 effect.Canceled += (_, _) => Console.WriteLine("canceled");
 effect.Finally += (_, _) => Console.WriteLine("finally");
-effect.Warn += (_, e) => Console.WriteLine($"降级 @{e.Stage}：{e.Message}");   // 某帧被丢弃、某路径被跳过、属性无采样器
-effect.Error += (_, e) => Console.WriteLine($"失败 @{e.Stage}：{e.Exception}");  // 回调 / 采样器 / 宿主抛异常
+effect.Warn += (_, e) => Console.WriteLine($"降级 @{e.Stage}：{e.Value}");   // 某帧被丢弃、某路径被跳过、属性无采样器
+effect.Error += (_, e) => Console.WriteLine($"失败 @{e.Stage}：{e.Value}");  // 回调 / 采样器 / 宿主抛异常
 ```
 
 **预期结果：** 干净的一趟先打印 `start`，随后 `completed` 再 `finally`；打断它则打印 `start`、`canceled`、`finally`；一条声明路径与目标运行时类型不符的运行会打印一行 `degraded @Unreadable` 然后继续。生命周期处理器由 `WeakDelegate` 承载，因此持有 effect 不会泄漏目标。

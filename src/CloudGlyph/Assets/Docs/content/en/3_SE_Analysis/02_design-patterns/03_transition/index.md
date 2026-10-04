@@ -42,6 +42,6 @@ flowchart TD
 | Park/wake (monitor without a monitor) | `ITimeSource.WaitWhileStalledAsync` + `ITimeSourceControl.Wake` | A stalled consumer costs no wake-ups; a seek or a stop still reaches it |
 | Null Object | `ThreadRef.None`, `NonPriority`, a `null` `FramePacerCore` | "No thread", "no priority", "no host pacer" are values, not failures |
 
-Sources: `Src/Core/VeloxDev.Core/TransitionSystem/*.cs`, `Src/Core/VeloxDev.Core/Timing/*.cs`, `Src/Core/VeloxDev.Core/Threading/*.cs`, `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs`, `Src/Core/VeloxDev.Core.Test/TransitionSystem/*.cs`, `Src/Adapters/VeloxDev.{WPF,Avalonia,WinUI,MAUI,WinForms,Razor,Jalium}/PlatformAdapters/*.cs`, `Examples/Transition/WPF/Demo/MainWindow.xaml.cs`, `Examples/Transition/AUTO TEST/**`.
+Sources: `Src/Core/VeloxDev.Core/TransitionSystem/**/*.cs`, `Src/Core/VeloxDev.Core/Timing/*.cs`, `Src/Core/VeloxDev.Core/Threading/*.cs`, `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs`, `Src/Core/VeloxDev.Core.Test/TransitionSystem/*.cs`, `Src/Adapters/VeloxDev.{WPF,Avalonia,WinUI,MAUI,WinForms,Razor,Jalium}/PlatformAdapters/*.cs`, `Examples/Transition/WPF/Demo/MainWindow.xaml.cs`, `Examples/Transition/AUTO TEST/**`.
 
 Related analysis: [Data flow — Transition](../../03_data-flow/03_transition/index.md) · [Complexity — Transition](../../04_complexity/03_transition/index.md)

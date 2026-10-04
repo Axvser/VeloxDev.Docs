@@ -69,7 +69,7 @@ TI -> EF: InvokeFinally(sender, args)
 @enduml
 ```
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/TransitionInterpreter.cs`（`ExecuteSamplingLoopAsync`、`RunPassAsync`、`EmitFrame`、`ArmNextFrame`）、`FramePacerCore.cs`、`ReusableTimerWait.cs`、`TransitionRun.cs`。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Runtime/TransitionInterpreter.cs`（`ExecuteSamplingLoopAsync`、`RunPassAsync`、`EmitFrame`、`ArmNextFrame`）、`FramePacerCore.cs`、`ReusableTimerWait.cs`、`TransitionRun.cs`。
 
 承重的一行是 `Pacer.PassAnchor = Timeline.Ticks`。一趟是绝对时间轴上的一个**锚点**，绝不是重置 —— 因此多个 run 能共享一个源（各自保留自己的趟与位置），而 `Transition.Seek` 不过是写入一个不同的锚点。图里显示的两个后果：一趟恰在一个地方结束（它的远端），因为时间轴只向前走；一趟的最后一帧是**精确**端点（正向 `easedT = 1`、反向 `0`），与 `Ease(1)` 是否恰为 `1` 无关。
 
@@ -122,7 +122,7 @@ end note
 @enduml
 ```
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/{FramePacerCore,ReusableTimerWait,TransitionInterpreter}.cs`、`Src/Adapters/*/PlatformAdapters/TransitionInterpreter.cs`。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Runtime/{FramePacerCore,ReusableTimerWait,TransitionInterpreter}.cs`、`Src/Adapters/*/PlatformAdapters/TransitionInterpreter.cs`。
 
 自定义 awaiter 为何不被编组回来：`FrameWait` 实现 `INotifyCompletion` 且刻意**不**实现 `ICriticalNotifyCompletion`，于是 builder 会把调用方的 `ExecutionContext` 流下去 —— 但恢复 `SynchronizationContext` 是 `Task` 的活，所以自定义 awaiter 的续体在哪个线程上完成等待就在哪个线程上恢复。因此一个在 UI 线程上启动的循环，除非宿主提供了节奏器，会在第一帧之后漂到线程池线程上。这正是节奏接缝存在的全部理由，也是宿主必须从写路径所用的同一答案推出节奏器、否则与 `Post` 不一致的节奏器会把每一帧变成一次派发的原因。
 
@@ -156,7 +156,7 @@ else
           Returns false when nothing was queued at all
           (dispatcher gone, or no queue yet). That is the only
           way a caller can tell a dropped action from a queued one,
-          and it is reported once through Warn("Dropped").
+          and it is reported once through Warn(WarnStage.Dropped).
         end note
     end
     H -> SM: InsertFrame(target, property, ref working, start, end, options, t)
@@ -173,7 +173,7 @@ deactivate SET
 @enduml
 ```
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/SamplerSet.cs`（`Apply`、`ApplyCore`、缓存闭包、`SetRun`）、`Src/Core/VeloxDev.Core/Threading/ThreadDispatcherBase.cs`、`Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Sampling/SamplerSet.cs`（`Apply`、`ApplyCore`、缓存闭包、`SetRun`）、`Src/Core/VeloxDev.Core/Threading/ThreadDispatcherBase.cs`、`Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`。
 
 这条流里有三个避免分配的决定可见：
 

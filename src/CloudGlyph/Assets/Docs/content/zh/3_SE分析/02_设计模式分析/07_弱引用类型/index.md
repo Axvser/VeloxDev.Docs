@@ -129,10 +129,10 @@ private void Prune()
 
 ## 3. 弱事件用法与唯一的强引用
 
-`WeakDelegate` 充当过渡引擎生命周期事件的后备：`TransitionEffectCore` 把每个事件声明为 `WeakDelegate<EventHandler<TransitionEventArgs>>` 字段，并把 C# `event` 访问器转发到它。
+`WeakDelegate` 充当过渡引擎事件的后备：`TransitionEffectCore` 把七个生命周期事件各声明为 `WeakDelegate<EventHandler<TransitionEventArgs>>` 字段，两个诊断事件则声明为 `WeakDelegate<EventHandler<TransitionEventArgs<WarnStage, string>>>`（`Warn`）与 `WeakDelegate<EventHandler<TransitionEventArgs<ErrorStage, Exception>>>`（`Error`），并把 C# `event` 访问器转发到它们。
 
 ```csharp
-// Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs（第 60-64 行）
+// Src/Core/VeloxDev.Core/TransitionSystem/Effects/TransitionEffect.cs（第 60-64 行）
 public virtual event EventHandler<TransitionEventArgs> Awaked
 {
     add => _awaked.AddHandler(value);
@@ -140,7 +140,7 @@ public virtual event EventHandler<TransitionEventArgs> Awaked
 }
 ```
 
-调用经由组合委托进行，`TransitionEffectCore` 以**类型化**（免反射）方式调用它（`Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs`，第 106-109 行）：
+调用经由组合委托进行，`TransitionEffectCore` 以**类型化**（免反射）方式调用它（`Src/Core/VeloxDev.Core/TransitionSystem/Effects/TransitionEffect.cs`，第 106-109 行）：
 
 ```csharp
 public virtual void InvokeAwake(object sender, TransitionEventArgs e)
@@ -157,4 +157,4 @@ public virtual void InvokeAwake(object sender, TransitionEventArgs e)
 | `WeakDelegate` 组合缓存 | 强缓存提供无锁读快车道，但会把已订阅处理器扎根到下次重建；`CanUpdateCache: false` 可逐处理器选择退出以获得真正弱的订阅 |
 | `WeakCache` 追踪列表 | `_targets` 仅弱、绝不扎根键，因此查找保持 ephemeron 正确，同时枚举依然可行 |
 
-> 出处汇总：`Src/Core/VeloxDev.Core/WeakTypes/{WeakDelegate,WeakQueue,WeakStack,WeakCache}.cs`；用法见 `Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs`；行为由 `Src/Core/VeloxDev.Core.Test/WeakTypes/*.cs` 验证。
+> 出处汇总：`Src/Core/VeloxDev.Core/WeakTypes/{WeakDelegate,WeakQueue,WeakStack,WeakCache}.cs`；用法见 `Src/Core/VeloxDev.Core/TransitionSystem/Effects/TransitionEffect.cs`；行为由 `Src/Core/VeloxDev.Core.Test/WeakTypes/*.cs` 验证。

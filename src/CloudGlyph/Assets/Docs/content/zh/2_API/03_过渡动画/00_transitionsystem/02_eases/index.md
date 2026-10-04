@@ -76,7 +76,7 @@ public static class Eases
 `EaseDefault`、`EaseInSine`、`EaseOutSine`、`EaseInOutSine`、`EaseInQuad`、`EaseOutQuad`、`EaseInOutQuad`、`EaseInCubic`、`EaseOutCubic`、`EaseInOutCubic`、`EaseInQuart`、`EaseOutQuart`、`EaseInOutQuart`、`EaseInQuint`、`EaseOutQuint`、`EaseInOutQuint`、`EaseInExpo`、`EaseOutExpo`、`EaseInOutExpo`、`EaseInCirc`、`EaseOutCirc`、`EaseInOutCirc`、`EaseInBack`、`EaseOutBack`、`EaseInOutBack`、`EaseInElastic`、`EaseOutElastic`、`EaseInOutElastic`、`EaseInBounce`、`EaseOutBounce`、`EaseInOutBounce`。
 
 **说明：**
-- `EaseDefault.Ease(t) => t`（线性）。标准缓动公式集（Robert Penner 风格）实现在 `Eases.cs`（`Src/Core/VeloxDev.Core/TransitionSystem/Eases.cs`）。
+- `EaseDefault.Ease(t) => t`（线性）。标准缓动公式集（Robert Penner 风格）实现在 `Eases.cs`（`Src/Core/VeloxDev.Core/TransitionSystem/Effects/Eases.cs`）。
 - *核验：* `EasesTests`（`Default_AtZero_ReturnsZero`、`Default_AtOne_ReturnsOne`、`AllStandardEases_AtBoundaries_ReturnExpected`、`QuadIn_IsTickabletonicallyIncreasing`、`InOutQuad_Symmetry_AtHalf`、`Sine_FactoryProperties_ReturnNonNull` 等每个工厂组一条）、`EaseOvershootTests`。
 
 ### `VeloxDev.TransitionSystem` 的其他成员

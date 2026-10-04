@@ -65,6 +65,8 @@
     "FrameEventArgs",
     "TimeLineEventArgs",
     "TransitionEventArgs",
+    "WarnStage",
+    "ErrorStage",
 
     "Skills",
     "Pipelines",
@@ -103,9 +105,12 @@
     "`VeloxDev.TransitionSystem` namespace / `Transition` class": [
       "TransitionSystem", "Transition"
     ],
-    "`Eases` (Src/Core/VeloxDev.Core/TransitionSystem/Eases.cs)": ["Eases"],
+    "`Eases` (Src/Core/VeloxDev.Core/TransitionSystem/Effects/Eases.cs)": ["Eases"],
     "`VeloxDev.TransitionSystem.NativeSamplers` namespace": ["NativeSamplers"],
     "`Abstractions` sub-namespace of VeloxDev.TransitionSystem": ["Abstractions"],
+    "`TransitionEventArgs` (Src/Core/VeloxDev.Core/TransitionSystem/Events/TransitionEventArgs.cs), `WarnStage` / `ErrorStage` (Src/Core/VeloxDev.Core/TransitionSystem/Enums/)": [
+      "TransitionEventArgs", "WarnStage", "ErrorStage"
+    ],
     "`VeloxDev.TimeLine` namespace": ["TimeLine"],
     "`Src/Core/VeloxDev.Core/DynamicTheme/*.cs`": [
       "ThemeManager", "ThemeCache", "ThemeConfigAttribute"
@@ -118,7 +123,7 @@
       "TickManager", "TickChannelEventArgs"
     ],
     "`Src/Core/VeloxDev.Core/TimeLine/`, `Src/Core/VeloxDev.Core/Interfaces/Tickable/`": [
-      "FrameEventArgs", "TimeLineEventArgs", "TransitionEventArgs"
+      "FrameEventArgs", "TimeLineEventArgs"
     ],
     "`VeloxDev.AI.Skills` / `VeloxDev.AI.Pipelines` / `VeloxDev.AI.Dashboard` namespaces (Src/Core/VeloxDev.Core.Extension/Agent/{Skills,Pipelines,Dashboard}/)": [
       "Skills", "Pipelines", "Dashboard"

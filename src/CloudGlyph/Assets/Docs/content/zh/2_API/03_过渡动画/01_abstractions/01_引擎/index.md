@@ -1,6 +1,6 @@
 # 过渡动画 — 抽象层：引擎
 
-命名空间 `VeloxDev.TransitionSystem.Abstractions`，位于 `VeloxDev.Core` 程序集（源：`TransitionSystem/Interpolator.cs`、`SamplerSet.cs`、`TransitionEffect.cs`、`TransitionScheduler.cs`、`TransitionInterpreter.cs`、`TransitionHostBase.cs`、`TransitionRun.cs`、`TransitionDiagnostics.cs`、`ReusableTimerWait.cs`）。构建器与状态容器见 [builder](../00_构建器/index.md)，属性路径见 [paths](../02_路径/index.md)。
+命名空间 `VeloxDev.TransitionSystem.Abstractions`，位于 `VeloxDev.Core` 程序集（源：`TransitionSystem/Sampling/Interpolator.cs`、`Sampling/SamplerSet.cs`、`Effects/TransitionEffect.cs`、`Runtime/TransitionScheduler.cs`、`Runtime/TransitionInterpreter.cs`、`Runtime/TransitionHostBase.cs`、`Runtime/TransitionRun.cs`、`Runtime/TransitionDiagnostics.cs`、`Runtime/ReusableTimerWait.cs`）。构建器与状态容器见 [builder](../00_构建器/index.md)，属性路径见 [paths](../02_路径/index.md)。
 
 ### 抽象类：`InterpolatorCore`
 
@@ -56,8 +56,8 @@ public sealed class SamplerSet<TPriorityCore>
 | 成员 | 类型 / 签名 |
 |---|---|
 | 属性 | `virtual int FPS`、`virtual TimeSpan Duration`、`virtual bool IsAutoReverse`、`virtual int LoopTime`、`virtual IEaseCalculator Ease`（均为 `{ get; set; }`） |
-| 事件 | `virtual event EventHandler<TransitionEventArgs>` —— `Awaked`、`Start`、`Update`、`LateUpdate`、`Canceled`、`Completed`、`Finally`、`Warn`、`Error` |
-| 触发器 | `virtual void InvokeAwake/InvokeStart/InvokeUpdate/InvokeLateUpdate/InvokeCompleted/InvokeCancled/InvokeFinally/InvokeWarn/InvokeError(object sender, TransitionEventArgs e)` |
+| 事件 | 生命周期七个用 `virtual event EventHandler<TransitionEventArgs>` —— `Awaked`、`Start`、`Update`、`LateUpdate`、`Canceled`、`Completed`、`Finally`；`Warn` 用 `virtual event EventHandler<TransitionEventArgs<WarnStage, string>>`；`Error` 用 `virtual event EventHandler<TransitionEventArgs<ErrorStage, Exception>>` |
+| 触发器 | 生命周期七个用 `virtual void InvokeAwake/InvokeStart/InvokeUpdate/InvokeLateUpdate/InvokeCompleted/InvokeCancled/InvokeFinally(object sender, TransitionEventArgs e)`；`virtual void InvokeWarn(object sender, TransitionEventArgs<WarnStage, string> e)`；`virtual void InvokeError(object sender, TransitionEventArgs<ErrorStage, Exception> e)` |
 | `Clone` | `ITransitionEffectCore Clone()` |
 
 **说明：** 事件由 `WeakDelegate`（`VeloxDev.WeakTypes`）承载，因此短命的事件拥有者不会泄漏；`Clone` 深拷贝事件后备存储并复制所有属性（含 `Warn` / `Error` 与 `Priority`）。`InvokeCancled` 是真实成员名。`InvokeWarn` / `InvokeError` 先写一行 `Debug.WriteLine` 再触发事件，且刻意**不**调 `Debug.Fail` —— 那会在无交互宿主中直接终止进程，而那正是本通道要防的事。裸基类本身实现 `ITransitionEffect<NonPriority>`（其 `NonPriority` 优先级恒为 `default`），因此无优先级的适配器可直接用它；子类 `TransitionEffectCore<TPriorityCore> : TransitionEffectCore, ITransitionEffect<TPriorityCore>` 增加 `virtual TPriorityCore Priority { get; set; }` 与 `new ITransitionEffect<TPriorityCore> Clone()`。*核验：* `TransitionEffectCoreTests`、`TransitionDiagnosticsTests`。
@@ -140,7 +140,7 @@ public abstract class TransitionInterpreterCore : IDisposable
 - `TransitionInterpreterCore<TTransitionEffectCore, TPriorityCore> : TransitionInterpreterCore, ITransitionInterpreter<TPriorityCore>`（约束 `TTransitionEffectCore : ITransitionEffect<TPriorityCore>`）—— 施加 `easedT => frameSet.Apply(target, easedT, effect.Priority)`。
 - `TransitionInterpreterCore<TTransitionEffectCore> : TransitionInterpreterCore, ITransitionInterpreter<NonPriority>`（约束 `TTransitionEffectCore : ITransitionEffectCore`）—— 施加 `easedT => frameSet.Apply(target, easedT)`；无优先级宿主保持在无优先级路径上采样，因此 `NonPriority` 每帧零成本。
 
-**采样循环语义**（`ExecuteSamplingLoopAsync`）：由时间轴驱动的连续采样，不是帧泵。归一化时间是当前趟的锚点与动画 `ITimeSource` 之间的距离 —— `Task.Delay` 绝不是计时来源，其不精确不影响正确性。让出间隔上限为 `1000 / FPS` 毫秒（`FPS` 是最大采样率，不是帧栅格）：这约束分配率，并在系统定时器分辨率很细时阻止循环淹没 UI 渲染线程。每趟算原始时间、缓动它（**不夹取** —— `Back` 与 `Elastic` 靠离开 `[0, 1]` 定义），然后 `InvokeUpdate` → `apply(easedT)` → `InvokeLateUpdate`；每趟最后一帧是**精确端点**（`t >= 1` → 正向缓动 `1` / 反向 `0`），不依赖 `Ease(1)` 是否恰为 `1`。时间轴未推进时，循环先画出冻结位置，再在 `WaitWhileStalledAsync` 上**停摆**，因此暂停或冻结的动画完全不耗定时器唤醒（速率为 0 会冻结时间轴而不暂停它，循环对它也停摆）。`Start` 在循环前触发一次；`IsAutoReverse` 追加一趟反向；`LoopTime` 重复（`int.MaxValue` = 永远），而趟计数器是从 run 读来而不是私有持有的，因此 `Seek` 能移动它。正常完成触发 `Completed`；取消 —— 取消的 `cts` **或** `Args.Handled = true` → `OperationCanceledException` —— 触发 `Canceled`；`Finally` 在每条结束路径上触发，且循环自身的资源（节奏器与复用的等待）在嵌套 `finally` 里释放，使抛异常的回调无法泄漏一个宿主定时器。**异常绝不离开本方法**：回调、采样器或宿主抛出会结束该趟并经 `Error` 报出，然后该趟沿正常取消路径回卷，使 `Canceled` 与 `Finally` 仍然触发。*核验：* `SamplingLoopTests`、`FramePacerTests`、`ReusableTimerWaitTests`、`TransitionDiagnosticsTests`。
+**采样循环语义**（`ExecuteSamplingLoopAsync`）：由时间轴驱动的连续采样，不是帧泵。归一化时间是当前趟的锚点与动画 `ITimeSource` 之间的距离 —— `Task.Delay` 绝不是计时来源，其不精确不影响正确性。让出间隔上限为 `1000 / FPS` 毫秒（`FPS` 是最大采样率，不是帧栅格）：这约束分配率，并在系统定时器分辨率很细时阻止循环淹没 UI 渲染线程。每趟算原始时间、缓动它（**不夹取** —— `Back` 与 `Elastic` 靠离开 `[0, 1]` 定义），然后 `InvokeUpdate` → `apply(easedT)` → `InvokeLateUpdate`；每趟最后一帧是**精确端点**（`t >= 1` → 正向缓动 `1` / 反向 `0`），不依赖 `Ease(1)` 是否恰为 `1`。时间轴未推进时，循环先画出冻结位置，再在 `WaitWhileStalledAsync` 上**停摆**，因此暂停或冻结的动画完全不耗定时器唤醒（速率为 0 会冻结时间轴而不暂停它，循环对它也停摆）。`Start` 在循环前触发一次；`IsAutoReverse` 追加一趟反向；`LoopTime` 重复（`int.MaxValue` = 永远），而趟计数器是从 run 读来而不是私有持有的，因此 `Seek` 能移动它。每帧解释器都会在回调前把本段的趟位（`Loop`）与整趟的计数（`Cycle`）以及该帧的时钟读数（`DeltaTime` / `TotalTime`）盖到共享的 `Args` 上，处理器因此能分辨是第几次重复、这一段已经跑了多久。正常完成触发 `Completed`；取消 —— 取消的 `cts` **或** `Args.Handled = true` → `OperationCanceledException` —— 触发 `Canceled`；`Finally` 在每条结束路径上触发，且循环自身的资源（节奏器与复用的等待）在嵌套 `finally` 里释放，使抛异常的回调无法泄漏一个宿主定时器。**异常绝不离开本方法**：回调、采样器或宿主抛出会结束该趟并经 `Error` 报出，然后该趟沿正常取消路径回卷，使 `Canceled` 与 `Finally` 仍然触发。*核验：* `SamplingLoopTests`、`FramePacerTests`、`ReusableTimerWaitTests`、`TransitionDiagnosticsTests`。
 
 ### 类：`TransitionHostBase<TPriorityCore>`
 
@@ -151,5 +151,5 @@ public abstract class TransitionInterpreterCore : IDisposable
 此处记录，因为其行为可观测，尽管类型是 `internal`：
 
 - **`TransitionRun`** —— 一次运行中的动画：结束它的 token、它锚定的 `ITimeSourceControl`、当前趟开始的时间轴位置（`PassAnchor`）、趟计数器（`Cycle`），以及它把帧投递到的 `ThreadRef`（由调度器一次性钉死，因为写路径跑在采样循环的线程上，而那个线程对一个「答案取决于调用方」的宿主没有答案 —— 例如 Blazor 回路的 renderer）。`PassAnchor` 与 `Cycle` 都是单个 `long` 字段，各由一个原子操作移动。
-- **`TransitionDiagnostics`** —— 报告一趟降级与失败的阶段：一行 `Debug`，以及有人在监听时的 effect 的 `Warn` / `Error` 事件。两个通道都不向调用方抛异常，且每个 `stage` 每个实例**至多报一次**，因为它们大多是逐帧的事实。在实参上置 `Handled` 的处理器即要求终止该趟。
+- **`TransitionDiagnostics`** —— 报告一趟降级与失败的阶段：一行 `Debug`，以及有人在监听时的 effect 的 `Warn` / `Error` 事件。两个通道都不向调用方抛异常，且每个阶段（一个 `WarnStage` 或 `ErrorStage` 取值）每个实例**至多报一次**，因为它们大多是逐帧的事实。它每次上报构造一个带类型的 `TransitionEventArgs<TStage, TValue>`，并先把运行的 `Loop` / `Cycle` 抄上去，处理器因此看到与该帧生命周期处理器一致的位置。在实参上置 `Handled` 的处理器即要求终止该趟。
 - **`ReusableTimerWait`** —— 整条循环一个 `Timer`、每次等待重新武装，且整个循环一次取消登记而不是每次等待一次。`await Task.Delay(interval, token)` 每次等待都建一个全新的 `DelayPromise` 并登记一个全新的取消回调；采样循环每个动画每帧等待一次，所以这曾是这条本来零分配路径上的最后一块分配 —— `ReusableTimerWaitTests` 量出了差别。它最终用的就是 `Task.Delay` 也会用的那个 `Timer`，因此改变的是等待的成本而不是它何时落地。停摆中的等待在释放时是被**放行**而不是被丢弃：丢弃会让循环悬在那里，再没有任何东西能唤醒它。

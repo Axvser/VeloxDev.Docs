@@ -52,13 +52,13 @@ All timing members (`Duration`, `IsAutoReverse`, `LoopTime`, `Ease`, `FPS`) and 
 var effect = new TransitionEffect { Duration = TimeSpan.FromSeconds(1) };
 
 effect.Warn += (_, e) =>
-    Console.WriteLine($"degraded @{e.Stage}: {e.Message}");       // dropped frame, skipped path, unsampled property
+    Console.WriteLine($"degraded @{e.Stage}: {e.Value}");       // dropped frame, skipped path, unsampled property
 
 effect.Error += (_, e) =>
-    Console.WriteLine($"failed @{e.Stage}: {e.Exception}");        // a throwing callback / sampler / host / Prepare
+    Console.WriteLine($"failed @{e.Stage}: {e.Value}");        // a throwing callback / sampler / host / Prepare
 ```
 
-**Notes:** each stage reports at most once per run, so a property that cannot be sampled does not report at frame rate; setting `Handled = true` on either argument asks for the run to be terminated (`TransitionEventArgs` carries `Stage`, `Message` and `Exception` — see [timeline](../../04_timeline/index.md)). A run that reports nothing is the normal case.
+**Notes:** each stage reports at most once per run, so a property that cannot be sampled does not report at frame rate; setting `Handled = true` on either argument asks for the run to be terminated (`Warn` is an `EventHandler<TransitionEventArgs<WarnStage, string>>` and `Error` is an `EventHandler<TransitionEventArgs<ErrorStage, Exception>>`, each carrying `Stage` / `Value` — see [event arguments](../../00_transitionsystem/04_transition-event-args/index.md)). A run that reports nothing is the normal case.
 
 ### Class: `TransitionEffects` — presets
 

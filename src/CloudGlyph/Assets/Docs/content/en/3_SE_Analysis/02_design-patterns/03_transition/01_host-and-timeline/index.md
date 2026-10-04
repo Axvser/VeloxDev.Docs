@@ -56,7 +56,7 @@ classDiagram
     UIThreadInspector --|> TransitionHostBase~TPriorityCore~
 ```
 
-> Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionHost.cs`, `Src/Core/VeloxDev.Core/Threading/{IThreadDispatcher,ThreadDispatcherBase,ThreadRef,NonPriority}.cs`, `Src/Core/VeloxDev.Core/Lifetime/IApplicationState.cs`, `Src/Core/VeloxDev.Core/TransitionSystem/TransitionHostBase.cs`, `Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`.
+> Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionHost.cs`, `Src/Core/VeloxDev.Core/Threading/{IThreadDispatcher,ThreadDispatcherBase,ThreadRef,NonPriority}.cs`, `Src/Core/VeloxDev.Core/Lifetime/IApplicationState.cs`, `Src/Core/VeloxDev.Core/TransitionSystem/Runtime/TransitionHostBase.cs`, `Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`.
 
 ### Pattern: Composition over a fat interface; Template Method over the derivation
 
@@ -98,4 +98,4 @@ The engine reads time from `ITimeSource`, never from a framework clock, and that
 
 `TimerCore` (the registry) and `InterpolatorCore` (the sampler registry) are deliberately shaped the same way: a private dictionary, a public register/unregister/try-get triple, atomic last-writer-wins, and keys the caller never sees. Both exist so a platform substitutes an implementation **under the contract**, and neither hands out its dictionary.
 
-Sources: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionHost.cs`, `Src/Core/VeloxDev.Core/Threading/*.cs`, `Src/Core/VeloxDev.Core/Lifetime/IApplicationState.cs`, `Src/Core/VeloxDev.Core/TransitionSystem/{TransitionHostBase,FramePacerCore,ReusableTimerWait,TransitionInterpreter,TransitionRun}.cs`, `Src/Core/VeloxDev.Core/Timing/*.cs`, `Src/Core/VeloxDev.Core/Interfaces/Timing/*.cs`, `Src/Adapters/*/PlatformAdapters/{UIThreadInspector,TransitionInterpreter}.cs`.
+Sources: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionHost.cs`, `Src/Core/VeloxDev.Core/Threading/*.cs`, `Src/Core/VeloxDev.Core/Lifetime/IApplicationState.cs`, `Src/Core/VeloxDev.Core/TransitionSystem/Runtime/{TransitionHostBase,FramePacerCore,ReusableTimerWait,TransitionInterpreter,TransitionRun}.cs`, `Src/Core/VeloxDev.Core/Timing/*.cs`, `Src/Core/VeloxDev.Core/Interfaces/Timing/*.cs`, `Src/Adapters/*/PlatformAdapters/{UIThreadInspector,TransitionInterpreter}.cs`.

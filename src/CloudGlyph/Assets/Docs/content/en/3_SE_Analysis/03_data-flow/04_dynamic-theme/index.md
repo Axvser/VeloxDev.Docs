@@ -10,4 +10,4 @@ The Dynamic Theme data flow splits into three phases: registering a theme-aware 
 | [Switching](01_switching/index.md) | `Transition<T>` prepares grouped entries and runs them on one shared `ITimeSourceControl` via `InterpolatorCore.CreateScheduler`; `Jump<T>` applies every end value directly. Guard conditions, degradation and cancellation paths |
 | [Runtime Overrides](02_runtime-overrides/index.md) | `SetThemeValue<T>` / `RestoreThemeValue<T>` and how active (dynamic) values override static ones |
 
-> Key source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`, `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`, `Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`, `Src/Generators/VeloxDev.Core.Generator/Theme.cs`.
+> Key source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`, `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`, `Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`, `Src/Generators/VeloxDev.Core.Generator/Theme.cs`.

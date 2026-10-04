@@ -1,7 +1,7 @@
 # Transition — 缓动曲线图
 
 内置的全部缓动族，均由库自身的 `Ease` 方法绘出。表达式是
-`Src/Core/VeloxDev.Core/TransitionSystem/Eases.cs` 里的代码本身，因此每条曲线画的都是
+`Src/Core/VeloxDev.Core/TransitionSystem/Effects/Eases.cs` 里的代码本身，因此每条曲线画的都是
 引擎真正执行的那次计算，而不是它的近似重绘。
 
 对这份誊写只做一处改写：`Math.Pow(2, u)` 记作 `exp(u*ln2)`。绘图用的区间采样器对

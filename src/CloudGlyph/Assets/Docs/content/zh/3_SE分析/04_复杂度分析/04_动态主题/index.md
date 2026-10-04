@@ -128,6 +128,6 @@ $$
 - `StartModel` 默认为 `Cache`，避免切换开始时逐属性反射；`Reflect` 则以读取实时属性值换取这一点。无论选哪一档，准备好的起点都会在 scheduler 启动前由 `WriteStartValues` 写回目标，因为 `InterpolatorCore.Prepare` 是从目标上读取起点、而不是从条目里取。
 - `TransitionProperty.FromProperty` 的记忆化正是准备阶段可扩展的原因。提交 `58ae23b3 perf(theme): memoize TransitionProperty.FromProperty` 的实测：改动前，一千个双属性元素在首帧之前约有 1.6 s 的 UI 线程停顿与 29 MB 分配；改动后约为 10 ms 与 6 MB。
 - 弱引用设计意味着：一个注册对象若在别处不可达，就会被回收（并在下一次切换时被清理），因此长期运行的编辑器不会累积主题注册。规模 Demo 就依赖这一点：它丢弃一批方块后强制回收一次，使活跃集合恰好是新的一批（`Examples/Theme/WPF/Demo/MainWindow.xaml.cs` 的 `Build`）。
-- 逐帧写入开销很小，因为写入走编译后的 `TransitionProperty` setter，而非逐帧反射（`Src/Core/VeloxDev.Core/TransitionSystem/TransitionProperty.cs`）。
+- 逐帧写入开销很小，因为写入走编译后的 `TransitionProperty` setter，而非逐帧反射（`Src/Core/VeloxDev.Core/TransitionSystem/Binding/TransitionProperty.cs`）。
 
-> 源码引用：`Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`（`Transition`、`Jump`、`RunSwitch`、`PrepareSamplers`、`CancelActiveSwitch`、`ApplyImmediately`、`ApplyHeldValues`）、`Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`、`Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`（`CreateScheduler`、`TryGetInterpolator`）、`Src/Core/VeloxDev.Core/TransitionSystem/TransitionProperty.cs`（`FromProperty`）、`Src/Generators/VeloxDev.Core.Generator/Theme.cs`。
+> 源码引用：`Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`（`Transition`、`Jump`、`RunSwitch`、`PrepareSamplers`、`CancelActiveSwitch`、`ApplyImmediately`、`ApplyHeldValues`）、`Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`、`Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`（`CreateScheduler`、`TryGetInterpolator`）、`Src/Core/VeloxDev.Core/TransitionSystem/Binding/TransitionProperty.cs`（`FromProperty`）、`Src/Generators/VeloxDev.Core.Generator/Theme.cs`。

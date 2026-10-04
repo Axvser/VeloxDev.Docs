@@ -29,7 +29,7 @@ Everything ships in the `VeloxDev.Core` package, and since the rename everything
 
 | Namespace | Hosted public API |
 |---|---|
-| `VeloxDev.TimeLine` | `TickableAttribute`, `TickManager`, `TickChannelEventArgs`, `ITickable`, `TimeLineEventArgs`, `FrameEventArgs`, `TransitionEventArgs` |
+| `VeloxDev.TimeLine` | `TickableAttribute`, `TickManager`, `TickChannelEventArgs`, `ITickable`, `TimeLineEventArgs`, `FrameEventArgs` |
 | `VeloxDev.Timing` | `ITimeSourceControl`, `ITimeSource` — the channel's clock, reached through `TickManager.Bus`. Shared infrastructure, documented with the transition feature |
 
 ## Model
@@ -63,11 +63,12 @@ Evidence: source (`Src/Core/VeloxDev.Core/TimeLine/`, `Src/Core/VeloxDev.Core/In
 |---|---|---|---|
 | `TickableAttribute` | sealed class : `Attribute` | 2 properties, 1 constructor | [TickableAttribute](00_TickableAttribute/index.md) |
 | `TickManager` | static class | 4 events, 2 public properties (`UseAsyncLoop`, `ChannelNames`), 1 public constant (`DEFAULT_CHANNEL`), 27 public static methods — 34 public members in all | [TickManager](01_TickManager/index.md) |
-| `TimeLineEventArgs` | abstract class | 1 property | [TimeLineEventArgs](02_TimeLineEventArgs/index.md) |
-| `FrameEventArgs` | class : `TimeLineEventArgs` | 4 read-only properties | [FrameEventArgs](03_FrameEventArgs/index.md) |
+| `TimeLineEventArgs` | abstract class | 3 properties | [TimeLineEventArgs](02_TimeLineEventArgs/index.md) |
+| `FrameEventArgs` | class : `TimeLineEventArgs` | 2 read-only properties + 3 inherited | [FrameEventArgs](03_FrameEventArgs/index.md) |
 | `TickChannelEventArgs` | sealed class : `EventArgs` | 1 property | [TickChannelEventArgs](04_TickChannelEventArgs/index.md) |
-| `TransitionEventArgs` | sealed class : `TimeLineEventArgs` | 3 properties | [TransitionEventArgs](05_TransitionEventArgs/index.md) |
-| `ITickable` | interface | 7 methods | [ITickable](06_ITickable/index.md) |
+| `ITickable` | interface | 7 methods | [ITickable](05_ITickable/index.md) |
+
+`TransitionEventArgs` is **no longer part of this feature**: it moved out of `VeloxDev.TimeLine` into `VeloxDev.TransitionSystem`, is no longer `sealed`, and now carries `Loop` / `Cycle` (plus the typed `TransitionEventArgs<TStage, TValue>` and the `WarnStage` / `ErrorStage` enums). It is documented with the transition feature — see [transition event arguments](../03_transition/00_transitionsystem/04_transition-event-args/index.md).
 
 Not part of the public surface, and deliberately so — these are `private` inside `TickManager` and must not appear in user code: the nested `LoopChannel`, `BehaviorWrapper`, `ConfigChangeRequest` and `ObjectPool<T>` types, and the `GetOrCreateChannel`, `LoopChannel`-returning and pump methods. The only public way to reach a channel is the static facade and `TickManager.Bus`.
 

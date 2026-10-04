@@ -85,7 +85,7 @@ deactivate SS
 @enduml
 ```
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Transition.cs`（`CoreExecute`、`ExecuteCoreAsync`、`RunSegmentAsync`）、`TransitionScheduler.cs`（`FindOrCreate`、`ExecuteCore`、门、代计数器、`Track`/`Untrack`）、`Interpolator.cs`（`Prepare`）、`SamplerSet.cs`。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Effects/Transition.cs`（`CoreExecute`、`ExecuteCoreAsync`、`RunSegmentAsync`）、`TransitionScheduler.cs`（`FindOrCreate`、`ExecuteCore`、门、代计数器、`Track`/`Untrack`）、`Interpolator.cs`（`Prepare`）、`SamplerSet.cs`。
 
 ## (b) 已准备状态是什么
 
@@ -112,7 +112,7 @@ loop path p in state.Values
     else p is a value type implementing ISampleable
         P -> P: sampler = StructAssembler.Create(...)  (null means skip)
     else
-        P -> P: Warn("Unsampled") and skip this path
+        P -> P: Warn(WarnStage.Unsampled) and skip this path
     end
     P -> ST: TryGetOptions(p)
     ST --> P: options (e.g. RotationDirection)
@@ -132,7 +132,7 @@ deactivate TI
 @enduml
 ```
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`（`Prepare<TPriorityCore>`）、`SamplerSet.cs`（`Add`、`Apply`、`CanSetValue`）、`StructAssembler.cs`。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`（`Prepare<TPriorityCore>`）、`SamplerSet.cs`（`Add`、`Apply`、`CanSetValue`）、`StructAssembler.cs`。
 
 关于这套集合、让引擎其余部分保持简单的三个事实：
 
@@ -185,6 +185,6 @@ SS -> SS: finally: Untrack(run); remove the no-mutual registration; run.Dispose(
 @enduml
 ```
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Transition.cs`（`RunSegmentAsync`、`RunBodyAsync`、`RunRangeAsync`、`DelayWhilePausedAsync`）、`TransitionScheduler.cs`（`ExecuteCapturing`、`Replay`）。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Effects/Transition.cs`（`RunSegmentAsync`、`RunBodyAsync`、`RunRangeAsync`、`DelayWhilePausedAsync`）、`TransitionScheduler.cs`（`ExecuteCapturing`、`Replay`）。
 
 分段之间的延时按**墙钟**（一个 `Stopwatch`）测量，不按源：速率为零会冻结源却不暂停它（`IsPaused` 仍为 false），而在冻结时钟上测量的延时永远减不下去。采样循环刻意相反 —— 它用时间轴，因为在那里时间轴才决定动画走了多远。

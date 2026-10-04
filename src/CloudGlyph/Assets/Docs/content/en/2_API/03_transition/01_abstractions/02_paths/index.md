@@ -1,6 +1,6 @@
 # Transition — Abstractions: Property Paths
 
-Namespace `VeloxDev.TransitionSystem.Abstractions` (source: `Src/Core/VeloxDev.Core/TransitionSystem/TransitionProperty.cs`, `PathSegment.cs`, `PathIndex.cs`). How one animatable value is addressed, how the path is used as a dictionary identity, and the two guards that reject a path which can never animate. The builder and state bag are on [builder](../00_builder/index.md); the engine is on [engine](../01_engine/index.md).
+Namespace `VeloxDev.TransitionSystem.Abstractions` (source: `Src/Core/VeloxDev.Core/TransitionSystem/Binding/TransitionProperty.cs`, `PathSegment.cs`, `PathIndex.cs`). How one animatable value is addressed, how the path is used as a dictionary identity, and the two guards that reject a path which can never animate. The builder and state bag are on [builder](../00_builder/index.md); the engine is on [engine](../01_engine/index.md).
 
 ### Class: `TransitionProperty : ITransitionProperty, IEquatable<TransitionProperty>`
 

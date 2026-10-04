@@ -1,6 +1,6 @@
 # Transition — Core Contracts: `VeloxDev.TransitionSystem`
 
-This section documents the core, UI-agnostic contracts of the animation engine. They are declared in the `VeloxDev.TransitionSystem` namespace of the `VeloxDev.Core` assembly (source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs` and `Src/Core/VeloxDev.Core/TransitionSystem/*.cs`) and never reference any platform type. Platform adapters implement these contracts with concrete types documented in [adapter-provided](../03_adapter-provided/index.md).
+This section documents the core, UI-agnostic contracts of the animation engine. They are declared in the `VeloxDev.TransitionSystem` namespace of the `VeloxDev.Core` assembly (source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs` and `Src/Core/VeloxDev.Core/TransitionSystem/**/*.cs`) and never reference any platform type. Platform adapters implement these contracts with concrete types documented in [adapter-provided](../03_adapter-provided/index.md).
 
 ## Roles
 
@@ -13,7 +13,7 @@ The engine separates six concerns, each expressed as interfaces:
 - **Host / UI marshaling** — `ITransitionHost<TPriorityCore>` is everything the engine asks of a host: which thread a target belongs to (`IThreadAffinity`), how to carry work there (`IThreadDispatcher<TPriorityCore>`) and whether the host is still running (`IApplicationState`). It is a *composition*, not a new contract — it adds no member.
 - **Clock** — the engine reads time from `VeloxDev.Timing`'s `ITimeSource`, not from a framework clock. That layer has its own section: [timing](../05_timing/index.md).
 
-The remaining members of this namespace — the `RotationDirection` enum and the `Eases` factory / concrete ease classes — are listed with the sampling contracts.
+Besides the event payloads, the remaining members of this namespace — the `RotationDirection` enum and the `Eases` factory / concrete ease classes — are listed with the sampling contracts.
 
 ## Sub-pages
 
@@ -21,3 +21,4 @@ The remaining members of this namespace — the `RotationDirection` enum and the
 - [effect-engine](01_effect-engine/index.md) — `ITransitionEffectCore` / `ITransitionEffect<TPriorityCore>`, the scheduler and interpreter interfaces, and the `FramePacerCore` pacing base.
 - [eases](02_eases/index.md) — `RotationDirection`, `Eases`, and the 31 concrete ease classes.
 - [host](03_host/index.md) — the host-thread contracts: `ITransitionHost<TPriorityCore>`, `IThreadAffinity`, `IThreadDispatcher<TPriorityCore>`, `ThreadRef`, `NonPriority`, `IApplicationState`, and the `ThreadDispatcherBase<TPriorityCore>` base.
+- [transition-event-args](04_transition-event-args/index.md) — the payloads of the effect callbacks: `TransitionEventArgs` (with `Loop` / `Cycle`), the typed `TransitionEventArgs<TStage, TValue>`, and the `WarnStage` / `ErrorStage` enums.

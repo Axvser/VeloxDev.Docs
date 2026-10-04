@@ -12,7 +12,7 @@
 
 平台插值器的基类，也是静态的按类型采样器注册表的持有者。静态构造函数会预注册原生采样器：`double`、`float`、`int`、`long`、`Point`、`PointF`、`Size`、`SizeF`、`Color`、`Rectangle`、`RectangleF`，以及（在 `NETSTANDARD2_0` 之外）`Vector2`、`Vector3`、`Vector4`、`Quaternion`。
 
-源码：`Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`。
+源码：`Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`。
 
 | 成员 | 签名 | 描述 |
 |---|---|---|
@@ -35,7 +35,7 @@
 
 一场切换中每个目标的驱动者。`ThemeManager` 经 `InterpolatorCore.CreateScheduler` 为每个目标解析一个，并在其上运行该目标的 `StateCore`。
 
-源码：`Src/Core/VeloxDev.Core/TransitionSystem/TransitionScheduler.cs`。
+源码：`Src/Core/VeloxDev.Core/TransitionSystem/Runtime/TransitionScheduler.cs`。
 
 | 成员 | 签名 | 描述 |
 |---|---|---|
@@ -67,7 +67,7 @@
 
 `ITransitionProperty` 的编译版 getter/setter 实现。属性路径由一个或多个 `PropertyInfo` 段组成；读写经由惰性编译的委托。当中间对象非空但其运行时类型与路径不匹配时，读返回哨兵 `UnreadablePath`，写返回 `false`，调用方据此跳过该属性而不是把它当作 null/identity 处理。
 
-源码：`Src/Core/VeloxDev.Core/TransitionSystem/TransitionProperty.cs`。
+源码：`Src/Core/VeloxDev.Core/TransitionSystem/Binding/TransitionProperty.cs`。
 
 | 成员 | 签名 | 描述 |
 |---|---|---|
@@ -146,8 +146,8 @@
 | `IsAutoReverse` | `bool IsAutoReverse { get; set; }` |
 | `LoopTime` | `int LoopTime { get; set; }` |
 | `Ease` | `IEaseCalculator Ease { get; set; }` |
-| 事件 | `event EventHandler<TransitionEventArgs> Awaked`、`Start`、`Update`、`LateUpdate`、`Canceled`、`Completed`、`Finally` |
-| 触发方法 | `void InvokeAwake(object, TransitionEventArgs)`、`InvokeStart`、`InvokeUpdate`、`InvokeLateUpdate`、`InvokeCompleted`、`InvokeCancled`、`InvokeFinally` |
+| 事件 | `event EventHandler<TransitionEventArgs> Awaked`、`Start`、`Update`、`LateUpdate`、`Canceled`、`Completed`、`Finally`；`event EventHandler<TransitionEventArgs<WarnStage, string>> Warn`；`event EventHandler<TransitionEventArgs<ErrorStage, Exception>> Error` |
+| 触发方法 | `void InvokeAwake(object, TransitionEventArgs)`、`InvokeStart`、`InvokeUpdate`、`InvokeLateUpdate`、`InvokeCompleted`、`InvokeCancled`、`InvokeFinally`；`InvokeWarn(object, TransitionEventArgs<WarnStage, string>)`；`InvokeError(object, TransitionEventArgs<ErrorStage, Exception>)` |
 | `Clone` | `ITransitionEffectCore Clone()` |
 
 **说明：**
@@ -159,7 +159,7 @@
 
 `public interface IEaseCalculator { double Ease(double t); }`
 
-源码：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/IEaseCalculator.cs` 与 `Src/Core/VeloxDev.Core/TransitionSystem/Eases.cs`。
+源码：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/IEaseCalculator.cs` 与 `Src/Core/VeloxDev.Core/TransitionSystem/Effects/Eases.cs`。
 
 | 成员 | 描述 |
 |---|---|

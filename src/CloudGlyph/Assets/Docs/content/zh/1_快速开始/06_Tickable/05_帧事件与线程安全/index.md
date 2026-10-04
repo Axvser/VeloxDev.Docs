@@ -2,7 +2,7 @@
 
 ## 1. 钩子收到什么
 
-除 `Awake` 与 `Start` 外，每个钩子都会收到一个 `FrameEventArgs`，它派生自抽象类 `TimeLineEventArgs`。
+除 `Awake` 与 `Start` 外，每个钩子都会收到一个 `FrameEventArgs`，它派生自抽象类 `TimeLineEventArgs`。两个时钟读数（`DeltaTime` / `TotalTime`）与 `Handled` 来自该基类；只有两个帧率读数声明在 `FrameEventArgs` 本身上。
 
 | 成员 | 类型 | 含义 |
 |---|---|---|
@@ -12,7 +12,7 @@
 | `TargetFPS` | `int` | 通道配置的目标帧率 |
 | `Handled` | `bool` | 继承自 `TimeLineEventArgs`。置为 `true` 可中止本帧阶段 |
 
-`DeltaTime`、`TotalTime`、`CurrentFPS`、`TargetFPS` 四者的 setter 都是 **`internal`**（`Src/Core/VeloxDev.Core/TimeLine/FrameEventArgs.cs` 第 10-25 行）。你可以在钩子里读，但写不了。`Handled` 是唯一可写的成员，也正是唯一一个你会想去写的。
+`DeltaTime` 与 `TotalTime` 声明在抽象基类 `TimeLineEventArgs` 上（`Src/Core/VeloxDev.Core/TimeLine/TimeLineEventArgs.cs`）；`CurrentFPS` 与 `TargetFPS` 声明在 `FrameEventArgs` 上（`Src/Core/VeloxDev.Core/TimeLine/FrameEventArgs.cs`）。四者的 setter 都是 **`internal`**：你可以在钩子里读，但写不了。`Handled` 是唯一可写的成员，也正是唯一一个你会想去写的。
 
 两个时间取自通道时钟上的同一次 `TimeSample`，所以速率已经在它们里面了（`CreateFrameEventArgs`，`TickManager.cs` 第 824-833 行）—— 泵之后不会再对任何值做缩放。
 

@@ -111,4 +111,4 @@ $$
 | 不可采样路径扫描（`RejectUnsampleablePaths`，每趟一次） | $O(P)$ 次注册表查找 |
 | 诊断报告 | 每阶段每趟 $O(1)$（一个 `HashSet` 守卫封顶重复） |
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/{TransitionInterpreter,FramePacerCore,ReusableTimerWait,TransitionScheduler,TransitionRun,TransitionProperty}.cs`、`Src/Core/VeloxDev.Core/Timing/{TimeSourceCore,CompensatingTimeSampler,UncompensatedTimeSampler}.cs`、`Src/Core/VeloxDev.Core.Test/TransitionSystem/{FramePathAllocationTests,ReusableTimerWaitTests,TimelineControlTests}.cs`、`Src/Core/VeloxDev.Core.Test/Timing/{CompensatingTimeSamplerTests,TimerCoreRegistryTests}.cs`。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/{Runtime/FramePacerCore,Runtime/ReusableTimerWait,Runtime/TransitionInterpreter,Runtime/TransitionRun,Runtime/TransitionScheduler,Binding/TransitionProperty}.cs`、`Src/Core/VeloxDev.Core/Timing/{TimeSourceCore,CompensatingTimeSampler,UncompensatedTimeSampler}.cs`、`Src/Core/VeloxDev.Core.Test/TransitionSystem/{FramePathAllocationTests,ReusableTimerWaitTests,TimelineControlTests}.cs`、`Src/Core/VeloxDev.Core.Test/Timing/{CompensatingTimeSamplerTests,TimerCoreRegistryTests}.cs`。

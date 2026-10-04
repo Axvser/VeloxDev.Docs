@@ -1,6 +1,6 @@
 # Transition — Engine Implementation: `VeloxDev.TransitionSystem.Abstractions`
 
-Namespace `VeloxDev.TransitionSystem.Abstractions` in the `VeloxDev.Core` assembly (source: `Src/Core/VeloxDev.Core/TransitionSystem/*.cs`). These concrete / abstract base types implement the contracts documented in [transitionsystem](../00_transitionsystem/index.md). Each platform adapter subclasses them to produce the `VeloxDev.TransitionSystem` types you actually construct (see [adapter-provided](../03_adapter-provided/index.md)).
+Namespace `VeloxDev.TransitionSystem.Abstractions` in the `VeloxDev.Core` assembly (source: `Src/Core/VeloxDev.Core/TransitionSystem/**/*.cs`). These concrete / abstract base types implement the contracts documented in [transitionsystem](../00_transitionsystem/index.md). Each platform adapter subclasses them to produce the `VeloxDev.TransitionSystem` types you actually construct (see [adapter-provided](../03_adapter-provided/index.md)).
 
 ## Map of the namespace
 

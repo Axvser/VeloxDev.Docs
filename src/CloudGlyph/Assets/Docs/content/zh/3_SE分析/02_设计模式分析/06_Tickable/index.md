@@ -80,17 +80,12 @@ classDiagram
     class TimeLineEventArgs {
         <<abstract>>
         +Handled bool
-    }
-    class FrameEventArgs {
         +DeltaTime TimeSpan
         +TotalTime TimeSpan
+    }
+    class FrameEventArgs {
         +CurrentFPS int
         +TargetFPS int
-    }
-    class TransitionEventArgs {
-        +Stage string
-        +Message string
-        +Exception Exception
     }
     class TickChannelEventArgs {
         +ChannelName string
@@ -104,7 +99,6 @@ classDiagram
     LoopChannel --> ITimeSourceControl : 每通道一条总线
     TickManager ..> TickChannelEventArgs : 触发 OnChannel*
     FrameEventArgs --|> TimeLineEventArgs
-    TransitionEventArgs --|> TimeLineEventArgs
     TickChannelEventArgs --|> EventArgs
 ```
 

@@ -85,7 +85,7 @@ Reset.Effect(TransitionEffects.Empty).Execute(rect);
 
 There is no capture step, so the reset list is part of the source and must be kept in step with the animation's own declared targets.
 
-An effect raises lifecycle events (all `EventHandler<TransitionEventArgs>`, where `TransitionEventArgs` carries `Handled` — set it to `true` to stop the current pass):
+An effect raises lifecycle events (all `EventHandler<TransitionEventArgs>`; with its base `TimeLineEventArgs` that argument carries `Handled` — set it to `true` to stop the current pass — plus the frame's `DeltaTime` / `TotalTime`, while `Loop` / `Cycle` say where the run is):
 
 - `Awaked` — once, when the scheduler begins (before value normalization).
 - `Start` — once per interpreter run, when the sampling loop starts.
@@ -106,8 +106,8 @@ effect.Start += (_, _) => Console.WriteLine("start");
 effect.Completed += (_, _) => Console.WriteLine("completed");
 effect.Canceled += (_, _) => Console.WriteLine("canceled");
 effect.Finally += (_, _) => Console.WriteLine("finally");
-effect.Warn += (_, e) => Console.WriteLine($"degraded @{e.Stage}: {e.Message}");   // dropped frame, skipped path, unsampled property
-effect.Error += (_, e) => Console.WriteLine($"failed @{e.Stage}: {e.Exception}");   // a throwing callback / sampler / host
+effect.Warn += (_, e) => Console.WriteLine($"degraded @{e.Stage}: {e.Value}");   // dropped frame, skipped path, unsampled property
+effect.Error += (_, e) => Console.WriteLine($"failed @{e.Stage}: {e.Value}");   // a throwing callback / sampler / host
 ```
 
 **Expected result:** a clean run prints `start`, then `completed` then `finally`; interrupting it prints `start`, `canceled`, `finally`; a run whose declared path does not match the target's runtime type prints one `degraded @Unreadable` line and carries on. The lifecycle handlers are backed by `WeakDelegate`, so holding an effect does not leak the target.

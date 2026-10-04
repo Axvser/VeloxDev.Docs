@@ -91,4 +91,4 @@ $$
 
 两个例外正是 `AUTO TEST` 存在要抓的：一个必须逐帧分配框架对象的适配器采样器（混合非纯色 WPF `Brush` 是有记录的那个），以及一个产出框架拒绝的值的采样器 —— 这就是一致性套件同时检查**接缝**（一条真实过渡运行）与算术的原因。
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`、`TransitionInterpreter.cs`、`TransitionProperty.cs`、`BoundedProgress.cs`、`Eases.cs`、`NativeSamplers/{ColorSampler,SizeSampler,QuaternionSampler}.cs`、`Src/Core/VeloxDev.Core.Test/TransitionSystem/{FramePathAllocationTests,SamplerConformanceTests,EaseOvershootTests}.cs`、`Examples/Transition/AUTO TEST/Conformance/ClosedForm.cs`。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`、`TransitionInterpreter.cs`、`TransitionProperty.cs`、`BoundedProgress.cs`、`Eases.cs`、`NativeSamplers/{ColorSampler,SizeSampler,QuaternionSampler}.cs`、`Src/Core/VeloxDev.Core.Test/TransitionSystem/{FramePathAllocationTests,SamplerConformanceTests,EaseOvershootTests}.cs`、`Examples/Transition/AUTO TEST/Conformance/ClosedForm.cs`。

@@ -85,7 +85,7 @@ deactivate SS
 @enduml
 ```
 
-> Source: `Src/Core/VeloxDev.Core/TransitionSystem/Transition.cs` (`CoreExecute`, `ExecuteCoreAsync`, `RunSegmentAsync`), `TransitionScheduler.cs` (`FindOrCreate`, `ExecuteCore`, gate, generation, `Track`/`Untrack`), `Interpolator.cs` (`Prepare`), `SamplerSet.cs`.
+> Source: `Src/Core/VeloxDev.Core/TransitionSystem/Effects/Transition.cs` (`CoreExecute`, `ExecuteCoreAsync`, `RunSegmentAsync`), `TransitionScheduler.cs` (`FindOrCreate`, `ExecuteCore`, gate, generation, `Track`/`Untrack`), `Interpolator.cs` (`Prepare`), `SamplerSet.cs`.
 
 ## (b) What a prepared state is
 
@@ -112,7 +112,7 @@ loop path p in state.Values
     else p is a value type implementing ISampleable
         P -> P: sampler = StructAssembler.Create(...)  (null means skip)
     else
-        P -> P: Warn("Unsampled") and skip this path
+        P -> P: Warn(WarnStage.Unsampled) and skip this path
     end
     P -> ST: TryGetOptions(p)
     ST --> P: options (e.g. RotationDirection)
@@ -132,7 +132,7 @@ deactivate TI
 @enduml
 ```
 
-> Source: `Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs` (`Prepare<TPriorityCore>`), `SamplerSet.cs` (`Add`, `Apply`, `CanSetValue`), `StructAssembler.cs`.
+> Source: `Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs` (`Prepare<TPriorityCore>`), `SamplerSet.cs` (`Add`, `Apply`, `CanSetValue`), `StructAssembler.cs`.
 
 Three facts about the set that make the rest of the engine simple:
 
@@ -185,6 +185,6 @@ SS -> SS: finally: Untrack(run); remove the no-mutual registration; run.Dispose(
 @enduml
 ```
 
-> Source: `Src/Core/VeloxDev.Core/TransitionSystem/Transition.cs` (`RunSegmentAsync`, `RunBodyAsync`, `RunRangeAsync`, `DelayWhilePausedAsync`), `TransitionScheduler.cs` (`ExecuteCapturing`, `Replay`).
+> Source: `Src/Core/VeloxDev.Core/TransitionSystem/Effects/Transition.cs` (`RunSegmentAsync`, `RunBodyAsync`, `RunRangeAsync`, `DelayWhilePausedAsync`), `TransitionScheduler.cs` (`ExecuteCapturing`, `Replay`).
 
 The delay between segments is measured on the **wall clock** (a `Stopwatch`), not on the source: a rate of zero freezes the source without pausing it (`IsPaused` stays false), and a delay measured on a frozen clock would never decrease. The sampling loop does the opposite on purpose — it uses the timeline, because there the timeline is what decides how far the animation has gone.

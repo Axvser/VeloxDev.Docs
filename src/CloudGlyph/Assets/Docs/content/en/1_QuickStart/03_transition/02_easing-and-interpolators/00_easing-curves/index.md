@@ -1,7 +1,7 @@
 # Transition — Easing Curves
 
 Every built-in family, drawn from the library's own `Ease` methods. The expressions
-are the code in `Src/Core/VeloxDev.Core/TransitionSystem/Eases.cs` transcribed, so
+are the code in `Src/Core/VeloxDev.Core/TransitionSystem/Effects/Eases.cs` transcribed, so
 each curve is the calculation the engine actually performs — not a redrawing of it.
 
 One edit is made to that transcription: `Math.Pow(2, u)` is written `exp(u*ln2)`.

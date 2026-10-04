@@ -1,6 +1,6 @@
 # 过渡动画 — 抽象层：构建器与状态
 
-命名空间 `VeloxDev.TransitionSystem.Abstractions`，位于 `VeloxDev.Core` 程序集（源：`Src/Core/VeloxDev.Core/TransitionSystem/Transition.cs`、`StateSnapshot.cs`、`State.cs`、`TransitionEx.cs`）。这里是流式构建器、分段链的根，以及已声明状态的容器。本命名空间其余部分见 [engine](../01_引擎/index.md) 与 [paths](../02_路径/index.md)。
+命名空间 `VeloxDev.TransitionSystem.Abstractions`，位于 `VeloxDev.Core` 程序集（源：`Src/Core/VeloxDev.Core/TransitionSystem/Effects/Transition.cs`、`StateSnapshot.cs`、`State.cs`、`TransitionEx.cs`）。这里是流式构建器、分段链的根，以及已声明状态的容器。本命名空间其余部分见 [engine](../01_引擎/index.md) 与 [paths](../02_路径/index.md)。
 
 ### 类：`TransitionCore`
 

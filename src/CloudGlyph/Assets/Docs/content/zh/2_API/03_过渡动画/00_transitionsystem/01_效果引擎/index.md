@@ -11,15 +11,15 @@
 | `FPS` | `int FPS { get; set; }` | **最大采样率上限**，默认 `60`。让出间隔为 `1000 / FPS` 毫秒。计时由时间轴驱动的连续采样 —— `FPS` 约束的是循环多久采一次，*不是*帧栅格。 |
 | `Duration` | `TimeSpan Duration { get; set; }` | 名义单趟时长；默认 `0`（零时长趟只采一次并直跳终点）。 |
 | `IsAutoReverse` | `bool IsAutoReverse { get; set; }` | 为 `true` 时每趟之后跟一趟反向。 |
-| `LoopTime` | `int LoopTime { get; set; }` | 首趟之后重复的趟数；`int.MaxValue` = 无限循环。 |
+| `LoopTime` | `int LoopTime { get; set; }` | 首趟之后重复的趟数；`int.MaxValue` = 无限循环。当前段是第几趟由 `TransitionEventArgs.Loop` 携带。 |
 | `Ease` | `IEaseCalculator Ease { get; set; }` | 施加在原始归一化时间上的缓动曲线。 |
-| 事件 | `EventHandler<TransitionEventArgs>` | `Awaked`、`Start`、`Update`、`LateUpdate`、`Canceled`、`Completed`、`Finally`、`Warn`、`Error`。 |
-| 触发器 | `void Invoke*(object sender, TransitionEventArgs e)` | `InvokeAwake`、`InvokeStart`、`InvokeUpdate`、`InvokeLateUpdate`、`InvokeCompleted`、`InvokeCancled`、`InvokeFinally`、`InvokeWarn`、`InvokeError`（拼错的 `InvokeCancled` 是真实成员名）。 |
+| 事件 | 七个生命周期事件用 `EventHandler<TransitionEventArgs>`；`Warn` 用 `EventHandler<TransitionEventArgs<WarnStage, string>>`；`Error` 用 `EventHandler<TransitionEventArgs<ErrorStage, Exception>>` | `Awaked`、`Start`、`Update`、`LateUpdate`、`Canceled`、`Completed`、`Finally` 共用无载荷实参；两个诊断事件携带带类型的阶段与值。 |
+| 触发器 | 七个生命周期事件用 `void Invoke*(object sender, TransitionEventArgs e)`；`InvokeWarn(object, TransitionEventArgs<WarnStage, string>)`；`InvokeError(object, TransitionEventArgs<ErrorStage, Exception>)` | `InvokeAwake`、`InvokeStart`、`InvokeUpdate`、`InvokeLateUpdate`、`InvokeCompleted`、`InvokeCancled`、`InvokeFinally`，外加 `InvokeWarn` / `InvokeError`（拼错的 `InvokeCancled` 是真实成员名）。 |
 | `Clone` | `ITransitionEffectCore Clone()` | 深拷贝，同时克隆（弱）事件后备存储。 |
 
 **说明：**
 - 正常一趟的事件顺序：调度器在准备之前于 UI 线程触发 `Awaked`，随后循环触发一次 `Start`，然后每个采样触发 `Update` / `LateUpdate`，最后一趟之后触发 `Completed`。被取消的一趟触发 `Canceled`，而**每一条**结束路径（完成或取消）都触发 `Finally`。
-- `Warn` 与 `Error` 是**诊断**通道，不是生命周期通道：当一趟降级但仍继续时（`Warn`：某一帧被丢弃、某条路径因目标运行时类型不符被跳过、属性无采样器、`Awake` 被拒绝），或某个阶段失败时（`Error`：回调、采样器、宿主派发或 `Prepare` 抛异常），引擎经 `Abstractions.TransitionDiagnostics` 触发它们。每个阶段每次运行**至多报告一次**，因此一个采不到值的属性不会以帧率刷屏。在 `Warn` / `Error` 实参上把 `Handled` 置 `true` 即要求终止该趟（`TransitionEventArgs.Stage` / `Message` / `Exception` 描述它 —— 见 [timeline](../../04_timeline/index.md)）。
+- `Warn` 与 `Error` 是**诊断**通道，不是生命周期通道：当一趟降级但仍继续时（`Warn`：某一帧被丢弃、某条路径因目标运行时类型不符被跳过、属性无采样器、`Awake` 被拒绝），或某个阶段失败时（`Error`：回调、采样器、宿主派发或 `Prepare` 抛异常），引擎经 `Abstractions.TransitionDiagnostics` 触发它们。每个阶段每次运行**至多报告一次**，因此一个采不到值的属性不会以帧率刷屏。在 `Warn` / `Error` 实参上把 `Handled` 置 `true` 即要求终止该趟（该实参是带类型的 `TransitionEventArgs<TStage, TValue>`，携带 `Stage` / `Value` —— 见[事件参数](../04_过渡事件参数/index.md)）。
 - *核验：* `TransitionEffectCoreTests`（`Defaults_AreCorrect`、`Events_AreInvoked`、`Clone_CopiesProperties`、`EventRemove_StopsFiring`）、`SamplingLoopTests`（事件顺序断言）、`TransitionDiagnosticsTests`。
 
 ### 接口：`ITransitionEffect<TPriorityCore>`

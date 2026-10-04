@@ -52,13 +52,13 @@ WinUI 换成 `DispatcherQueuePriority`；MAUI、WinForms、Razor 换成 `NonPrio
 var effect = new TransitionEffect { Duration = TimeSpan.FromSeconds(1) };
 
 effect.Warn += (_, e) =>
-    Console.WriteLine($"降级 @{e.Stage}：{e.Message}");   // 某帧被丢弃、某路径被跳过、属性无采样器
+    Console.WriteLine($"降级 @{e.Stage}：{e.Value}");   // 某帧被丢弃、某路径被跳过、属性无采样器
 
 effect.Error += (_, e) =>
-    Console.WriteLine($"失败 @{e.Stage}：{e.Exception}");  // 回调 / 采样器 / 宿主 / Prepare 抛异常
+    Console.WriteLine($"失败 @{e.Stage}：{e.Value}");  // 回调 / 采样器 / 宿主 / Prepare 抛异常
 ```
 
-**说明：** 每个阶段每次运行至多报一次，因此一个采不到值的属性不会以帧率刷屏；在任一实参上置 `Handled = true` 即要求终止该趟（`TransitionEventArgs` 携带 `Stage`、`Message`、`Exception` —— 见 [timeline](../../04_timeline/index.md)）。什么都不报的运行是常态。
+**说明：** 每个阶段每次运行至多报一次，因此一个采不到值的属性不会以帧率刷屏；在任一实参上置 `Handled = true` 即要求终止该趟（`Warn` 是 `EventHandler<TransitionEventArgs<WarnStage, string>>`，`Error` 是 `EventHandler<TransitionEventArgs<ErrorStage, Exception>>`，各自携带 `Stage` / `Value` —— 见[事件参数](../../00_transitionsystem/04_过渡事件参数/index.md)）。什么都不报的运行是常态。
 
 ### 类：`TransitionEffects` —— 预设
 

@@ -28,7 +28,7 @@ loop each prepared entry
     SET -> SM: InsertFrame(...)
     SM -> SM: throws (e.g. the framework rejects the value)
 end
-SET -> DG: Error("Sampling", exception)
+SET -> DG: Error(ErrorStage.Sampling, exception)
 activate DG
 DG -> DG: first time this stage -> report; subsequent -> false
 DG -> EF: InvokeError(target, args)
@@ -56,12 +56,12 @@ end note
 @enduml
 ```
 
-> Source: `Src/Core/VeloxDev.Core/TransitionSystem/SamplerSet.cs` (`ApplyCore`, `CancelQuietly`), `TransitionDiagnostics.cs`, `TransitionInterpreter.cs` (`ExecuteSamplingLoopAsync`, `Report`, `ReleaseLoopResources`).
+> Source: `Src/Core/VeloxDev.Core/TransitionSystem/Sampling/SamplerSet.cs` (`ApplyCore`, `CancelQuietly`), `TransitionDiagnostics.cs`, `TransitionInterpreter.cs` (`ExecuteSamplingLoopAsync`, `Report`, `ReleaseLoopResources`).
 
 Two details are worth spelling out:
 
 - **The exception does not propagate, and the token is cancelled *quietly*.** `CancelQuietly` swallows `ObjectDisposedException` because the animation or the adapter may already have disposed the token source — there is nothing left to cancel, and that is not a new failure.
-- **`Error` is reported once per stage.** `TransitionDiagnostics` keeps a per-instance `HashSet<string> _reported`; a stage already reported returns `false`. That is what stops a per-frame condition from producing a per-frame log, and it is why the message names the *stage* rather than the frame.
+- **`Error` is reported once per stage.** `TransitionDiagnostics` keeps per-instance `HashSet<ErrorStage> _reported` / `HashSet<WarnStage> _warned`; a stage already reported returns `false`. That is what stops a per-frame condition from producing a per-frame log, and it is why the report names the *stage* rather than the frame.
 
 ## (b) A throwing callback, and the aborted stages at entry
 
@@ -83,13 +83,13 @@ activate H
 H --> Sch: throws, or returns false (nothing was queued)
 deactivate H
 alt the Awake callback threw
-    Sch -> DG: Error("Awake", exception)
+    Sch -> DG: Error(ErrorStage.Awake, exception)
     note right of Sch
       A host callback that throws ends the animation here
       and leaves the host process untouched.
     end note
 else the dispatch was refused
-    Sch -> DG: Warn("Dropped", "the host's dispatch queue refused the animation's Awake")
+    Sch -> DG: Warn(WarnStage.Dropped, "the host's dispatch queue refused the animation's Awake")
     note right of Sch
       Nothing would be dispatched, frames included, so giving up
       is better than starting a run that cannot draw.
@@ -100,7 +100,7 @@ deactivate Sch
 
 == Run: a callback that throws inside the loop ==
 Sch -> Sch: newInterpreter.Execute(...)
-Sch -> DG: Error("Update" or "LateUpdate" or "Marshaling", exception)
+Sch -> DG: Error(ErrorStage.Update / ErrorStage.LateUpdate / ErrorStage.Marshaling, exception)
 activate DG
 DG -> EF: InvokeError(target, args)
 deactivate DG
@@ -114,7 +114,7 @@ note over Sch, EF
 end note
 
 == Last resort: anything that still escapes ==
-CE -> DG: Error("Run", exception)
+CE -> DG: Error(ErrorStage.Run, exception)
 note right of CE
   CoreExecute is async void, so an escaped exception has no caller
   and would be an unhandled exception in the host process. The catch
@@ -123,22 +123,23 @@ end note
 @enduml
 ```
 
-> Source: `Src/Core/VeloxDev.Core/TransitionSystem/TransitionScheduler.cs` (`ExecuteCore`), `Transition.cs` (`CoreExecute`), `TransitionInterpreter.cs` (`Report`, `ReportMarshaling`, `ExecuteSamplingLoopAsync`'s catch clauses).
+> Source: `Src/Core/VeloxDev.Core/TransitionSystem/Runtime/TransitionScheduler.cs` (`ExecuteCore`), `Transition.cs` (`CoreExecute`), `TransitionInterpreter.cs` (`Report`, `ReportMarshaling`, `ExecuteSamplingLoopAsync`'s catch clauses).
 
 ## (c) The diagnosis an operator actually sees
 
-Every report carries `TransitionEventArgs.Stage`, so a log line names the failing stage without re-running anything:
+Every report is a typed `TransitionEventArgs<TStage, TValue>` whose `Stage` is an `ErrorStage` or `WarnStage` value, so a log line names the failing step without re-running anything:
 
 | `Stage` | Raised as | Meaning |
 |---|---|---|
-| `Awake` | `Error` | the `Awaked` handler threw; the run aborts before preparation |
-| `Prepare` | `Error` | normalization threw; the run aborts |
-| `Update` / `LateUpdate` | `Error` | an effect callback threw; the pass ends |
-| `Marshaling` | `Error` | the host's write path threw (`Apply`) |
-| `Sampling` | `Error` | an `ISampler.InsertFrame` threw; the run is cancelled quietly |
-| `Run` | `Error` | something escaped the loop's own catch — the `async void` last resort |
-| `Dropped` | `Warn` | the host refused a frame, or refused the `Awake` dispatch |
-| `Unreadable` | `Warn` | a declared path does not match the target's runtime type; skipped |
-| `Unsampled` | `Warn` | no sampler resolves for a declared path; skipped |
+| `ErrorStage.Awake` | `Error` | the `Awaked` handler threw; the run aborts before preparation |
+| `ErrorStage.Prepare` | `Error` | normalization threw; the run aborts |
+| `ErrorStage.Update` / `ErrorStage.LateUpdate` | `Error` | an effect callback threw; the pass ends |
+| `ErrorStage.Marshaling` | `Error` | the host's write path threw (`Apply`) |
+| `ErrorStage.Sampling` | `Error` | an `ISampler.InsertFrame` threw; the run is cancelled quietly |
+| `ErrorStage.Run` | `Error` | something escaped the loop's own catch — the `async void` last resort |
+| `ErrorStage.Start` / `Completed` / `Canceled` / `Finally` | `Error` | a subscriber of that lifecycle event threw |
+| `WarnStage.Dropped` | `Warn` | the host refused a frame, or refused the `Awake` dispatch |
+| `WarnStage.Unreadable` | `Warn` | a declared path does not match the target's runtime type; skipped |
+| `WarnStage.Unsampled` | `Warn` | no sampler resolves for a declared path; skipped |
 
 The `Warn` / `Error` handlers are `WeakDelegate`-backed like the lifecycle events, and setting `Handled = true` inside one asks the run to terminate — the one place a diagnostic is allowed to *change* behavior. Without a handler the report still reaches `Debug.WriteLine`, so a run that silently degrades in a debugger is still visible.

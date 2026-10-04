@@ -12,7 +12,7 @@ The dynamic-theme feature animates themed properties through the TransitionSyste
 
 Base class for platform interpolators and holder of the static per-type sampler registry. The static constructor pre-registers native samplers for `double`, `float`, `int`, `long`, `Point`, `PointF`, `Size`, `SizeF`, `Color`, `Rectangle`, `RectangleF`, and (outside `NETSTANDARD2_0`) `Vector2`, `Vector3`, `Vector4`, `Quaternion`.
 
-Source: `Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`.
+Source: `Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`.
 
 | Member | Signature | Description |
 |---|---|---|
@@ -35,7 +35,7 @@ Source: `Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`.
 
 The per-target driver of a switch. `ThemeManager` resolves one per target through `InterpolatorCore.CreateScheduler` and runs the target's `StateCore` on it.
 
-Source: `Src/Core/VeloxDev.Core/TransitionSystem/TransitionScheduler.cs`.
+Source: `Src/Core/VeloxDev.Core/TransitionSystem/Runtime/TransitionScheduler.cs`.
 
 | Member | Signature | Description |
 |---|---|---|
@@ -67,7 +67,7 @@ Source: `Src/Core/VeloxDev.Core/Timing/TimeSourceCore.cs`.
 
 Compiled getter/setter implementation of `ITransitionProperty`. A property path is one or more `PropertyInfo` segments; reads and writes go through lazily compiled delegates. When an intermediate object is non-null but its runtime type does not match the path, reads return the sentinel `UnreadablePath` and writes return `false`, so callers skip the property instead of treating it as null/identity.
 
-Source: `Src/Core/VeloxDev.Core/TransitionSystem/TransitionProperty.cs`.
+Source: `Src/Core/VeloxDev.Core/TransitionSystem/Binding/TransitionProperty.cs`.
 
 | Member | Signature | Description |
 |---|---|---|
@@ -146,8 +146,8 @@ Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionEffect.cs
 | `IsAutoReverse` | `bool IsAutoReverse { get; set; }` |
 | `LoopTime` | `int LoopTime { get; set; }` |
 | `Ease` | `IEaseCalculator Ease { get; set; }` |
-| Events | `event EventHandler<TransitionEventArgs> Awaked`, `Start`, `Update`, `LateUpdate`, `Canceled`, `Completed`, `Finally` |
-| Invoke methods | `void InvokeAwake(object, TransitionEventArgs)`, `InvokeStart`, `InvokeUpdate`, `InvokeLateUpdate`, `InvokeCompleted`, `InvokeCancled`, `InvokeFinally` |
+| Events | `event EventHandler<TransitionEventArgs> Awaked`, `Start`, `Update`, `LateUpdate`, `Canceled`, `Completed`, `Finally`; `event EventHandler<TransitionEventArgs<WarnStage, string>> Warn`; `event EventHandler<TransitionEventArgs<ErrorStage, Exception>> Error` |
+| Invoke methods | `void InvokeAwake(object, TransitionEventArgs)`, `InvokeStart`, `InvokeUpdate`, `InvokeLateUpdate`, `InvokeCompleted`, `InvokeCancled`, `InvokeFinally`; `InvokeWarn(object, TransitionEventArgs<WarnStage, string>)`; `InvokeError(object, TransitionEventArgs<ErrorStage, Exception>)` |
 | `Clone` | `ITransitionEffectCore Clone()` |
 
 **Notes:**
@@ -159,7 +159,7 @@ Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionEffect.cs
 
 `public interface IEaseCalculator { double Ease(double t); }`
 
-Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/IEaseCalculator.cs` and `Src/Core/VeloxDev.Core/TransitionSystem/Eases.cs`.
+Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/IEaseCalculator.cs` and `Src/Core/VeloxDev.Core/TransitionSystem/Effects/Eases.cs`.
 
 | Member | Description |
 |---|---|

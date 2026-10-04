@@ -60,7 +60,7 @@ classDiagram
     SamplerSet --> ISampler : InsertFrame per frame
 ```
 
-> Source: `Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`, `SamplerSet.cs`, `StructAssembler.cs`, `BoundedProgress.cs`, `NativeSamplers/*.cs`, `Interfaces/TransitionSystem/ISampler.cs`, `ISampleable.cs`.
+> Source: `Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`, `SamplerSet.cs`, `StructAssembler.cs`, `BoundedProgress.cs`, `NativeSamplers/*.cs`, `Interfaces/TransitionSystem/ISampler.cs`, `ISampleable.cs`.
 
 ## Pattern: Strategy (`ISampler`)
 
@@ -104,4 +104,4 @@ Reference types are **not** expanded: `Prepare` reaches for `ISampleable` only w
 
 `BoundedProgress` is a small value-type helper, but it encodes a design decision: a group of channels that share one bound move **by one progress**, so an overshoot cannot distort the value. `ColorSampler` gives R/G/B one `[0, 255]` progress and lets alpha keep the full eased time; `SizeSampler` / `SizeFSampler` / `RectangleSampler` / `RectangleFSampler` give width/height one `[0, +∞)` progress. `Add` only ever *tightens*, so the order channels are added in does not matter, and the remaining overshoot is dropped for the group rather than letting one channel leave its range.
 
-Sources: `Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`, `SamplerSet.cs`, `StructAssembler.cs`, `BoundedProgress.cs`, `NativeSamplers/{ColorSampler,SizeSampler,RectangleSampler,SizeFSampler,RectangleFSampler}.cs`, `Src/Adapters/VeloxDev.WPF/PlatformAdapters/Interpolator.cs`, `Src/Core/VeloxDev.Core.Test/TransitionSystem/{InterpolatorCoreTests,EaseOvershootTests,SamplerConformanceTests}.cs`, `Examples/Transition/AUTO TEST/Conformance/ClosedForm.cs`.
+Sources: `Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`, `SamplerSet.cs`, `StructAssembler.cs`, `BoundedProgress.cs`, `NativeSamplers/{ColorSampler,SizeSampler,RectangleSampler,SizeFSampler,RectangleFSampler}.cs`, `Src/Adapters/VeloxDev.WPF/PlatformAdapters/Interpolator.cs`, `Src/Core/VeloxDev.Core.Test/TransitionSystem/{InterpolatorCoreTests,EaseOvershootTests,SamplerConformanceTests}.cs`, `Examples/Transition/AUTO TEST/Conformance/ClosedForm.cs`.

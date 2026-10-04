@@ -1,6 +1,6 @@
 # 过渡动画 — 引擎实现：`VeloxDev.TransitionSystem.Abstractions`
 
-命名空间 `VeloxDev.TransitionSystem.Abstractions`，位于 `VeloxDev.Core` 程序集（源：`Src/Core/VeloxDev.Core/TransitionSystem/*.cs`）。这些具体 / 抽象基类实现 [transitionsystem](../00_transitionsystem/index.md) 中记录的契约。每个平台适配器派生它们，产出你实际构造的 `VeloxDev.TransitionSystem` 类型（见 [adapter-provided](../03_适配器提供/index.md)）。
+命名空间 `VeloxDev.TransitionSystem.Abstractions`，位于 `VeloxDev.Core` 程序集（源：`Src/Core/VeloxDev.Core/TransitionSystem/**/*.cs`）。这些具体 / 抽象基类实现 [transitionsystem](../00_transitionsystem/index.md) 中记录的契约。每个平台适配器派生它们，产出你实际构造的 `VeloxDev.TransitionSystem` 类型（见 [adapter-provided](../03_适配器提供/index.md)）。
 
 ## 命名空间地图
 

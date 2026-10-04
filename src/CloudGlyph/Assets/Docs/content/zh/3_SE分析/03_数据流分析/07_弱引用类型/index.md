@@ -128,4 +128,4 @@ deactivate W
 
 `AddHandler` 追加 `WeakReference<Delegate>`，当 `CanUpdateCache` 为 true 时立即重建组合委托（第 26-34 行）；`RemoveHandler` 从尾端扫描并移除匹配条目（第 36-49 行）。调用从不遍历弱列表的热路径：`GetInvocationList` 通过无锁 `volatile` 读返回缓存的 `_combinedDelegate`，仅在缓存为 null 时才加锁并重建（第 56-67 行）。`Invoke(object?[] objects)` 对该缓存委托做 DynamicInvoke（第 74-77 行）——知道签名的调用方改为类型化调用，这正是 `TransitionEffectCore` 每帧所做的（`TransitionEffect.cs`，第 106-109 行）。缓存委托是强引用，因此剪除只移除已回收处理器的包装条目：`RebuildCache` 调用 `CleanupCollectedHandlers`（第 79-93、95-104 行），`Clone` 只把存活处理器复制进新实例（第 106-121 行）。因此唯一类泄漏的角落是：以默认缓存更新添加、却从不退订的处理器——它会被强缓存扎根，直到之后某次增删/克隆重建将其排除。
 
-出处：`Src/Core/VeloxDev.Core/WeakTypes/{WeakQueue,WeakStack,WeakDelegate,WeakCache}.cs`；用法见 `Src/Core/VeloxDev.Core/TransitionSystem/TransitionEffect.cs`；行为由 `Src/Core/VeloxDev.Core.Test/WeakTypes/*.cs` 覆盖（FIFO/LIFO 顺序、peek、范围操作、缓存覆盖/移除/清理）。
+出处：`Src/Core/VeloxDev.Core/WeakTypes/{WeakQueue,WeakStack,WeakDelegate,WeakCache}.cs`；用法见 `Src/Core/VeloxDev.Core/TransitionSystem/Effects/TransitionEffect.cs`；行为由 `Src/Core/VeloxDev.Core.Test/WeakTypes/*.cs` 覆盖（FIFO/LIFO 顺序、peek、范围操作、缓存覆盖/移除/清理）。

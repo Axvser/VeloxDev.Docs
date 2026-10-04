@@ -42,6 +42,6 @@ flowchart TD
 | 停摆/唤醒（不用 monitor 的 monitor） | `ITimeSource.WaitWhileStalledAsync` + `ITimeSourceControl.Wake` | 停摆的消费者零唤醒；定位或停止仍能到达它 |
 | Null Object | `ThreadRef.None`、`NonPriority`、`null` 的 `FramePacerCore` | 「没有线程」「没有优先级」「没有宿主节奏器」是值，不是失败 |
 
-来源：`Src/Core/VeloxDev.Core/TransitionSystem/*.cs`、`Src/Core/VeloxDev.Core/Timing/*.cs`、`Src/Core/VeloxDev.Core/Threading/*.cs`、`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs`、`Src/Core/VeloxDev.Core.Test/TransitionSystem/*.cs`、`Src/Adapters/VeloxDev.{WPF,Avalonia,WinUI,MAUI,WinForms,Razor,Jalium}/PlatformAdapters/*.cs`、`Examples/Transition/WPF/Demo/MainWindow.xaml.cs`、`Examples/Transition/AUTO TEST/**`。
+来源：`Src/Core/VeloxDev.Core/TransitionSystem/**/*.cs`、`Src/Core/VeloxDev.Core/Timing/*.cs`、`Src/Core/VeloxDev.Core/Threading/*.cs`、`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/*.cs`、`Src/Core/VeloxDev.Core.Test/TransitionSystem/*.cs`、`Src/Adapters/VeloxDev.{WPF,Avalonia,WinUI,MAUI,WinForms,Razor,Jalium}/PlatformAdapters/*.cs`、`Examples/Transition/WPF/Demo/MainWindow.xaml.cs`、`Examples/Transition/AUTO TEST/**`。
 
 相关分析：[数据流 — 过渡动画](../../03_数据流分析/03_过渡动画/index.md) · [复杂度 — 过渡动画](../../04_复杂度分析/03_过渡动画/index.md)

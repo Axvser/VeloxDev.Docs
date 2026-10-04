@@ -28,7 +28,7 @@ tickable 特性在 .NET 侧提供一套类似 Unity 的帧驱动行为循环。�
 
 | 命名空间 | 承载的公开 API |
 |---|---|
-| `VeloxDev.TimeLine` | `TickableAttribute`、`TickManager`、`TickChannelEventArgs`、`ITickable`、`TimeLineEventArgs`、`FrameEventArgs`、`TransitionEventArgs` |
+| `VeloxDev.TimeLine` | `TickableAttribute`、`TickManager`、`TickChannelEventArgs`、`ITickable`、`TimeLineEventArgs`、`FrameEventArgs` |
 | `VeloxDev.Timing` | `ITimeSourceControl`、`ITimeSource` —— 通道的时钟，经 `TickManager.Bus` 取得。属于共享基础设施，随过渡动画特性一并记录 |
 
 ## 模型
@@ -62,11 +62,12 @@ public partial class Behaviour
 |---|---|---|---|
 | `TickableAttribute` | sealed class : `Attribute` | 2 属性、1 构造函数 | [TickableAttribute](00_TickableAttribute/index.md) |
 | `TickManager` | 静态类 | 4 事件、2 个公开属性（`UseAsyncLoop`、`ChannelNames`）、1 个公开常量（`DEFAULT_CHANNEL`）、27 个公开静态方法 —— 合计 34 个公开成员 | [TickManager](01_TickManager/index.md) |
-| `TimeLineEventArgs` | 抽象类 | 1 属性 | [TimeLineEventArgs](02_TimeLineEventArgs/index.md) |
-| `FrameEventArgs` | class : `TimeLineEventArgs` | 4 个只读属性 | [FrameEventArgs](03_FrameEventArgs/index.md) |
+| `TimeLineEventArgs` | 抽象类 | 3 属性 | [TimeLineEventArgs](02_TimeLineEventArgs/index.md) |
+| `FrameEventArgs` | class : `TimeLineEventArgs` | 2 个只读属性 + 3 个继承 | [FrameEventArgs](03_FrameEventArgs/index.md) |
 | `TickChannelEventArgs` | sealed class : `EventArgs` | 1 属性 | [TickChannelEventArgs](04_TickChannelEventArgs/index.md) |
-| `TransitionEventArgs` | sealed class : `TimeLineEventArgs` | 3 属性 | [TransitionEventArgs](05_TransitionEventArgs/index.md) |
-| `ITickable` | 接口 | 7 个方法 | [ITickable](06_ITickable/index.md) |
+| `ITickable` | 接口 | 7 个方法 | [ITickable](05_ITickable/index.md) |
+
+`TransitionEventArgs` **不再属于本特性**：它已从 `VeloxDev.TimeLine` 移入 `VeloxDev.TransitionSystem`，不再 `sealed`，并携带 `Loop` / `Cycle`（另有带类型的 `TransitionEventArgs<TStage, TValue>` 与 `WarnStage` / `ErrorStage` 枚举）。它随过渡动画特性记录 —— 见[过渡事件参数](../03_过渡动画/00_transitionsystem/04_过渡事件参数/index.md)。
 
 以下内容**不属于**公开表面，也不应出现在用户代码里 —— 它们是 `TickManager` 内部的 `private`：嵌套类型 `LoopChannel`、`BehaviorWrapper`、`ConfigChangeRequest`、`ObjectPool<T>`，以及 `GetOrCreateChannel`、所有返回 `LoopChannel` 的方法和各泵方法。公开途径只有静态门面与 `TickManager.Bus`。
 

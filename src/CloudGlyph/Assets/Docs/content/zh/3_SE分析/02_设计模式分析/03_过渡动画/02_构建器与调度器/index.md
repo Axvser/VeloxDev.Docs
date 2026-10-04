@@ -52,8 +52,8 @@ classDiagram
     }
     class TransitionDiagnostics {
         <<internal>>
-        +Warn(stage, message) void
-        +Error(stage, exception) bool
+        +Warn(WarnStage, string) void
+        +Error(ErrorStage, Exception) bool
     }
     class TransitionEffectCore {
         +FPS int
@@ -74,7 +74,7 @@ classDiagram
     TransitionRun --> TransitionEffectCore : reads per pass
 ```
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/{Transition,StateSnapshot,State,TransitionScheduler,TransitionRun,TransitionDiagnostics,TransitionEffect}.cs`。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/{Effects/Transition,Effects/TransitionEffect,Runtime/TransitionDiagnostics,Runtime/TransitionRun,Runtime/TransitionScheduler,State/State,State/StateSnapshot}.cs`。
 
 ## 模式：同时是 Composite 的流式构建器
 
@@ -116,8 +116,9 @@ classDiagram
 
 - 它是**一次运行作用域**的对象（每次 `Prepare` / 每条循环创建），因此「每个阶段至多报一次」是按运行计的 —— 一个逐帧发生的情况报一次之后便安静；
 - 它把 `Warn` / `Error` 经 effect 的事件*以及*一行 `Debug.WriteLine` 送出，因此即便无人监听，一次运行也会报告；
+- 它每次上报构造一个带类型的实参（`Warn` 用 `TransitionEventArgs<WarnStage, string>`，`Error` 用 `TransitionEventArgs<ErrorStage, Exception>`），并先把运行的 `Loop` / `Cycle` 抄上去再触发，诊断处理器因此看得到运行的位置；
 - 它尊重 `TransitionEventArgs.Handled`：置位的处理器即要求终止该趟，`TransitionDiagnostics` 就把该趟自己的 `Handled` 标志翻起来。
 
 这也正是采样循环把每个回调与每次 `apply` 都包进 `Report` / `ReportMarshaling` 的原因：要点不是吞掉异常，而是把它转成一次报告加上该趟的**正常**取消路径，使 `Canceled` 与 `Finally` 仍然触发、循环自身的资源仍然释放。`InvokeError` 刻意不调 `Debug.Fail` —— 那会在无交互宿主中直接终止进程，而那正是本通道存在要防的事。
 
-来源：`Src/Core/VeloxDev.Core/TransitionSystem/{Transition,StateSnapshot,State,TransitionScheduler,TransitionRun,TransitionDiagnostics,TransitionEffect}.cs`、`Src/Core/VeloxDev.Core/TransitionSystem/TransitionEx.cs`、`Src/Core/VeloxDev.Core.Test/TransitionSystem/{ChainRepeatTests,TransitionSchedulerExitTests,NoMutualSchedulerRegistryTests,TransitionDiagnosticsTests}.cs`、`Examples/Transition/WPF/Demo/MainWindow.xaml.cs`。
+来源：`Src/Core/VeloxDev.Core/TransitionSystem/{Effects/Transition,Effects/TransitionEffect,Runtime/TransitionDiagnostics,Runtime/TransitionRun,Runtime/TransitionScheduler,State/State,State/StateSnapshot}.cs`、`Src/Core/VeloxDev.Core/TransitionSystem/Effects/TransitionEx.cs`、`Src/Core/VeloxDev.Core.Test/TransitionSystem/{ChainRepeatTests,TransitionSchedulerExitTests,NoMutualSchedulerRegistryTests,TransitionDiagnosticsTests}.cs`、`Examples/Transition/WPF/Demo/MainWindow.xaml.cs`。

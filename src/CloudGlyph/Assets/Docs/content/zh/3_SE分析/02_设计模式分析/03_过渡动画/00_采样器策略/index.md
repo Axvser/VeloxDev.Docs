@@ -60,7 +60,7 @@ classDiagram
     SamplerSet --> ISampler : InsertFrame per frame
 ```
 
-> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`、`SamplerSet.cs`、`StructAssembler.cs`、`BoundedProgress.cs`、`NativeSamplers/*.cs`、`Interfaces/TransitionSystem/ISampler.cs`、`ISampleable.cs`。
+> 来源：`Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`、`SamplerSet.cs`、`StructAssembler.cs`、`BoundedProgress.cs`、`NativeSamplers/*.cs`、`Interfaces/TransitionSystem/ISampler.cs`、`ISampleable.cs`。
 
 ## 模式：Strategy（`ISampler`）
 
@@ -104,4 +104,4 @@ classDiagram
 
 `BoundedProgress` 是个小的值类型助手，但它编码了一个设计决定：共享同一个界的一组通道**按同一个进度**移动，因此过冲无法扭曲该值。`ColorSampler` 给 R/G/B 一个 `[0, 255]` 进度、让 alpha 保留完整缓动时间；`SizeSampler` / `SizeFSampler` / `RectangleSampler` / `RectangleFSampler` 给宽/高一个 `[0, +∞)` 进度。`Add` 只会*收紧*，因此加通道的顺序无关，该组剩余的过冲被丢弃，而不是让某个通道离开它的范围。
 
-来源：`Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`、`SamplerSet.cs`、`StructAssembler.cs`、`BoundedProgress.cs`、`NativeSamplers/{ColorSampler,SizeSampler,RectangleSampler,SizeFSampler,RectangleFSampler}.cs`、`Src/Adapters/VeloxDev.WPF/PlatformAdapters/Interpolator.cs`、`Src/Core/VeloxDev.Core.Test/TransitionSystem/{InterpolatorCoreTests,EaseOvershootTests,SamplerConformanceTests}.cs`、`Examples/Transition/AUTO TEST/Conformance/ClosedForm.cs`。
+来源：`Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`、`SamplerSet.cs`、`StructAssembler.cs`、`BoundedProgress.cs`、`NativeSamplers/{ColorSampler,SizeSampler,RectangleSampler,SizeFSampler,RectangleFSampler}.cs`、`Src/Adapters/VeloxDev.WPF/PlatformAdapters/Interpolator.cs`、`Src/Core/VeloxDev.Core.Test/TransitionSystem/{InterpolatorCoreTests,EaseOvershootTests,SamplerConformanceTests}.cs`、`Examples/Transition/AUTO TEST/Conformance/ClosedForm.cs`。

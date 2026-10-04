@@ -131,7 +131,7 @@ classDiagram
     InterpolatorCore --> ISampler : 注册表值
 ```
 
-> `ThemeManager` 是普通类，其 API 只以静态成员被使用；`ThemeCache` 是静态类。`InterpolatorCore` 是抽象基类，其平台子类（如 WPF 的 `Interpolator`）注册原生采样器，DynamicTheme 经静态的 `TryGetInterpolator` 读取它们。平台实际构建的是泛型闭合形式 `TransitionSchedulerCore<TInspector, TInterpreter, TPriority>`；图中画非泛型基类，因为那才是 `CreateScheduler` 的返回类型。生成的 `partial` 类（如 Demo 的 `MainWindow`）实现 `IThemeObject` 并把它们接起来。源码：`Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`、`Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`、`Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`、`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ISampler.cs`。
+> `ThemeManager` 是普通类，其 API 只以静态成员被使用；`ThemeCache` 是静态类。`InterpolatorCore` 是抽象基类，其平台子类（如 WPF 的 `Interpolator`）注册原生采样器，DynamicTheme 经静态的 `TryGetInterpolator` 读取它们。平台实际构建的是泛型闭合形式 `TransitionSchedulerCore<TInspector, TInterpreter, TPriority>`；图中画非泛型基类，因为那才是 `CreateScheduler` 的返回类型。生成的 `partial` 类（如 Demo 的 `MainWindow`）实现 `IThemeObject` 并把它们接起来。源码：`Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`、`Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`、`Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`、`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ISampler.cs`。
 
 **转换器集合由平台提供。** 上图列出的七个 `IThemeValueConverter` 类是 WPF 的转换器集合（`Src/Adapters/VeloxDev.WPF/PlatformAdapters/ThemeValueConverters.cs`）。Avalonia、MAUI、WinUI 提供同样的七个（`Double`、`Point`、`Thickness`、`CornerRadius`、`Color`、`Brush`、`Object`）。`VeloxDev.WinForms` 提供面向 `System.Drawing` 的集合——`Double`、`Int`、`Float`、`Point`、`PointF`、`Size`、`SizeF`、`Rectangle`、`RectangleF`、`Padding`、`Color`、`Font`、`Object`——`VeloxDev.Razor` 提供最小集合（`Double`、`String`、`Int`、`Bool`）。`VeloxDev.Jalium` **不带** DynamicTheme 层（无值转换器，也无主题接线）。每个转换器都实现核心 `IThemeValueConverter`，每条 `[ThemeConfig]` 声明经 `TConverter` 类型实参选定所用集合，因此核心保持 GUI 无关。`ThemeCache` 另维护一个可选的共享转换器注册表（`RegisterConverter` / `GetConverter`，键形如 `__velox_global_converter_N__`），但当前生成器并不使用它——它在生成的 `InitializeTheme` 里经 `Activator.CreateInstance` 内联实例化转换器（见下）。
 
@@ -272,12 +272,12 @@ group.Entries.Add(new TransitionEntry(
     hasSampler));
 ```
 
-`TransitionEntry`（`ThemeManager` 的私有嵌套类）携带 `Target` / `PropertyInfo` / `TransitionProperty` / `StartValue` / `EndValue` / `HasSampler`；条目按目标归入 `TargetEntries`，每个目标一组。这一层不做任何端点归一化 —— scheduler 的 `InterpolatorCore.Prepare` 在目标存在之后才解析采样器并调用 `NormalizeStart` / `NormalizeEnd`。没有采样器的属性整趟保持旧值，由 `ApplyHeldValues` 在最后一次采样写终值；终值为 null 的属性被 `BuildState` 跳过，因此「某主题不管这个属性」不会拖垮整场切换。逐帧写入经编译后的 `TransitionProperty.SetValue` 完成（`Src/Core/VeloxDev.Core/TransitionSystem/TransitionProperty.cs`）。
+`TransitionEntry`（`ThemeManager` 的私有嵌套类）携带 `Target` / `PropertyInfo` / `TransitionProperty` / `StartValue` / `EndValue` / `HasSampler`；条目按目标归入 `TargetEntries`，每个目标一组。这一层不做任何端点归一化 —— scheduler 的 `InterpolatorCore.Prepare` 在目标存在之后才解析采样器并调用 `NormalizeStart` / `NormalizeEnd`。没有采样器的属性整趟保持旧值，由 `ApplyHeldValues` 在最后一次采样写终值；终值为 null 的属性被 `BuildState` 跳过，因此「某主题不管这个属性」不会拖垮整场切换。逐帧写入经编译后的 `TransitionProperty.SetValue` 完成（`Src/Core/VeloxDev.Core/TransitionSystem/Binding/TransitionProperty.cs`）。
 
 ### 记忆化工厂 — `TransitionProperty.FromProperty`
 
 ```csharp
-// Src/Core/VeloxDev.Core/TransitionSystem/TransitionProperty.cs, lines 601-611
+// Src/Core/VeloxDev.Core/TransitionSystem/Binding/TransitionProperty.cs, lines 601-611
 public static TransitionProperty FromProperty(PropertyInfo propertyInfo)
 {
     if (propertyInfo is null)
@@ -293,4 +293,4 @@ private static readonly ConcurrentDictionary<PropertyInfo, TransitionProperty> F
 
 主题系统在**每一次**切换时，都要为每个已注册目标的每个主题属性重建一条路径，而新建的 `TransitionProperty` 会在首次使用时编译自己的 getter 与 setter。提交 `58ae23b3 perf(theme): memoize TransitionProperty.FromProperty` 的实测：一千个双属性元素下，首帧之前约 1.6 s 的 UI 线程停顿与 29 MB 分配；记忆化之后约 10 ms 与 6 MB。共享是安全的：路径不可变，且在没有需要冻结的索引实参时 `BindTo` 返回实例自身。
 
-> 源码引用：`Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`、`Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`、`Src/Core/VeloxDev.Core/Interfaces/DynamicTheme/*`、`Src/Core/VeloxDev.Core/TransitionSystem/Interpolator.cs`、`Src/Core/VeloxDev.Core/TransitionSystem/TransitionProperty.cs`、`Src/Generators/VeloxDev.Core.Generator/Theme.cs`、`Src/Adapters/VeloxDev.WPF/PlatformAdapters/ThemeValueConverters.cs`、`Examples/Theme/WPF Trimmed/Demo/MainWindow.xaml.cs`、`Examples/Theme/WPF/Demo/MainWindow.xaml.cs`。
+> 源码引用：`Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`、`Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`、`Src/Core/VeloxDev.Core/Interfaces/DynamicTheme/*`、`Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`、`Src/Core/VeloxDev.Core/TransitionSystem/Binding/TransitionProperty.cs`、`Src/Generators/VeloxDev.Core.Generator/Theme.cs`、`Src/Adapters/VeloxDev.WPF/PlatformAdapters/ThemeValueConverters.cs`、`Examples/Theme/WPF Trimmed/Demo/MainWindow.xaml.cs`、`Examples/Theme/WPF/Demo/MainWindow.xaml.cs`。

@@ -69,7 +69,7 @@ TI -> EF: InvokeFinally(sender, args)
 @enduml
 ```
 
-> Source: `Src/Core/VeloxDev.Core/TransitionSystem/TransitionInterpreter.cs` (`ExecuteSamplingLoopAsync`, `RunPassAsync`, `EmitFrame`, `ArmNextFrame`), `FramePacerCore.cs`, `ReusableTimerWait.cs`, `TransitionRun.cs`.
+> Source: `Src/Core/VeloxDev.Core/TransitionSystem/Runtime/TransitionInterpreter.cs` (`ExecuteSamplingLoopAsync`, `RunPassAsync`, `EmitFrame`, `ArmNextFrame`), `FramePacerCore.cs`, `ReusableTimerWait.cs`, `TransitionRun.cs`.
 
 The load-bearing line is `Pacer.PassAnchor = Timeline.Ticks`. A pass is an **anchor** into an absolute timeline, never a reset — so several runs can share one source (each keeps its own pass and its own place), and `Transition.Seek` is nothing more than writing a different anchor. Two consequences the diagram shows: the pass ends in exactly one place (its far end), because the timeline only ever moves forwards; and the last frame of a pass is the **exact** endpoint (`easedT = 1` forward, `0` reverse), independent of whether `Ease(1)` is exactly `1`.
 
@@ -122,7 +122,7 @@ end note
 @enduml
 ```
 
-> Source: `Src/Core/VeloxDev.Core/TransitionSystem/{FramePacerCore,ReusableTimerWait,TransitionInterpreter}.cs`, `Src/Adapters/*/PlatformAdapters/TransitionInterpreter.cs`.
+> Source: `Src/Core/VeloxDev.Core/TransitionSystem/Runtime/{FramePacerCore,ReusableTimerWait,TransitionInterpreter}.cs`, `Src/Adapters/*/PlatformAdapters/TransitionInterpreter.cs`.
 
 Why a custom awaiter is not marshalled back: `FrameWait` implements `INotifyCompletion` and deliberately **not** `ICriticalNotifyCompletion`, so the builder flows the caller's `ExecutionContext` — but restoring a `SynchronizationContext` is `Task`'s job, so a custom awaiter's continuation resumes on whatever thread completed the wait. A loop started on a UI thread therefore drifts to a pool thread after its first frame *unless the host supplied a pacer*. That is the whole reason the pacing seam exists, and why a host must derive its pacer from the same answer the write path uses: a pacer that disagrees with `Post` turns every frame into a dispatch.
 
@@ -156,7 +156,7 @@ else
           Returns false when nothing was queued at all
           (dispatcher gone, or no queue yet). That is the only
           way a caller can tell a dropped action from a queued one,
-          and it is reported once through Warn("Dropped").
+          and it is reported once through Warn(WarnStage.Dropped).
         end note
     end
     H -> SM: InsertFrame(target, property, ref working, start, end, options, t)
@@ -173,7 +173,7 @@ deactivate SET
 @enduml
 ```
 
-> Source: `Src/Core/VeloxDev.Core/TransitionSystem/SamplerSet.cs` (`Apply`, `ApplyCore`, cached closure, `SetRun`), `Src/Core/VeloxDev.Core/Threading/ThreadDispatcherBase.cs`, `Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`.
+> Source: `Src/Core/VeloxDev.Core/TransitionSystem/Sampling/SamplerSet.cs` (`Apply`, `ApplyCore`, cached closure, `SetRun`), `Src/Core/VeloxDev.Core/Threading/ThreadDispatcherBase.cs`, `Src/Adapters/*/PlatformAdapters/UIThreadInspector.cs`.
 
 Three allocation-avoidance decisions are visible in this flow:
 

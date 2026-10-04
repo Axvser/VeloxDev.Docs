@@ -52,8 +52,8 @@ classDiagram
     }
     class TransitionDiagnostics {
         <<internal>>
-        +Warn(stage, message) void
-        +Error(stage, exception) bool
+        +Warn(WarnStage, string) void
+        +Error(ErrorStage, Exception) bool
     }
     class TransitionEffectCore {
         +FPS int
@@ -74,7 +74,7 @@ classDiagram
     TransitionRun --> TransitionEffectCore : reads per pass
 ```
 
-> Source: `Src/Core/VeloxDev.Core/TransitionSystem/{Transition,StateSnapshot,State,TransitionScheduler,TransitionRun,TransitionDiagnostics,TransitionEffect}.cs`.
+> Source: `Src/Core/VeloxDev.Core/TransitionSystem/{Effects/Transition,Effects/TransitionEffect,Runtime/TransitionDiagnostics,Runtime/TransitionRun,Runtime/TransitionScheduler,State/State,State/StateSnapshot}.cs`.
 
 ## Pattern: Fluent Builder that is also a Composite
 
@@ -116,8 +116,9 @@ Replaying keeps every iteration identical and pins the endpoints. What it delibe
 
 - it is a **run-scoped** object (created per `Prepare` / per loop), so "each stage reports at most once" is per run — a per-frame condition reports once and is then quiet;
 - it routes `Warn` / `Error` through the effect's events *and* a `Debug.WriteLine`, so a run reports even with no handler;
+- it builds a typed argument per report (`TransitionEventArgs<WarnStage, string>` for `Warn`, `TransitionEventArgs<ErrorStage, Exception>` for `Error`) and copies the run's `Loop` / `Cycle` onto it before raising, so a diagnostic handler sees the run's position;
 - it honours `TransitionEventArgs.Handled`: a handler that sets it asks the run to terminate, and `TransitionDiagnostics` flips the run's own `Handled` flag.
 
 That is also why the sampling loop wraps every callback and every `apply` in `Report` / `ReportMarshaling`: the point is not to swallow the exception but to convert it into a report plus the run's **normal** cancellation path, so `Canceled` and `Finally` still fire and the loop's own resources are still released. `InvokeError` deliberately does not call `Debug.Fail` — that would terminate the process in a non-interactive host, which is precisely what this channel exists to prevent.
 
-Sources: `Src/Core/VeloxDev.Core/TransitionSystem/{Transition,StateSnapshot,State,TransitionScheduler,TransitionRun,TransitionDiagnostics,TransitionEffect}.cs`, `Src/Core/VeloxDev.Core/TransitionSystem/TransitionEx.cs`, `Src/Core/VeloxDev.Core.Test/TransitionSystem/{ChainRepeatTests,TransitionSchedulerExitTests,NoMutualSchedulerRegistryTests,TransitionDiagnosticsTests}.cs`, `Examples/Transition/WPF/Demo/MainWindow.xaml.cs`.
+Sources: `Src/Core/VeloxDev.Core/TransitionSystem/{Effects/Transition,Effects/TransitionEffect,Runtime/TransitionDiagnostics,Runtime/TransitionRun,Runtime/TransitionScheduler,State/State,State/StateSnapshot}.cs`, `Src/Core/VeloxDev.Core/TransitionSystem/Effects/TransitionEx.cs`, `Src/Core/VeloxDev.Core.Test/TransitionSystem/{ChainRepeatTests,TransitionSchedulerExitTests,NoMutualSchedulerRegistryTests,TransitionDiagnosticsTests}.cs`, `Examples/Transition/WPF/Demo/MainWindow.xaml.cs`.

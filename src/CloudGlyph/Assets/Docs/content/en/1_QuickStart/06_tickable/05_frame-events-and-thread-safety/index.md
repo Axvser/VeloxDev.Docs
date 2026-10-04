@@ -2,7 +2,7 @@
 
 ## 1. What a hook is handed
 
-Every hook except `Awake` and `Start` receives a `FrameEventArgs`, which derives from the abstract `TimeLineEventArgs`.
+Every hook except `Awake` and `Start` receives a `FrameEventArgs`, which derives from the abstract `TimeLineEventArgs`. The two clock readings (`DeltaTime` / `TotalTime`) and `Handled` come from that base; only the two frame-rate readings are declared on `FrameEventArgs` itself.
 
 | Member | Type | Meaning |
 |---|---|---|
@@ -12,7 +12,7 @@ Every hook except `Awake` and `Start` receives a `FrameEventArgs`, which derives
 | `TargetFPS` | `int` | The channel's configured target |
 | `Handled` | `bool` | Inherited from `TimeLineEventArgs`. Set it to `true` to stop this frame phase |
 
-All four of `DeltaTime`, `TotalTime`, `CurrentFPS` and `TargetFPS` have **`internal` setters** (`Src/Core/VeloxDev.Core/TimeLine/FrameEventArgs.cs` lines 10-25). You can read them from your hooks; you cannot write them. `Handled` is the only writable member, and it is the only one you would ever want to write.
+`DeltaTime` and `TotalTime` are declared on the abstract base `TimeLineEventArgs` (`Src/Core/VeloxDev.Core/TimeLine/TimeLineEventArgs.cs`); `CurrentFPS` and `TargetFPS` are declared on `FrameEventArgs` (`Src/Core/VeloxDev.Core/TimeLine/FrameEventArgs.cs`). All four have **`internal` setters**: you can read them from your hooks, but you cannot write them. `Handled` is the only writable member, and it is the only one you would ever want to write.
 
 Both times come from one `TimeSample` taken from the channel's clock, so the rate is already inside them (`CreateFrameEventArgs`, `TickManager.cs` lines 824-833) — the pumps do not scale anything afterwards.
 
