@@ -52,6 +52,6 @@ public static class TickManager
 
 ## 位于本页边界上的其他类型
 
-- **`TickChannelEventArgs`** —— 四个静态事件的载荷；单独记录（[TickChannelEventArgs](../05_TickChannelEventArgs/index.md)）。
-- **`ITickable`** —— `RegisterBehaviour` 接受的类型；单独记录（[ITickable](../07_ITickable/index.md)）。
+- **`TickChannelEventArgs`** —— 四个静态事件的载荷；单独记录（[TickChannelEventArgs](../04_TickChannelEventArgs/index.md)）。
+- **`ITickable`** —— `RegisterBehaviour` 接受的类型；单独记录（[ITickable](../06_ITickable/index.md)）。
 - **`ITimeSourceControl`**（`VeloxDev.Timing`）—— `Bus` 的返回类型。它属于共享基础设施，随过渡动画特性一并记录；本特性用户需要的成员是 `IsAdvancing`、`IsPaused`、`Rate`、`Position`、`Epoch`、`Pause()`、`Resume()`、`SetRate(double)` 与 `WaitWhileStalledAsync(CancellationToken)`。

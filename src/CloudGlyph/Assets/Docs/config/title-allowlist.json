@@ -64,7 +64,6 @@
     "TickChannelEventArgs",
     "FrameEventArgs",
     "TimeLineEventArgs",
-    "ThreadSafeFrameEventArgs",
     "TransitionEventArgs",
 
     "Skills",
@@ -119,7 +118,7 @@
       "TickManager", "TickChannelEventArgs"
     ],
     "`Src/Core/VeloxDev.Core/TimeLine/`, `Src/Core/VeloxDev.Core/Interfaces/Tickable/`": [
-      "FrameEventArgs", "TimeLineEventArgs", "ThreadSafeFrameEventArgs", "TransitionEventArgs"
+      "FrameEventArgs", "TimeLineEventArgs", "TransitionEventArgs"
     ],
     "`VeloxDev.AI.Skills` / `VeloxDev.AI.Pipelines` / `VeloxDev.AI.Dashboard` namespaces (Src/Core/VeloxDev.Core.Extension/Agent/{Skills,Pipelines,Dashboard}/)": [
       "Skills", "Pipelines", "Dashboard"

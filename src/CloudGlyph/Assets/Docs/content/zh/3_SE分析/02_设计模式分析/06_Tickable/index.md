@@ -87,9 +87,6 @@ classDiagram
         +CurrentFPS int
         +TargetFPS int
     }
-    class ThreadSafeFrameEventArgs {
-        +Handled bool
-    }
     class TransitionEventArgs {
         +Stage string
         +Message string
@@ -107,7 +104,6 @@ classDiagram
     LoopChannel --> ITimeSourceControl : 每通道一条总线
     TickManager ..> TickChannelEventArgs : 触发 OnChannel*
     FrameEventArgs --|> TimeLineEventArgs
-    ThreadSafeFrameEventArgs --|> FrameEventArgs
     TransitionEventArgs --|> TimeLineEventArgs
     TickChannelEventArgs --|> EventArgs
 ```

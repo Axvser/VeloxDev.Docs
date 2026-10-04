@@ -52,6 +52,6 @@ Source: `TickManager.cs` lines 10-33.
 
 ## Other types on this page's boundary
 
-- **`TickChannelEventArgs`** — the payload of the four static events; documented separately ([TickChannelEventArgs](../05_TickChannelEventArgs/index.md)).
-- **`ITickable`** — what `RegisterBehaviour` accepts; documented separately ([ITickable](../07_ITickable/index.md)).
+- **`TickChannelEventArgs`** — the payload of the four static events; documented separately ([TickChannelEventArgs](../04_TickChannelEventArgs/index.md)).
+- **`ITickable`** — what `RegisterBehaviour` accepts; documented separately ([ITickable](../06_ITickable/index.md)).
 - **`ITimeSourceControl`** (`VeloxDev.Timing`) — what `Bus` returns. It is shared infrastructure documented with the transition feature; the members this feature's users need are `IsAdvancing`, `IsPaused`, `Rate`, `Position`, `Epoch`, `Pause()`, `Resume()`, `SetRate(double)` and `WaitWhileStalledAsync(CancellationToken)`.

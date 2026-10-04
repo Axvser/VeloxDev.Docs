@@ -29,7 +29,7 @@ Everything ships in the `VeloxDev.Core` package, and since the rename everything
 
 | Namespace | Hosted public API |
 |---|---|
-| `VeloxDev.TimeLine` | `TickableAttribute`, `TickManager`, `TickChannelEventArgs`, `ITickable`, `TimeLineEventArgs`, `FrameEventArgs`, `ThreadSafeFrameEventArgs`, `TransitionEventArgs` |
+| `VeloxDev.TimeLine` | `TickableAttribute`, `TickManager`, `TickChannelEventArgs`, `ITickable`, `TimeLineEventArgs`, `FrameEventArgs`, `TransitionEventArgs` |
 | `VeloxDev.Timing` | `ITimeSourceControl`, `ITimeSource` — the channel's clock, reached through `TickManager.Bus`. Shared infrastructure, documented with the transition feature |
 
 ## Model
@@ -65,10 +65,9 @@ Evidence: source (`Src/Core/VeloxDev.Core/TimeLine/`, `Src/Core/VeloxDev.Core/In
 | `TickManager` | static class | 4 events, 2 public properties (`UseAsyncLoop`, `ChannelNames`), 1 public constant (`DEFAULT_CHANNEL`), 27 public static methods — 34 public members in all | [TickManager](01_TickManager/index.md) |
 | `TimeLineEventArgs` | abstract class | 1 property | [TimeLineEventArgs](02_TimeLineEventArgs/index.md) |
 | `FrameEventArgs` | class : `TimeLineEventArgs` | 4 read-only properties | [FrameEventArgs](03_FrameEventArgs/index.md) |
-| `ThreadSafeFrameEventArgs` | class : `FrameEventArgs` | 1 property (shadowing) | [ThreadSafeFrameEventArgs](04_ThreadSafeFrameEventArgs/index.md) |
-| `TickChannelEventArgs` | sealed class : `EventArgs` | 1 property | [TickChannelEventArgs](05_TickChannelEventArgs/index.md) |
-| `TransitionEventArgs` | sealed class : `TimeLineEventArgs` | 3 properties | [TransitionEventArgs](06_TransitionEventArgs/index.md) |
-| `ITickable` | interface | 7 methods | [ITickable](07_ITickable/index.md) |
+| `TickChannelEventArgs` | sealed class : `EventArgs` | 1 property | [TickChannelEventArgs](04_TickChannelEventArgs/index.md) |
+| `TransitionEventArgs` | sealed class : `TimeLineEventArgs` | 3 properties | [TransitionEventArgs](05_TransitionEventArgs/index.md) |
+| `ITickable` | interface | 7 methods | [ITickable](06_ITickable/index.md) |
 
 Not part of the public surface, and deliberately so — these are `private` inside `TickManager` and must not appear in user code: the nested `LoopChannel`, `BehaviorWrapper`, `ConfigChangeRequest` and `ObjectPool<T>` types, and the `GetOrCreateChannel`, `LoopChannel`-returning and pump methods. The only public way to reach a channel is the static facade and `TickManager.Bus`.
 

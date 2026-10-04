@@ -81,25 +81,27 @@ catch (Exception ex) { Debug.WriteLine($"[{Name}] Update error: {ex.Message}"); 
 
 **Expected result:** a hook that throws every frame leaves the loop running, `TotalFrames` still climbing, and — in a Debug build with a debugger attached — one line per exception in the Output window.
 
-## 5. When you need a thread-safe flag
+## 5. When you need a cross-thread flag
 
-`FrameEventArgs` is a plain class and its `Handled` property is an ordinary `bool` with no memory barrier. The pump reads it on the pump thread and you write it on the pump thread, so within one hook it is fine. If you want to *raise* a flag from another thread, use `ThreadSafeFrameEventArgs`, which guards the property with a lock (`Src/Core/VeloxDev.Core/TimeLine/ThreadSafeFrameEventArgs.cs`):
+`FrameEventArgs` is a plain class and its `Handled` property is an ordinary `bool` with no memory barrier. That is safe here because the pump reads it and your hooks write it on the **same** thread: `Handled` never crosses a thread boundary inside the framework. It is also reset to `false` every time the arguments are built (`CreateFrameEventArgs`, `TickManager.cs` line 833), so it carries nothing from one frame to the next.
+
+An earlier version of this page recommended `ThreadSafeFrameEventArgs`, a lock-guarded subclass. **It has been deleted from the source.** The framework never constructed it — every `FrameEventArgs` a hook receives comes from the channel's pool as a plain `FrameEventArgs` (`TickManager.cs:154`) — and its `new`-shadowed `Handled` resolved to the *unsynchronised* base property through a `FrameEventArgs` reference anyway, so it could not have done the job it advertised.
+
+If your own code must observe a flag raised on another thread, do not write `FrameEventArgs.Handled` from that thread. Publish the flag with `Volatile.Write` and read it with `Volatile.Read` — the idiom the framework itself uses for the cross-thread `_targetFPS` (`TickManager.cs:778` write, `:832` read) — and transfer it to `Handled` inside a hook, on the pump thread:
 
 ```csharp
-public class ThreadSafeFrameEventArgs : FrameEventArgs
-{
-    private readonly object _lockObject = new();
-    private bool _handled;
+// Host state, written from another thread:
+private int _stopRequested;                          // 0 / 1
+public void RequestStop() => Volatile.Write(ref _stopRequested, 1);
 
-    public new bool Handled
-    {
-        get { lock (_lockObject) return _handled; }
-        set { lock (_lockObject) _handled = value; }
-    }
+// In the hook — runs on the pump thread:
+partial void Update(FrameEventArgs e)
+{
+    if (Volatile.Read(ref _stopRequested) != 0) e.Handled = true;
 }
 ```
 
-Note that the framework never constructs this type — every `FrameEventArgs` handed to a hook comes from the channel's pool as a plain `FrameEventArgs`. It exists for hosts that build their own arguments, and the `new` keyword means a `ThreadSafeFrameEventArgs` read through a `FrameEventArgs` reference gets the **unsynchronised** property. Use it through its own static type or not at all.
+`Handled` stays a single-threaded write on the pump thread; only the host flag crosses threads, and it does so through a proper barrier. Remember that `Handled` stops only the current frame phase (section 2). To end the loop itself, call `TickManager.Pause(channel)` / `StopAsync(channel)` — the lifecycle calls are safe from any thread (section 3).
 
 ## Notes
 

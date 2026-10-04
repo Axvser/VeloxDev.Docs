@@ -81,25 +81,27 @@ catch (Exception ex) { Debug.WriteLine($"[{Name}] Update error: {ex.Message}"); 
 
 **预期结果：** 一个每帧都抛异常的钩子会让循环继续运行、`TotalFrames` 继续增长；在挂着调试器的 Debug 构建里，Output 窗口每个异常一行。
 
-## 5. 什么时候需要线程安全标志
+## 5. 什么时候需要跨线程标志
 
-`FrameEventArgs` 是普通类，它的 `Handled` 就是普通 `bool`，没有任何内存屏障。泵线程读、你在泵线程写，所以在单个钩子内部它是安全的。如果你想从**另一个线程**立起这个标志，就用 `ThreadSafeFrameEventArgs`，它用一把锁包住该属性（`Src/Core/VeloxDev.Core/TimeLine/ThreadSafeFrameEventArgs.cs`）：
+`FrameEventArgs` 是普通类，它的 `Handled` 就是普通 `bool`，没有任何内存屏障。这里之所以安全，是因为泵读它、你的钩子写它，用的**是同一条线程**：在框架内部，`Handled` 从不跨越线程边界。而且每次构造事件参数时它都会被重置为 `false`（`CreateFrameEventArgs`，`TickManager.cs` 第 833 行），不会从上一帧带到下一帧。
+
+本页早先的版本推荐过 `ThreadSafeFrameEventArgs` —— 一个用锁包住属性的子类。**它已从源码中删除。** 框架自己从不构造它：交给钩子的每个 `FrameEventArgs` 都是从通道池里取出的普通 `FrameEventArgs`（`TickManager.cs:154`）；而且它那个 `new` 遮蔽出来的 `Handled`，通过 `FrameEventArgs` 引用去读时解析到的是基类**未同步**的那个属性 —— 也就是说，它根本做不到它宣称的事。
+
+如果你自己的代码必须感知另一个线程立起的标志，不要在那个线程上写 `FrameEventArgs.Handled`。用 `Volatile.Write` 发布这个标志、用 `Volatile.Read` 读取它 —— 这正是框架自己处理跨线程 `_targetFPS` 所用的写法（`TickManager.cs:778` 写，`:832` 读）—— 然后在钩子里、于泵线程上把它转写到 `Handled`：
 
 ```csharp
-public class ThreadSafeFrameEventArgs : FrameEventArgs
-{
-    private readonly object _lockObject = new();
-    private bool _handled;
+// 宿主状态，由另一个线程写入：
+private int _stopRequested;                          // 0 / 1
+public void RequestStop() => Volatile.Write(ref _stopRequested, 1);
 
-    public new bool Handled
-    {
-        get { lock (_lockObject) return _handled; }
-        set { lock (_lockObject) _handled = value; }
-    }
+// 在钩子里 —— 运行于泵线程：
+partial void Update(FrameEventArgs e)
+{
+    if (Volatile.Read(ref _stopRequested) != 0) e.Handled = true;
 }
 ```
 
-注意框架自己从不构造这个类型 —— 交给钩子的每个 `FrameEventArgs` 都是从通道池里取出的普通 `FrameEventArgs`。它是给「自建事件参数的宿主」用的；而 `new` 关键字意味着，通过 `FrameEventArgs` 引用去读一个 `ThreadSafeFrameEventArgs`，拿到的是**未同步**的那个属性。要么用它的静态类型引用来使用，要么就别用。
+这样 `Handled` 始终是泵线程上的单线程写入；只有宿主标志跨线程，而且带上了正确的内存屏障。记住 `Handled` 只中止当前帧阶段（第 2 节）。要结束循环本身，请调用 `TickManager.Pause(channel)` / `StopAsync(channel)` —— 这些生命周期调用从任意线程调用都安全（第 3 节）。
 
 ## 说明
 
