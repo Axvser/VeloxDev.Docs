@@ -81,7 +81,7 @@ Task<IReadOnlyList<CompiledGraph>> CompileAsync<T>(T component, CompileRole role
 
 **Notes:** linear segments → `ChainSegment`; `ICompileTimeRouter` nodes → `BranchSegment` (static branches pruned by the compile-time key, dynamic kept all); multi-target routes or plain-node fan-out → `ParallelSegment`; no downstream → terminal branch. Execution is then driven by `RuntimeEngine.RunAsync(graph, context, ct)`.
 
-## `ComponentModelEx.Serialize` / `Deserialize`
+## `ViewModelSerializer.Serialize` / `Deserialize`
 
 **Signature:**
 
@@ -99,11 +99,11 @@ T Deserialize<T>(this string json) where T : INotifyPropertyChanged;
 
 **Returns:** `Serialize` → JSON string; `Deserialize` → a new `T` instance.
 
-**Exceptions:** `Serialize` → `ArgumentNullException` on null workflow; `Deserialize` → `ArgumentException` on null/empty JSON, `JsonSerializationException` when the result is null. `TryDeserialize` returns `false` instead of throwing.
+**Exceptions:** `Serialize` → `ArgumentNullException` on null workflow; `Deserialize` → `ArgumentException` on blank JSON, `InvalidOperationException` when the result is null. `TryDeserialize` returns `false` instead of throwing.
 
 **Example:** `Examples/Workflow/Common/Lib/ViewModels/Workflow/TreeViewModel.cs`, line 291 (`var json = this.Serialize();` in `SaveCommand`); `Examples/Workflow/WPF/Demo/Views/Workflow/WorkflowView.xaml.cs`, lines 71 and 73 (`json.Deserialize<TreeViewModel>()` + `result.Layout.UpdateCommand.Execute(null)`).
 
-**Notes:** settings include `TypeNameHandling.Auto`, `PreserveReferencesHandling.Objects`, `WritablePropertiesOnlyResolver`.
+**Notes:** the engine is closed-world and reflection-free — a type round-trips only because the source generator emitted a reader and a writer for it. Type information is written when the runtime type differs from the declared type; global null/default handling no longer exists, and moved to the per-member `[JsonIgnore(Condition = …)]`.
 
 ## `RuntimeEngine.RunAsync`
 

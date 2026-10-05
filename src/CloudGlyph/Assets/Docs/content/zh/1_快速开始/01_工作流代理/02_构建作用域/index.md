@@ -9,8 +9,7 @@ using VeloxDev.AI.Workflow;
 WorkflowAgentScope scope = tree.AsAgentScope()
     .WithPromptLanguage(AgentLanguages.English)     // 提示 / [AgentContext] 文档的语言
     .WithOutputLanguage(AgentLanguages.Chinese)     // 模型必须使用的回答语言
-    .WithAutoDiscovery(assemblyName: "VeloxDev.Core")
-    .WithAutoDiscovery(assemblyName: "Lib")
+    .WithAutoDiscovery()                            // 注册编译期上下文树里的客户类型
     .WithMaxToolCalls(200)
     .WithAllowNodeExecution(true)
     .WithSynchronizationContext(SynchronizationContext.Current)
@@ -33,8 +32,7 @@ WorkflowAgentScope scope = tree.AsAgentScope()
 |---|---|---|
 | `WithPromptLanguage` | `WithPromptLanguage(AgentLanguages language)` | 当每次调用的 `language` 为 `null` 时，提示与 `[AgentContext]` 文档的全局默认语言。应先调用；它也会传播到已挂载的 `SkillScope`。 |
 | `WithOutputLanguage` | `WithOutputLanguage(AgentLanguages language)` | LLM 必须回答所用的语言（与提示语言无关）。 |
-| `WithAutoDiscovery` | `WithAutoDiscovery(Assembly assembly, AgentLanguages? language = null)` | 对一个程序集做两趟扫描。 |
-| `WithAutoDiscovery` | `WithAutoDiscovery(string assemblyName, AgentLanguages? language = null)` | 同上，按简单程序集名；程序集未加载时抛 `ArgumentException`。 |
+| `WithAutoDiscovery` | `WithAutoDiscovery(AgentLanguages? language = null)` | 注册编译期上下文树 `Customer/` 根下的全部类型条目 —— 组件（按四个组件接口分组）、枚举、接口与数据。**运行期不做任何扫描**；见 §3。 |
 | `WithEnums` / `WithInterfaces` / `WithComponents` / `WithData` | `(Type[] …, AgentLanguages? language = null)` | 显式注册类型，而不是扫描。 |
 | `WithMaxToolCalls` | `WithMaxToolCalls(int maxCalls)` | 累计工具调用上限。 |
 | `WithMaxReadToolCalls` | `WithMaxReadToolCalls(int maxCalls)` | 只读（查询）调用的独立上限。 |
@@ -44,14 +42,20 @@ WorkflowAgentScope scope = tree.AsAgentScope()
 
 ## 3. 类型发现的细节
 
-`WithAutoDiscovery` 跑两趟：
+上下文树是**编译期**走出来编译单元生成的，所以 `WithAutoDiscovery` 是一组目录列举，而不是运行期扫描：
 
-1. **第 1 趟 —— 程序集扫描。** 枚举程序集中的每个类型，注册具体 workflow 组件（`IWorkflowTreeViewModel` / `IWorkflowNodeViewModel` / `IWorkflowSlotViewModel` / `IWorkflowLinkViewModel`）、带 `[AgentContext]` 的枚举，以及带 `[AgentContext]` 的数据类/结构体。
-2. **第 2 趟 —— 深度成员扫描。** 对每个已注册组件，反射其公开属性、后备字段与方法，按语言推断 —— 枚举类型（经 `[SlotSelectors]` 与成员类型）、用作成员类型的接口、`[AgentCommandParameter]` 的参数类型，以及非基元值对象结构体。
+| `Customer/` 下的目录 | 装什么 |
+|---|---|
+| `Enums` | 生成器放行的枚举类型 |
+| `Interfaces` | 被用作成员类型的接口 |
+| `Data` | 数据类型 —— 带 `[AgentContext]` 的类与结构体，**以及（2026-10-05 起）被某个已收录类型的成员声明类型直接暴露出来的普通类** |
+| `Components/{kind}` | 四类组件，按 `IWorkflowTreeViewModel` / `IWorkflowNodeViewModel` / `IWorkflowSlotViewModel` / `IWorkflowLinkViewModel` 分组 |
 
-框架命名空间的类型（`System*`、`Microsoft*`、`VeloxDev.WorkflowSystem`、`VeloxDev.MVVM`、`VeloxDev.Core.WorkflowSystem`，外加 `FrameworkEnums` / `FrameworkInterfaces` / `FrameworkComponents` / `FrameworkData` 白名单）永不重复添加。一个全局 `HashSet` 保证每个类型跨所有语言只被深扫一次。
+**注册什么取决于生成器放行了什么。** 没有任何标注触及、没有组件接口到达、也没有成员引用的类型，既不在树里，也不在这里注册 —— 对它根本没有上下文可渲染。框架类型住在 `Framework/` 下，而只读 `Customer/`。
 
-**预期结果：** 两次 `WithAutoDiscovery` 后，作用域持有两个程序集注册的并集；询问一个你从未注册的程序集中的类型，得不到任何上下文块。
+源码：`WorkflowAgentScope.cs:969-986`；数据那条放宽的可达判据在 `AIContextModel.cs:311-322` 与 `:377-399`。
+
+**预期结果：** `WithAutoDiscovery()` 之后，作用域持有编译期树里的客户注册；询问一个生成器从未放行的类型，得不到任何上下文块。
 
 ## 4. 提示提供器
 

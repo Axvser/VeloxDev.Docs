@@ -11,12 +11,13 @@ VeloxDev/
 │   │   │   ├── TransitionSystem/          ← Animation engine, split by role: Events/ Effects/ Binding/ Sampling/ State/ Runtime/ Enums/ NativeSamplers/
 │   │   │   ├── DynamicTheme/              ← Theme switching (ThemeManager, ThemeCache)
 │   │   │   ├── MVVM/                      ← VeloxProperty/VeloxCommand runtime + IVeloxCommand
+│   │   │   ├── Serialization/             ← Archive engine (VeloxJson*), Archivable/Archive annotations
 │   │   │   ├── AspectOriented/            ← AOP proxies (#if NET)
 │   │   │   ├── AI/                        ← Agent attributes + reflection utilities
 │   │   │   ├── TimeLine/                  ← Tickable frame loop (TickManager)
 │   │   │   ├── WeakTypes/                 ← WeakQueue/WeakStack/WeakCache/WeakDelegate
 │   │   │   └── Interfaces/                ← Public API contracts (WorkflowSystem, TransitionSystem, ...)
-│   │   ├── VeloxDev.Core.Extension/       ← Workflow Agent (AI.Workflow), MCP, ComponentModelEx serialization
+│   │   ├── VeloxDev.Core.Extension/       ← Workflow Agent (AI.Workflow), MCP, compiled-graph & checkpoint documents
 │   │   ├── VeloxDev.Core.Test/            ← MSTest unit tests
 │   │   └── VeloxDev.Core.Extension.Test/  ← Extension unit tests
 │   ├── Adapters/                          ← Per-GUI adapters
@@ -95,7 +96,6 @@ flowchart LR
     EXT[VeloxDev.Core.Extension] --> Core
     EXT --> MCP[ModelContextProtocol]
     EXT --> EXAI[Microsoft.Extensions.AI]
-    EXT --> NJ[Newtonsoft.Json]
     WPF[VeloxDev.WPF] --> Core
     AV[VeloxDev.Avalonia] --> Core
     WU[VeloxDev.WinUI] --> Core

@@ -9,8 +9,7 @@ using VeloxDev.AI.Workflow;
 WorkflowAgentScope scope = tree.AsAgentScope()
     .WithPromptLanguage(AgentLanguages.English)     // language of the prompt / [AgentContext] docs
     .WithOutputLanguage(AgentLanguages.Chinese)     // language the model must answer in
-    .WithAutoDiscovery(assemblyName: "VeloxDev.Core")
-    .WithAutoDiscovery(assemblyName: "Lib")
+    .WithAutoDiscovery()                            // registers the compiled context tree's customer types
     .WithMaxToolCalls(200)
     .WithAllowNodeExecution(true)
     .WithSynchronizationContext(SynchronizationContext.Current)
@@ -33,8 +32,7 @@ Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`
 |---|---|---|
 | `WithPromptLanguage` | `WithPromptLanguage(AgentLanguages language)` | Global default language for the prompt and `[AgentContext]` docs when a per-call `language` is `null`. Call it first; it also propagates to an already-attached `SkillScope`. |
 | `WithOutputLanguage` | `WithOutputLanguage(AgentLanguages language)` | Language the LLM must reply in (independent of prompt language). |
-| `WithAutoDiscovery` | `WithAutoDiscovery(Assembly assembly, AgentLanguages? language = null)` | Two-pass scan of one assembly. |
-| `WithAutoDiscovery` | `WithAutoDiscovery(string assemblyName, AgentLanguages? language = null)` | Same, by simple assembly name; throws `ArgumentException` when the assembly is not loaded. |
+| `WithAutoDiscovery` | `WithAutoDiscovery(AgentLanguages? language = null)` | Registers every type entry under the compiled context tree's `Customer/` root — components (grouped by the four component interfaces), enums, interfaces and data. **Nothing is scanned at runtime**; see §3. |
 | `WithEnums` / `WithInterfaces` / `WithComponents` / `WithData` | `(Type[] …, AgentLanguages? language = null)` | Register types explicitly instead of scanning. |
 | `WithMaxToolCalls` | `WithMaxToolCalls(int maxCalls)` | Cumulative tool-call cap. |
 | `WithMaxReadToolCalls` | `WithMaxReadToolCalls(int maxCalls)` | Separate cap on read-only (query) calls. |
@@ -44,14 +42,20 @@ Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`
 
 ## 3. Type discovery in detail
 
-`WithAutoDiscovery` runs two passes:
+The context tree is built **at compile time** by walking the compilation, so `WithAutoDiscovery` is a set of directory listings rather than a runtime scan:
 
-1. **Pass 1 — assembly scan.** Enumerate every type in the assembly and register concrete workflow components (`IWorkflowTreeViewModel` / `IWorkflowNodeViewModel` / `IWorkflowSlotViewModel` / `IWorkflowLinkViewModel`), `[AgentContext]`-annotated enums, and `[AgentContext]`-annotated data classes/structs.
-2. **Pass 2 — deep member scan.** For every registered component, reflect over its public properties, backing fields and methods to infer — per language — enum types (via `[SlotSelectors]` and member types), interface types used as member types, `[AgentCommandParameter]` parameter types, and non-primitive value-object structs.
+| Directory under `Customer/` | What it holds |
+|---|---|
+| `Enums` | enum types the generator admitted |
+| `Interfaces` | interface types used as member types |
+| `Data` | data types — `[AgentContext]`-annotated classes and structs, **and (since 2026-10-05) a plain class exposed as the declared type of a member on an already-listed type** |
+| `Components/{kind}` | the four component kinds, grouped by `IWorkflowTreeViewModel` / `IWorkflowNodeViewModel` / `IWorkflowSlotViewModel` / `IWorkflowLinkViewModel` |
 
-Framework-namespace types (`System*`, `Microsoft*`, `VeloxDev.WorkflowSystem`, `VeloxDev.MVVM`, `VeloxDev.Core.WorkflowSystem`, plus the `FrameworkEnums` / `FrameworkInterfaces` / `FrameworkComponents` / `FrameworkData` allow-lists) are never added. A global `HashSet` guarantees each type is deep-scanned once across all languages.
+**What gets registered is what the generator admitted.** A type nothing annotates, no component interface reaches and no member references is not in the tree, and is not registered here either — there would be no context to render for it. Framework types live under `Framework/`, and only `Customer/` is read.
 
-**Expected result:** after two `WithAutoDiscovery` calls the scope holds the union of both assemblies' registrations; asking for a type from an assembly you never registered yields no context block.
+Source: `WorkflowAgentScope.cs:969-986`; the reachability rule for the data widening is `AIContextModel.cs:311-322` and `:377-399`.
+
+**Expected result:** after `WithAutoDiscovery()`, the scope holds the compiled tree's customer registrations; asking for a type the generator never admitted yields no context block.
 
 ## 4. Prompt providers
 

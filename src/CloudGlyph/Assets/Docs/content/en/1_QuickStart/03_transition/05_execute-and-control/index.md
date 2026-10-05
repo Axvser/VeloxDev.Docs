@@ -110,7 +110,14 @@ Transition.Seek(rect, Transition.Cycle(rect, IncludeMutual: true, IncludeNoMutua
 
 ## 6. The per-target scheduler
 
-Every `Execute` resolves a scheduler for the target via `TransitionSchedulerCore<THost, TTransitionInterpreterCore, TPriorityCore>.FindOrCreate(target, CanMutualTask)`. Mutual schedulers are cached per target in a `ConditionalWeakTable` (so they vanish with the target); no-mutual schedulers are created per run and registered/unregistered over the **whole** animation — including the `Await` gaps between segments — so an `Exit` during a gap still finds and cancels them. The scheduler serializes access through a `SemaphoreSlim`, tracks every live run of the animation, and hands the interpreter the prepared `SamplerSet<TPriorityCore>`. You normally never touch it, but you can address it directly with the static lookup helpers if needed:
+Every `Execute` resolves a scheduler for the target via `TransitionSchedulerCore<THost, TTransitionInterpreterCore, TPriorityCore>.FindOrCreate(target, CanMutualTask)`:
+
+| Kind | Lifetime | Consequence |
+|---|---|---|
+| Mutual | one per target, cached in a `ConditionalWeakTable` | it vanishes with the target |
+| No-mutual | one per run, registered/unregistered over the **whole** animation — the `Await` gaps between segments included | an `Exit` during a gap still finds and cancels the run |
+
+The scheduler serializes access through a `SemaphoreSlim`, tracks every live run of the animation, and hands the interpreter the prepared `SamplerSet<TPriorityCore>`. You normally never touch it, but the static lookup helpers address it directly:
 
 ```csharp
 using VeloxDev.TransitionSystem.Abstractions;   // TransitionSchedulerCore
@@ -138,7 +145,7 @@ public abstract class InterpolatorCore
 }
 ```
 
-The theme system ([Dynamic Theme](../../04_dynamic-theme/index.md)) is the caller that needs it — it drives one switch across targets of many runtime types, so it asks the interpolator which scheduler to animate a given target with. `Transition<T>.Execute` does not go through it, because `T` already names the type arguments. Three points the contract carries:
+The theme system ([Dynamic Theme](../../04_dynamic-theme/index.md)) is the caller that needs it: it drives one switch across targets of many runtime types, so it asks the interpolator which scheduler to animate a given target with. `Transition<T>.Execute` does not go through it — `T` already names the type arguments. Three points the contract carries:
 
 - **Every adapter overrides it** (`PlatformAdapters/Interpolator.cs`), each answering with its own host / `TransitionInterpreter` / priority triple — `DispatcherPriority` for WPF, Avalonia and Jalium; `DispatcherQueuePriority` for WinUI; `NonPriority` for MAUI, WinForms and Razor.
 - **`null` is an honest answer**, both for "this platform has not opted in" and for "this effect does not belong to this platform" (the override casts the effect, so the answer mirrors the cast the scheduler itself performs before running). The caller then switches without animating, rather than starting a run that draws nothing.

@@ -13,3 +13,4 @@ Design-pattern analysis for each feature. Every page below documents the pattern
 | [06 Tickable](06_tickable) | Template Method, Shared transport (Adapter), Publisher-Subscriber, Object Pool |
 | [07 Weak Types](07_weak-types) | Weak Reference, Sweep-on-Access |
 | [08 Platform Adapters](08_platform-adapters) | Adapter, Attached Behavior, Object Pool, Command, Strategy / Bridge, Observer |
+| [09 Serialization](09_serialization) | Registry, Strategy (the generated writer/reader pair), Marker Attribute, Immutable Snapshot |

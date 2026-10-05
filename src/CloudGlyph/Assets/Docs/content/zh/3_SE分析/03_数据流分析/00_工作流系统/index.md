@@ -17,7 +17,7 @@
 
 ## 各条流程在哪里汇合
 
-上面每条路径最终都落在同一个方法 —— `IWorkflowNodeViewModelHelper.ReceiveAsync(ITaskContext, CancellationToken)` —— 节点只靠收到的**上下文类型**区分它们。Compiler 路径传的是运行的 `IRuntimeContext`；广播路径每条边传一个新的 `TaskContext`。逐参数的对照见 API 维度的 `05_执行机制` 页。
+上面每条路径最终都落在同一个方法 —— `IWorkflowNodeViewModelHelper.ReceiveAsync(ITaskContext, CancellationToken)` —— 节点只靠收到的**上下文类型**区分它们。Compiler 路径传的是运行的 `IRuntimeContext`；广播路径每条边传一个新的 `TaskContext`。逐参数的对照见 API 维度的 `04_执行机制` 页。
 
 所有图都成立的两条不变量：
 

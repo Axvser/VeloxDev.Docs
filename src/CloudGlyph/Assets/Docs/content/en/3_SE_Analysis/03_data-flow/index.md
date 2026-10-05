@@ -13,3 +13,4 @@ PlantUML sequence diagrams for each feature's core API call chains. Each page co
 | [06 Tickable](06_tickable) | Start + registration → per-frame Update/LateUpdate + fixed batch → pause/resume → stop |
 | [07 Weak Types](07_weak-types) | Enqueue/push → sweep-on-access → dequeue/pop |
 | [08 Platform Adapters](08_platform-adapters) | Attach & wiring → pan/pointer → zoom collapse → node drag → slot connect → minimap navigation |
+| [09 Serialization](09_serialization) | Resolve type → pick writer/reader → walk members; write: first sighting takes an id and a type tag, a repeat writes a reference; read: forward-only cursor, member order irrelevant; two hand-written sync/async chains |

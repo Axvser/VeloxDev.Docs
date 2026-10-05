@@ -6,8 +6,8 @@ The wiki is organized around **features**, not directories. A feature is a cohes
 
 | Feature | Owning project(s) | Public API surface (summary) | Dependencies | Evidence |
 |---|---|---|---|---|
-| **workflow-system** | `VeloxDev.Core` (+ `VeloxDev.Core.Extension` for serialization) | `[WorkflowBuilder.*]`, `IWorkflowTreeViewModel` family, `CompilerEx`, `SelectorEx`, `StandardEx`, `SpatialGridHashMap` | Roslyn generator | Demo + Test |
-| **workflow-agent** | `VeloxDev.Core.Extension` | `WorkflowAgentScope`, `WorkflowAgentToolkit` (~60 tools), `McpScope`, `VeloxDev.AI` | `Microsoft.Extensions.AI`, `ModelContextProtocol` | Test + README + Demo |
+| **workflow-system** | `VeloxDev.Core` (+ `VeloxDev.Core.Extension` for the compiled-graph and checkpoint documents) | `[WorkflowBuilder.*]`, `IWorkflowTreeViewModel` family, `CompilerEx`, `SelectorEx`, `StandardEx`, `SpatialGridHashMap` | Roslyn generator | Demo + Test |
+| **workflow-agent** | `VeloxDev.Core.Extension` | `WorkflowAgentScope`, `WorkflowAgentToolkit` (66 built-in tools), `McpScope`, `VeloxDev.AI` | `Microsoft.Extensions.AI`, `ModelContextProtocol` | Test + README + Demo |
 | **mvvm** | `VeloxDev.Core` | `VeloxPropertyAttribute`, `VeloxCommandAttribute`, `VeloxCommand`, `IVeloxCommand` | Roslyn generator | Demo + Test |
 | **transition** | `VeloxDev.Core` + adapters | `Eases`, `Transition<T>`, `InterpolatorCore`, `TransitionSchedulerCore`, native interpolators | `System.Numerics`, `System.Drawing` | Demo + Test |
 | **dynamic-theme** | `VeloxDev.Core` + adapters | `ThemeManager`, `ThemeConfigAttribute`, `IThemeObject`, converters | Transition engine | Demo + Test |
@@ -15,6 +15,7 @@ The wiki is organized around **features**, not directories. A feature is a cohes
 | **tickable** | `VeloxDev.Core` | `TickManager`, `TickableAttribute`, `ITickable` | Roslyn generator | Demo + Test |
 | **weak-types** | `VeloxDev.Core` | `WeakDelegate`, `WeakQueue`, `WeakStack`, `WeakCache` | — | Test |
 | **platform-adapters** | 6 adapters + `Src/Templates` | Attached workflow behaviors, per-platform Transition/Theme wiring, `dotnet new` templates | per-framework SDK | README + Demo + Source |
+| **serialization** | `VeloxDev.Core` (+ `VeloxDev.Core.Extension` for the compiled-graph and checkpoint documents) | `ViewModelSerializer`, `SerializationOptions`, `ArchivableAttribute`, `ArchiveAttribute`, `ArchiveOptions`, `CompiledGraphEx`, `CheckpointEx` | Roslyn generator | Demo + Test |
 
 ## Module Responsibility Boundaries
 
@@ -29,11 +30,11 @@ flowchart TD
         MB[Tickable<br/>frame loop]
         WT[WeakTypes<br/>weak collections]
         AI[AI<br/>agent attributes + reflection]
+        SER[Serialization<br/>archive engine · VeloxJson*]
     end
     subgraph Ext [VeloxDev.Core.Extension]
-        AGT[Workflow Agent<br/>~60 tools · state tracker]
+        AGT[Workflow Agent<br/>66 tools · state tracker]
         MCP[MCP scope<br/>stdio servers]
-        SER[ComponentModelEx<br/>JSON serialization]
     end
     subgraph Adapters [VeloxDev.WPF / Avalonia / WinUI / MAUI / WinForms / Razor]
         AB[Attached workflow behaviors<br/>surface · drag · connect · pool · minimap]

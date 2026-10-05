@@ -61,7 +61,7 @@
 [7] refused on a serialized copy: The checkpoint does not belong to this graph status=Idle
 ```
 
-**文件存储的异步注意事项：** 检查点是纯 JSON，而 JSON 只有一种整数类型。进去的 `int` 回来变成 `long`，`float` 变成 `double`，无论 `TypeNameHandling` 怎么设 —— 所以一个用 `int` 匹配载荷的节点在经由文件恢复之后匹配不上。保留对象图原样的存储（`InMemoryCheckpointStore`）没有这个缺口。
+**文件存储的异步注意事项：** 检查点是纯 JSON，而 JSON 只有一种整数类型。进去的 `int` 回来变成 `long`，`float` 变成 `double`，改设置也没用 —— 基元值是按裸 JSON 值写出去的、不带类型标签 —— 所以一个用 `int` 匹配载荷的节点在经由文件恢复之后匹配不上。保留对象图原样的存储（`InMemoryCheckpointStore`）没有这个缺口。
 
 ---
 

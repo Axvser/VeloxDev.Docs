@@ -46,6 +46,8 @@
 
 每个条目绑定它作用于的那条连线，因此增删一个动作只改模板：`MenuItem` / `MenuFlyoutItem` 写 `Command="{Binding DeleteCommand}"`，Razor 按钮写 `@onclick="() => link.DeleteCommand.Execute(null)"`。Avalonia 的菜单资源没有 `x:DataType`，在编译绑定下写 `{ReflectionBinding DeleteCommand}`。
 
+在 Razor 上，那句 `@onclick` 之所以能绑上，是因为本库自带一个 `_Imports.razor`，内容是 `@using Microsoft.AspNetCore.Components.Web`（`Src/Adapters/VeloxDev.Razor/_Imports.razor`）。这个文件是**有承载作用的、不是装饰**：少了它，编译器会把处理器当成**字面属性**输出（`"@onclick"`），于是永不执行。消费方项目若也要编译生成出来的 Razor 视图，同样需要这条 import。
+
 ## CLI 选项（以 WPF 套件为例）
 
 每个模板都接受 `-ns <Namespace>` 指定生成的命名空间。视图模板另声明样式参数；WPF 套件的 `dotnetcli.host.json` 映射如下：

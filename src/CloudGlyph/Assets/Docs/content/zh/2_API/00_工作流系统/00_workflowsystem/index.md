@@ -206,12 +206,14 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 
 | 类型 | 说明 |
 |---|---|
-| `SlotEnumerator<TSlot>` | 动态槽位集合（`TSlot : IWorkflowSlotViewModel, new()`）。`SetSelector(object?)`（`Type`、类型名字符串或 `ISlotProvider`）、`TrySelect(object, out TSlot?)`、`Items`、`Count`、索引器、`CurrentValue`、`SelectorType`、`SelectorTypeName`、`Install(parent, memberName)`、`Uninstall()`。选择器切换以可撤销操作提交；各类型的槽位状态跨切换记忆。 |
+| `SlotEnumerator<TSlot>` | 动态槽位集合（`TSlot : IWorkflowSlotViewModel, new()`）。`SetSelector(object?)`（`Type`、类型名字符串或 `ISlotProvider`）、`TrySelect(object, out TSlot?)`、`Items`、`Count`、索引器、`CurrentValue`、`SelectorType`、`SelectorTypeName`、`Install(parent, memberName)`、`Uninstall()`。选择器切换以可撤销操作提交。**枚举**选择器跨切换记忆各类型的状态（槽位布局与布线）；**provider** 选择器**不记忆** —— provider 是一个**值**而不是类型，同一个类的两个实例可以给出完全不同的端口，所以每次调用都重建端口集。重建会接回原来喂给旧分支的连线：选择器类型没变时按**名字**配对，变了则按**序号**。 |
 | `ConditionalSlot<TSlot>` | `SlotEnumerator.Items` 中的一项：`Name`、`Value`、`Slot`。 |
 | `SlotDefinition(value, label)` | `ISlotProvider` 产生的条目。 |
 | `ISlotProvider` | `IEnumerable<SlotDefinition> GetSlots()` —— 以任意路由驱动枚举器。 |
 | `[SlotSelectors(params Type[] or params string[])]` | `VeloxDev.AI` 属性，声明 `SlotEnumerator` 属性上允许的选择器类型。 |
 | `IConditionalSlotProvider<TSlot>` | `SlotEnumerator<TSlot>` 实现的契约：`Parent`、`SelectorTypeName`、`Items`、`CurrentValue`、`TrySelect`、`SetSelector`、`Install`、`Uninstall`。 |
+| `IConditionalSlotProvider` | 同一个对象的**非泛型**视图，由 `SlotEnumerator<TSlot>` 显式实现 —— 只拿到一个 `object` 的调用方（比如 Agent 工具面）因此无需反射就能打开选择器：`Parent`、`SelectorTypeName`、`SelectorType`、`CurrentValue`、`Slots`（`IReadOnlyList<IConditionalSlot>`）、`TrySelect(object, out IWorkflowSlotViewModel?)`、`SetSelector(object?)`。`Slots` 是 `Items` 的**投影**而不是副本。 |
+| `IConditionalSlot` | `ConditionalSlot<TSlot>` 的非泛型形态：`Name`、`Value`、`Slot`（`IWorkflowSlotViewModel`）。 |
 
 `TrySelect` 是在 `conditionMap` 上的字典查找（期望 `O(1)`）。`CurrentValue` 的 getter 返回字符串形式；setter 接受字符串 / 枚举 / 数值并归一化。
 

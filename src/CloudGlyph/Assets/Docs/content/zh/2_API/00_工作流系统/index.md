@@ -9,9 +9,9 @@
 - [命名空间：VeloxDev.WorkflowSystem](00_workflowsystem/index.md) —— `VeloxDev.WorkflowSystem` 核心面（构建器特性、组件接口、几何/值类型、默认 ViewModel、选择器、空间索引、渲染就绪）
 - [命名空间：VeloxDev.WorkflowSystem.StandardEx](01_standardex/index.md) —— `VeloxDev.WorkflowSystem.StandardEx` 标准行为扩展
 - [命名空间：VeloxDev.Core.WorkflowSystem.CompilerEx](02_compilerex/index.md) —— `VeloxDev.Core.WorkflowSystem.CompilerEx` 的编译管线、编译模型、运行时引擎与宿主能力层
-- [命名空间：VeloxDev.MVVM.Serialization](03_MVVM序列化/index.md) —— `VeloxDev.MVVM.Serialization`：`ComponentModelEx` 存取、`CompiledGraphEx`、`CheckpointEx` + `FileCheckpointStore`
-- [关键成员契约](04_关键成员契约/index.md) —— 顶层 API 的条目模板式写法
-- [执行机制（Compiler 与 非Compiler）](05_执行机制/index.md) —— Compiler（引擎驱动）与 非 Compiler（广播）两条路径如何抵达同一个 `ReceiveAsync`
+- [关键成员契约](03_关键成员契约/index.md) —— 顶层 API 的条目模板式写法
+- [执行机制（Compiler 与 非Compiler）](04_执行机制/index.md) —— Compiler（引擎驱动）与 非 Compiler（广播）两条路径如何抵达同一个 `ReceiveAsync`
+- [GUI 输入](05_输入事件/index.md) —— 被路由的指针/键盘输入面：`WorkflowInput`、`IInputEvents`、那十五个标准类型，以及平台代码必须遵守的别名纪律
 
 ### `compilerex` 内部
 

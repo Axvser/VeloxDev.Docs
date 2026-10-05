@@ -58,9 +58,9 @@ $$
 
 *源码：`Src/Core/VeloxDev.Core/WorkflowSystem/SelectorEx/SlotEnumerator.cs`，`TrySelect` 第 255-258 行。*
 
-## 序列化（`ComponentModelEx.Serialize` / `Deserialize`）
+## 序列化（`ViewModelSerializer.Serialize` / `Deserialize`）
 
-`JsonConvert.SerializeObject` 做的是一次图遍历。开着 `PreserveReferencesHandling.Objects` 时，每个对象只被访问一次并分配一个引用 id，所以遍历对「被序列化的对象/属性数」是线性的。设 $P$ = 被序列化的对象 + 属性总数（有界于 $O(V + E + \text{自定义属性})$，$V$ 个节点、$E$ 条连线）：
+写入器顺着对象图走，靠的是**生成出来的**读写器 —— 没有反射，因此也没有运行期契约缓存需要预热。每个对象只被访问一次：`VeloxJsonWriter.WriteStartObject` 给它一个对象 id，第二次遇到时改写成引用标记而不再展开对象 —— 这正是让带 `Parent` 反向引用的图不会膨胀的原因。遍历对「写出去的成员数」是线性的。设 $P$ = 写出去的成员数（有界于 $O(V + E + \text{自定义成员})$，$V$ 个节点、$E$ 条连线）：
 
 $$
 T_{\text{serialize}} = O(P), \qquad T_{\text{deserialize}} = O(P)
@@ -68,17 +68,17 @@ $$
 
 三个值得注意的常数因子：
 
-- `WritablePropertiesOnlyResolver` 只保留可写属性，减小 $P$（`Helper` 这类只读成员被跳过）（`ComponentModelEx.cs` 第 459-518 行）。
-- `DictionaryKeyConverter` 按引用 id 写以接口为键的字典（`LinksMap` 用 `IWorkflowSlotViewModel` 做键），每个字典条目 $O(1)$；读入时经 `ReferenceResolver` 解析每个键（`ComponentModelEx.cs` 第 400-457 行）。
+- **成员集在编译期就定了**，不是运行期过滤：生成器收的是带 public setter 的 public 属性（按声明顺序），然后是 `[VeloxProperty]` 字段。`Helper` 这类只读成员从来不是候选，也就从不产生分支（`Src/Generators/VeloxDev.Core.Generator/Base/VeloxJsonModel.cs:912-1025`）。
+- **以接口为键的字典**（`LinksMap` 用 `IWorkflowSlotViewModel` 做键）按键的引用 id 写出 —— 每条 $O(1)$ —— 读回来时经读取器的引用表解析（`Src/Core/VeloxDev.Core/Serialization/VeloxJsonSerializer.cs:540,625`）。
 - **编译图快照是刻意更小的。** `CompiledGraphEx.SerializeCompiledGraph(graph, includeTree: false)` 排除 `IWorkflowTreeViewModel` 与 `ObservableCollection<IWorkflowSlotViewModel>` 属性，写入器因此绝不顺着 `Parent` 走进树、也不顺着槽位的 `Targets`/`Sources` 走进整个连通分量。代价从「整棵树加它的连通分量」降到分段结构加每个节点自身的状态 —— 代价是还原出来的节点不可重新上墙。
 
-设置（以及其 resolver 的 Newtonsoft 契约缓存）是静态缓存的，重复调用不会重新反射类型系统（`ComponentModelEx.cs` 第 71-121 行）。反序列化会先按序列化下来的 `SelectorTypeName` 重新解析 `SlotEnumerator` 的选择器类型，消费方再重新抛出派生值。异步重载仍然会把完整 JSON 字符串 / 字节数组物化在内存里，所以内存是：
+注册表查找无锁（`volatile` 字段挡着的不可变快照），成员名是**就地比对**而不是驻留成字符串，所以读写两侧都不为每个成员分配字符串（`Src/Core/VeloxDev.Core/Serialization/VeloxJsonRegistry.cs:83-96`）。反序列化会先按序列化下来的 `SelectorTypeName` 重新解析 `SlotEnumerator` 的选择器类型，消费方再重新抛出派生值。异步重载仍然会把完整 JSON 字符串 / 字节数组物化在内存里，所以内存是：
 
 $$
 S_{\text{json}} = O(P \cdot \text{avg bytes per value})
 $$
 
-*源码：`Src/Core/VeloxDev.Core.Extension/ComponentModelEx.cs`、`CompiledGraphEx.cs`。*
+*源码：`Src/Core/VeloxDev.Core/Serialization/`、`Src/Core/VeloxDev.Core.Extension/CompiledGraphEx.cs`。*
 
 ## 汇总表
 
@@ -89,5 +89,5 @@ $$
 | `WorkflowSpatialEx.Virtualize` | 期望 $O(m + v)$ | $O(1)$ 临时 | 两次空间查询 + 可见集合调和 |
 | 撤销 / 重做 | 每个动作 $O(1)$ | $O(n)$ | 并发栈 |
 | `SlotEnumerator.TrySelect` | 期望 $O(1)$ | $O(\text{成员数})$ | 字典查找 |
-| `ComponentModelEx.Serialize` / `Deserialize` | $O(P)$ | $O(P)$ | Newtonsoft 图遍历（PreserveReferences） |
+| `ViewModelSerializer.Serialize` / `Deserialize` | $O(P)$ | $O(P)$ | 生成的遍历，每个对象只访问一次（id / 引用标记） |
 | `CompiledGraphEx.SerializeCompiledGraph`（快照） | $O(P_{\text{graph}})$ | $O(P_{\text{graph}})$ | 写入器停在图的边界上 |

@@ -34,4 +34,4 @@ Copyright (c) 2025 Axvser。以 MIT 许可证发布。
 
 ## 第三方声明
 
-项目引用了第三方 NuGet 包（例如 `Microsoft.Extensions.AI`、`ModelContextProtocol`、`Newtonsoft.Json`）。适用各自许可证；本仓库不附带 NOTICE 文件。
+项目引用了第三方 NuGet 包（例如 `Microsoft.Extensions.AI`、`ModelContextProtocol`、`CliWrap`、`Microsoft.Bcl.HashCode`）。适用各自许可证；本仓库不附带 NOTICE 文件。

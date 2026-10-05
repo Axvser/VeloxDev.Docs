@@ -25,51 +25,63 @@ All four run tools require `WithAllowNodeExecution(true)`.
 | `StartCompiledWorkflow` | `StartCompiledWorkflow(int startNodeIndex, string? seed = null)` | Compiles the sub-graph from the start node and starts driving it on a background task, returning a handle **at once**. |
 | `ContinueCompiledWorkflow` | `ContinueCompiledWorkflow(int startNodeIndex, string? seed = null)` | Loads the last checkpoint from the scope's checkpoint store and carries on: nodes that place records as done are **not** driven again, and what they produced is restored for the nodes behind them. |
 
-`ContinueCompiledWorkflow` **errors when there is no checkpoint to carry on from**:
+`ContinueCompiledWorkflow` never starts a fresh run behind the agent's back — with nothing written yet it errors:
 
 ```text
 There is no checkpoint to carry on from: nothing has been written yet.
 Run the workflow once (StartCompiledWorkflow) and stop it mid-way, then continue.
 ```
 
-It deliberately never starts a fresh run behind the agent's back. Source: `CompiledRunControlTests.CarryingOn_WithNothingWrittenYet_IsRefused` (asserts `status:"error"` and a message containing `"no checkpoint"`), `AStoppedRun_EndsAsCancelled_AndTheAgentCanCarryOnFromIt` (a stopped run is resumed to `Completed` with `logCount > 0`).
+Source: `CompiledRunControlTests.CarryingOn_WithNothingWrittenYet_IsRefused`, `AStoppedRun_EndsAsCancelled_AndTheAgentCanCarryOnFromIt`.
 
 Handles are formatted `run-{n}` (a per-toolkit counter). An unknown handle returns `Unknown run handle '<h>'. Handles come from StartCompiledWorkflow / ContinueCompiledWorkflow and belong to one scope; list the run you started rather than inventing one.`
 
-## 2. Follow — `GetCompiledRunStatus` (and handle retirement)
+## 2. Follow — `GetCompiledRunStatus`
 
-`GetCompiledRunStatus(handle)` is the way to learn a run has finished: a still-running run's `outcome` is `Unknown`; a finished one stops being `Unknown`. It reports `isRunning`, `runStatus`, `outcome`, `isPaused`, `attempts`, `endedWithError`, the final `data`, `failures` (as records: `phase`/`level`/`message`/`attempt`/`order`), `failureCount`, `logCount`, the **last 40 lines** of the log (`RunStatusLogTail = 40`, read once through `RuntimeContext.SnapshotLogs()` on the run's own thread), and `logFile` (an absolute path when the host sent the lines to a file).
+The status reply is the whole state of a run in one object:
 
-**It retires the run's handle once it has reported the run as finished.** A finished run is dropped from the registry and its `CancellationTokenSource` disposed in the same call that answered "is it finished", so the answer and the retirement describe one state:
+| Field | Meaning |
+|---|---|
+| `isRunning` | Whether the run is still going. **A finished run's answer is `false` — that is the terminal reading.** |
+| `runStatus` | `Running` / `Paused` / `Stopped` |
+| `outcome` | `Unknown` while running, then `Completed` / `Cancelled` / `Failed` |
+| `isPaused` | The gate is holding it. `isPaused:true` comes with `isRunning:true` — *held is not finished* |
+| `attempts`, `endedWithError` | Redirect attempts, and whether a failure ended the flow |
+| `data` | The run's final payload |
+| `failures`, `failureCount` | Failure records: `phase` / `level` / `message` / `attempt` / `order` |
+| `logCount`, `logs` | `logs` is the **last 40 lines** (`RunStatusLogTail = 40`, read once through `RuntimeContext.SnapshotLogs()` on the run's own thread) |
+| `logFile` | An absolute path, present only when the host sent the lines to a file |
+
+**The call retires the handle once it has reported the run as finished** — the run is dropped from the registry and its `CancellationTokenSource` disposed in the same call that answered "is it finished", so the answer and the retirement describe one state:
 
 ```text
 GetCompiledRunStatus("run-1")   → {"status":"ok", "isRunning":false, "outcome":"Completed", ...}   // last good answer
 GetCompiledRunStatus("run-1")   → {"status":"error", "message":"Unknown run handle 'run-1'. ..."}  // retired
 ```
 
-So a poll loop must treat **`isRunning:false` as the terminal answer** and stop; a subsequent non-`ok` reply is not an ending. Source: `CompiledRunControlTests.WaitForEndAsync` (its only exit is `isRunning == false`; the source comment reads *"A finished run is dropped once it has been reported… Asking again afterwards is an unknown handle, which is the honest answer."*).
+So a poll loop stops on **`isRunning:false`**; a later non-`ok` reply is not an ending. Source: `CompiledRunControlTests.WaitForEndAsync` — its only exit is `isRunning == false`.
 
 **Expected result:** poll until `isRunning == false`, then read `outcome` from that same reply; asking again returns an unknown-handle error.
 
 ## 3. Hold and let go — `PauseCompiledRun` / `ResumeCompiledRun`
 
-```text
-PauseCompiledRun  → the node being driven finishes, nothing new starts, runStatus becomes "Paused"
-ResumeCompiledRun → the run goes on from where it stopped (a no-op when it was not held)
-```
+| Tool | Effect |
+|---|---|
+| `PauseCompiledRun` | The node being driven finishes, nothing new starts, `runStatus` becomes `Paused` |
+| `ResumeCompiledRun` | The run goes on from where it stopped — a no-op when it was not held |
 
-Both are idempotent, and `isPaused` in `GetCompiledRunStatus` reflects the gate. Source: `CompiledRunControlTests.AStartedRun_CanBeHeld_LetGo_AndFollowedToItsEnd` (holding shows `isPaused:true` **and** `isRunning:true` — "held is not finished"; resuming then ends `Completed`).
+Both are idempotent. Source: `CompiledRunControlTests.AStartedRun_CanBeHeld_LetGo_AndFollowedToItsEnd`.
 
 ### The `RunsOnOurGate` guard
 
-`PauseCompiledRun` and `ResumeCompiledRun` operate on `run.Gate`, so that gate must be **the one the engine is actually waiting on**. A host that brought its own `ManualExecutionGate` via `WithSessionConfiguration` has a gate these tools cannot drive, and both tools then **return an error** instead of reporting a pause that never happened:
+These two operate on `run.Gate`, so that gate must be **the one the engine is actually waiting on**. A host that brought its own `ManualExecutionGate` via `WithSessionConfiguration` has a gate the tools cannot drive, and they return an error rather than reporting a pause that never happened:
 
 ```text
 Run 'run-1' is held by an execution gate this tool cannot drive — the host brought its own.
 Pause and resume it through the host's controls; StopCompiledRun still works.
 ```
 
-The check is `RunsOnOurGate(run) == ReferenceEquals(run.Context?.ExecutionGate, run.Gate)`. `NewSession` adopts the host's gate when it is a `ManualExecutionGate` (`run.Gate = hostGate`), so a run started with a plain host gate is driven correctly; the error fires only when the host's gate is *not* the one the run is parked on. **`StopCompiledRun` has no such guard** — it cancels the token, which works whatever the gate, exactly as its message promises.
+The check is `ReferenceEquals(run.Context?.ExecutionGate, run.Gate)`. `NewSession` adopts a host `ManualExecutionGate` (`run.Gate = hostGate`), so a plain host gate is driven correctly; the error fires only when the host's gate is *not* the one the run is parked on. **`StopCompiledRun` has no such guard** — it cancels the token, which works whatever the gate.
 
 ## 4. Stop and carry on — `StopCompiledRun`
 
@@ -78,13 +90,16 @@ StopCompiledRun(handle)  → the node being driven finishes, the run ends at tha
                             and the checkpoint it left stays in the scope's store.
 ```
 
-`StopCompiledRun` calls `run.Cts.Cancel()`, so the run ends as `Cancelled` (not `Failed`). The checkpoint it left behind is exactly what `ContinueCompiledWorkflow` reads — a stopped run can be resumed later once whatever it needed has been fixed. This is different from `PauseCompiledRun`, which holds the run **without ending it** (the token is not cancelled, so `ContinueCompiledWorkflow` would not help; use `ResumeCompiledRun`).
+| | Ends the run? | Token | How to go on |
+|---|---|---|---|
+| `PauseCompiledRun` | No — it holds the run | not cancelled | `ResumeCompiledRun` |
+| `StopCompiledRun` | Yes, as `Cancelled` (not `Failed`) | cancelled | `ContinueCompiledWorkflow` reads the checkpoint it left |
 
 **Expected result:** after `StopCompiledRun`, the end status is `outcome:"Cancelled"`; a following `ContinueCompiledWorkflow` starts a new handle that runs to `Completed`.
 
 ## 5. Failures and the log travel with the result
 
-Both run entries report `failures` as records and `logFile` as an absolute path. With a retry policy configured on the session (`WithSessionConfiguration(ctx => ctx.RetryPolicy = ...)`) the failures array carries both `"Warning"` and `"Error"` levels, and the log file contains the retry lines (`"[Retry 1]"`). Source: `CompiledRunControlTests.TheFailureRecords_AndTheLogFile_TravelWithTheResult`.
+Both run entries report `failures` as records and `logFile` as an absolute path. With a retry policy on the session (`WithSessionConfiguration(ctx => ctx.RetryPolicy = ...)`) the array carries both `"Warning"` and `"Error"` levels, and the log file contains the retry lines (`"[Retry 1]"`). Source: `CompiledRunControlTests.TheFailureRecords_AndTheLogFile_TravelWithTheResult`.
 
 ## Run declaration
 

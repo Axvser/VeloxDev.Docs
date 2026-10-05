@@ -30,8 +30,9 @@ That `net10.0` build is only the *tested* configuration, not the minimum — it 
 | `Microsoft.Agents.AI` | 1.22.0 | `AIAgent`, `AIContextProvider`, `ChatClientAgent`, the pipeline middlewares |
 | `Microsoft.Extensions.AI` | 10.10.0 | `AITool`, `AIFunction`, `AIFunctionFactory`, `IChatClient` |
 | `ModelContextProtocol` | 2.2.0 | the MCP client / stdio + HTTP transports |
-| `Newtonsoft.Json` | 13.0.4 | every tool's compact JSON output |
 | `CliWrap` | 3.10.5 | launching `npm` / `pip` / `npx` for local MCP servers |
+
+Every tool's compact JSON output is built by the archive engine's own JSON tree (`VeloxJsonObject` / `VeloxJsonValue.ToJson`), which ships inside `VeloxDev.Core` — the Agent adds no JSON package of its own.
 
 - **`IChatClient` implementation** — the agent runs over `Microsoft.Extensions.AI`. The demo constructs an OpenAI-compatible client (`OpenAIClient` → `AsIChatClient()`) pointed at `https://api.deepseek.com`; any `IChatClient` works.
 

@@ -62,7 +62,15 @@ private void ExecuteBehaviorsUpdateSync(FrameEventArgs frameArgs, CancellationTo
 | `TickManager.Start` / `Pause` / `Resume` / `SetTargetFPS` / `RegisterBehaviour` / … | 调用它的那个线程 —— 从任意线程调用都安全 |
 | `TickManager.ExecuteOnMainThread(action, channel)` | 委托在**Update**线程上、于下一帧开头运行 |
 
-两个泵是两条独立线程、**并发**执行。一个 `FixedUpdate` 函数体与一个 `Update` 函数体可能在同一瞬间运行，所以任何被两者触碰的字段都要自己做同步。演示靠的是**所有权**而不是锁：每只球都由恰好一条泵线程独占，窗口从不触碰它 —— `SimState.cs` 的原话就是「No locking anywhere: exactly one pump thread owns each instance and the window never touches one」。唯一需要跨线程的状态是整体发布的：一个不可变的 `BallReport` 快照用 `Volatile.Write` 写、用 `Volatile.Read` 读，再加上 `Interlocked` 计数器与 `ConcurrentQueue` 日志（`DemoState`，`SimState.cs` 第 191-279 行）。框架不会替你处理这些。
+两个泵是两条独立线程、**并发**执行：一个 `FixedUpdate` 函数体与一个 `Update` 函数体可能在同一瞬间运行，所以任何被两者触碰的字段都要自己做同步。演示靠的是**所有权**而不是锁 —— 每只球都由恰好一条泵线程独占，窗口从不触碰它（`SimState.cs`）。唯一需要跨线程的状态是整体发布的：
+
+| 通道 | 机制 |
+|---|---|
+| 球的状态快照 | 不可变的 `BallReport`，用 `Volatile.Write` 写、`Volatile.Read` 读 |
+| 计数器 | `Interlocked` |
+| 日志 | `ConcurrentQueue`（`DemoState`，`SimState.cs` 第 191-279 行） |
+
+框架不会替你处理这些。
 
 `ExecuteOnMainThread` 里的「主线程」指的是 **Update 泵的线程**，不是 UI 线程。在 GUI 宿主里你仍然要自己封送到 dispatcher —— 而且不要在钩子里做，因为引擎会捕获钩子抛出的一切异常并只写进 `Debug.WriteLine`。一个抛异常的 `Dispatcher.Invoke` 因此是**屏幕上没有症状、任何日志里也没有记录**的失败。WPF 演示用「钩子发布不可变快照、UI 线程轮询」绕开了整类问题（`MainWindow.Hooks.cs` 第 15-22 行）。
 
@@ -83,7 +91,7 @@ catch (Exception ex) { Debug.WriteLine($"[{Name}] Update error: {ex.Message}"); 
 
 ## 5. 什么时候需要跨线程标志
 
-`FrameEventArgs` 是普通类，它的 `Handled` 就是普通 `bool`，没有任何内存屏障。这里之所以安全，是因为泵读它、你的钩子写它，用的**是同一条线程**：在框架内部，`Handled` 从不跨越线程边界。而且每次构造事件参数时它都会被重置为 `false`（`CreateFrameEventArgs`，`TickManager.cs` 第 833 行），不会从上一帧带到下一帧。
+`FrameEventArgs` 是普通类，`Handled` 就是普通 `bool`，没有任何内存屏障。之所以安全，是因为泵读它、你的钩子写它，用的**是同一条线程** —— 在框架内部 `Handled` 从不跨越线程边界。而且每次构造事件参数时它都会被重置为 `false`（`TickManager.cs` 第 833 行），不会从上一帧带到下一帧。
 
 本页早先的版本推荐过 `ThreadSafeFrameEventArgs` —— 一个用锁包住属性的子类。**它已从源码中删除。** 框架自己从不构造它：交给钩子的每个 `FrameEventArgs` 都是从通道池里取出的普通 `FrameEventArgs`（`TickManager.cs:154`）；而且它那个 `new` 遮蔽出来的 `Handled`，通过 `FrameEventArgs` 引用去读时解析到的是基类**未同步**的那个属性 —— 也就是说，它根本做不到它宣称的事。
 

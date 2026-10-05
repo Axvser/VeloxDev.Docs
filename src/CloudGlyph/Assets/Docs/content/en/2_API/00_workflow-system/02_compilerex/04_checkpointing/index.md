@@ -61,7 +61,7 @@ The engine files each node under `IWorkflowIdentifiable.RuntimeId` when the node
 [7] refused on a serialized copy: The checkpoint does not belong to this graph status=Idle
 ```
 
-**Async caveat for file-backed stores:** a checkpoint is plain JSON, and JSON has one integer type. An `int` that went in comes back as a `long`, a `float` as a `double`, whatever the `TypeNameHandling` setting — so a node that pattern-matches a payload on `int` will not match after a resume through a file. The store that keeps the object graph as it is (`InMemoryCheckpointStore`) has no such gap.
+**Async caveat for file-backed stores:** a checkpoint is plain JSON, and JSON has one integer type. An `int` that went in comes back as a `long`, a `float` as a `double`, and no setting changes that — a primitive is written as a bare JSON value with no type tag — so a node that pattern-matches a payload on `int` will not match after a resume through a file. The store that keeps the object graph as it is (`InMemoryCheckpointStore`) has no such gap.
 
 ---
 

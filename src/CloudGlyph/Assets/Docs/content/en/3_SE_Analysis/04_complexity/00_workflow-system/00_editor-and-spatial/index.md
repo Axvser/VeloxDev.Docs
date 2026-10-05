@@ -58,9 +58,9 @@ $$
 
 *Source: `Src/Core/VeloxDev.Core/WorkflowSystem/SelectorEx/SlotEnumerator.cs`, `TrySelect` lines 255-258.*
 
-## Serialization (`ComponentModelEx.Serialize` / `Deserialize`)
+## Serialization (`ViewModelSerializer.Serialize` / `Deserialize`)
 
-`JsonConvert.SerializeObject` performs a graph traversal. With `PreserveReferencesHandling.Objects`, every object is visited once and assigned a reference id, so the traversal is linear in the number of serialized objects/properties. With $P$ = total serialized objects + properties (bounded by $O(V + E + \text{custom properties})$, $V$ nodes, $E$ links):
+The writer walks the object graph through **generated** readers and writers — there is no reflection, and therefore no runtime contract cache to warm. Each object is visited once: `VeloxJsonWriter.WriteStartObject` gives it an object id, and a second encounter writes a reference marker instead of the object again, which is what keeps a graph with `Parent` back-references from expanding. Traversal is linear in the number of written members. With $P$ = written members (bounded by $O(V + E + \text{custom members})$, $V$ nodes, $E$ links):
 
 $$
 T_{\text{serialize}} = O(P), \qquad T_{\text{deserialize}} = O(P)
@@ -68,17 +68,17 @@ $$
 
 Three constant factors worth noting:
 
-- `WritablePropertiesOnlyResolver` filters to writable properties, reducing $P$ (read-only members like `Helper` are skipped) (`ComponentModelEx.cs`, lines 459-518).
-- `DictionaryKeyConverter` writes interface-keyed dictionaries (`LinksMap` uses `IWorkflowSlotViewModel` keys) by reference id, adding $O(1)$ per dictionary entry; on read it resolves each key via the `ReferenceResolver` (`ComponentModelEx.cs`, lines 400-457).
+- **The member set is decided at compile time**, not filtered at run time: the generator collects public properties with a public setter, in declaration order, then the `[VeloxProperty]` fields. A read-only member like `Helper` is never a candidate and never costs a branch (`Src/Generators/VeloxDev.Core.Generator/Base/VeloxJsonModel.cs:912-1025`).
+- **Interface-keyed maps** (`LinksMap` keys by `IWorkflowSlotViewModel`) are written as the key's reference id — $O(1)$ per entry — and resolved through the reader's reference table on the way back (`Src/Core/VeloxDev.Core/Serialization/VeloxJsonSerializer.cs:540,625`).
 - **A compiled-graph snapshot is smaller by design.** `CompiledGraphEx.SerializeCompiledGraph(graph, includeTree: false)` excludes `IWorkflowTreeViewModel` and `ObservableCollection<IWorkflowSlotViewModel>` properties, so the writer never follows `Parent` into the tree or a slot's `Targets`/`Sources` into the whole connected component. The cost drops from "the tree plus its connected component" to the segment structure plus each node's own state — at the price that the restored nodes are not re-mountable.
 
-Settings (and their resolver's Newtonsoft contract cache) are cached statically, so repeated calls do not re-reflect the type system (`ComponentModelEx.cs`, lines 71-121). Deserialization re-resolves a `SlotEnumerator`'s selector type from the serialized `SelectorTypeName` before consumers re-raise derived values. The async overloads still materialize the full JSON string / byte array in memory, so memory usage is:
+Registry lookups are lock-free (an immutable snapshot behind a `volatile` field), and member names are compared in place rather than interned, so neither side allocates a string per member (`Src/Core/VeloxDev.Core/Serialization/VeloxJsonRegistry.cs:83-96`). Deserialization re-resolves a `SlotEnumerator`'s selector type from the serialized `SelectorTypeName` before consumers re-raise derived values. The async overloads still materialize the full JSON string / byte array in memory, so memory usage is:
 
 $$
 S_{\text{json}} = O(P \cdot \text{avg bytes per value})
 $$
 
-*Source: `Src/Core/VeloxDev.Core.Extension/ComponentModelEx.cs`, `CompiledGraphEx.cs`.*
+*Source: `Src/Core/VeloxDev.Core/Serialization/`, `Src/Core/VeloxDev.Core.Extension/CompiledGraphEx.cs`.*
 
 ## Summary Table
 
@@ -89,5 +89,5 @@ $$
 | `WorkflowSpatialEx.Virtualize` | expected $O(m + v)$ | $O(1)$ scratch | two spatial queries + visible reconcile |
 | Undo / Redo | $O(1)$ per action | $O(n)$ | concurrent stacks |
 | `SlotEnumerator.TrySelect` | $O(1)$ expected | $O(\text{members})$ | dictionary lookup |
-| `ComponentModelEx.Serialize` / `Deserialize` | $O(P)$ | $O(P)$ | Newtonsoft graph traversal (PreserveReferences) |
+| `ViewModelSerializer.Serialize` / `Deserialize` | $O(P)$ | $O(P)$ | generated traversal, one visit per object (id / reference marker) |
 | `CompiledGraphEx.SerializeCompiledGraph` (snapshot) | $O(P_{\text{graph}})$ | $O(P_{\text{graph}})$ | writer stops at the graph boundary |

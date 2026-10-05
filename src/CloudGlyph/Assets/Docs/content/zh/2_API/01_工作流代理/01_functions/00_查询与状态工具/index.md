@@ -4,10 +4,12 @@
 
 ## Query —— 只读检查（20）
 
+节点几何（`x` / `y` / `l` / `w` / `h`）按**世界坐标**报告 —— 也就是 `CreateNode`、`SetNodePosition` 与存档写入所用的同一坐标系，不受画布缩放影响。直接读 `Anchor` / `Size` 拿到的是**折叠后**的值（它们的 getter 会除以 `Layout.Scale`），所以查询工具统一走 `WorldAnchor` / `WorldSize`（`WorkflowAgentToolkit.cs:2844-2879`）—— 模型读回来的与它写进去的才是同一个数。
+
 | 工具 | 签名 | 用途 |
 |---|---|---|
-| `ListNodes` | `ListNodes()` | 紧凑节点列表 `[{i,id,t,x,y,l,w,h,slots,...props}]`；完整信息用 `GetNodeDetail`。 |
-| `GetNodeDetail` | `GetNodeDetail(int nodeIndex)` | 按零基索引的完整节点详情：属性、带连接的槽。 |
+| `ListNodes` | `ListNodes()` | 紧凑节点列表 `[{i,id,t,x,y,l,w,h,slots,...props}]` —— `i` 零基索引、`id` 运行时 id、`t` 类型简名、`x`/`y` 世界左右、`l` 图层 z-order、`w`/`h` 世界尺寸、`slots` 槽数量；完整信息用 `GetNodeDetail`。 |
+| `GetNodeDetail` | `GetNodeDetail(int nodeIndex)` | 按零基索引的完整节点详情：同样的世界几何，外加 `fullType`；`slots` 是**对象数组**（`si` 索引、`id`、`ch` 通道、`st` 状态、`prop`，以及可选的 `tgt`/`src` 连接）而不是计数。 |
 | `GetNodeDetailById` | `GetNodeDetailById(string runtimeId)` | 按运行时 ID 的完整节点详情（跨增删稳定）。 |
 | `ListConnections` | `ListConnections()` | 仅可见连接（紧凑，含 link id）。要整个图优先用 `GetFullTopology`。 |
 | `GetTypeSchema` | `GetTypeSchema(string fullTypeName)` | 按全名返回 .NET 类型的 JSON schema（`TypeIntrospector`）。 |
@@ -26,6 +28,8 @@
 | `CompileNodeResult` | `CompileNodeResult(int nodeIndex)` | 某节点祖先锥的编译计划（Terminal 角色）。 |
 | `GetCompileStatus` | `GetCompileStatus()` | 每个编译感知节点的当前编译身份（`Order`/`ChainIndex`/`Offset`/`isStopped`），无需重新编译。 |
 | `GetExecutionLog` | `GetExecutionLog()` | 树的聚合直接执行日志（约定命名的 `ExecutionLog` 属性）。 |
+
+**槽的发现有一条运行期兜底。** 按属性名解析槽被 `ResolveSlotId`、`ListSlotProperties`、`ConnectEnumSlot`（以及两个私有辅助）使用。一条属性算作单槽的条件是：编译期标志说是**或者**该属性**当前持有的值**是 `IWorkflowSlotViewModel` —— 即 `TreeProperty.HoldsASingleSlot`，`WorkflowAgentToolkit.cs:2780`。第二个判据是给「装了旧版生成器的消费方」用的：`[WorkflowBuilder.Slot<T>]` 注入的槽组件接口，与上下文生成器跑在**同一个编译趟**里，而源生成器看不见另一个生成器的产物（`AIContextModel.cs:917-935`）—— 所以在修复之前发布的包里，根本没有标志可读。
 
 注意 `CompileWorkflow`、`CompileNodeResult`、`GetCompileStatus`、`GetExecutionLog` 是 **Query 工具**，但从不运行节点代码 —— 它们不受 `WithAllowNodeExecution` 闸控。
 

@@ -6,8 +6,8 @@ Wiki 围绕**功能**而非目录组织。功能是项目对外暴露的一组�
 
 | 功能 | 所属项目 | 公共 API 面（摘要） | 依赖 | 证据 |
 |---|---|---|---|---|
-| **工作流系统** | `VeloxDev.Core`（序列化来自 `VeloxDev.Core.Extension`） | `[WorkflowBuilder.*]`、`IWorkflowTreeViewModel` 家族、`CompilerEx`、`SelectorEx`、`StandardEx`、`SpatialGridHashMap` | Roslyn 生成器 | Demo + Test |
-| **工作流代理** | `VeloxDev.Core.Extension` | `WorkflowAgentScope`、`WorkflowAgentToolkit`（约 60 个工具）、`McpScope`、`VeloxDev.AI` | `Microsoft.Extensions.AI`、`ModelContextProtocol` | Test + README + Demo |
+| **工作流系统** | `VeloxDev.Core`（编译图与检查点文档来自 `VeloxDev.Core.Extension`） | `[WorkflowBuilder.*]`、`IWorkflowTreeViewModel` 家族、`CompilerEx`、`SelectorEx`、`StandardEx`、`SpatialGridHashMap` | Roslyn 生成器 | Demo + Test |
+| **工作流代理** | `VeloxDev.Core.Extension` | `WorkflowAgentScope`、`WorkflowAgentToolkit`（66 个内置工具）、`McpScope`、`VeloxDev.AI` | `Microsoft.Extensions.AI`、`ModelContextProtocol` | Test + README + Demo |
 | **MVVM** | `VeloxDev.Core` | `VeloxPropertyAttribute`、`VeloxCommandAttribute`、`VeloxCommand`、`IVeloxCommand` | Roslyn 生成器 | Demo + Test |
 | **过渡动画** | `VeloxDev.Core` + 适配器 | `Eases`、`Transition<T>`、`InterpolatorCore`、`TransitionSchedulerCore`、原生插值器 | `System.Numerics`、`System.Drawing` | Demo + Test |
 | **动态主题** | `VeloxDev.Core` + 适配器 | `ThemeManager`、`ThemeConfigAttribute`、`IThemeObject`、转换器 | 过渡引擎 | Demo + Test |
@@ -15,6 +15,7 @@ Wiki 围绕**功能**而非目录组织。功能是项目对外暴露的一组�
 | **Tickable** | `VeloxDev.Core` | `TickManager`、`TickableAttribute`、`ITickable` | Roslyn 生成器 | Demo + Test |
 | **弱引用类型** | `VeloxDev.Core` | `WeakDelegate`、`WeakQueue`、`WeakStack`、`WeakCache` | — | Test |
 | **平台适配器** | 6 个适配器 + `Src/Templates` | 附加工作流行为、各平台过渡/主题接线、`dotnet new` 模板 | 各框架 SDK | README + Demo + 源码 |
+| **序列化** | `VeloxDev.Core`（编译图与检查点文档来自 `VeloxDev.Core.Extension`） | `ViewModelSerializer`、`SerializationOptions`、`ArchivableAttribute`、`ArchiveAttribute`、`ArchiveOptions`、`CompiledGraphEx`、`CheckpointEx` | Roslyn 生成器 | Demo + Test |
 
 ## 模块职责边界
 
@@ -29,11 +30,11 @@ flowchart TD
         MB[Tickable<br/>帧循环]
         WT[WeakTypes<br/>弱集合]
         AI[AI<br/>代理属性 + 反射]
+        SER[序列化<br/>归档引擎 · VeloxJson*]
     end
     subgraph Ext [VeloxDev.Core.Extension]
-        AGT[工作流代理<br/>约 60 个工具 · 状态跟踪]
+        AGT[工作流代理<br/>66 个工具 · 状态跟踪]
         MCP[MCP 作用域<br/>stdio 服务器]
-        SER[ComponentModelEx<br/>JSON 序列化]
     end
     subgraph Adapters [VeloxDev.WPF / Avalonia / WinUI / MAUI / WinForms / Razor]
         AB[附加工作流行为<br/>表面 · 拖拽 · 连接 · 池 · 小地图]

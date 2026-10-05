@@ -17,7 +17,7 @@ PlantUML sequence diagrams trace the core data flows of the workflow-system feat
 
 ## Where the flows meet
 
-Every path above ends in the same method — `IWorkflowNodeViewModelHelper.ReceiveAsync(ITaskContext, CancellationToken)` — and a node tells them apart only by the **context type** it receives. The Compiler path passes the run's `IRuntimeContext`; the broadcast path passes a fresh `TaskContext` per edge. For the parameter-by-parameter comparison see the `05_execution-mechanism` page in the API dimension.
+Every path above ends in the same method — `IWorkflowNodeViewModelHelper.ReceiveAsync(ITaskContext, CancellationToken)` — and a node tells them apart only by the **context type** it receives. The Compiler path passes the run's `IRuntimeContext`; the broadcast path passes a fresh `TaskContext` per edge. For the parameter-by-parameter comparison see the `04_execution-mechanism` page in the API dimension.
 
 Two invariants hold across all the diagrams:
 

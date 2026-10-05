@@ -30,8 +30,9 @@
 | `Microsoft.Agents.AI` | 1.22.0 | `AIAgent`、`AIContextProvider`、`ChatClientAgent`、管线中间件 |
 | `Microsoft.Extensions.AI` | 10.10.0 | `AITool`、`AIFunction`、`AIFunctionFactory`、`IChatClient` |
 | `ModelContextProtocol` | 2.2.0 | MCP 客户端 / stdio 与 HTTP 传输 |
-| `Newtonsoft.Json` | 13.0.4 | 每个工具的紧凑 JSON 输出 |
 | `CliWrap` | 3.10.5 | 启动本地 MCP 服务器的 `npm` / `pip` / `npx` |
+
+每个工具的紧凑 JSON 输出由归档引擎自己的 JSON 树构造（`VeloxJsonObject` / `VeloxJsonValue.ToJson`），它随 `VeloxDev.Core` 发布 —— Agent 没有自己额外的 JSON 包。
 
 - **`IChatClient` 实现** —— agent 运行在 `Microsoft.Extensions.AI` 之上。demo 构造一个 OpenAI 兼容客户端（`OpenAIClient` → `AsIChatClient()`），指向 `https://api.deepseek.com`；任何 `IChatClient` 都可以。
 

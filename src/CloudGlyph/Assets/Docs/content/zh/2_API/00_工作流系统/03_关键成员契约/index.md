@@ -71,7 +71,7 @@ Task<IReadOnlyList<CompiledGraph>> CompileAsync<T>(
 
 **说明：** 线性段 → `ChainSegment`、路由点 → `BranchSegment`、单键/普通节点多目标扇出 → `ParallelSegment`；编译完给每个 `ICompileTimeAware` 节点注入 `CompileContext`（`Order`/`ChainIndex`/`Offset`，未选中分支 `Order = -1`）。
 
-### `ComponentModelEx.Serialize` / `Deserialize`
+### `ViewModelSerializer.Serialize` / `Deserialize`
 
 **签名：**
 
@@ -89,11 +89,11 @@ T Deserialize<T>(this string json) where T : INotifyPropertyChanged;
 
 **返回：** `Serialize` → JSON 字符串；`Deserialize` → 新的 `T` 实例。
 
-**异常：** `Serialize` 对 null workflow 抛 `ArgumentNullException`；`Deserialize` 对 null / 空 JSON 抛 `ArgumentException`，结果为空时抛 `JsonSerializationException`。`TryDeserialize` 返回 `false` 而非抛出。
+**异常：** `Serialize` 对 null workflow 抛 `ArgumentNullException`；`Deserialize` 对空白 JSON 抛 `ArgumentException`，结果为空时抛 `InvalidOperationException`。`TryDeserialize` 返回 `false` 而非抛出。
 
 **示例：** `Examples/Workflow/Common/Lib/ViewModels/Workflow/TreeViewModel.cs` 的 `Save` 命令（第 291 行 `var json = this.Serialize();`）；`Examples/Workflow/WPF/Demo/Views/Workflow/WorkflowView.xaml.cs` 的 `SelectWorkflow`（第 71、73 行 `json.Deserialize<TreeViewModel>()` + `Layout.UpdateCommand.Execute(null)`）。
 
-**说明：** 设置包含 `TypeNameHandling.Auto`、`PreserveReferencesHandling.Objects`、`WritablePropertiesOnlyResolver`。
+**说明：** 引擎是闭世界、零反射的 —— 一个类型能往返，只因为源生成器为它编出了读写器。运行期类型与声明类型不同时才写类型信息；全局的 null/默认值处理已不存在，下沉成了逐成员的 `[JsonIgnore(Condition = …)]`。
 
 ## `RuntimeEngine.RunAsync`
 

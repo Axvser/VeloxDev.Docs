@@ -23,9 +23,11 @@
 | `WorkflowSlotConnectionBehavior` | 按下/松开时连接槽（执行 `SendConnectionCommand` / `ReceiveConnectionCommand`） | 全部七个 |
 | `WorkflowSlotLayoutBehavior` | 让槽锚点与节点布局保持同步 | 全部七个 |
 | `WorkflowMinimapOverlay` | 节点/连接缩略图 + 可拖拽视口指示框 | 全部七个 |
-| `WorkflowLinkOverlay` | 仅 MAUI：连接折线覆盖层，同时承载拖拽几何 | MAUI |
-| `WorkflowGridDecorator` | 随源码附带的网格/标尺装饰元素（其余 XAML 适配器改由 `*-v-decorator` 模板提供） | Jalium（`.cs`）、Razor（`.razor`） |
+| `WorkflowLinkOverlay` | 仅 MAUI：视口大小的绘制层，画那些自己没有视图的连接（立即模式宿主，以及池化连接视图成形之前的帧） | MAUI |
+| `WorkflowGridDecorator` | 随源码附带的网格/标尺装饰元素（其余 XAML 适配器改由 `*-v-decorator` 模板提供） | WinForms（`.cs`）、Jalium（`.cs`）、Razor（`.razor`） |
 | `WorkflowTreeView` | 复合宿主控件，生成的树视图条目从它派生（WinForms：`PART_*` 命名部件；Jalium：`PortLayout` / `GridDecorator` / `TemplateSelector` 属性） | WinForms、Jalium |
+| `WorkflowNodeAttachment` / `WorkflowSlotAttachment` / `WorkflowLinkAttachment` | 各角色**附加类**：生成的条目模板对自己已持有的控件调 `Attach(...)` —— WinForms 是 `Attach(Control)`，Jalium 的节点是 `Attach(Canvas)`、槽位与连线是 `Attach(FrameworkElement)` —— 而不是从基类派生 | WinForms、Jalium |
+| `WorkflowTemplateSelector` | 把模型绑到它视图上的工厂 —— 仍是生成的模板会派生的类型 | WinForms、Jalium |
 | `IWorkflowTemplateSelector` | 对应 `DataTemplateSelector` 的工厂契约 | WinForms、Jalium |
 | `IWorkflowGridDecorator` / `IWorkflowMinimapOverlay` | 覆盖层实现的数据交换契约；**现定义于 Core**，命名空间 `VeloxDev.WorkflowSystem` | 全部七个（由覆盖层实现） |
 

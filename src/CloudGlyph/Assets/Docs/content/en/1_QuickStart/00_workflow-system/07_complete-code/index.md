@@ -18,7 +18,7 @@ The component and node files are reproduced in full on those pages; each declare
 ```csharp
 using System.Diagnostics;
 using VeloxDev.Core.WorkflowSystem.CompilerEx;
-using VeloxDev.MVVM.Serialization;
+using VeloxDev.Serialization;
 using VeloxDev.WorkflowSystem;
 
 namespace WorkflowQuickStart

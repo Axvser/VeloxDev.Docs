@@ -33,13 +33,13 @@ Make sure the project file enables nullable and implicit usings so it matches th
 
 **Expected result:** `dotnet restore` completes without errors, and a component file can `using VeloxDev.WorkflowSystem;` and `using VeloxDev.Core.WorkflowSystem.CompilerEx;`.
 
-**Whole-tree JSON serialization** (used on the `Serialize & rebuild` page) lives in the `VeloxDev.Core.Extension` project. Reference it the same way when you get to that step:
+**Whole-tree JSON serialization** ships with `VeloxDev.Core` itself (`VeloxDev.Serialization`) — the `Serialize & rebuild` page adds no package. `VeloxDev.Core.Extension` is needed only for the **Agent** and for the compiled-graph / checkpoint documents:
 
 ```bash
 dotnet add reference ..\Src\Core\VeloxDev.Core.Extension\VeloxDev.Core.Extension.csproj
 ```
 
-(or `dotnet add package VeloxDev.Core.Extension`). **Expected result:** a component file can also `using VeloxDev.MVVM.Serialization;`.
+(or `dotnet add package VeloxDev.Core.Extension`). **Expected result:** a component file can also `using VeloxDev.Serialization;`.
 
 ## 3. Where each API lives
 

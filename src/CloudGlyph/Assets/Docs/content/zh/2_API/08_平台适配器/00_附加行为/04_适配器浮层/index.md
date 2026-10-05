@@ -23,13 +23,14 @@ public sealed class WorkflowLinkOverlay : GraphicsView
 | `StrokeWidth` | `double` | 连接描边宽度。 |
 | `LinkFlowEnabled` | `bool` | 开关沿曲线流动的光带动画。 |
 | `InteractionSource` | `View?` | 已在表面输入路径上的视图，用来把悬停/按下转发给命中测试（覆盖层自身保持 `InputTransparent`）。 |
-| `SelectedLinkColor` | `Color?` | 悬停/选中连接的描边。 |
 
-覆盖层用 MAUI 图形 `IDrawable` 模型（`Draw(ICanvas canvas, RectF dirtyRect)`）把每条连接画成一条三次贝塞尔曲线；流动的光带是按弧长从该曲线上裁出来的，而不是沿折线映射。它是纯绘制层（`VisualElement.InputTransparent` 恒为 `true`，视口大小的视图因此不会吞掉画布手势）；交互经 `InteractionSource` 驱动 —— 悬停一条连接即选中它，`Delete` 删除它，右键（非 Windows 上是长按）转发给 `LinkInteraction`，由宿主表面弹出自己的菜单。*确切的拖拽/重排语义属 `*推断所得*` —— 未经自动化 Demo 驱动。*
+覆盖层用 MAUI 图形 `IDrawable` 模型（`Draw(ICanvas canvas, RectF dirtyRect)`）把每条连接画成一条三次贝塞尔曲线；流动的光带是按弧长从该曲线上裁出来的，而不是沿折线映射。它是纯绘制层（`VisualElement.InputTransparent` 恒为 `true`，视口大小的视图因此不会吞掉画布手势）；交互经 `InteractionSource` 驱动 —— 命中测试记录指针落在哪条连接上，`Delete` 删除它，右键（非 Windows 上是长按）转发给 `LinkInteraction`，由宿主表面弹出自己的菜单。
+
+**悬停外观归宿主**，这一层只画静息的连接。想让悬停的连接看起来不同的宿主，订阅树的 `IInputEvents` 并在本层之上画自己的一层，曲线取自连接自己发布的那条（`ILinkHitTestable.Curve`）—— 于是两层对「线在哪」永远不会各执一词。*确切的拖拽/重排语义属 `*推断所得*` —— 未经自动化 Demo 驱动。*
 
 ## 类：`WorkflowGridDecorator`（Jalium）
 
-Jalium 提供现成的网格/标尺装饰层（WPF/Avalonia/WinUI/WinForms 改由 `*-v-decorator` 模板或各角色基类获得）。源码：`Src/Adapters/VeloxDev.Jalium/Attached/Workflow/WorkflowGridDecorator.cs`。它是一个纯绘制/配置类（无基类型，**也不实现** `IWorkflowGridDecorator`）；复合控件 `WorkflowTreeView` 经自身的 `GridDecorator` 属性持有它。Razor 有同名组件（`WorkflowGridDecorator.razor` + `.razor.cs`）。
+Jalium 提供现成的网格/标尺装饰层，WinForms（`.cs`）与 Razor（`.razor`）也是；WPF/Avalonia/WinUI 改由 `*-v-decorator` 模板获得。源码：`Src/Adapters/VeloxDev.Jalium/Attached/Workflow/WorkflowGridDecorator.cs`。它是一个纯绘制/配置类（无基类型，**也不实现** `IWorkflowGridDecorator`）；复合控件 `WorkflowTreeView` 经自身的 `GridDecorator` 属性持有它。
 
 ```csharp
 public class WorkflowGridDecorator
@@ -55,7 +56,7 @@ public class WorkflowTreeView : Canvas
 | 成员 | 类型 | 说明 |
 |---|---|---|
 | `Tree` | `IWorkflowTreeViewModel?`（get） | 当前挂上的工作流树。 |
-| `PortLayout` | `WorkflowPortLayout` | 各角色基类共用的设计期端口布局。 |
+| `PortLayout` | `WorkflowPortLayout` | 各角色附加类共用的设计期端口布局。 |
 | `GridDecorator` | `WorkflowGridDecorator` | 网格/标尺装饰层。 |
 | `TemplateSelector` | `IWorkflowTemplateSelector?` | 节点/连接视图工厂；须在 `SetTree` 前设置。 |
 | `OriginX` / `OriginY` | `double`（get） | 世界原点加上标尺带。 |

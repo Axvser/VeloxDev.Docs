@@ -110,7 +110,14 @@ Transition.Seek(rect, Transition.Cycle(rect, IncludeMutual: true, IncludeNoMutua
 
 ## 6. 按目标调度器
 
-每次 `Execute` 都经 `TransitionSchedulerCore<THost, TTransitionInterpreterCore, TPriorityCore>.FindOrCreate(target, CanMutualTask)` 为目标解析一个调度器。互斥调度器按目标缓存在 `ConditionalWeakTable` 里（随目标回收）；非互斥调度器每次运行新建，并在**整条**动画期间登记/注销 —— 包括分段之间的 `Await` 间隔 —— 因此间隔期间的 `Exit` 仍能找得到并取消它们。调度器经 `SemaphoreSlim` 串行化访问，跟踪该动画的每一个活着的 run，并把准备好的 `SamplerSet<TPriorityCore>` 交给解释器。你通常永不触碰它，但需要时可以用静态查找助手直接寻址：
+每次 `Execute` 都经 `TransitionSchedulerCore<THost, TTransitionInterpreterCore, TPriorityCore>.FindOrCreate(target, CanMutualTask)` 为目标解析一个调度器：
+
+| 种类 | 生命周期 | 后果 |
+|---|---|---|
+| 互斥 | 每个目标一个，缓存在 `ConditionalWeakTable` 里 | 随目标一起回收 |
+| 非互斥 | 每次运行一个，在**整条**动画期间登记/注销 —— 包括分段之间的 `Await` 间隔 | 间隔期间的 `Exit` 仍能找得到并取消这次运行 |
+
+调度器经 `SemaphoreSlim` 串行化访问，跟踪该动画的每一个活着的 run，并把准备好的 `SamplerSet<TPriorityCore>` 交给解释器。你通常永不触碰它，但静态查找助手可以直接寻址：
 
 ```csharp
 using VeloxDev.TransitionSystem.Abstractions;   // TransitionSchedulerCore
@@ -138,7 +145,7 @@ public abstract class InterpolatorCore
 }
 ```
 
-主题系统（[动态主题](../../04_动态主题/index.md)）正是需要它的调用方 —— 它一次切换横跨多种运行时类型的目标，于是问插值器该用哪个调度器给某个目标做动画。`Transition<T>.Execute` 不走它，因为 `T` 已经命名了那些类型实参。契约承载三点：
+主题系统（[动态主题](../../04_动态主题/index.md)）正是需要它的调用方：它一次切换横跨多种运行时类型的目标，于是问插值器该用哪个调度器给某个目标做动画。`Transition<T>.Execute` 不走它 —— `T` 已经命名了那些类型实参。契约承载三点：
 
 - **每个适配器都重写它**（`PlatformAdapters/Interpolator.cs`），各自用自己那套宿主 / `TransitionInterpreter` / 优先级三元组作答 —— WPF、Avalonia、Jalium 为 `DispatcherPriority`；WinUI 为 `DispatcherQueuePriority`；MAUI、WinForms、Razor 为 `NonPriority`。
 - **`null` 是诚实答案**，对「本平台未接入」与「这个 effect 不属于本平台」都是（重写会强制转换 effect，因此答案镜像调度器自己运行前所做的强制转换）。调用方于是不带动画地完成切换，而不是启动一次什么都画不出来的运行。

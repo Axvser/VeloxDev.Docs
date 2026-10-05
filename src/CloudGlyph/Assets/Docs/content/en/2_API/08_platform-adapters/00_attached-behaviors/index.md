@@ -26,7 +26,8 @@ So a XAML view binds e.g. `behaviors:WorkflowSurfaceBehavior.IsEnabled="True"`, 
 | `WorkflowLinkOverlay` | MAUI-only: viewport-sized paint layer for the links that have no view of their own (the immediate-mode hosts and the frames before a pooled link view materializes) | MAUI |
 | `WorkflowGridDecorator` | Grid/ruler decorator element shipped as source (the other XAML adapters get it from the `*-v-decorator` template instead) | WinForms (`.cs`), Jalium (`.cs`), Razor (`.razor`) |
 | `WorkflowTreeView` | Composite host control the generated tree-view item derives from (WinForms: `PART_*` named parts; Jalium: `PortLayout` / `GridDecorator` / `TemplateSelector` properties) | WinForms, Jalium |
-| `WorkflowNodeView` / `WorkflowSlotView` / `WorkflowLinkView` / `WorkflowTemplateSelector` | Per-role base classes a generated item template derives from (the "no-markup platforms get a base class per role" standard) | WinForms, Jalium |
+| `WorkflowNodeAttachment` / `WorkflowSlotAttachment` / `WorkflowLinkAttachment` | Per-role **attachments**: a generated item template calls `Attach(...)` on a control it already owns — `Attach(Control)` on WinForms, `Attach(Canvas)` (node) / `Attach(FrameworkElement)` (slot, link) on Jalium — instead of deriving from a base class | WinForms, Jalium |
+| `WorkflowTemplateSelector` | Factory that binds a model to its view — still a type a generated template derives from | WinForms, Jalium |
 | `IWorkflowTemplateSelector` | Factory contract mirroring a `DataTemplateSelector` | WinForms, Jalium |
 | `IWorkflowGridDecorator` / `IWorkflowMinimapOverlay` | Data-exchange contracts the overlays implement; **now defined in Core**, namespace `VeloxDev.WorkflowSystem` | all seven (implemented by overlays) |
 

@@ -12,7 +12,7 @@ scope.WithSubAgents(subAgents);   // attach BEFORE CreateContextProviders()
 
 Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs` (`ProvideAgent`).
 
-The five dispatch tools reach the model as the subsystem's context provider's contribution, so attaching **after** `CreateContextProviders()` would leave the model with none of them and the subsystem unreachable however it was configured. The depth limit is not redundant with `WithMaxToolCalls`: the budget makes the tree terminate, but a root allowing 200 calls also permits a 199-deep chain — bounded and useless. Three levels is what the demo wants.
+Attach it **before** `CreateContextProviders()`. The five dispatch tools arrive as the subsystem's context-provider contribution, so attaching later leaves the model with none of them — the subsystem is unreachable however it was configured. The depth limit is not redundant with `WithMaxToolCalls`: the budget makes the tree terminate, but a root allowing 200 calls also permits a 199-deep chain, which is bounded and useless. Three levels is what the demo wants.
 
 **Expected result:** before `WithSubAgents` the scope has one provider and no sub-agent tools; after it, the model is offered exactly `SpawnSubAgent`, `WaitSubAgents`, `GetSubAgentResult`, `ListSubAgents`, `CancelSubAgent`.
 

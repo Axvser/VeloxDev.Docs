@@ -5,13 +5,13 @@
 > they never add, remove, or rename features.
 > Regenerated each run — a future template sync removing it is expected.
 >
-> **Re-derived 2026-10-01** (discovery order: README → Examples → Tests → source). Supersedes the 2026-09-07 set.
+> **Re-derived 2026-10-05** (discovery order: README → Examples → Tests → source). Supersedes the 2026-10-01 set.
 
 ## Feature Inventory
 
 | # | Feature | Owning Project | Evidence | Coverage Status |
 |---|---|---|---|---|
-| 00 | workflow-system | `VeloxDev.Core` (`WorkflowSystem/`) + `VeloxDev.Core.Extension` (`ComponentModelEx`, `CompiledGraphEx`, `CheckpointEx`) | Demo (`Examples/Workflow/*`, 7 platforms + Trimmed) + Test (`VeloxDev.Core.Test/WorkflowSystem/` ≈35 files) | QS ✓ / API ✓ / SE ✓ |
+| 00 | workflow-system | `VeloxDev.Core` (`WorkflowSystem/`, `GUI/Events/Input/`) + `VeloxDev.Core.Extension` (`CompiledGraphEx`, `CheckpointEx` — the document wrappers only) | Demo (`Examples/Workflow/*`, 7 platforms + Trimmed) + Test (`VeloxDev.Core.Test/WorkflowSystem/` ≈35 files) | QS ✓ / API ✓ / SE ✓ |
 | 01 | workflow-agent | `VeloxDev.Core.Extension` (`Agent/`) + `VeloxDev.Core` (`AI/`) | Demo (Agent pane in all 7 platform demos, via `Examples/Workflow/Common/Lib/.../AgentHelper.cs`) + Test (`VeloxDev.Core.Extension.Test/Agent/**` 25 files, `VeloxDev.Core.Test/AI/*` 7 files) | QS ✓ / API ✓ / SE ✓ |
 | 02 | mvvm | `VeloxDev.Core` (`MVVM/`, `Interfaces/MVVM/`) | Demo (`Examples/MVVM/WPF`, `Examples/MVVM/Avalonia`) + Test (`VeloxDev.Core.Test/MVVM/` 22 files) | QS ✓ / API ✓ / SE ✓ |
 | 03 | transition | `VeloxDev.Core` (`TransitionSystem/`) + 7 adapters | Demo (`Examples/Transition/*` 7 platforms + `AUTO TEST` conformance harness) + Test (`VeloxDev.Core.Test/TransitionSystem/` 28 files) | QS ✓ / API ✓ / SE ✓ |
@@ -19,7 +19,8 @@
 | 05 | aop | `VeloxDev.Core` (`AspectOriented/`, `#if NET`) | Demo (`Examples/AOP/WPF`, `Examples/AOP/Avalonia`) — **no unit tests** | QS ✓ / API ✓ / SE ✓ |
 | 06 | **tickable** *(was `monobehaviour`)* | `VeloxDev.Core` (`TimeLine/`, `Interfaces/Tickable/`) | Demo (`Examples/Tickable/WPF`) + Test (`VeloxDev.Core.Test/TimeLine/` 4 files) | QS ✓ / API ✓ / SE ✓ |
 | 07 | weak-types | `VeloxDev.Core` (`WeakTypes/`) | Test only (`VeloxDev.Core.Test/WeakTypes/` 4 files) — **no demo** | QS ✓ / API ✓ / SE ✓ |
-| 08 | platform-adapters | `Src/Adapters/VeloxDev.{WPF,Avalonia,WinUI,MAUI,WinForms,Razor,Jalium}` + `Src/Templates` | Demo (`Examples/Workflow/<Platform>`, `Examples/Transition/<Platform>`) + `Src/Verification/VeloxDev.TrimProbe` — per-platform detail partly *inferred* | QS ✓ / API ✓ / SE ✓ |
+| 08 | platform-adapters | `Src/Adapters/VeloxDev.{WPF,Avalonia,WinUI,MAUI,WinForms,Razor,Jalium}` + `Src/Templates` | Demo (`Examples/Workflow/<Platform>`, `Examples/Transition/<Platform>`) — per-platform detail partly *inferred* | QS ✓ / API ✓ / SE ✓ |
+| 09 | **serialization** | `VeloxDev.Core` (`Serialization/`) + `VeloxDev.Core.Extension` (`CompiledGraphEx`, `CheckpointEx`, `FileCheckpointStore`) | Demo (the demos' save/load path through `TreeViewModel.Save`) + Test (`VeloxDev.Core.Test/Serialization/` 10 files, `VeloxDev.Core.Extension.Test/Serialization/` 32 files) | QS ✓ / API ✓ / SE ✓ |
 
 ## Feature → Directory Name Map (frozen)
 
@@ -34,13 +35,15 @@
 | 06 | `06_tickable` | `06_Tickable` |
 | 07 | `07_weak-types` | `07_弱引用类型` |
 | 08 | `08_platform-adapters` | `08_平台适配器` |
+| 09 | `09_serialization` | `09_序列化` |
 
 > Cross-dimension rule: the SAME name is used in `1_QuickStart`, `2_API`, and `3_SE_Analysis` feature sub-directories.
 > **2026-10-01 change: `06_monobehaviour` → `06_tickable` / `06_MonoBehaviour` → `06_Tickable`.** Entries 00–05 and 07–08 unchanged.
+> **2026-10-05 change: `09_serialization` added.** Serialization was previously a sub-topic of `00_workflow-system` (`2_API/00_workflow-system/03_mvvm-serialization`, `1_QuickStart/00_workflow-system/06_serialization`). It is now its own feature because it archives **any** view model — the workflow tree is one caller — and it owns a top-level source directory (`Src/Core/VeloxDev.Core/Serialization/`) alongside `WorkflowSystem/`. The API page moved to `2_API/09_serialization`; the QuickStart narrative step 06 **stays** in `00_workflow-system` (it is how you persist the tree that story just built). The freed `03` slot in `2_API/00_workflow-system/` was closed by renumbering `04`→`03`, `05`→`04`, `06`→`05` in both languages.
 
 ## Decisions taken during discovery
 
-1. **No 10th feature.** `VeloxDev.Timing` (`Src/Core/VeloxDev.Core/Timing/` + `Interfaces/Timing/`, first added 2026-09-14) is keyword-level *infrastructure* shared by transition / dynamic-theme / tickable, not a user-facing capability. It is documented as a sub-module **under `03_transition`**, and referenced from `04` and `06`. (`TickManager.Bus` exposes the channel's `ITimeSourceControl`.)
+1. **`VeloxDev.Timing` is not a feature.** (`Src/Core/VeloxDev.Core/Timing/` + `Interfaces/Timing/`, first added 2026-09-14) It is keyword-level *infrastructure* shared by transition / dynamic-theme / tickable, not a user-facing capability. It is documented as a sub-module **under `03_transition`**, and referenced from `04` and `06`. (`TickManager.Bus` exposes the channel's `ITimeSourceControl`.) — Note: this is a different question from serialization, which **was** promoted to `09` on 2026-10-05 (see the map note above).
 2. **`platform-adapters` keeps its `*inferred*` labelling** where demos do not exercise the detail.
 3. The wiki's existing **localized top-level dimension names** (`0_欢迎` / `1_快速开始` / `3_SE分析` / `4_版权`) are **preserved** — the skill's Review step must not treat them as untracked entries to prune.
 

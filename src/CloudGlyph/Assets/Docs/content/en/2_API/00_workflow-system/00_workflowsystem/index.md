@@ -206,12 +206,14 @@ Notes:
 
 | Type | Description |
 |---|---|
-| `SlotEnumerator<TSlot>` | Dynamic slot collection (`TSlot : IWorkflowSlotViewModel, new()`). `SetSelector(object?)` (a `Type`, type-name string, or `ISlotProvider`), `TrySelect(object, out TSlot?)`, `Items`, `Count`, indexer, `CurrentValue`, `SelectorType`, `SelectorTypeName`, `Install(parent, memberName)`, `Uninstall()`. Selector switches are submitted as undoable actions; per-type slot state is remembered across switches. |
+| `SlotEnumerator<TSlot>` | Dynamic slot collection (`TSlot : IWorkflowSlotViewModel, new()`). `SetSelector(object?)` (a `Type`, type-name string, or `ISlotProvider`), `TrySelect(object, out TSlot?)`, `Items`, `Count`, indexer, `CurrentValue`, `SelectorType`, `SelectorTypeName`, `Install(parent, memberName)`, `Uninstall()`. Selector switches are submitted as undoable actions. An **enum** selector remembers its per-type state across switches (slot layout and wiring); a **provider** selector does not — a provider is a *value*, not a type, so two instances of one class can expose different ports and the port set is rebuilt on every call. Rebuilding a port set re-wires the links that fed the old branches, matching by name when the selector type did not change and by position when it did. |
 | `ConditionalSlot<TSlot>` | One entry in `SlotEnumerator.Items`: `Name`, `Value`, `Slot`. |
 | `SlotDefinition(value, label)` | Entry produced by an `ISlotProvider`. |
 | `ISlotProvider` | `IEnumerable<SlotDefinition> GetSlots()` — drives an enumerator with arbitrary routes. |
 | `[SlotSelectors(params Type[] or params string[])]` | `VeloxDev.AI` attribute declaring allowed selector types on a `SlotEnumerator` property. |
 | `IConditionalSlotProvider<TSlot>` | Contract implemented by `SlotEnumerator<TSlot>`: `Parent`, `SelectorTypeName`, `Items`, `CurrentValue`, `TrySelect`, `SetSelector`, `Install`, `Uninstall`. |
+| `IConditionalSlotProvider` | The **non-generic** view of the same object, which `SlotEnumerator<TSlot>` implements explicitly — so a caller holding only an `object` (the Agent toolkit, for one) can open the selector without reflection: `Parent`, `SelectorTypeName`, `SelectorType`, `CurrentValue`, `Slots` (`IReadOnlyList<IConditionalSlot>`), `TrySelect(object, out IWorkflowSlotViewModel?)`, `SetSelector(object?)`. `Slots` is a projection of `Items`, not a copy. |
+| `IConditionalSlot` | The non-generic form of `ConditionalSlot<TSlot>`: `Name`, `Value`, `Slot` (`IWorkflowSlotViewModel`). |
 
 `TrySelect` is a dictionary lookup over `conditionMap` (expected `O(1)`). `CurrentValue` getter returns the string form; setter accepts string / enum / numeric and normalizes.
 

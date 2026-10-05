@@ -13,3 +13,4 @@ Time and space complexity analysis of each feature's core operations, using KaTe
 | [06 Tickable](06_tickable) | Frame dispatch O(N), compensating sampler with debt caps, pooled frame args |
 | [07 Weak Types](07_weak-types) | Sweep-on-access, adaptive cleanup threshold |
 | [08 Platform Adapters](08_platform-adapters) | View pool reuse, spatial virtualization, zoom collapse, minimap projection |
+| [09 Serialization](09_serialization) | Lock-free registry lookup $O(1)$; write and read $O(P)$ in written members; in-place member-name compare; document size linear in members |

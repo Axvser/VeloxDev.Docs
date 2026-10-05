@@ -46,6 +46,8 @@ The tree-view template also declares the **link context menu** and points the su
 
 Each entry binds the link it acts on, so adding or removing an action is a template-only edit: a `MenuItem` / `MenuFlyoutItem` with `Command="{Binding DeleteCommand}"`, or a Razor button with `@onclick="() => link.DeleteCommand.Execute(null)"`. The Avalonia menu resource carries no `x:DataType`, so under compiled bindings it writes `{ReflectionBinding DeleteCommand}`.
 
+On Razor, that `@onclick` only binds because the library ships an `_Imports.razor` containing `@using Microsoft.AspNetCore.Components.Web` (`Src/Adapters/VeloxDev.Razor/_Imports.razor`). The file is load-bearing, not cosmetic: without it the compiler emits the handler as a **literal attribute** (`"@onclick"`) and it never runs. A consuming project that compiles the generated Razor views needs the same import.
+
 ## CLI options (WPF suite example)
 
 Each template accepts `-ns <Namespace>` for the generated namespace. View templates additionally declare style parameters; the WPF suite's `dotnetcli.host.json` maps them as follows:

@@ -23,13 +23,14 @@ Bindable properties / CLR properties:
 | `StrokeWidth` | `double` | Link stroke width. |
 | `LinkFlowEnabled` | `bool` | Toggles the travelling-light animation along each curve. |
 | `InteractionSource` | `View?` | The view already on the surface's input path that forwards hover/press to the hit test (the overlay itself stays `InputTransparent`). |
-| `SelectedLinkColor` | `Color?` | Stroke for the hovered/selected link. |
 
-The overlay draws each link as one cubic Bézier with the MAUI graphics `IDrawable` model (`Draw(ICanvas canvas, RectF dirtyRect)`); the travelling light is cut out of that curve by arc length rather than mapped along a polyline. It is paint-only (`VisualElement.InputTransparent` stays `true`, so a viewport-sized view cannot swallow the canvas gestures); interaction is driven through `InteractionSource` — hovering a link selects it, `Delete` removes it, and a right press (or, off Windows, a long press) is forwarded to `LinkInteraction` so the host surface can open its own menu. *Exact drag/reroute semantics `*inferred*` — not exercised by an automated demo.*
+The overlay draws each link as one cubic Bézier with the MAUI graphics `IDrawable` model (`Draw(ICanvas canvas, RectF dirtyRect)`); the travelling light is cut out of that curve by arc length rather than mapped along a polyline. It is paint-only (`VisualElement.InputTransparent` stays `true`, so a viewport-sized view cannot swallow the canvas gestures); interaction is driven through `InteractionSource` — the hit test tracks which link the pointer is on, `Delete` removes it, and a right press (or, off Windows, a long press) is forwarded to `LinkInteraction` so the host surface can open its own menu.
+
+**Hover feedback is the host's**, and this layer paints resting links only. A host that wants a hovered link to look different subscribes the tree's `IInputEvents` and draws its own layer above this one, from the curve the link published (`ILinkHitTestable.Curve`) — so the two can never disagree about where the line is. *Exact drag/reroute semantics `*inferred*` — not exercised by an automated demo.*
 
 ## Class: `WorkflowGridDecorator` (Jalium)
 
-Jalium ships a ready-made grid/ruler decorator (WPF/Avalonia/WinUI/WinForms instead get one from the `*-v-decorator` template or a per-role base class). `Src/Adapters/VeloxDev.Jalium/Attached/Workflow/WorkflowGridDecorator.cs`. It is a plain drawing/configuration class (no base type and **no** `IWorkflowGridDecorator` implementation); the composite `WorkflowTreeView` owns it through its `GridDecorator` property. Razor ships a component by the same name (`WorkflowGridDecorator.razor` + `.razor.cs`).
+Jalium ships a ready-made grid/ruler decorator, as do WinForms (`.cs`) and Razor (`.razor`); WPF/Avalonia/WinUI instead get one from the `*-v-decorator` template. `Src/Adapters/VeloxDev.Jalium/Attached/Workflow/WorkflowGridDecorator.cs` is a plain drawing/configuration class (no base type and **no** `IWorkflowGridDecorator` implementation); the composite `WorkflowTreeView` owns it through its `GridDecorator` property.
 
 ```csharp
 public class WorkflowGridDecorator
@@ -55,7 +56,7 @@ public class WorkflowTreeView : Canvas
 | Member | Type | Description |
 |---|---|---|
 | `Tree` | `IWorkflowTreeViewModel?` (get) | The workflow tree currently attached. |
-| `PortLayout` | `WorkflowPortLayout` | The design-time port layout shared by the per-role base classes. |
+| `PortLayout` | `WorkflowPortLayout` | The design-time port layout shared by the per-role attachments. |
 | `GridDecorator` | `WorkflowGridDecorator` | The grid/ruler decorator. |
 | `TemplateSelector` | `IWorkflowTemplateSelector?` | Factory for node/link views; set it before `SetTree`. |
 | `OriginX` / `OriginY` | `double` (get) | World origin plus the ruler band. |

@@ -34,4 +34,4 @@ Copyright (c) 2025 Axvser. Released under the MIT License.
 
 ## Third-party Notices
 
-The project references third-party NuGet packages (e.g. `Microsoft.Extensions.AI`, `ModelContextProtocol`, `Newtonsoft.Json`). Their respective licenses apply; no NOTICE file is shipped with this repository.
+The project references third-party NuGet packages (e.g. `Microsoft.Extensions.AI`, `ModelContextProtocol`, `CliWrap`, `Microsoft.Bcl.HashCode`). Their respective licenses apply; no NOTICE file is shipped with this repository.

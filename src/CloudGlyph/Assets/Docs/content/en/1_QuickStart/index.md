@@ -15,6 +15,7 @@ VeloxDev is a set of .NET libraries for building **AI-controllable workflow edit
 | [06 Tickable](06_tickable) | Frame-driven lifecycle loop |
 | [07 Weak Types](07_weak-types) | Weak collections and delegates |
 | [08 Platform Adapters](08_platform-adapters) | GUI adapters and `dotnet new` view templates |
+| [09 Serialization](09_serialization) | The archive engine: annotate a type, write it to JSON, rebuild it |
 
 ## Prerequisites (common to all pages)
 

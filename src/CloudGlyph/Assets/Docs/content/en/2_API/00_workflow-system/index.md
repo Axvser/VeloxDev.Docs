@@ -9,9 +9,9 @@ This feature's API reference is split into:
 - [Namespace: VeloxDev.WorkflowSystem](00_workflowsystem/index.md) — the core `VeloxDev.WorkflowSystem` surface (builder attributes, component interfaces, geometry/value types, default view-models, selectors, spatial map, render-readiness)
 - [Namespace: VeloxDev.WorkflowSystem.StandardEx](01_standardex/index.md) — the `VeloxDev.WorkflowSystem.StandardEx` standard behavior extensions
 - [Namespace: VeloxDev.Core.WorkflowSystem.CompilerEx](02_compilerex/index.md) — the `VeloxDev.Core.WorkflowSystem.CompilerEx` compile pipeline, compiled model, runtime engine, and the host-capability layer
-- [Namespace: VeloxDev.MVVM.Serialization](03_mvvm-serialization/index.md) — `VeloxDev.MVVM.Serialization`: `ComponentModelEx` save/load, `CompiledGraphEx`, `CheckpointEx` + `FileCheckpointStore`
-- [Key Member Contracts](04_key-member-contracts/index.md) — entry-template form of the headline top-level APIs
-- [Execution Mechanism (Compiler vs non-Compiler)](05_execution-mechanism/index.md) — how the Compiler (engine-driven) and non-Compiler (broadcast) paths both reach a node's `ReceiveAsync`
+- [Key Member Contracts](03_key-member-contracts/index.md) — entry-template form of the headline top-level APIs
+- [Execution Mechanism (Compiler vs non-Compiler)](04_execution-mechanism/index.md) — how the Compiler (engine-driven) and non-Compiler (broadcast) paths both reach a node's `ReceiveAsync`
+- [GUI Input](05_gui-input/index.md) — the routed pointer/keyboard surface: `WorkflowInput`, `IInputEvents`, the fifteen standard types, and the alias discipline platform code must follow
 
 ### Inside `compilerex`
 

@@ -108,9 +108,9 @@ await Compiler.CompileAsync(this, CompileRole.Root);
 
 `internal static class`。不属于公开面；写在这里是因为它解释了一个否则会被当成 bug 的序列化行为。
 
-分支键以 `object` 保存，因为 `ICompileTimeRouter` 可以用任何东西做键，而一个数字从 JSON 回来会变成 `long`：`object` 成员里的枚举即使开 `TypeNameHandling.All` 也会还原成它的底层数字（由 `ComponentModelExTests.AnEnumInAnObjectMember_ComesBackAsItsNumber` 钉住）。**静态**分支靠运气躲过这一劫（两边都退化成 `long`，比较仍然相等），但**动态**分支会在运行期重新解析出真枚举，于是匹配不到任何选项 —— 运行会像那条分支没有下游一样结束。
+分支键以 `object` 保存，因为 `ICompileTimeRouter` 可以用任何东西做键，而一个数字从 JSON 回来会变成 `long`：`object` 成员里的枚举会还原成它的底层数字，因为枚举是按裸整数写出去的、不带类型标签（由 `ComponentModelExTests.AnEnumInAnObjectMember_ComesBackAsItsNumber` 钉住）。**静态**分支靠运气躲过这一劫（两边都退化成 `long`，比较仍然相等），但**动态**分支会在运行期重新解析出真枚举，于是匹配不到任何选项 —— 运行会像那条分支没有下游一样结束。
 
-所以编译器在键旁边记下它的类型（`TypeNameOf`），`BranchSegment` / `BranchOption` 在加载时通过 Newtonsoft 的 `[OnDeserialized]` 回调（`Normalize`）还原它 —— 用回调而不是属性 setter，因为加载时 setter 会在文档中位置更靠后的类型名成员尚未读到之前就触发。匹配不到任何成员的数字会变成*未定义*的枚举值而不是报错，这正是实跑遇到「没有选项认领的键」时的行为。
+所以编译器在键旁边记下它的类型（`CompileKeyNormalizer.TypeNameOf`），`BranchSegment` / `BranchOption` 在加载时通过一个 `[OnDeserialized]` 回调调用 `CompileKeyNormalizer.Normalize` 还原它 —— 用回调而不是属性 setter，因为加载时 setter 会在文档中位置更靠后的类型名成员尚未读到之前就触发。匹配不到任何成员的数字会变成*未定义*的枚举值而不是报错，这正是实跑遇到「没有选项认领的键」时的行为。
 
 ---
 

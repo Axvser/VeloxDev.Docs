@@ -12,7 +12,7 @@ scope.WithSubAgents(subAgents);   // 必须在 CreateContextProviders() 之前
 
 来源：`Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`（`ProvideAgent`）。
 
-五个派发工具是作为子系统的上下文提供器的贡献到达模型的，所以在 `CreateContextProviders()` **之后**挂载会让模型一个都拿不到，无论子系统怎么配置都到不了。深度上限与 `WithMaxToolCalls` 并不重复：预算让树终止，但根允许 200 次调用也允许一条 199 层深的链 —— 有界却无用。三层是 demo 想要的。
+要在 `CreateContextProviders()` **之前**挂载。五个派发工具是作为子系统的上下文提供器的贡献到达模型的，之后挂载会让模型一个都拿不到 —— 子系统无论怎么配置都到不了。深度上限与 `WithMaxToolCalls` 并不重复：预算让树终止，但根允许 200 次调用也允许一条 199 层深的链，有界却无用。三层是 demo 想要的。
 
 **预期结果：** `WithSubAgents` 之前作用域只有一个提供器、没有子代理工具；之后向模型恰好提供 `SpawnSubAgent`、`WaitSubAgents`、`GetSubAgentResult`、`ListSubAgents`、`CancelSubAgent`。
 

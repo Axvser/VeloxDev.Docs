@@ -17,9 +17,9 @@ The namespace is large enough that this page is an overview only. It is split in
 | [Execution Implementations](03_execution-implementations/index.md) | The shipped implementations of those contracts: `ManualExecutionGate`, `DelegateExecutionGate`, `DelegateExecutionObserver`, `DelegateExecutionErrorSink`, `DelegateExecutionCompensation`, `DelegateLogWriter`, `TextWriterLogWriter`, `ExponentialBackoffRetry` |
 | [Checkpointing](04_checkpointing/index.md) | `ExecutionCheckpoint`, `InMemoryCheckpointStore`, `BranchRuntimeContext` (internal), and the resume/refuse contract |
 
-Serialization of the compiled artifacts and of a checkpoint lives in a different assembly and is documented separately: see [Namespace: VeloxDev.MVVM.Serialization](../03_mvvm-serialization/index.md) (`CompiledGraphEx`, `CheckpointEx`, `FileCheckpointStore`).
+Serialization is its own feature now, not a workflow sub-topic — the archive engine (`VeloxDev.Serialization`) ships in `VeloxDev.Core`, and the compiled-graph and checkpoint documents (`CompiledGraphEx`, `CheckpointEx`, `FileCheckpointStore`) ship in `VeloxDev.Core.Extension` under the same namespace. See [Serialization](../../09_serialization/index.md).
 
-> For how the engine-driven (Compiler) path and the node-driven broadcast path reach the *same* `ReceiveAsync` — entry points, parameters, and timing — see [Execution Mechanism (Compiler vs non-Compiler)](../05_execution-mechanism/index.md).
+> For how the engine-driven (Compiler) path and the node-driven broadcast path reach the *same* `ReceiveAsync` — entry points, parameters, and timing — see [Execution Mechanism (Compiler vs non-Compiler)](../04_execution-mechanism/index.md).
 
 ## Evidence
 

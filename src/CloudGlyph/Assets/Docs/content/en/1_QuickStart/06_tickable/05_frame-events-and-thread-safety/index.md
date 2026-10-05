@@ -62,7 +62,15 @@ Three consequences:
 | `TickManager.Start` / `Pause` / `Resume` / `SetTargetFPS` / `RegisterBehaviour` / … | Whatever thread calls it — safe from any thread |
 | `TickManager.ExecuteOnMainThread(action, channel)` | The delegate runs on the **update** thread, at the start of the next frame |
 
-The two pumps are separate threads and run **concurrently**. A `FixedUpdate` body and an `Update` body can be executing at the same instant, so any field both touch needs its own synchronisation. The demo solves it by *ownership* rather than locks: each ball is owned outright by exactly one pump thread and the window never touches one — `SimState.cs` says so in as many words ("No locking anywhere: exactly one pump thread owns each instance and the window never touches one"). The only state that crosses threads is published whole: an immutable `BallReport` snapshot written with `Volatile.Write` and read with `Volatile.Read`, `Interlocked` counters, and a `ConcurrentQueue` log (`DemoState`, `SimState.cs` lines 191-279). Nothing in the framework does any of this for you.
+The two pumps are separate threads and run **concurrently**: a `FixedUpdate` body and an `Update` body can be executing at the same instant, so any field both touch needs its own synchronisation. The demo solves that by *ownership* rather than locks — each ball is owned outright by exactly one pump thread and the window never touches one (`SimState.cs`). The only state that crosses threads is published whole:
+
+| Channel | Mechanism |
+|---|---|
+| Ball snapshots | an immutable `BallReport` written with `Volatile.Write`, read with `Volatile.Read` |
+| Counters | `Interlocked` |
+| Log | `ConcurrentQueue` (`DemoState`, `SimState.cs:191-279`) |
+
+Nothing in the framework does any of this for you.
 
 "Main thread" in `ExecuteOnMainThread` means *the update pump's thread*, not a UI thread. In a GUI host you still have to marshal to the dispatcher yourself — and you should not do it from inside a hook, because the engine catches every exception a hook throws and writes it to `Debug.WriteLine` only. A `Dispatcher.Invoke` that throws is therefore a failure with **no symptom on screen and nothing in any log**. The WPF demo avoids the whole class of problem by having hooks publish immutable snapshots that the UI thread polls (`MainWindow.Hooks.cs` lines 15-22).
 
@@ -83,7 +91,7 @@ catch (Exception ex) { Debug.WriteLine($"[{Name}] Update error: {ex.Message}"); 
 
 ## 5. When you need a cross-thread flag
 
-`FrameEventArgs` is a plain class and its `Handled` property is an ordinary `bool` with no memory barrier. That is safe here because the pump reads it and your hooks write it on the **same** thread: `Handled` never crosses a thread boundary inside the framework. It is also reset to `false` every time the arguments are built (`CreateFrameEventArgs`, `TickManager.cs` line 833), so it carries nothing from one frame to the next.
+`FrameEventArgs` is a plain class and `Handled` is an ordinary `bool` with no memory barrier. That is safe because the pump reads it and your hooks write it on the **same** thread — inside the framework `Handled` never crosses a thread boundary. It is also reset to `false` whenever the arguments are built (`TickManager.cs:833`), so it carries nothing from one frame to the next.
 
 An earlier version of this page recommended `ThreadSafeFrameEventArgs`, a lock-guarded subclass. **It has been deleted from the source.** The framework never constructed it — every `FrameEventArgs` a hook receives comes from the channel's pool as a plain `FrameEventArgs` (`TickManager.cs:154`) — and its `new`-shadowed `Handled` resolved to the *unsynchronised* base property through a `FrameEventArgs` reference anyway, so it could not have done the job it advertised.
 

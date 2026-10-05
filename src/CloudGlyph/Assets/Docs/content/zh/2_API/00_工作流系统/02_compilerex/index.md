@@ -17,9 +17,9 @@
 | [执行实现](03_执行实现/index.md) | 这些契约的随库实现：`ManualExecutionGate`、`DelegateExecutionGate`、`DelegateExecutionObserver`、`DelegateExecutionErrorSink`、`DelegateExecutionCompensation`、`DelegateLogWriter`、`TextWriterLogWriter`、`ExponentialBackoffRetry` |
 | [检查点](04_检查点/index.md) | `ExecutionCheckpoint`、`InMemoryCheckpointStore`、`BranchRuntimeContext`（internal），以及恢复/拒绝恢复的契约 |
 
-编译产物与检查点的序列化在另一个程序集里，单独成页：见 [命名空间：VeloxDev.MVVM.Serialization](../03_MVVM序列化/index.md)（`CompiledGraphEx`、`CheckpointEx`、`FileCheckpointStore`）。
+序列化现在是一个独立特性，不再是工作流的子话题 —— 归档引擎（`VeloxDev.Serialization`）在 `VeloxDev.Core`；编译图与检查点文档（`CompiledGraphEx`、`CheckpointEx`、`FileCheckpointStore`）在同一命名空间下、位于 `VeloxDev.Core.Extension`。见 [序列化](../../09_序列化/index.md)。
 
-> 关于「引擎驱动（Compiler）路径」与「节点驱动的广播路径」如何抵达**同一个** `ReceiveAsync` —— 入口、参数、时序 —— 见 [执行机制（Compiler 与 非Compiler）](../05_执行机制/index.md)。
+> 关于「引擎驱动（Compiler）路径」与「节点驱动的广播路径」如何抵达**同一个** `ReceiveAsync` —— 入口、参数、时序 —— 见 [执行机制（Compiler 与 非Compiler）](../04_执行机制/index.md)。
 
 ## 证据
 

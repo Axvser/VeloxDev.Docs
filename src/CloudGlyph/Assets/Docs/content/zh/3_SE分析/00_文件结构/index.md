@@ -11,12 +11,13 @@ VeloxDev/
 │   │   │   ├── TransitionSystem/          ← 动画引擎，按职责分：Events/ Effects/ Binding/ Sampling/ State/ Runtime/ Enums/ NativeSamplers/
 │   │   │   ├── DynamicTheme/              ← 主题切换（ThemeManager、ThemeCache）
 │   │   │   ├── MVVM/                      ← VeloxProperty/VeloxCommand 运行时 + IVeloxCommand
+│   │   │   ├── Serialization/             ← 归档引擎（VeloxJson*）、Archivable/Archive 标注
 │   │   │   ├── AspectOriented/            ← AOP 代理（#if NET）
 │   │   │   ├── AI/                        ← 代理属性 + 反射工具
 │   │   │   ├── TimeLine/                  ← Tickable 帧循环（TickManager）
 │   │   │   ├── WeakTypes/                 ← WeakQueue/WeakStack/WeakCache/WeakDelegate
 │   │   │   └── Interfaces/                ← 公共 API 契约（WorkflowSystem、TransitionSystem、...）
-│   │   ├── VeloxDev.Core.Extension/       ← 工作流代理（AI.Workflow）、MCP、ComponentModelEx 序列化
+│   │   ├── VeloxDev.Core.Extension/       ← 工作流代理（AI.Workflow）、MCP、编译图与检查点文档
 │   │   ├── VeloxDev.Core.Test/            ← MSTest 单元测试
 │   │   └── VeloxDev.Core.Extension.Test/  ← 扩展单元测试
 │   ├── Adapters/                          ← 各 GUI 适配器
@@ -95,7 +96,6 @@ flowchart LR
     EXT[VeloxDev.Core.Extension] --> Core
     EXT --> MCP[ModelContextProtocol]
     EXT --> EXAI[Microsoft.Extensions.AI]
-    EXT --> NJ[Newtonsoft.Json]
     WPF[VeloxDev.WPF] --> Core
     AV[VeloxDev.Avalonia] --> Core
     WU[VeloxDev.WinUI] --> Core

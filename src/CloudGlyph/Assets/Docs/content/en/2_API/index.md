@@ -4,7 +4,7 @@ Complete API catalog for every VeloxDev feature, grouped by feature and namespac
 
 | Feature | Namespaces covered |
 |---|---|
-| [00 Workflow System](00_workflow-system) | `VeloxDev.WorkflowSystem`, `.StandardEx`, `VeloxDev.Core.WorkflowSystem.CompilerEx`, `VeloxDev.MVVM.Serialization` |
+| [00 Workflow System](00_workflow-system) | `VeloxDev.WorkflowSystem`, `.StandardEx`, `VeloxDev.Core.WorkflowSystem.CompilerEx` |
 | [01 Workflow Agent](01_workflow-agent) | `VeloxDev.AI`, `VeloxDev.AI.Workflow`, `VeloxDev.AI.Workflow.Functions`, `VeloxDev.AI.MCP` |
 | [02 MVVM](02_mvvm) | `VeloxDev.MVVM`, `VeloxDev.Generators` |
 | [03 Transition](03_transition) | `VeloxDev.TransitionSystem`, `.Abstractions`, `.NativeSamplers`, `VeloxDev.TimeLine` |
@@ -13,3 +13,4 @@ Complete API catalog for every VeloxDev feature, grouped by feature and namespac
 | [06 Tickable](06_tickable) | `VeloxDev.TimeLine` |
 | [07 Weak Types](07_weak-types) | `VeloxDev.WeakTypes` |
 | [08 Platform Adapters](08_platform-adapters) | `VeloxDev.WorkflowSystem.AttachedBehaviors`, per-adapter `VeloxDev.*` |
+| [09 Serialization](09_serialization) | `VeloxDev.Serialization` (the archive engine in `VeloxDev.Core`; `CompiledGraphEx` / `CheckpointEx` in `VeloxDev.Core.Extension`) |
