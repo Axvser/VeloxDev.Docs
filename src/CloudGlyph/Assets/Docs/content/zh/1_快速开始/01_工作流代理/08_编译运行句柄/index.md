@@ -1,6 +1,6 @@
 # 08 · 编译运行句柄
 
-`RunCompiledWorkflow` 会等待到结束。而一次 agent 需要**持有、放开、跟进或停止**的运行做不到这点，于是第二个入口在后台启动同一条编译链并立即返回句柄。句柄家族位于工具包上，每个作用域一份注册表 —— 句柄在启动它的作用域之外毫无意义。
+`RunCompiledWorkflow` 等待结束。若 agent 需要**持有、放行、跟进或停止**一次运行，它做不到，因此第二个入口在后台启动同一条编译链并立即返回句柄。句柄家族位于工具包上，每个作用域一个注册表 —— 句柄在启动它的作用域之外没有意义。
 
 ```text
 StartCompiledWorkflow(startNodeIndex: 0, seed: null)
@@ -16,16 +16,16 @@ ResumeCompiledRun(handle: "run-1")  → {"status":"ok","message":"Run 'run-1' is
 StopCompiledRun(handle: "run-1")    → {"status":"ok","message":"Run 'run-1' was asked to stop; it ends at the current node boundary."}
 ```
 
-四个运行工具都需要 `WithAllowNodeExecution(true)`。
+`StartCompiledWorkflow` / `ContinueCompiledWorkflow` 要求 `WithAllowNodeExecution(true)`，因为它们会启动节点代码。`GetCompiledRunStatus`、`PauseCompiledRun`、`ResumeCompiledRun` 与 `StopCompiledRun` 操作已有句柄，**不**检查该闸门。
 
-## 1. 启动与续跑
+## 1. 启动与继续
 
 | 工具 | 签名 | 行为 |
 |---|---|---|
-| `StartCompiledWorkflow` | `StartCompiledWorkflow(int startNodeIndex, string? seed = null)` | 编译从起始节点开始的子图，并在后台任务上开始驱动，**立即**返回句柄。 |
-| `ContinueCompiledWorkflow` | `ContinueCompiledWorkflow(int startNodeIndex, string? seed = null)` | 从作用域检查点存储中加载最近的检查点并续跑：已记录为完成的节点**不**再驱动，其产物为下游节点恢复。 |
+| `StartCompiledWorkflow` | `StartCompiledWorkflow(int startNodeIndex, string? seed = null)` | 编译从起始节点出发的子图，并在后台任务上开始驱动，**立即**返回句柄。 |
+| `ContinueCompiledWorkflow` | `ContinueCompiledWorkflow(int startNodeIndex, string? seed = null)` | 从作用域检查点存储加载上一个检查点并继续：已记录为完成的节点不会再次驱动，它们产出的值会为下游节点恢复。 |
 
-`ContinueCompiledWorkflow` 刻意绝不在 agent 背后启动一次全新运行 —— 什么都没写过时它报错：
+`ContinueCompiledWorkflow` 绝不在 agent 背后偷偷开始全新运行 —— 什么都还没写时它会报错：
 
 ```text
 There is no checkpoint to carry on from: nothing has been written yet.
@@ -38,70 +38,70 @@ Run the workflow once (StartCompiledWorkflow) and stop it mid-way, then continue
 
 ## 2. 跟进 —— `GetCompiledRunStatus`
 
-状态回复把一次运行的全部状态装在一个对象里：
+状态回复用一个对象给出运行的全部状态：
 
 | 字段 | 含义 |
 |---|---|
-| `isRunning` | 运行是否还在进行。**已结束的运行回答 `false` —— 那就是终态读数。** |
+| `isRunning` | 运行是否仍在进行。**已结束运行的答案是 `false` —— 那就是终结读数。** |
 | `runStatus` | `Running` / `Paused` / `Stopped` |
-| `outcome` | 运行中为 `Unknown`，之后是 `Completed` / `Cancelled` / `Failed` |
-| `isPaused` | 门正持有它。`isPaused:true` 总是伴随 `isRunning:true` —— *持有不等于结束* |
-| `attempts`、`endedWithError` | 重定向尝试次数，以及是否由失败终结 |
+| `outcome` | 运行中为 `Unknown`，之后为 `Completed` / `Cancelled` / `Failed` |
+| `isPaused` | 闸门正持有它。`isPaused:true` 伴随 `isRunning:true` —— *被持有不等于已结束* |
+| `attempts`、`endedWithError` | 重定向尝试次数，以及失败是否结束了流程 |
 | `data` | 运行的最终载荷 |
 | `failures`、`failureCount` | 失败记录：`phase` / `level` / `message` / `attempt` / `order` |
 | `logCount`、`logs` | `logs` 是**最后 40 行**（`RunStatusLogTail = 40`，在运行自己的线程上经 `RuntimeContext.SnapshotLogs()` 读取一次） |
-| `logFile` | 绝对路径，仅当宿主把日志写入了文件时存在 |
+| `logFile` | 仅当宿主把日志行写入文件时为绝对路径 |
 
-**这次调用在报告某次运行已结束的同时退休它的句柄** —— 已结束的运行在回答「是否结束」的同一次调用里被从注册表移除、其 `CancellationTokenSource` 被释放，因此回答与退休描述的是同一状态：
+**一旦报告运行已结束，该调用就退休这个句柄** —— 运行从注册表移除，其 `CancellationTokenSource` 在回答“是否结束”的同一次调用中释放，因此答案与退休描述的是同一状态：
 
 ```text
-GetCompiledRunStatus("run-1")   → {"status":"ok", "isRunning":false, "outcome":"Completed", ...}   // 最后一次有效回答
+GetCompiledRunStatus("run-1")   → {"status":"ok", "isRunning":false, "outcome":"Completed", ...}   // 最后一次有效答案
 GetCompiledRunStatus("run-1")   → {"status":"error", "message":"Unknown run handle 'run-1'. ..."}  // 已退休
 ```
 
-因此轮询循环停在 **`isRunning:false`**；随后一次非 `ok` 的回复不是结束。来源：`CompiledRunControlTests.WaitForEndAsync` —— 它唯一的出口就是 `isRunning == false`。
+因此轮询循环应在 **`isRunning:false`** 停止；之后一次非 `ok` 回复不是结局。来源：`CompiledRunControlTests.WaitForEndAsync` —— 它唯一的退出条件是 `isRunning == false`。
 
-**预期结果：** 轮询直到 `isRunning == false`，然后从同一条回复读取 `outcome`；再问一次返回未知句柄错误。
+**预期结果：** 轮询到 `isRunning == false`，从同一次回复读取 `outcome`；再次询问返回未知句柄错误。
 
-## 3. 持有与放开 —— `PauseCompiledRun` / `ResumeCompiledRun`
+## 3. 持有与放行 —— `PauseCompiledRun` / `ResumeCompiledRun`
 
 | 工具 | 效果 |
 |---|---|
-| `PauseCompiledRun` | 正在驱动的节点跑完，不启动新的，`runStatus` 变为 `Paused` |
-| `ResumeCompiledRun` | 运行从停止处继续 —— 未被持有时是空操作 |
+| `PauseCompiledRun` | 正在驱动的节点完成后，不再启动新节点，`runStatus` 变为 `Paused` |
+| `ResumeCompiledRun` | 运行从停下的地方继续 —— 未被持有时是空操作 |
 
 两者都是幂等的。来源：`CompiledRunControlTests.AStartedRun_CanBeHeld_LetGo_AndFollowedToItsEnd`。
 
 ### `RunsOnOurGate` 守卫
 
-这两个工具操作的是 `run.Gate`，因此该门必须**就是引擎实际在等待的那把**。若宿主经 `WithSessionConfiguration` 自带了一个 `ManualExecutionGate`，这两个工具无法驱动它，于是**返回错误**，而不是报告一次根本没发生的暂停：
+这两个工具操作 `run.Gate`，因此该闸门必须**正是引擎实际等待的那个**。通过 `WithSessionConfiguration` 自带 `ManualExecutionGate` 的宿主拥有一个工具无法驱动的闸门，它们会返回错误，而不是报告一次并未发生的暂停：
 
 ```text
 Run 'run-1' is held by an execution gate this tool cannot drive — the host brought its own.
 Pause and resume it through the host's controls; StopCompiledRun still works.
 ```
 
-检查是 `ReferenceEquals(run.Context?.ExecutionGate, run.Gate)`。当宿主的门是 `ManualExecutionGate` 时 `NewSession` 会采纳它（`run.Gate = hostGate`），因此用普通宿主门启动的运行能被正确驱动；错误只在宿主的门**不是**运行所驻的那把时触发。**`StopCompiledRun` 没有此守卫** —— 它取消令牌，无论哪把门都有效。
+检查是 `ReferenceEquals(run.Context?.ExecutionGate, run.Gate)`。`NewSession` 会采纳宿主的 `ManualExecutionGate`（`run.Gate = hostGate`），因此普通宿主闸门能被正确驱动；只有当宿主的闸门*不是*运行停驻的那个时才报错。**`StopCompiledRun` 没有此守卫** —— 它取消 token，无论闸门是什么都有效。
 
-## 4. 停止与续跑 —— `StopCompiledRun`
+## 4. 停止与继续 —— `StopCompiledRun`
 
 ```text
-StopCompiledRun(handle)  → 正在驱动的节点跑完，运行在该边界以 outcome Cancelled 结束，
-                           它留下的检查点仍留在作用域的存储中。
+StopCompiledRun(handle)  → 正在驱动的节点完成，运行在该边界以 outcome Cancelled 结束，
+                           它留下的检查点保留在作用域存储中。
 ```
 
-| | 会结束运行吗 | 令牌 | 怎么继续 |
+| | 结束运行？ | Token | 如何继续 |
 |---|---|---|---|
-| `PauseCompiledRun` | 不会 —— 它只是持有 | 未取消 | `ResumeCompiledRun` |
-| `StopCompiledRun` | 会，以 `Cancelled` 结束（非 `Failed`） | 已取消 | `ContinueCompiledWorkflow` 读它留下的检查点 |
+| `PauseCompiledRun` | 否 —— 持有运行 | 未取消 | `ResumeCompiledRun` |
+| `StopCompiledRun` | 是，作为 `Cancelled`（不是 `Failed`） | 已取消 | `ContinueCompiledWorkflow` 读取它留下的检查点 |
 
-**预期结果：** `StopCompiledRun` 后结束状态为 `outcome:"Cancelled"`；随后的 `ContinueCompiledWorkflow` 启动一个新句柄并跑到 `Completed`。
+**预期结果：** `StopCompiledRun` 后结束状态为 `outcome:"Cancelled"`；随后 `ContinueCompiledWorkflow` 启动新句柄并运行到 `Completed`。
 
-## 5. 失败与日志随结果同行
+## 5. 失败与日志随结果一起返回
 
-两个运行入口都把 `failures` 作为记录、`logFile` 作为绝对路径报告。当会话配置了重试策略（`WithSessionConfiguration(ctx => ctx.RetryPolicy = ...)`）时，failures 数组同时携带 `"Warning"` 与 `"Error"` 级别，且日志文件包含重试行（`"[Retry 1]"`）。来源：`CompiledRunControlTests.TheFailureRecords_AndTheLogFile_TravelWithTheResult`。
+两个运行入口都以记录形式报告 `failures`，并把 `logFile` 报告为绝对路径。会话上启用重试策略后（`WithSessionConfiguration(ctx => ctx.RetryPolicy = ...)`），数组同时携带 `"Warning"` 与 `"Error"` 级别，日志文件包含重试行（`"[Retry 1]"`）。来源：`CompiledRunControlTests.TheFailureRecords_AndTheLogFile_TravelWithTheResult`。
 
 ## 运行声明
 
-- ✅ 实际构建并运行 —— `CompiledRunControlTests` 在 2026-10-01 的确定性套件中通过（`已通过! 失败: 0，通过: 387`）：`AStartedRun_CanBeHeld_LetGo_AndFollowedToItsEnd`、`AStoppedRun_EndsAsCancelled_AndTheAgentCanCarryOnFromIt`、`CarryingOn_WithNothingWrittenYet_IsRefused`、`TheFailureRecords_AndTheLogFile_TravelWithTheResult`。
-- ⚠️ **`RunsOnOurGate` 守卫**与 **40 行日志尾巴**仅对照源码核验 —— `Agent/**` 中没有测试覆盖它们（测试文件自身的备注已明确说明）。它们引自 `WorkflowAgentToolkit.cs`。
+- ⚠️ **本次修订未运行** —— 2026-10-18 对照当前源码静态核验。曾有一次 2026-10-01 的 `CompiledRunControlTests` 记录（387 项），但它早于权限模式重构，不作为当前证据。
+- ⚠️ **`RunsOnOurGate` 守卫**与**40 行日志尾部**仅对照源码核验 —— `Agent/**` 中没有测试覆盖它们（测试文件自身的备注也如此说明）。它们引自 `WorkflowAgentToolkit.cs`。

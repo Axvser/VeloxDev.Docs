@@ -8,7 +8,7 @@ All four weak types live in the `VeloxDev.Core` package (current version `10.0.0
 dotnet add package VeloxDev.Core
 ```
 
-**Expected result:** the command exits `0` and a `<PackageReference Include="VeloxDev.Core" Version="10.0.0" />` appears in your `.csproj`. Because the four types multi-target `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0`, any project that can reference `netstandard2.0` (for example a `net10.0` console) receives them automatically.
+**Expected result:** the command exits `0` and a `<PackageReference Include="VeloxDev.Core" Version="10.0.0" />` appears in your `.csproj`. Because the four types multi-target `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0` / `net8.0`, any project that can reference one of those receives them automatically.
 
 ## 2. From this repository (project reference)
 
@@ -32,7 +32,7 @@ To build against the source in this repo, add a project reference to the Core pr
 </Project>
 ```
 
-**Expected result:** `dotnet build` succeeds; the compiler resolves the types from the `netstandard2.0` build of `VeloxDev.Core` because that is the nearest asset compatible with a `net10.0` consumer.
+**Expected result:** `dotnet build` succeeds; a `net10.0` consumer resolves the `net8.0` build of `VeloxDev.Core` (the nearest compatible asset), not the `netstandard2.0` one.
 
 ## 3. Add the using
 
@@ -46,4 +46,4 @@ using VeloxDev.WeakTypes;
 
 ## Run declaration
 
-- ⚠️ Statically verified for the NuGet command and the `.csproj` shape. The exact `<ProjectReference>` + `net10.0` console shape in section 2 *was* compiled and executed while writing this page; the end-to-end build and run are recorded on the [Verify & Complete Code](../08_verify-and-complete-code/) page.
+- ⚠️ Not re-run during the 2026-10-18 revision — statically verified against `Src/Core/VeloxDev.Core/VeloxDev.Core.csproj` (TFMs and `Version`) and the package layout. The `net10.0` console shape in section 2 was previously compiled and executed; the end-to-end run transcript is on the [Verify & Complete Code](../08_verify-and-complete-code/) page.

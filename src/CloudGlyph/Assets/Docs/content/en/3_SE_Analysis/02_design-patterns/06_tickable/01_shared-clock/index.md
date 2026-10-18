@@ -4,10 +4,10 @@ Each channel owns exactly one `ITimeSourceControl`, created when the channel is 
 
 | Element | Type | Source |
 |---|---|---|
-| The transport | `LoopChannel._bus` — `TimerCore.CreateTimeSource<ITimeSourceControl>()` | `TickManager.cs` 116 |
-| Uncompensated sampler (Update) | `IUncompensatedTimeSampler _updateSampler` | `TickManager.cs` 119 |
-| Compensating sampler (FixedUpdate) | `ICompensatingTimeSampler _fixedSampler` | `TickManager.cs` 122 |
-| Public accessor | `TickManager.Bus(channel)` | `TickManager.cs` 1144-1145 |
+| The transport | `LoopChannel._bus` — `TimerCore.CreateTimeSource<ITimeSourceControl>()` | `TickManager.cs` 118 |
+| Uncompensated sampler (Update) | `IUncompensatedTimeSampler _updateSampler` | `TickManager.cs` 121 |
+| Compensating sampler (FixedUpdate) | `ICompensatingTimeSampler _fixedSampler` | `TickManager.cs` 124 |
+| Public accessor | `TickManager.Bus(channel)` | `TickManager.cs` 1146-1147 |
 | Consumer contract | `ITimeSourceControl` / `ITimeSource` | `Src/Core/VeloxDev.Core/Interfaces/Timing/` |
 
 ```mermaid
@@ -27,23 +27,23 @@ flowchart TD
 `SetTimeScale` is a one-liner that forwards to the transport:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (line 238)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (line 242)
 public void SetTimeScale(float timeScale) => _bus.SetRate(timeScale);
 ```
 
-The old shape had the rate as a channel field applied by the loop on the next config drain, with a clamp and a silent ignore outside the range. The current one inherits the transport's rule instead: no clamping, and a negative rate is rejected with `ArgumentOutOfRangeException` rather than dropped. `TickableBusTests.ANegativeTimeScaleIsRejectedRatherThanClamped` is the executable statement of that difference.
+The rate is applied verbatim: there is no clamping, and a negative rate is rejected with `ArgumentOutOfRangeException` rather than dropped. `TickableBusTests.ANegativeTimeScaleIsRejectedRatherThanClamped` is the executable statement of that rule.
 
 Two consequences follow from the rate living on the clock rather than in the channel:
 
 - **It multiplies both consumers.** `TickableBusTests.TheChannelsRateScalesTheAnimationButNotTheFrameCadence` sets `4f` and asserts both that `TickManager.TimeScale(channel) == 4f` and that `bus.Rate == 4f` — one value, read from two places, because there is only one value.
-- **It does not scale the frame cadence.** The target FPS constrains *sampling rhythm*, measured off the wall clock (`FrameRateControlSync` remarks, `TickManager.cs` line 838), so halving the rate does not halve the number of frames.
+- **It does not scale the frame cadence.** The target FPS constrains *sampling rhythm*, measured off the wall clock (`FrameRateControlSync` remarks, `TickManager.cs` line 840), so halving the rate does not halve the number of frames.
 
 ## Why both loops park instead of polling
 
 Before this design a paused channel woke every 10 ms to re-read a pause flag. Now the pause is a property of the transport and the pumps wait on the transport's signal:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 520-524, inside UpdateLoop)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 522-526, inside UpdateLoop)
 if (!_bus.IsAdvancing)
 {
     _bus.WaitWhileStalledAsync(token).GetAwaiter().GetResult();
@@ -56,7 +56,7 @@ The predicate is `IsAdvancing`, not `IsPaused`, and the distinction is deliberat
 This design has one cost, and the code pays it explicitly. "Has this thread been active recently" — the liveness heuristic — is necessarily false for a parked pump. `IsUpdateThreadAlive` therefore qualifies it:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 193-194)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 195-196)
 public bool IsUpdateThreadAlive => _isRunning && _isUpdateThreadActive &&
     (!_bus.IsAdvancing || IsRecentActivity(Interlocked.Read(ref _updateThreadLastActivityTimestamp)));
 ```
@@ -68,7 +68,7 @@ public bool IsUpdateThreadAlive => _isRunning && _isUpdateThreadActive &&
 `Start` and `StopAsync` both call `_bus.Resume()`:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (line 293, inside Start)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (line 295, inside Start)
 // 启动要清掉上一个生命周期留下的暂停，与旧实现的 _isPaused = false 对齐。不清的话，
 // 一个「暂停中被停掉」的渠道重启后会立刻 park，再也跑不起来。
 _bus.Resume();
@@ -79,14 +79,14 @@ The transport is a long-lived object owned by the channel, so "a stop clears the
 The same call also re-anchors the samplers:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 288-289)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 290-291)
 _updateSampler.Reset();
 _fixedSampler.Reset();
 ```
 
 which is why a frame delivered right after a restart carries one frame's `DeltaTime` rather than the whole downtime (`TickableBusTests.RestartingAChannelRePrimesItsClocks`).
 
-Note what `Resume()` does **not** lift: a rate of `0`. After a frozen clock, `Resume` clears the paused flag and the channel stays parked, because `IsAdvancing` is still false. The bus's rule is deliberately not papered over in `LoopChannel.Resume` (lines 391-396).
+Note what `Resume()` does **not** lift: a rate of `0`. After a frozen clock, `Resume` clears the paused flag and the channel stays parked, because `IsAdvancing` is still false. The bus's rule is deliberately not papered over in `LoopChannel.Resume` (lines 393-398).
 
 ## The consumer's side
 
@@ -105,4 +105,4 @@ TestTransition.Create()
 
 Then one `TickManager.Pause(channel)` and the assertion that neither the frame count nor the animation value moved. That is the executable definition of "the wiring connects the animation and the frame loop at once".
 
-> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 116, 119, 122, 187-197, 238, 288-293, 339, 384-402, 520-524, 1134-1145; `Src/Core/VeloxDev.Core/Interfaces/Timing/ITimeSource.cs`; `Src/Core/VeloxDev.Core.Test/TimeLine/TickableBusTests.cs` lines 112-243.
+> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 118, 121, 124, 195-199, 242, 290-295, 341, 386-404, 522-526, 1146-1147; `Src/Core/VeloxDev.Core/Interfaces/Timing/ITimeSource.cs`; `Src/Core/VeloxDev.Core.Test/TimeLine/TickableBusTests.cs` lines 112-243.

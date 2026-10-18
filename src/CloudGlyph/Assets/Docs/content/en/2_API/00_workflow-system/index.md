@@ -39,5 +39,6 @@ The compile/run core is fully covered by Demo + Test evidence. The host-capabili
 | `MaxParallelBranches` | **Test** only (`ParallelExecutionTests.cs`) — no demo sets it, so no demo demonstrates a concurrency cap |
 | `Target` / `TargetReached` | **Test** only (`CompileToReverseTests.cs`, `RuntimeEngineRunTests.cs`) — the Agent extension reads them, no demo sets `Target` |
 | `RunOutcome`, `CompiledOutline` | **Demo** (`WorkflowDemoSession.cs` reads `Outcome`; `TreeViewModel.cs` binds `CompiledOutline.Of`) + **Test** |
+| `ConnectionCheck`, `ConnectionPreviewState`, `StandardSetPreviewReceiver`, `StandardRefreshConnectionPreview`, `SlotHitTestEx` | **Test** (`WorkflowConnectionPreviewTests.cs`) + **Demo** (the platform curve views paint `IConnectionPreviewLink.Preview`; adapters call the slot hit test from `WorkflowSurfaceBehavior` / `WorkflowSlotConnectionBehavior`) |
 
 Both `internal` types that matter behaviorally — `BranchRuntimeContext` and `CompileKeyNormalizer` — are documented on the pages where they appear and marked `internal`, so the public surface stays an exact statement of what a consumer can call.

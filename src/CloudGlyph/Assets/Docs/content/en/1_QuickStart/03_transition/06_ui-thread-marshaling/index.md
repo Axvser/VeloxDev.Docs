@@ -28,7 +28,7 @@ WPF/Avalonia/Jalium and WinUI hosts carry a dispatch *priority* (`DispatcherPrio
 | WinForms | the target `Control` (`BeginInvoke` / `Invoke`) | lazily captured `WindowsFormsSynchronizationContext` | optional `UIThreadInspector.CaptureUIThread()` before `Application.Run` |
 | Blazor (Razor) | the circuit `SynchronizationContext` | same context | `UIThreadInspector.CaptureUIThread()` in `OnInitialized` to allow background starts |
 
-All hosts also **lazily capture** the global context the first time they are touched on the UI thread, so explicit capture is only ever needed for the first start from a background thread of a target that cannot identify its own thread. `ThreadFor` never mints a dispatcher for the calling thread and never throws: it answers `ThreadRef.None`, which merely costs that target its UI-thread frame pacer (the loop then waits on the default thread-pool timer).
+The WinUI, WinForms and Razor hosts also **lazily capture** the global context the first time they are touched on the UI thread, so explicit capture is only ever needed for the first start from a background thread of a target that cannot identify its own thread. WPF, Avalonia and MAUI resolve their dispatcher from the target or from `Application.Current` instead. `ThreadFor` never mints a dispatcher for the calling thread and never throws: it answers `ThreadRef.None`, which merely costs that target its UI-thread frame pacer (the loop then waits on the default thread-pool timer).
 
 ## 3. Recommended patterns
 

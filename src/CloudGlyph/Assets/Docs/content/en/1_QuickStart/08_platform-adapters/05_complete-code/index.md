@@ -1,6 +1,6 @@
 # Platform Adapters — Complete Code
 
-The seven sub-pages reproduce, **verbatim**, the files that the Setup page's `dotnet new wpf-v-*` commands generate (`-n` names and the `Demo.Views.Workflow` namespace already substituted, template default colors filled in). Combined they are the workflow **view layer** of a WPF project.
+The seven sub-pages reproduce, **verbatim**, the files that the Setup page's `dotnet new wpf-v-*` commands generate (`-n` names and the `Demo.Views.Workflow` namespace already substituted, template default colors filled in). One deliberate addition: the `WorkflowView.xaml` page shows a `Delete` `MenuItem` in the link `ContextMenu`; the template itself ships that `ContextMenu` **empty**, and the entry is the documented customization point. Combined they are the workflow **view layer** of a WPF project.
 
 ## The project file
 
@@ -48,5 +48,7 @@ Sub-pages (one page per source file):
 ```
 
   The code blocks on the seven sub-pages were then byte-compared against the generated files: **9 of 11 match verbatim**; the two that did not (`WorkflowView.xaml` missing `CornerRadius="3"`, and a mangled comment in `NodeView.xaml`) were corrected to match.
-- ✅ The demo that hosts this view layer built on the same date: `dotnet build Examples/Workflow/WPF/Demo/Demo.csproj` succeeded with 0 warnings / 0 errors (see the [Verification](../04_verification/index.md) run declaration).
+
+- ⚠️ **This revision (2026-10-18) did not regenerate the templates.** The sub-pages were re-checked statically against `Src/Templates/VeloxDev.WPF.Templates/working/content/*`; the sample files and the `Viewbox`/`PART_*` wiring still match. The `Delete` menu entry is the documented addition (the template ships the menu empty).
+- ✅ Historical record (2026-10-01, not re-run): the demo that hosts this view layer built with `dotnet build Examples/Workflow/WPF/Demo/Demo.csproj`, 0 warnings / 0 errors (see the [Verification](../04_verification/index.md) run declaration).
 - ⚠️ The generated scaffold was not compiled *in isolation* (it was emitted into a scratch folder, not a WPF project) and the assembled app was not launched — treat it as verified-by-generation plus verified-by-build of the equivalent in-repo demo, not as a proven end-to-end run of this exact scaffold.

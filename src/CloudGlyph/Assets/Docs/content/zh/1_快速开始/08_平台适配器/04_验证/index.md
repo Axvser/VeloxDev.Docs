@@ -9,7 +9,7 @@
 | 拖拽空白背景 | 画布平移；网格/标尺与小地图跟随滚动偏移。 |
 | 在画布上 Ctrl + 鼠标滚轮 | 围绕视口中心缩放；小地图里的视口指示框同步更新。 |
 | 拖拽节点头部 | 节点跟随光标移动；输入/输出槽锚点随之更新。 |
-| 按下输出槽并在输入槽上松开 | 创建一条连线；槽针脚按 `SlotState` 换色。 |
+| 按下输出槽，把指针移到输入槽上，再松开 | 移动过程中候选槽显示 `PreviewReceiver`，虚拟连线报告 `ValidTarget`（Core 会拒绝的槽则为 `InvalidTarget`）；在有效槽上松开创建连线；槽针脚按 `SlotState` 换色。 |
 | 滚得很远 / 添加很多节点 | 只有可见的项视图被实例化（虚拟化）——可见项计数器保持有界。 |
 | 在小地图里拖拽 | 画布滚动到小地图指示的位置。 |
 
@@ -25,7 +25,8 @@ dotnet run --project Examples/Workflow/WPF/Demo
 
 ## 运行声明
 
-- ✅ 已于 2026-10-01 构建：`dotnet build Examples/Workflow/WPF/Demo/Demo.csproj`（Debug，`net9.0-windows`）把 WPF 适配器及其工作流行为针对本仓库的 Core 引擎编译通过，**0 警告 / 0 错误**：
+- ⚠️ **本次修订（2026-10-18）没有构建或运行。** 本页所有论断均依据适配器源码（`Src/Adapters/*`）、Core 的输入/预览路径（`Src/Core/VeloxDev.Core/WorkflowSystem`）与演示调用形态（`Examples/Workflow/WPF/Demo`、`Examples/Transition/WPF`、`Examples/Theme/WPF`）静态核验。未启动 GUI，因此平移 / 缩放 / 拖拽 / 连接预览 / 小地图均未在屏幕上观察。
+- ✅ 历史记录（2026-10-01，本次未重跑）：`dotnet build Examples/Workflow/WPF/Demo/Demo.csproj`（Debug，`net9.0-windows`）把 WPF 适配器及其工作流行为针对 Core 引擎编译通过，**0 警告 / 0 错误**：
 
 ```text
   VeloxDev.WPF -> ...\Src\Adapters\VeloxDev.WPF\bin\Debug\net5.0-windows\VeloxDev.WPF.dll
@@ -35,5 +36,3 @@ dotnet run --project Examples/Workflow/WPF/Demo
     0 个警告
     0 个错误
 ```
-
-- ⚠️ 未启动 GUI：本环境没有打开任何图形界面，因此第 1 节的交互结果（平移 / 缩放 / 拖拽 / 连线 / 小地图）是依据适配器源码（`Src/Adapters/*`）与演示调用形态（`Examples/Workflow/WPF/Demo`、`Examples/Transition/WPF`、`Examples/Theme/WPF`）做的静态核验——并未在屏幕上实际观察。

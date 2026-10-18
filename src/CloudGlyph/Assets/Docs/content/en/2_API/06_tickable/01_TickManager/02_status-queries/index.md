@@ -1,6 +1,6 @@
 # `TickManager` — Status Queries
 
-Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 1105-1156.
+Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 1109-1156.
 
 All thirteen members take `string channel = TickManager.DEFAULT_CHANNEL`, are `static`, and are safe to call from any thread. Their common contract is the one worth stating once:
 
@@ -29,11 +29,11 @@ Each is implemented as `_channels.TryGetValue(channel, out var c) ? c.X : <fallb
 **Signature:**
 `public static string SystemStatus(string channel = TickManager.DEFAULT_CHANNEL)`
 
-**Returns:** one of three literals — `"Stopped"` when `!_isRunning`, `"Paused"` when the bus is paused, `"Running"` otherwise (line 185).
+**Returns:** one of three literals — `"Stopped"` when `!_isRunning`, `"Paused"` when the bus is paused, `"Running"` otherwise (line 187).
 
 **Notes:**
 - The strings are the public contract; there is no enum.
-- **`"Running"` is reported at a rate of `0`.** A frozen clock is not a pause, so this is the one status the query does not cover. Use `TickManager.Bus(channel)?.IsAdvancing` for "is the clock actually moving" — the WPF demo prints both side by side for exactly this reason (`MainWindow.xaml.cs` lines 307-324).
+- **`"Running"` is reported at a rate of `0`.** A frozen clock is not a pause, so this is the one status the query does not cover. Use `TickManager.Bus(channel)?.IsAdvancing` for "is the clock actually moving" — the WPF demo prints both side by side (`MainWindow.xaml.cs` lines 276-285).
 
 #### `TickManager.IsUpdateThreadAlive` / `TickManager.IsFixedUpdateThreadAlive`
 
@@ -44,7 +44,7 @@ Each is implemented as `_channels.TryGetValue(channel, out var c) ? c.X : <fallb
 **Returns:** `bool` — `true` while the pump is running, including while it is parked.
 
 **Notes:**
-- The implementation (lines 193-197) is not an inactivity test:
+- The implementation (lines 195-199) is not an inactivity test:
 
 ```csharp
 public bool IsUpdateThreadAlive => _isRunning && _isUpdateThreadActive &&
@@ -56,7 +56,7 @@ public bool IsUpdateThreadAlive => _isRunning && _isUpdateThreadActive &&
 
 **Example:**
 ```text
-// Source: Src/Core/VeloxDev.Core.Test/TimeLine/TickableBusTests.cs (lines 151-155)
+// Source: Src/Core/VeloxDev.Core.Test/TimeLine/TickableBusTests.cs (lines 153-155)
 // 旧实现靠每 10ms 醒来轮询暂停标志，暂停中的循环仍然活着；这里改为 park 在总线上，
 // 所以「线程还活着吗」不能再用「最近有没有活动」来判断。
 Assert.IsTrue(TickManager.IsUpdateThreadAlive(channel),
@@ -75,7 +75,7 @@ Assert.IsTrue(TickManager.IsFixedUpdateThreadAlive(channel));
 
 **Example:**
 ```text
-// Source: Examples/Tickable/WPF/Demo/MainWindow.xaml.cs (line 307)
+// Source: Examples/Tickable/WPF/Demo/MainWindow.xaml.cs (line 276)
 var bus = TickManager.Bus(DemoChannel.Name);
 $"IsAdvancing {bus?.IsAdvancing}  IsPaused {bus?.IsPaused}  Epoch {bus?.Epoch}  Rate {bus?.Rate ?? 0:F2}×"
 ```
@@ -83,9 +83,9 @@ $"IsAdvancing {bus?.IsAdvancing}  IsPaused {bus?.IsPaused}  Epoch {bus?.Epoch}  
 **Notes:**
 - `null` is the deliberate answer for a channel that was never started: a query must not create one as a side effect (`TickableBusTests.BusIsNullForAChannelThatWasNeverStarted`).
 - One channel is one transport for its whole life; two calls return the same instance (`TickableBusTests.BusIsStableForAStartedChannel`).
-- The source is resolved once, at channel construction, through `TimerCore.CreateTimeSource<ITimeSourceControl>()` (line 116), so a platform can substitute its own by registering one there. The default implementation is `TimeSourceCore` in `VeloxDev.Timing`.
+- The source is resolved once, at channel construction, through `TimerCore.CreateTimeSource<ITimeSourceControl>()` (line 118), so a platform can substitute its own by registering one there. The default implementation is `TimeSourceCore` in `VeloxDev.Timing`.
 - Passing it to `TransitionCore.Execute(target, timeline)` is what makes one `Pause()` stop the frame callbacks and the animation together, and what makes the channel's rate multiply both (`TickableBusTests.PausingAChannelStopsItsFramesAndTheAnimationAnchoredToIt`).
-- The members a consumer normally touches: `IsAdvancing`, `IsPaused`, `Rate`, `Position`, `Epoch`, `Pause()`, `Resume()`, `SetRate(double)`, `WaitWhileStalledAsync(CancellationToken)`.
+- The members a consumer normally touches: `IsAdvancing`, `IsPaused`, `Rate`, `Position`, `Epoch`, `Pause()`, `Resume()`, `SetRate(double)`, `Seek(TimeSpan)`, `Wake()`, `WaitWhileStalledAsync(CancellationToken)`.
 
 #### `TickManager.ActiveBehaviorCount`
 

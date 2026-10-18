@@ -39,5 +39,6 @@
 | `MaxParallelBranches` | **仅测试**（`ParallelExecutionTests.cs`）——没有 demo 设置它，因此没有 demo 演示并发上限 |
 | `Target` / `TargetReached` | **仅测试**（`CompileToReverseTests.cs`、`RuntimeEngineRunTests.cs`）——Agent 扩展会读它们，没有 demo 设置 `Target` |
 | `RunOutcome`、`CompiledOutline` | **Demo**（`WorkflowDemoSession.cs` 读 `Outcome`；`TreeViewModel.cs` 绑定 `CompiledOutline.Of`）+ **测试** |
+| `ConnectionCheck`、`ConnectionPreviewState`、`StandardSetPreviewReceiver`、`StandardRefreshConnectionPreview`、`SlotHitTestEx` | **Test**（`WorkflowConnectionPreviewTests.cs`）+ **Demo**（各平台曲线视图绘制 `IConnectionPreviewLink.Preview`；适配器在 `WorkflowSurfaceBehavior` / `WorkflowSlotConnectionBehavior` 中调用槽命中） |
 
 两个在行为上重要的 `internal` 类型 —— `BranchRuntimeContext` 与 `CompileKeyNormalizer` —— 都在它们出现的页面上被记录并标注为 `internal`，这样公开面就仍是对「调用方能调用什么」的精确陈述。

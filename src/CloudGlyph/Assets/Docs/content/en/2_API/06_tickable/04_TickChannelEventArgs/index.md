@@ -6,11 +6,9 @@ Namespace `VeloxDev.TimeLine`. Assembly `VeloxDev.Core`.
 public sealed class TickChannelEventArgs(string channelName) : EventArgs
 ```
 
-Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 1159-1162.
+Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 1162-1166.
 
 The payload of the four `TickManager` channel events. It is a top-level type in the same file as `TickManager` and does **not** derive from `TimeLineEventArgs` — it derives from `EventArgs`, because it carries no cancelable state, only a name.
-
-This is the type formerly named `MonoBehaviourChannelEventArgs`; the rename changed nothing but the name.
 
 #### Constructor
 
@@ -36,7 +34,7 @@ This is the type formerly named `MonoBehaviourChannelEventArgs`; the rename chan
 
 **Example:**
 ```text
-// Source: the forwarding in GetOrCreateChannel (TickManager.cs lines 1024-1027)
+// Source: the forwarding in GetOrCreateChannel (TickManager.cs lines 1023-1031)
 ch.Started += (s, e) => OnChannelStarted?.Invoke(s, new TickChannelEventArgs(n));
 ch.Paused  += (s, e) => OnChannelPaused?.Invoke(s, new TickChannelEventArgs(n));
 ch.Resumed += (s, e) => OnChannelResumed?.Invoke(s, new TickChannelEventArgs(n));

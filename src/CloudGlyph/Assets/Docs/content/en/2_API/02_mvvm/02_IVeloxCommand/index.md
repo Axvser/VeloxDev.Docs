@@ -1,6 +1,6 @@
 # MVVM — `IVeloxCommand`
 
-`VeloxDev.MVVM.IVeloxCommand` (`Src/Core/VeloxDev.Core/Interfaces/MVVM/IVeloxCommand.cs`) is the command contract. It extends `System.Windows.Input.ICommand` with an async execution model, a per-execution lifecycle, and runtime lock / interrupt / queue controls. The concrete implementation is `VeloxCommand` (see `05_VeloxCommand`).
+`VeloxDev.MVVM.IVeloxCommand` (`Src/Core/VeloxDev.Core/Interfaces/MVVM/IVeloxCommand.cs`) is the command contract. It extends `System.Windows.Input.ICommand` with async execution, a per-execution lifecycle, and runtime lock / interrupt / queue controls. The concrete implementations are `VeloxCommand` and the typed arity family (see `05_VeloxCommand` and `16_typed-commands`).
 
 ## Interface: `IVeloxCommand`
 
@@ -43,20 +43,20 @@ namespace VeloxDev.MVVM
 
 **Inherited from `ICommand`:** `bool CanExecute(object? parameter)`, `void Execute(object? parameter)`, event `EventHandler? CanExecuteChanged`.
 
-**Not declared here:** `ExecuteAndWaitAsync` (on `IVeloxCommandCompletion`), `IsBusy` / `ActiveCount` / `PendingCount` (on `IVeloxCommandStatus`). Both are reachable from this interface through `VeloxCommandExtensions` — adding them to `IVeloxCommand` would break every hand-written implementer.
+**Not declared here:** `ExecuteAndWaitAsync` (`IVeloxCommandCompletion`), `ExecuteAsync(object?, CancellationToken)` / `Execute(object?, out object?)` (`IVeloxCommandResult`), `IsBusy` / `ActiveCount` / `PendingCount` (`IVeloxCommandStatus`). Adding them to `IVeloxCommand` would break every hand-written implementer.
 
 ##### Events
 
 | Name | Type | Description |
-|---|---|---|
+| --- | --- | --- |
 | `Created` | `CommandEventHandler?` | Raised when an execution request has been accepted. |
 | `Enqueued` | `CommandEventHandler?` | Raised when capacity is exhausted and the request joins the pending queue. |
 | `Dequeued` | `CommandEventHandler?` | Raised when a queued item leaves the queue and is about to run. |
 | `Started` | `CommandEventHandler?` | Raised immediately before the command method is invoked. |
 | `Completed` | `CommandEventHandler?` | Raised when the command method returned successfully. |
-| `Failed` | `CommandEventHandler?` | Raised when the command method threw a non-cancellation exception; `e.Exception` carries it. |
+| `Failed` | `CommandEventHandler?` | Raised when the body threw a non-cancellation exception; `e.Exception` carries it. |
 | `Canceled` | `CommandEventHandler?` | Raised when the execution was cancelled or refused. At most once per execution. |
-| `Exited` | `CommandEventHandler?` | Raised when the execution finished and left the active set. Not raised for refused or cleared calls. |
+| `Exited` | `CommandEventHandler?` | Raised when the execution left the active set. Not raised for refused or cleared calls. |
 | `CanExecuteChanged` | `EventHandler?` | Inherited from `ICommand`. |
 
 ##### Methods
@@ -67,7 +67,7 @@ namespace VeloxDev.MVVM
 `Task ExecuteAsync(object? parameter)`
 
 | Parameter | Type | Description |
-|---|---|---|
+| --- | --- | --- |
 | `parameter` | `object?` | The argument passed to the command body. |
 
 **Returns:** `Task` — completes once the call has been **accepted** (started or queued), not when the body finishes.
@@ -77,7 +77,7 @@ namespace VeloxDev.MVVM
 **Example:**
 
 ```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/CommandSignatureTests.cs, lines 141-147
+// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/CommandSignatureTests.cs
 private static async Task RunToCompletionAsync(IVeloxCommand command, object? parameter = null)
 {
     var exited = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -94,25 +94,22 @@ private static async Task RunToCompletionAsync(IVeloxCommand command, object? pa
 **Signature:**
 `void Lock()` — `Task LockAsync()`
 
-**Returns:** `Task` (async form) — completes once the force-lock is set.
+**Returns:** `Task` (async form) — completes once the force-lock is set and `CanExecuteChanged` has been raised.
 
 **Example:**
 
 ```csharp
-// Source: Demo — Examples/MVVM/WPF/Demo/MainWindowViewModel.cs, lines 158-167
+// Source: Demo — Examples/MVVM/WPF/Demo/MainWindowViewModel.cs
 private void FreeCommand()
 {
-    MinusCommand.Lock();   // enter the locked state: prevents new commands from triggering but
-                           // does not interrupt the currently running command
-
-    MinusCommand.Interrupt();    // interrupt the current command
-    MinusCommand.Clear();        // interrupt the current command and all queued commands
-
-    MinusCommand.Unlock(); // release the lock
+    MinusCommand.Lock();
+    MinusCommand.Interrupt();
+    MinusCommand.Clear();
+    MinusCommand.Unlock();
 }
 ```
 
-**Notes:** `CanExecute` returns `false` while locked, and new requests are refused (raising `Created` then `Canceled`). Running work is untouched. A command that is already locked stays locked after `Interrupt` / `Clear`.
+**Notes:** `CanExecute` returns `false` while locked, and new requests are refused (`Created` then `Canceled`). Running work is untouched. A command that is already locked stays locked after `Interrupt` / `Clear`.
 
 ###### `IVeloxCommand.Unlock` / `UnlockAsync`
 
@@ -121,7 +118,7 @@ private void FreeCommand()
 
 **Returns:** `Task` (async form) — completes once the lock is released and the queue has been drained as far as capacity allows.
 
-**Notes:** the member is spelled `Unlock`. It exists on the interface, so it is forwarded by *both* `VeloxCommand` and generated command properties.
+**Notes:** the member is spelled `Unlock`. It is declared on the interface, so generated command properties expose it too.
 
 ###### `IVeloxCommand.Notify`
 
@@ -133,10 +130,10 @@ private void FreeCommand()
 **Example:**
 
 ```csharp
-// Source: Demo — Examples/MVVM/WPF/Demo/MainWindowViewModel.cs, lines 34-37
+// Source: Demo — Examples/MVVM/WPF/Demo/MainWindowViewModel.cs
 partial void OnIndexChanged(int oldValue, int newValue)
 {
-    MinusCommand.Notify(); // notify that MinusCommand's executability needs to be refreshed
+    MinusCommand.Notify();
 }
 ```
 
@@ -149,14 +146,14 @@ partial void OnIndexChanged(int oldValue, int newValue)
 
 **Returns:** `Task` (async form) — completes once the active executions have been cancelled and the command is back to its prior lock state.
 
-**Notes:** cancels the running executions and raises `Canceled` for each. Queued items are left in the queue. A command that was not locked is unlocked again afterwards; one that was already locked stays locked.
+**Notes:** cancels the running executions and raises `Canceled` for each. Queued items stay queued. A command that was not locked is unlocked again afterwards; one that was already locked stays locked.
 
 ###### `IVeloxCommand.Clear` / `ClearAsync`
 
 **Signature:**
 `void Clear()` — `Task ClearAsync()`
 
-**Returns:** `Task` (async form) — completes once the queue is emptied and the active executions have been cancelled.
+**Returns:** `Task` (async form) — completes once the queue is empty and the active executions have been cancelled.
 
 **Notes:** raises `Dequeued` for every pending item first, then `Canceled` for pending and active items alike. A pending item dropped this way never reaches `Started` / `Exited`.
 
@@ -167,7 +164,7 @@ partial void OnIndexChanged(int oldValue, int newValue)
 
 **Returns:** `Task` (async form).
 
-**Notes:** starts queued work if the command is not force-locked; otherwise a no-op. Dirtying the queue after a `Clear` that left nothing pending starts nothing.
+**Notes:** starts queued work if the command is not force-locked; otherwise a no-op.
 
 ###### `IVeloxCommand.ChangeSemaphore` / `ChangeSemaphoreAsync`
 
@@ -175,7 +172,7 @@ partial void OnIndexChanged(int oldValue, int newValue)
 `void ChangeSemaphore(int semaphore)` — `Task ChangeSemaphoreAsync(int semaphore)`
 
 | Parameter | Type | Description |
-|---|---|---|
+| --- | --- | --- |
 | `semaphore` | `int` | The new maximum number of concurrent executions. |
 
 **Returns:** `Task` (async form).
@@ -183,17 +180,16 @@ partial void OnIndexChanged(int oldValue, int newValue)
 **Exceptions:**
 
 | Exception | Condition |
-|---|---|
+| --- | --- |
 | `ArgumentOutOfRangeException` | `semaphore` is less than 1. The synchronous form validates before dispatching so the failure is not lost as an unobserved exception. |
 
 **Example:**
 
 ```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandConcurrencyTests.cs, lines 119-122
+// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandConcurrencyTests.cs
 await command.ChangeSemaphoreAsync(3);
-
 await gate.WaitForStartedAsync(3);
-Assert.AreEqual(3, gate.StartedCount, "raising the cap is what releases the queue - nothing else will");
+Assert.AreEqual(3, gate.StartedCount);
 ```
 
-**Notes:** raising the cap immediately drains whatever the queue can now hold.
+**Notes:** raising the cap drains whatever the queue can now hold; lowering it never cancels running work.

@@ -67,7 +67,7 @@ public Transition<T> Property<TValue>(Expression<Func<T, TValue>> propertyLambda
 
 **说明：**
 - 泛型重载接受任意值类型。Razor 是唯一**没有**声明它的适配器 —— 它只提供带类型重载。某个已声明属性只有在 `InterpolatorCore.Prepare` 能为其类型解析出 `ISampler`（自定义覆盖 → 注册表 → 结构体 `ISampleable`）时才会被采样，否则该属性被跳过（并经 effect 的 `Warn` 报出）。什么都没解析到的引用类型末端会被 `Execute` 事先拒绝（`TransitionPathUnsampleableException`），而同时声明一条路径与它的某个子叶会在构建时抛 `TransitionPathConflictException`。
-- 带类型的便捷重载对引擎值类型形状相同 —— `int`、`double`、`float`、`decimal`、`System.Drawing.{Point, PointF, Size, SizeF, Color, Rectangle, RectangleF}`，以及（非 `netstandard2.0` 编译时）`System.Numerics.{Vector2, Vector3, Vector4, Quaternion}`。这里 Jalium 是例外：它只有 `int`、`float`、`double` 三个带类型重载（它确实声明了泛型重载）。
+- 带类型的便捷重载对引擎值类型形状相同 —— `int`、`double`、`float`、`decimal`、`System.Drawing.{Point, PointF, Size, SizeF, Color, Rectangle, RectangleF}`，以及（非 `netstandard2.0` 编译时）`System.Numerics.{Vector2, Vector3, Vector4, Quaternion}`。Jalium 声明了泛型重载与 `int` / `double` / `float` 三个带类型重载，但**没有 `decimal`**；它的平台值类型重载见下表。
 - 变换重载接收集合（`ICollection<Transform>`；Avalonia 另有单个 `ITransform?` 形式）。单个变换直接赋值以保留运行时类型 —— 包成组会破坏 `((TranslateTransform)x.RenderTransform).X` 这类嵌套路径。多个变换会被包进一个组（`TransformGroup`）。
 - 平台专属带类型重载（除注明外均另带 `object? interpolationOptions = null`）：
 

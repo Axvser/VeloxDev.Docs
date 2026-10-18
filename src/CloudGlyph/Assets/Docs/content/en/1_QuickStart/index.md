@@ -19,6 +19,9 @@ VeloxDev is a set of .NET libraries for building **AI-controllable workflow edit
 
 ## Prerequisites (common to all pages)
 
-- .NET SDK **8.0.400+** (examples target `net9.0`; the libraries multi-target `netstandard2.0` / `net6.0` / `net9.0`).
-- A supported GUI workload installed for the adapter you pick (WPF / Avalonia / WinUI / MAUI / WinForms / Razor).
+- **.NET SDK 8.0+** for the `net8.0` target. `VeloxDev.Core` multi-targets `netstandard2.0;netframework4.6.1;net5.0;netcoreapp3.0;net8.0`; `VeloxDev.Core.Extension` is `netstandard2.0;net8.0`.
+- The repository demos use newer target frameworks (`net9.0` for most GUI demos, `net10.0` for Jalium). A demo is a **tested configuration**, not the minimum supported version.
+- A supported GUI workload installed for the adapter you pick (WPF / Avalonia / WinUI / MAUI / WinForms / Razor / Jalium).
 - NuGet access to restore `VeloxDev.*` packages.
+
+Each feature's own `00_prerequisites` page states the exact TFM, package minimum and workload it needs. Do not infer the minimum from a demo's runtime.

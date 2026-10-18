@@ -6,13 +6,13 @@
 
 | 适配器 | 提供的命名空间 | 工作流行为文件（`Attached/Workflow/*`） |
 |---|---|---|
-| WPF | `AttachedBehaviors`、`TransitionSystem`、`DynamicTheme`、`Adapters.NativeSamplers` | `WorkflowSurfaceBehavior`、`WorkflowCanvasTransformBehavior`、`ViewPool`、`ViewManager`、`WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`、`WorkflowMinimapOverlay` |
-| Avalonia | 同上四个 | WPF 集合 **加** `PlatformDetection`（internal，触屏平台检测） |
+| WPF | `AttachedBehaviors`、`TransitionSystem`、`DynamicTheme`、`Adapters.NativeSamplers` | `WorkflowSurfaceBehavior`、`WorkflowCanvasTransformBehavior`、`ViewPool`、`ViewManager`、`WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`、`WorkflowMinimapOverlay`、`WorkflowEvents` |
+| Avalonia | 同上四个 | WPF 集合 |
 | WinUI | 同上四个 | WPF 集合 |
-| MAUI | 同上四个 | WPF 集合 **减** `WorkflowCanvasTransformBehavior`；**加** `WorkflowLinkOverlay` |
-| WinForms | 同上四个 | `WorkflowTreeView`、`WorkflowNodeAttachment`、`WorkflowSlotAttachment`、`WorkflowLinkAttachment`、`WorkflowGridDecorator`、`WorkflowMinimapOverlay`、`WorkflowTemplateSelector`、`WorkflowSurfaceBehavior`、`WorkflowCanvasTransformBehavior`、`ViewPool`、`ViewManager`、`WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`、绘制辅助 `WorkflowSurfaceColors` / `WorkflowSurfaceGraphics` / `WorkflowSurfaceGrid`、`IWorkflowMinimapScrollSource`、`IWorkflowSurfaceNodeView`、`ModelChangeRelay` 与 `NativeWindowStyleHelper`（internal）；`ViewManager.cs` 另声明 `IWorkflowTemplateSelector` |
-| Razor | 同上四个 | 组件集合：`WorkflowSurfaceBehavior`、`ViewPool`、`WorkflowGridDecorator`、`WorkflowMinimapOverlay`、`WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`（`.razor` 分部类）**加** 静态 `WorkflowCanvasTransformBehavior`、`WorkflowGeometryScope`、`WorkflowRuntimeIds` |
-| Jalium | `AttachedBehaviors`、`TransitionSystem`、`Adapters.NativeSamplers`（**无 `DynamicTheme`**） | 各角色附加类 `WorkflowNodeAttachment`、`WorkflowSlotAttachment`、`WorkflowLinkAttachment`，加 `WorkflowTreeView`、`WorkflowGridDecorator`、`WorkflowMinimapOverlay`、`WorkflowTemplateSelector`、`WorkflowPortLayout` / `WorkflowPortGeometry`、`ViewPool`、`ViewManager` 与 `IWorkflowTemplateSelector` —— **没有**独立的 `WorkflowSurfaceBehavior` / `WorkflowCanvasTransformBehavior`，表面由 `WorkflowTreeView` 自己持有 |
+| MAUI | 同上四个 | `WorkflowSurfaceBehavior`、`ViewPool`、`ViewManager`、`WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`、`WorkflowMinimapOverlay`、`WorkflowEvents`，**加** `WorkflowLinkOverlay`；**无** `WorkflowCanvasTransformBehavior` |
+| WinForms | 同上四个 | `WorkflowTreeView`、`WorkflowNodeAttachment`、`WorkflowSlotAttachment`、`WorkflowLinkAttachment`、`WorkflowGridDecorator`、`WorkflowMinimapOverlay`（两者均为 `Panel` 子类）、`WorkflowTemplateSelector`、`WorkflowSurfaceBehavior`、`WorkflowCanvasTransformBehavior`、`ViewPool`、`ViewManager`、`WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`、`WorkflowBindingExtensions`、绘制辅助 `WorkflowSurfaceColors` / `WorkflowSurfaceGraphics` / `WorkflowSurfaceGrid`、`SvgPathParser`、`IWorkflowMinimapScrollSource`、`IWorkflowSurfaceNodeView`、`ModelChangeRelay` 与 `NativeWindowStyleHelper`（internal）；`ViewManager.cs` 另声明 `IWorkflowTemplateSelector` |
+| Razor | 同上四个 | 组件集合：`WorkflowSurfaceBehavior`、`ViewPool`、`WorkflowGridDecorator`、`WorkflowMinimapOverlay`、`WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`（`.razor` 分部类）**加** 静态 `WorkflowCanvasTransformBehavior`、`WorkflowGeometryScope`、`WorkflowRuntimeIds`、`WorkflowPresentation` 与 `SurfacePointerKind` 枚举 |
+| Jalium | `AttachedBehaviors`、`TransitionSystem`、`Adapters.NativeSamplers`（**无 `DynamicTheme`**） | `WorkflowSurfaceBehavior`、`ViewPool`、`ViewManager`、`WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`、`WorkflowMinimapOverlay`、`WorkflowLinkBounds`、`WorkflowEvents`；**无**独立 `WorkflowCanvasTransformBehavior`（表面暴露 `CanvasTransform`），也没有 `WorkflowTreeView` / 各角色附加类 / `IWorkflowTemplateSelector` —— 网格装饰层与 `DataTemplateSelector` 由模板提供 |
 
 ### 各适配器的类形态
 
@@ -20,12 +20,12 @@
 
 | 行为 | WPF | WinUI | Jalium | Avalonia | MAUI | WinForms | Razor |
 |---|---|---|---|---|---|---|---|
-| `WorkflowSurfaceBehavior` | `sealed : DependencyObject` | `sealed : DependencyObject` | 无（纯代码；表面由 `WorkflowTreeView` 持有） | `sealed : AvaloniaObject` | `sealed`（附加 `BindableProperty`） | `sealed`（状态表） | `ComponentBase` |
+| `WorkflowSurfaceBehavior` | `sealed : DependencyObject` | `sealed : DependencyObject` | `static class`（附加 DP；宿主 `FrameworkElement`） | `sealed : AvaloniaObject` | `sealed`（附加 `BindableProperty`） | `sealed`（状态表） | `ComponentBase` |
 | `ViewPool` | `sealed : DependencyObject` | `sealed : DependencyObject` | `static class` | `sealed : AvaloniaObject` | `sealed`（附加 `BindableProperty`） | `sealed`（状态表） | `ComponentBase` |
 | `ViewManager` 构造 | `(Panel)` | `(Panel)` | `(Panel)` ： `IDisposable` | `(Panel, IDataTemplate?)` | `(Layout)` | `(Control)` ： `IDisposable` | 无（组件） |
-| 节点/槽行为 | `sealed : DependencyObject` | `sealed : DependencyObject` | 无（改由各角色视图基类承担） | `sealed : AvaloniaObject` | `sealed`（附加 `BindableProperty`） | `sealed`（状态表） | `ComponentBase` |
-| `WorkflowMinimapOverlay` | `FrameworkElement` | `Canvas` | `FrameworkElement` | `Control` | `GraphicsView : IDrawable` | `static class`（绘制控件） | `ComponentBase` |
-| `WorkflowCanvasTransformBehavior` | 静态（附加 DP） | 静态（附加 DP） | 不提供 | `sealed : AvaloniaObject` | 不提供 | 静态（持有 `Offset`） | 静态（CSS） |
+| 节点/槽行为 | `sealed : DependencyObject` | `sealed : DependencyObject` | `sealed : DependencyObject` | `sealed : AvaloniaObject` | `sealed`（附加 `BindableProperty`） | `sealed`（状态表） | `ComponentBase` |
+| `WorkflowMinimapOverlay` | `FrameworkElement` | `Canvas` | `FrameworkElement` | `Control` | `GraphicsView : IDrawable` | `Panel`（自行绘制） | `ComponentBase` |
+| `WorkflowCanvasTransformBehavior` | 静态（附加 DP） | 静态（附加 DP） | 不提供 —— 改用 `WorkflowSurfaceBehavior.CanvasTransform` 附加 DP | `sealed : AvaloniaObject` | 不提供 | 静态（持有 `Offset`） | 静态（CSS） |
 
 ## 各适配器过渡接线（摘要）
 

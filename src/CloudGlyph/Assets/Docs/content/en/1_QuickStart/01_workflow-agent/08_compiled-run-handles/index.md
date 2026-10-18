@@ -16,7 +16,7 @@ ResumeCompiledRun(handle: "run-1")  → {"status":"ok","message":"Run 'run-1' is
 StopCompiledRun(handle: "run-1")    → {"status":"ok","message":"Run 'run-1' was asked to stop; it ends at the current node boundary."}
 ```
 
-All four run tools require `WithAllowNodeExecution(true)`.
+`StartCompiledWorkflow` / `ContinueCompiledWorkflow` require `WithAllowNodeExecution(true)`, because they start node code. `GetCompiledRunStatus`, `PauseCompiledRun`, `ResumeCompiledRun` and `StopCompiledRun` operate on an existing handle and do **not** check that gate.
 
 ## 1. Start and continue
 
@@ -103,5 +103,5 @@ Both run entries report `failures` as records and `logFile` as an absolute path.
 
 ## Run declaration
 
-- ✅ Actually built and ran — `CompiledRunControlTests` passed in the deterministic suite on 2026-10-01 (`已通过! 失败: 0，通过: 387`): `AStartedRun_CanBeHeld_LetGo_AndFollowedToItsEnd`, `AStoppedRun_EndsAsCancelled_AndTheAgentCanCarryOnFromIt`, `CarryingOn_WithNothingWrittenYet_IsRefused`, `TheFailureRecords_AndTheLogFile_TravelWithTheResult`.
+- ⚠️ **Not run for this revision** — statically verified against the current source on 2026-10-18. A previously recorded `CompiledRunControlTests` run (2026-10-01, 387 tests) predates the permission-mode redesign and is not used as current evidence.
 - ⚠️ The **`RunsOnOurGate` guard** and the **40-line log tail** are verified against source only — no test in `Agent/**` covers them (noted explicitly in the test file's own remarks). They are quoted from `WorkflowAgentToolkit.cs`.

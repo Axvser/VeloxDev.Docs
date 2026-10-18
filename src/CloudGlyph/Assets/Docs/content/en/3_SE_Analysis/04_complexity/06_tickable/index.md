@@ -11,7 +11,7 @@ Let $N$ be the number of behaviours registered on one channel, $F$ the target fr
 | Per-frame `Update` + `LateUpdate` sweeps | $O(N)$ | $O(1)$ | $N$, not $F$ |
 | Per-step `FixedUpdate` sweep | $O(N)$ per step | $O(1)$ | $N$ |
 | `RegisterBehaviour` (caller side) | $O(1)$ amortised | $O(1)$ | `ConcurrentQueue<T>` enqueue |
-| Registration drain (pump side) | $O(k \log N + k)$ | $O(1)$ per behaviour | $k$ = behaviours added this frame |
+| Registration drain (pump side) | $O(N^2)$ worst case, $O(N)$ typical | $O(1)$ per behaviour | A rebuild per drain that added something |
 | `RebuildCachedWrappers` | $O(N^2)$ worst case | $O(N)$ | Insertion sort — chosen because $N$ is small |
 | `GetCachedWrappers` cache hit | $O(1)$ | — | One `Stopwatch.GetTimestamp` |
 | Status query | $O(1)$ expected | $O(1)$ | `ConcurrentDictionary` hash lookup |
@@ -36,7 +36,7 @@ Let $N$ be the number of behaviours registered on one channel, $F$ the target fr
 At target rate $F$ and step $h$ ms, a channel delivers about
 
 $$
-\text{deliveries per second} \approx F \cdot (2N) + \left(\frac{F \cdot h}{1000}\right)^{-1} \cdot N
+\text{deliveries per second} \approx F \cdot (2N) + \frac{1000}{h} \cdot N
 $$
 
-where the first term is the update and late sweeps and the second is the fixed steps. The demo reports the second factor directly as "steps per frame": the WPF demo measures $\Delta \text{fixed} / \Delta \text{frames}$ over a one-second window and displays it, and the point of the measurement is that it barely moves when the frame-rate buttons are pressed (`MainWindow.xaml.cs` lines 201-228).
+where the first term is the update and late sweeps and the second is the fixed steps — note that the fixed rate is $1000/h$, independent of $F$. The demo reports the ratio directly as "steps per frame": the WPF demo measures $\Delta \text{fixed} / \Delta \text{frames}$ over a one-second window and displays it, and the point of the measurement is that it barely moves when the frame-rate buttons are pressed (`MainWindow.xaml.cs` lines 170-197).

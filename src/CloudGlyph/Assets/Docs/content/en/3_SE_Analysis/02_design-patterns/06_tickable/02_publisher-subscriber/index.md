@@ -4,9 +4,9 @@
 
 | Role | What it means here | Source |
 |---|---|---|
-| Façade | 34 public static members, all one-line forwards to a `LoopChannel` | `TickManager.cs` 1046-1156 |
-| Registry | a static `ConcurrentDictionary<string, LoopChannel>` with a lazy factory | `TickManager.cs` 1017-1033 |
-| Publisher | four static events, republished per channel | `TickManager.cs` 1024-1027 of the `GetOrAdd` factory, 1037-1042 |
+| Façade | 34 public static members, all one-line forwards to a `LoopChannel` | `TickManager.cs` 1050-1156 |
+| Registry | a static `ConcurrentDictionary<string, LoopChannel>` with a lazy factory | `TickManager.cs` 1019-1032 |
+| Publisher | four static events, republished per channel | `TickManager.cs` 1023-1031 of the `GetOrAdd` factory, 1041-1044 |
 
 ```mermaid
 flowchart LR
@@ -23,7 +23,7 @@ flowchart LR
 Every public member is a one-line forward, which is why the reference documentation splits by member group rather than by type:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 1048-1064)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 1050-1057)
 public static void Start(string channel = DEFAULT_CHANNEL)
     => GetOrCreateChannel(channel).Start();
 
@@ -39,7 +39,7 @@ The façade owns no state of its own beyond the channel dictionary. Everything w
 The status queries are the one place the façade is not a pure forward: they must answer for a channel that does not exist, so each one becomes a `TryGetValue` with an explicit fallback.
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 1107-1108)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 1109-1110)
 public static bool IsRunning(string channel = DEFAULT_CHANNEL)
     => _channels.TryGetValue(channel, out var c) && c.IsRunning;
 ```
@@ -49,7 +49,7 @@ Note the deliberate asymmetry with the mutators: `Start` **creates** the channel
 ## Registry
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 1017-1030)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 1019-1032)
 private static readonly ConcurrentDictionary<string, LoopChannel> _channels = new();
 
 private static LoopChannel GetOrCreateChannel(string name)
@@ -89,6 +89,6 @@ The pattern is *honest about transitions only*: every handler is placed after th
 Two consequences a subscriber should design around:
 
 - Handlers run on the caller's thread — the calling thread for `Start` / `Pause` / `Resume` / `TogglePause`, the awaiter's continuation context at the end of `StopAsync` / `RestartAsync`. The invocation is not guarded, so a throwing handler propagates to the caller; the loop is already running or already stopped at that point, so it is unaffected.
-- The demo does **not** subscribe to these events. It polls instead (`MainWindow.xaml.cs` lines 31, 51, 164-176), and the reason is stated in the file: a hook that called `Dispatcher.Invoke` would be swallowed by the engine's per-hook catch, so the demo publishes immutable snapshots and lets the UI thread read them.
+- The demo does **not** subscribe to these events. It polls instead (`MainWindow.xaml.cs` lines 142-154), and the reason is stated in the file: a hook that called `Dispatcher.Invoke` would be swallowed by the engine's per-hook catch, so the demo publishes immutable snapshots and lets the UI thread read them.
 
-> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 274-327 (Start), 329-374 (StopAsync), 384-402 (Pause/Resume), 1017-1042 (registry and events), 1105-1156 (queries); `Examples/Tickable/WPF/Demo/MainWindow.xaml.cs` lines 31, 51, 164-176; `Src/Core/VeloxDev.Core.Test/TimeLine/TickableBusTests.cs` lines 112-131.
+> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 276-330 (Start), 331-377 (StopAsync), 386-404 (Pause/Resume), 1019-1044 (registry and events), 1109-1156 (queries); `Examples/Tickable/WPF/Demo/MainWindow.xaml.cs` lines 142-154; `Src/Core/VeloxDev.Core.Test/TimeLine/TickableBusTests.cs` lines 112-131.

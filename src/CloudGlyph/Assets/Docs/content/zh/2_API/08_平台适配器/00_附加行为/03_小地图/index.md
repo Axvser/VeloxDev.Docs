@@ -10,7 +10,7 @@
 | Avalonia | `public class WorkflowMinimapOverlay : Control, IWorkflowMinimapOverlay` | 控件渲染（StyledProperty） |
 | WinUI | `public class WorkflowMinimapOverlay : Canvas, IWorkflowMinimapOverlay` | XAML `Rectangle` / `Line` 形状 |
 | MAUI | `public class WorkflowMinimapOverlay : GraphicsView, IDrawable, IWorkflowMinimapOverlay` | `IDrawable.Draw(ICanvas, RectF)` |
-| WinForms | `public static class WorkflowMinimapOverlay` | 绘制已注册控件的表面 |
+| WinForms | `public class WorkflowMinimapOverlay : Panel, IWorkflowMinimapOverlay, IWorkflowMinimapScrollSource` | 自行绘制（`OnPaint`），锚定右上角 |
 | Jalium | `public class WorkflowMinimapOverlay : FrameworkElement, IWorkflowMinimapOverlay` | OnRender 几何 |
 | Razor | `partial class WorkflowMinimapOverlay : ComponentBase, IWorkflowMinimapOverlay, IAsyncDisposable` | 经 JS 互操作的 SVG/DOM |
 
@@ -71,9 +71,9 @@ public interface IWorkflowMinimapOverlay : IWorkflowGridDecorator
 }
 ```
 
-## WinForms 静态覆盖层
+## WinForms 覆盖层
 
-WinForms 的 `WorkflowMinimapOverlay` 是静态附加风格持有类：`SetIsEnabled(Control, bool)` / `SetWorkflowTree(Control, IWorkflowTreeViewModel?)` 及对应 getter。行为在控件上注册绘制处理；实际缩略图画进控件的 `Paint` 表面。*细节由源码推断所得 —— 没有自动化 Demo 绘制它。*
+WinForms 的 `WorkflowMinimapOverlay` 是 `Panel` 子类，不是静态持有类。它在 `OnPaint` 中自行绘制，锚定宿主右上角（`AnchorStyles.Top | AnchorStyles.Right`，边距 `CornerMargin = 12`，默认尺寸 200×140），并实现 `IWorkflowMinimapScrollSource`：拖拽视口会触发 `ViewportScrollRequested(double, double)` 事件，`WorkflowTreeView` 订阅它并转成表面平移。把它赋给 `WorkflowTreeView.MinimapOverlay`，树视图会将它加入控件树并接好事件。颜色是 `Color` CLR 属性（`MinimapBackground`、`MinimapBorderBrush`、`NodeBrush`、`ViewportStroke`）。
 
 ## Razor 组件
 

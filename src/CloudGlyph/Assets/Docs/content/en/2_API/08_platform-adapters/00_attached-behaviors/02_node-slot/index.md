@@ -59,6 +59,43 @@ Connects slots by press/release. On press it executes `slot.SendConnectionComman
 
 Public JS-callback methods: `OnSlotConnectionStart(double worldX, double worldY)`, `OnSlotConnectionMove(double worldX, double worldY)`, `OnSlotConnectionEnd(string? targetSlotId)`.
 
+### Connection preview during the drag
+
+The connection gesture exposes a live candidate receiver through two Core members (namespace `VeloxDev.WorkflowSystem`), not through adapter types:
+
+| Member | Signature | Role |
+|---|---|---|
+| `WorkflowTreeEx.StandardSetPreviewReceiver` | `static void StandardSetPreviewReceiver(this IWorkflowTreeViewModel component, IWorkflowSlotViewModel? slot)` | Reports the slot under the pointer. Ignores the sender, skips re-validation while the candidate is unchanged, and otherwise writes `SlotState.PreviewReceiver` + `ConnectionPreviewState`. |
+| `WorkflowTreeEx.StandardRefreshConnectionPreview` | `static void StandardRefreshConnectionPreview(this IWorkflowTreeViewModel component)` | Re-runs the check for the current candidate (for an asynchronous host verdict). |
+| `WorkflowTreeEx.StandardCheckConnection` | `static ConnectionCheck StandardCheckConnection(this IWorkflowTreeViewModel component, IWorkflowSlotViewModel sender, IWorkflowSlotViewModel receiver)` | Pure pre-check: direction, same-node, and the helper's `ValidateConnection`. |
+| `SlotHitTestEx.HitTest` | `static IWorkflowSlotViewModel? HitTest(IWorkflowTreeViewModel tree, double x, double y, double radius = 12d)` | Nearest measured slot anchor within `radius`; `NaN` anchors are skipped. |
+
+Each adapter calls these from its own pointer-move path while `tree.VirtualLink.IsVisible`:
+
+| Adapter | Pointer-move call site |
+|---|---|
+| WPF | `WorkflowSurfaceBehavior.OnPreviewMouseMove` (returns before hover routing) |
+| Avalonia | `WorkflowSurfaceBehavior.OnPointerMoved` |
+| WinUI | `WorkflowSurfaceBehavior.OnPointerMoved` |
+| Jalium | `WorkflowSurfaceBehavior.OnMouseMove` |
+| MAUI | `WorkflowSlotConnectionBehavior.UpdatePointer` |
+| WinForms | `WorkflowSlotConnectionBehavior.UpdatePointer` |
+| Razor | `WorkflowSlotConnectionBehavior.OnSlotConnectionMove` (`[JSInvokable]`) |
+
+```csharp
+// Source: Src/Adapters/VeloxDev.WPF/Attached/Workflow/WorkflowSurfaceBehavior.cs
+viewModel.SetPointerCommand.Execute(pointer);
+
+if (viewModel.VirtualLink.IsVisible)
+{
+    viewModel.StandardSetPreviewReceiver(
+        SlotHitTestEx.HitTest(viewModel, pointer.Horizontal, pointer.Vertical));
+    return;
+}
+```
+
+**Evidence:** the Core tests `Src/Core/VeloxDev.Core.Test/WorkflowSystem/WorkflowConnectionPreviewTests.cs` cover `StandardSetPreviewReceiver` (candidate changes, sender self-hit, clearing) and `SlotHitTestEx.HitTest` (nearest slot, empty tree).
+
 ## Class: `WorkflowSlotLayoutBehavior`
 
 Keeps slot anchors in sync with the node layout. It watches the node's `Anchor` / `Size` / slot properties and re-computes each slot's `Anchor` (accounting for `Layout.ActualOffset`), using `TranslatePoint` to find the slot center.
@@ -79,8 +116,6 @@ Keeps slot anchors in sync with the node layout. It watches the node's `Anchor` 
 | MAUI | `sealed class`; `BindableProperty.CreateAttached` |
 | WinForms | `sealed class` over a `Control` state table |
 | Jalium | `sealed class : DependencyObject` |
-
-**Avalonia touch note:** on Android/iOS Avalonia registers pointer handlers with `Tunnel` routing so the `ScrollViewer`'s gesture recognizer does not steal capture (see the internal `PlatformDetection.IsTouchPlatform`). *Avalonia touch-competition behavior is source-verified; desktop drag semantics mirror WPF.*
 
 ### Razor component: `WorkflowSlotLayoutBehavior`
 

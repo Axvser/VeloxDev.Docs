@@ -1,39 +1,13 @@
 # 工作流系统 — 前置条件
 
-本快速开始带你从零搭一个 .NET 控制台项目，复用真实 Demo（`Examples/Workflow/Common/Lib`）里的写法，把一张工作流图画出来并编译运行。
+- **支持的目标框架**（来自 `Src/Core/VeloxDev.Core/VeloxDev.Core.csproj`）：
+  `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0` / `net8.0` —— 库本身可用于 .NET Framework 4.6.1+、.NET Core 3.0+、.NET 5+ 与 .NET 8+。`VeloxDev.Core.Extension` 的目标框架是 `netstandard2.0` / `net8.0`。
+- **SDK / 运行时：** 现代 .NET SDK。后续页面的组件声明使用**部分属性**（`[VeloxProperty] public partial QuickSlot InputSlot { get; set; }`），这是生成器消费的 C# 13 特性，因此 SDK 必须自带 Roslyn 4.12+（**.NET SDK 9.0+**；本指南的示例目标为 `net10.0`，与仓库的 Trimmed demo 生成方式及记录运行所用的 .NET SDK 10.0.401 一致）。
+- **包管理器：** NuGet / `dotnet` CLI（`dotnet new`、`dotnet add reference`、`dotnet restore`）。
+- **需要的服务：** 无 —— 核心引擎自包含、可无头运行。Python 只在运行 *demo 的* Python 工作节点时才需要（见「验证与完整代码」），本快速开始不需要。
+- **仓库结构（本教程的事实基准）：**
+  - 共享 demo 组件与会话构建器：`Examples/Workflow/Common/Lib/ViewModels/Workflow/`（`ControllerViewModel.cs`、`TimerNodeViewModel.cs`、`EnumSelectorNodeViewModel.cs`、`WorkflowDemoSession.cs`、`Helper/*`）。
+  - 编译器 / 运行时引擎源码：`Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/`（`Compile/`、`Runtime/`）。
+  - 编译器契约测试：`Src/Core/VeloxDev.Core.Test/WorkflowSystem/CompilerEx/`。
 
-#### 1. 支持的 .NET 目标
-
-取自已声明的目标框架（`Src/Core/VeloxDev.Core/VeloxDev.Core.csproj` 的 `TargetFrameworks`）：
-
-- `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0`
-
-即：可用于 .NET Framework 4.6.1+、.NET Core 3.0+ 与 .NET 5+。下表说明本指南选用的**被验证过**的运行配置（只是示例已验证的组合，不是最低要求）：
-
-| 项 | 值 |
-|---|---|
-| 示例项目 TFM | `net10.0`（经 `netstandard2.0` 资产引用核心库） |
-| .NET SDK | 10.0.401（本指南实测；≥ Roslyn 4.x 即可跑源码生成器） |
-
-#### 2. SDK / 运行时
-
-- 需要带 **Roslyn 4.x** 的 .NET SDK 才能执行 Roslyn 源码生成器（`VeloxDev.Core.Generator`），它随 `VeloxDev.Core` 传递依赖自动成为 Analyzer。
-- 仓库内示例面向 `net9.0`；那是*被验证过*的配置，并非最低版本。
-
-**预期结果：** 在命令行执行 `dotnet --list-sdks` 能看到 ≥ 9 的 SDK；`dotnet --list-runtimes` 能看到对应的 .NET 运行时。
-
-#### 3. 包管理器
-
-- NuGet / `dotnet` CLI（`dotnet new`、`dotnet add package`、`dotnet restore`）。
-
-#### 4. 所需服务
-
-- 无。核心引擎自包含，不依赖外部服务。本指南不启动任何 GUI。
-
-**预期结果：** 无服务依赖；新建并构建一个空控制台项目即退出码 0。
-
-> 若本地无法逐项核验上面的工具链，文末 `07 完整代码` 的运行声明会如实降级为 ⚠️。
-
-## 下一步
-
-准备好工具链后，进入 `01 安装 / 添加依赖`。
+**预期结果：** `dotnet --version` 返回 9.0.x 或更高，并且你能打开仓库的 `VeloxDev.sln`。

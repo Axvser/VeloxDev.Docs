@@ -19,7 +19,7 @@ scope.WithQueryTools(null, lookupTool);            // 只读自定义工具
 - `AIFunction` 自定义工具会被 `TrackedAIFunction` 包装，从而与内置工具一样获得 UI 线程编组、预算计数、`ToolCalled` 回调与自动脏标记。非 `AIFunction` 工具按原样加入，得不到上述任何一项。
 - 可选的 `promptContext` 会作为「Custom Tools」小节注入提示。注册按组记忆，因此**子代理派发可以只授予子集**，并带上与之匹配的指引 —— 绝不会带上子代理未收到工具的指引。
 
-**预期结果：** `scope.ProvideTools()` 中除 68 个内置工具外还包含你的工具名。
+**预期结果：** `scope.ProvideTools()` 中除 66 个无条件内置工具（两个处理器都注册时为 71）外还包含你的工具名。
 
 ## 2. 挂载 MCP 服务器
 
@@ -49,18 +49,20 @@ await mcp.LoadAsync(mcp.RegisteredServers);
 
 ## 3. MCP 管理工具
 
-`McpAgentToolkit` 向模型暴露服务器管理。注册是有条件的：
+`McpAgentToolkit` 向模型暴露服务器管理。注册取决于该作用域是否为**授权视图**（交给派生子代理的收窄 MCP 表面）：
 
-| 工具 | 注册条件 |
-|---|---|
-| `ListMcpServers` | 始终 —— 纯查询 |
-| `LoadMcpServers` | `!IsGrantedView`（即由宿主拥有该作用域，而非收窄的子代理视图） |
-| `UnloadMcpServer` | `!IsGrantedView` |
-| `AddMcpServer` | `SelfServiceLevel != McpSelfServiceLevel.Closed` **且** `!IsGrantedView` |
+| 工具 | 注册条件 | 类别 |
+|---|---|---|
+| `ListMcpServers` | 始终 —— 纯查询 | `Read` |
+| `LoadMcpServers` | `!IsGrantedView` | `Curate` |
+| `UnloadMcpServer` | `!IsGrantedView` | `Curate` |
+| `DescribeMcpServer` | 始终 —— 纯查询 | `Read` |
+| `AddMcpServer` | `!IsGrantedView` | `Curate` |
+| `SetMcpServerArguments` | `!IsGrantedView` | `Curate` |
 
-`McpSelfServiceLevel` 是一道阶梯：`Closed = 0`（demo 的选择 —— agent 只能加载/卸载/查看宿主预注册的服务器）、`RemoteConfirmed = 1`、`AllConfirmed = 2`、`Unrestricted = 3`。用 `McpScope.WithSelfService(level)` 提升。
+自助级别阶梯已不存在（`McpSelfServiceLevel` 与 `McpScope.WithSelfService` 均已移除）。能运行什么由**权限模式与宿主规则**在调用时决定：`Curate` 动作正是 `AgentPermissionMode.Auto` 下仍会询问的那一类，拒绝会点名模式。授权视图只注册两个读工具，因为加载会安装软件，卸载会拆掉父作用域可能仍在使用的连接。
 
-**预期结果：** 在 `Closed` 下提供 `ListMcpServers` / `LoadMcpServers` / `UnloadMcpServer` / `DescribeMcpServer`，没有 `AddMcpServer`；提升级别后新增 `AddMcpServer`。
+**预期结果：** 在 `AgentPermissionMode.Auto` 下模型拿到全部六个工具，调用 `AddMcpServer` 会交给确认处理器；切到 `Bypass` 后它直接运行（除非有 `Deny` 规则命中）。
 
 ## 4. 运行模式与配置
 
@@ -74,7 +76,7 @@ await mcp.LoadAsync(mcp.RegisteredServers);
 | `Exe` | 直接执行 `{root}/exe/{package}`。 |
 | `Http` | 连接 `Endpoint` 处的远程服务器（Streamable HTTP，SSE 回退）。 |
 
-`McpServerConfiguration.Options` 是匿名对象 blob：`Http` 用 `headers`、`oauth`、`connectionTimeout`、`transportMode`、`ownsSession`；stdio 用 `env`、`workingDirectory`。未知键会被拒绝。
+`McpServerConfiguration.Options` 是 `IReadOnlyDictionary<string, object?>?`（映射，不是匿名对象）：`Http` 用 `headers`、`oauth`、`connectionTimeout`、`transportMode`、`ownsSession`；stdio 用 `env`、`workingDirectory`。未知键会被拒绝。
 
 **预期结果：** 一个错误配置（未知 `Options` 键、本地模式缺 `Package`）只让该服务器失败 —— 其状态变为 `Error`，触发 `ServerError`，贡献零个工具；批次中的其余服务器照常加载。
 
@@ -89,4 +91,4 @@ scope.WithTools("用 Ping 检查连通性。", ping)
 
 ## 运行声明
 
-- ⚠️ 未实际运行 —— 仅静态核验。接线与条件化工具注册读自 `WorkflowAgentScope.WithMcps` 与 `McpAgentToolkit.CreateTools`；未从本页加载任何 MCP 服务器。（确定性 `Agent/**` 测试套件已通过 —— 见「工具预算与宿主策略」页 —— 但该套件不会启动真实的 MCP 服务器。）
+- ⚠️ 未实际运行 —— 仅静态核验（2026-10-18）。接线与授权视图/管理工具注册读自 `WorkflowAgentScope.WithMcps` 与 `McpAgentToolkit.CreateTools`；未从本页加载任何 MCP 服务器，且此前的 `Agent/**` 测试记录早于权限模式重构。

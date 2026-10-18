@@ -1,79 +1,107 @@
-# AOP — Generated API (source generator)
+# AOP — Generated API
 
-Emitted at compile time for every `partial` class that has at least one member carrying `[AspectOriented]` (detection in `Base/AnalizeHelper.IsAopClass` and `Writers/AopWriter.ReadAopConfig`). Three artifacts come from the generators in `Src/Generators/VeloxDev.Core.Generator`:
+Two incremental generators in `Src/Generators/VeloxDev.Core.Generator` produce everything the caller touches:
 
-| Artifact | Emitted by | File hint |
+| Generator | Source | Emits |
 |---|---|---|
-| AOP proxy interface | `AopInterface` | `{Class}_{Ns}_Aop.g.cs` |
-| Partial-class glue | `AopProxy` → `AopWriter.Write` | `{Class}_{Ns}_AOP.g.cs` |
-| `Aop(this T)` extension | `AopProxy` → `AopWriter.WriteExtension` | `{Class}_{Ns}_AopExt.g.cs` |
+| `VeloxDev.Generators.AopSurface` | `AopSurface.cs` | the mirror interface and the proxy class (two files) |
+| `VeloxDev.Generators.AopProxy` | `AopProxy.cs` → `Writers/AopWriter.cs` | the `Aop()` extension |
 
-`Ns` is the class's containing namespace with `.` replaced by `_` (for a file-scoped `Demo.TeamViewModel`, `Ns = Demo`).
+Nothing is injected into the user's class. `AopWriter.GenerateBaseTypes` and `GenerateBaseInterfaces` return empty arrays, and `GenerateBody` returns an empty string — the old partial-class glue no longer exists.
 
-## Generated type: `VeloxDev.AopInterfaces.{Class}_{Ns}_Aop`
+## Discovery
 
-Naming rule from `AopInterface.cs`:
+`Analizer.Filters.Targets` uses `ForAttributeWithMetadataName("VeloxDev.AspectOriented.AspectOrientedAttribute", ...)`, and `IsCandidateClass` accepts only **partial** class declarations. `AnalizeHelper.IsAopClass` then re-checks the members across every partial declaration by the attribute's simple name. Consequences:
+
+- the class must be `partial`;
+- write `[AspectOriented]`, not a qualified or aliased form;
+- a type split across partial files is generated once, with members collected from all parts.
+
+## Naming
+
+`Base/AopNames.cs` is the single naming algorithm:
 
 ```csharp
-string interfaceName = $"{classDeclaration.Identifier.Text}_{classSymbol.ContainingNamespace.ToDisplayString().Replace('.', '_')}_Aop";
+internal const string InterfaceNamespace = "VeloxDev.AopInterfaces";
+
+internal static string InterfaceFor(INamedTypeSymbol symbol)
+    => $"{symbol.Name}_{Segment(symbol)}_Aop";
+
+internal static string ProxyFor(INamedTypeSymbol symbol)
+    => InterfaceFor(symbol) + "Proxy";
+
+internal static string Segment(INamedTypeSymbol symbol)
+    => symbol.ContainingNamespace is null || symbol.ContainingNamespace.IsGlobalNamespace
+        ? "Global"
+        : symbol.ContainingNamespace.ToDisplayString().Replace('.', '_');
 ```
 
-`public`, inherits `global::VeloxDev.AspectOriented.IAspectOriented`. Examples: `Demo.TeamViewModel` → `TeamViewModel_Demo_Aop`; `Demo.ViewModels.TeamViewModel` → `TeamViewModel_Demo_ViewModels_Aop`.
+Examples: `Demo.TeamViewModel` → `TeamViewModel_Demo_Aop`; `Demo.ViewModels.TeamViewModel` → `TeamViewModel_Demo_ViewModels_Aop`; a global-namespace class → `{Class}_Global_Aop`.
 
-**Generated members** (one public member per qualifying member of the class, in source order by kind):
+## Generated interface
 
-- **Fields** that carry both `[AspectOriented]` and an attribute whose simple name contains `Observable` or `Property` (for example `[VeloxProperty]`, `[Observable]`) become a get/set property. The name drops a leading `_` and upper-cases the next character (`Base/AnalizeHelper.GetPropertyNameByFieldName`): `_name` → `Name`.
-- **Public properties** annotated `[AspectOriented]` become a property: the getter is kept when there is no getter or the getter is public; the setter only when a public setter exists.
-- **Public methods** annotated `[AspectOriented]` become a method; parameter and return types are rewritten to their fully-qualified symbol display (`void` stays `void`).
-
-Readable rendering of what `AopInterface` emits for the WPF demo class `Demo.TeamViewModel` (the generator writes fully-qualified type names resolved by the semantic model):
+File hint `{Interface}.g.cs`, namespace `VeloxDev.AopInterfaces`. For `AopFixture` (namespace `VeloxDev.Core.Test.AspectOriented`), the emitted declaration is:
 
 ```csharp
-public interface TeamViewModel_Demo_Aop : global::VeloxDev.AspectOriented.IAspectOriented
+public interface AopFixture_VeloxDev_Core_Test_AspectOriented_Aop : global::VeloxDev.AspectOriented.IAspectOriented, global::VeloxDev.AspectOriented.IAopHookTarget
 {
-    string Name { get; set; }
-    ObservableCollection<MemberViewModel> Members { get; set; }
-    void Reset();
-    void AOP_OnMemberAdded(object? sender, NotifyCollectionChangedEventArgs e);
-    void AOP_OnMemberRemoved(object? sender, NotifyCollectionChangedEventArgs e);
+    public string Title { get; set; }
+
+    public int Add(int a, int b);
+    public void Ping();
+    public string Echo(string value);
 }
 ```
 
-`Name` / `Members` come from the two `[VeloxProperty][AspectOriented]` fields of `TeamViewModel.cs`; `Reset`, `AOP_OnMemberAdded` and `AOP_OnMemberRemoved` from the `[AspectOriented]` public methods. This is the type passed to `DispatchProxy.Create<T, ProxyInstance>()`, which is why the runtime can intercept the `get_*` / `set_*` / method names (`AspectOrientedAttribute` is documented in [attribute-and-marker](../00_aspect-oriented/00_attribute-and-marker/index.md)).
+Member rules, from `AopSurface.GenerateSource`:
 
-## Generated partial class (file `{Class}_{Ns}_AOP.g.cs`)
+| Source member | Condition | Interface member |
+|---|---|---|
+| Field | `[AspectOriented]` plus an attribute whose text contains `Observable` or `Property` | `get`/`set` property, named by dropping a leading `_` and upper-casing the next character (`_name` → `Name`) |
+| Property | `public` and `[AspectOriented]`; getter mirrored when a public getter exists or no getter is declared; setter only if a public setter exists | the same property |
+| Method | `public` and `[AspectOriented]` | the same method with fully qualified parameter and return types |
 
-`AopProxy` (namespace `VeloxDev.Generators`) collects every class reaching the filter and, when `AopWriter.CanWrite()` is true (an `[AspectOriented]` member exists), emits a source through the inherited `WriterBase.Write()`: the containing namespace and the class re-declared as `partial`, its base-type list preserved from the symbol plus the generated AOP interface (`AopWriter.GenerateBaseInterfaces`), with an empty body.
+A property's getter and setter are independent members and get independent hook sets.
 
-Real contract from `Writers/AopWriter.cs`:
+## Generated proxy
+
+File hint `{Interface}Proxy.g.cs`, namespace `VeloxDev.AopInterfaces`:
 
 ```csharp
-public override string[] GenerateBaseInterfaces() =>
-[
-    $"{NAMESPACE_VELOX_AOP}.{Syntax?.Identifier.Text}_{NamespaceFileSegment()}_Aop"
-];
+internal sealed class AopFixture_VeloxDev_Core_Test_AspectOriented_AopProxy : AopFixture_VeloxDev_Core_Test_AspectOriented_Aop
+{
+    private global::VeloxDev.AspectOriented.AspectHooks? _hooks_Add;
+    private global::VeloxDev.AspectOriented.AspectHooks? _hooks_Ping;
+    private global::VeloxDev.AspectOriented.AspectHooks? _hooks_Echo;
+    private global::VeloxDev.AspectOriented.AspectHooks? _hooks_get_Title;
+    private global::VeloxDev.AspectOriented.AspectHooks? _hooks_set_Title;
+
+    private readonly global::VeloxDev.Core.Test.AspectOriented.AopFixture _target;
+
+    internal AopFixture_VeloxDev_Core_Test_AspectOriented_AopProxy(global::VeloxDev.Core.Test.AspectOriented.AopFixture target) => _target = target;
+    // members and SetHooks ...
+}
 ```
 
-where `NAMESPACE_VELOX_AOP = "global::VeloxDev.AopInterfaces"` and `NamespaceFileSegment()` are defined in `Writers/WriterBase.cs`. `NamespaceFileSegment()` returns the containing namespace with `.` replaced by `_`, or the placeholder `"Global"` when the class sits in the global namespace — `ToDisplayString()` would hand back the illegal `<global namespace>` for that case. Effect: the compiler sees the class implement its generated interface, so the members living in the user's own `partial` part satisfy the interface contract — the model never has to declare the interface itself.
+It is `internal` and `sealed`; callers only see the interface type returned by `Aop()`. Its behavior and exception surface are documented on [Generated proxy](../00_aspect-oriented/03_proxy-class/index.md).
 
-## Generated extension: `Aop(this T)` in `{Class}_{Ns}_AopExtensions`
+## Generated extension
 
-`AopWriter.WriteExtension()` emits file `{Class}_{Ns}_AopExt.g.cs` in namespace `VeloxDev.AspectOriented`. Concrete output for the WPF demo's `Demo.TeamViewModel`:
+File hint `{Class}_{NamespaceSegment}_AopExt.g.cs`, namespace `VeloxDev.AspectOriented`, class `{Class}_{NamespaceSegment}_AopExtensions`. Actual emitted output for `AopFixture`:
 
 ```csharp
 namespace VeloxDev.AspectOriented;
 
-public static class TeamViewModel_Demo_AopExtensions
+public static class AopFixture_VeloxDev_Core_Test_AspectOriented_AopExtensions
 {
-    public static global::VeloxDev.AopInterfaces.TeamViewModel_Demo_Aop Aop(
-        this global::Demo.TeamViewModel instance)
+    public static global::VeloxDev.AopInterfaces.AopFixture_VeloxDev_Core_Test_AspectOriented_Aop Aop(this global::VeloxDev.Core.Test.AspectOriented.AopFixture instance)
         => global::VeloxDev.AspectOriented.AopCache.Resolve<
-            global::Demo.TeamViewModel,
-            global::VeloxDev.AopInterfaces.TeamViewModel_Demo_Aop>(
+            global::VeloxDev.Core.Test.AspectOriented.AopFixture,
+            global::VeloxDev.AopInterfaces.AopFixture_VeloxDev_Core_Test_AspectOriented_Aop>(
             instance,
             static x =>
             {
-                var p = global::VeloxDev.AspectOriented.ProxyEx.CreateProxy<global::VeloxDev.AopInterfaces.TeamViewModel_Demo_Aop>(x);
+                var p = new global::VeloxDev.AopInterfaces.AopFixture_VeloxDev_Core_Test_AspectOriented_AopProxy(x);
                 global::VeloxDev.AspectOriented.Aop.Map(p, x);
                 return p;
             });
@@ -82,19 +110,20 @@ public static class TeamViewModel_Demo_AopExtensions
 
 | Parameter | Type | Description |
 |---|---|---|
-| `instance` | `T` (the model class) | The target instance to wrap |
+| `instance` | the model class | Target instance |
 
-**Returns:** `{Class}_{Ns}_Aop` — the cached proxy (one per instance, via `AopCache.Resolve`), typed as the generated interface.
+**Returns:** the generated interface — one cached proxy per instance via `AopCache.Resolve`.
 
-**Notes:**
+**Generated output paths:** by default Roslyn only returns these sources to the compiler. Set `EmitCompilerGeneratedFiles=true` to inspect them under `obj/<Configuration>/<TFM>/generated/VeloxDev.Core.Generator/VeloxDev.Generators.{AopSurface,AopProxy}/`. The snippets above are the emitted files from `Src/Core/VeloxDev.Core.Test` (`obj/Debug/net10.0/generated/...`).
 
-- Resolves through `AopCache.Resolve<TClass, TInterface>` (see [Aop & AopCache](../00_aspect-oriented/04_proxy-lifecycle/index.md)); the factory it runs calls `ProxyEx.CreateProxy<I>(x)` and `Aop.Map(p, x)`.
-- Demo usage, `Examples/AOP/WPF/Demo/MainWindow.xaml.cs`:
+## Limits (source-verified)
 
-```csharp
-var team = _teamData.Aop();     // cached proxy
-_ = _teamData.Aop().Name;       // getter intercepted (start hook fires)
-_teamData.Aop().Reset();        // method intercepted (coverage replaces body)
-```
+| Shape | Result | Cause |
+|---|---|---|
+| Non-partial class | Nothing generated, no diagnostic | `IsCandidateClass` requires `partial` |
+| Overloaded methods | Generated code does not compile | one hook field and one `switch` case per bare name |
+| Generic method | Generated interface loses the type-parameter list | `MethodDeclaration(...)` is created without `WithTypeParameterList` |
+| `ref` / `out` / `in` parameter | Generated call omits the modifier | the proxy calls `_target.M(arg1, ...)` with plain identifiers |
+| Non-public method, or non-public accessor | Not mirrored | `public` filters in `AopSurface` |
 
-Related pages: [AOP runtime overview](../00_aspect-oriented/index.md).
+Keep intercepted members instance members with unique names and plain by-value parameters.

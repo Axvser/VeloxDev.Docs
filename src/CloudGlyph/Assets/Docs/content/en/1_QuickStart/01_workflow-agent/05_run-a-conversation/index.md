@@ -35,7 +35,7 @@ The convenience overload `AgentClientExtensions.AsAIAgent(this IChatClient chatC
 
 ## 2. The provider renders per turn
 
-`WorkflowAgentContextProvider` (one of `scope.CreateContextProviders()`) is what makes attaching, switching off or loading something take effect on the **next** turn without rebuilding the agent. It keys its cached render on `scope.ContextKey` (the scope `Version` plus a budget-usage band):
+`WorkflowAgentContextProvider` (one of `scope.CreateContextProviders()`) is what makes attaching, switching off or loading something take effect on the **next** turn without rebuilding the agent. It keys its cached render on `scope.ContextKey` (the scope `Version`, the tree's current selection revision, and a budget-usage band):
 
 - On an **unchanged** turn it takes no lock and allocates nothing — it returns the very same `AIContext` instance it returned last time.
 - On a changed turn it rebuilds the instructions (`BuildDynamicInstructions`) and, if the scope `Version` moved, the tool list (`BuildDynamicTools`).

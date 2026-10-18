@@ -240,19 +240,20 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 
 *源码：`WorkflowSlotUpdateGate.cs`、`WorkflowLinkRenderEx.cs`、`WorkflowGuard.cs`。*
 
-### 连线交互（`LinkInteraction`）
+### 连接预览（`ConnectionCheck` 及其同伴）
 
-所有 GUI 把连线输入转发进来的中枢，每棵树一个实例。`LinkInteraction.For(IWorkflowTreeViewModel)` 返回共享实例；宿主用 `Publish(PointerEvent)`、`Publish(KeyEvent)` 发布翻译后的输入，并在自己的菜单开/合时用 `Publish(ContextMenuEvent)` 上报，然后订阅结果，而不必各平台各自重推命中测试。
+连接拖拽是 `WorkflowInput` 上的头等、与 UI 无关的状态（见 GUI 输入一节）。它的公开面很小，与输入路由放在一起：
 
-| 成员 | 类别 | 说明 |
-|---|---|---|
-| `For(tree)` | 静态 | 一棵树唯一的中枢（与树同寿）。 |
-| `HoveredLink`、`HitRadius` | 属性 | 指针下的连线；曲线两侧的命中半径。 |
-| `AutoHighlight`、`AutoDelete`、`IsSuspended` | 属性 | 悬停高亮与 Delete 删除默认开启；宿主菜单打开期间 `IsSuspended` 为真，使指针移到菜单上不会清掉选中。 |
-| `HoverChanged`、`LinkPressed`、`LinkDeleteRequested` | 事件 | 结果事件；删除只是「请求」，除非 `AutoDelete` 才真正执行。 |
-| `PreviewHoverChanged`、`PreviewLinkPressed`、`PreviewLinkDeleteRequested` | 事件 | 预览阶段，可用 `WorkflowEventHandle.PreventDefault` 逐事件拒绝。 |
-| `ContextMenuRequesting`、`ContextMenuRequested` | 事件 | 右键的两个阶段，交给弹菜单的人；在 `Requesting` 里拒绝会由构造保证连 `Requested` 也不报。 |
-| `ContextMenuOpened`、`ContextMenuClosed` | 事件 | `Publish(ContextMenuEvent)` 上报菜单已开/已合之后抛出；悬停挂起随之升降。 |
-| `ContextMenuDismissRequested` | 事件 | 当打开的菜单所针对的连线离开树时抛出，请宿主收起那份菜单 —— 菜单绝不比它作用的连线活得更久。宿主收起后报 `ContextMenuPhase.Closed`。 |
+| 类型 | 成员 / 含义 |
+|---|---|
+| `ConnectionPreviewState` | `None`、`Started`、`ValidTarget`、`InvalidTarget` —— 虚拟连线绘制的阶段。 |
+| `ConnectionCheck` | `readonly struct`：`IsValid`、`Reason`（`ConnectionRejectReason`）、`Message`；`Valid`、`Rejected(reason, message)`。它是对一对 sender/receiver 的框架裁决，无副作用。 |
+| `ConnectionRejectReason` | `None`、`SenderCannotSend`、`ReceiverCannotReceive`、`SameNode`、`RejectedByRule`、`RejectedByHost`。 |
+| `IConnectionPreviewLink` | 虚拟连线的可选能力：`Preview`（`ConnectionPreviewState`）与 `SetPreview(state)`。`LinkDefaultViewModel` 实现了它。 |
+| `ConnectionPreviewEventArgs` | `Sender`、`Receiver`、`State`、`Check` —— `WorkflowInput.PreviewChanged` 的载荷。 |
+| `ConnectionPreviewValidatingEventArgs` | `Sender`、`Receiver`、`Check` 与 `Reject(message)` —— 允许宿主仅为本次预览拒绝一个框架已通过的候选。 |
+| `SlotHitTestEx` | `DefaultHitRadius`（12）与 `HitTest(tree, x, y, radius)` —— 不借助平台可视树，找到最近的已测量槽锚点。橡皮筋覆盖整个表面时由适配器调用。 |
 
-*源码：`WorkflowSystem/GUI/Events/LinkInteraction.cs`、`WorkflowSystem/GUI/Events/Link/*.cs`、`WorkflowSystem/GUI/Events/Menu/*.cs`。*
+`ConnectionCheck` 刻意不包含释放时的 `IWorkflowTreeEvents.Connecting` 否决：那是一次性的逐次决定，可能依赖预览不应消费的状态。预览只能**收紧**框架裁决，绝不能放松。
+
+*源码：`Interfaces/WorkflowSystem/ConnectionCheck.cs`、`Interfaces/WorkflowSystem/IConnectionPreviewLink.cs`、`GUI/Events/WorkflowInput.cs`、`GUI/Events/Tree/ConnectionPreviewEventArgs.cs`、`GUI/Events/Tree/ConnectionPreviewValidatingEventArgs.cs`、`GUI/Interaction/SlotHitTestEx.cs`。*

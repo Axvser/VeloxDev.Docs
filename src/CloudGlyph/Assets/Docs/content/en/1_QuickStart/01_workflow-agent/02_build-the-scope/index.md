@@ -53,7 +53,7 @@ The context tree is built **at compile time** by walking the compilation, so `Wi
 
 **What gets registered is what the generator admitted.** A type nothing annotates, no component interface reaches and no member references is not in the tree, and is not registered here either — there would be no context to render for it. Framework types live under `Framework/`, and only `Customer/` is read.
 
-Source: `WorkflowAgentScope.cs:969-986`; the reachability rule for the data widening is `AIContextModel.cs:311-322` and `:377-399`.
+Source: `WorkflowAgentScope.cs` (`WithAutoDiscovery`); the reachability rule for the data widening is in `AIContextModel.cs`.
 
 **Expected result:** after `WithAutoDiscovery()`, the scope holds the compiled tree's customer registrations; asking for a type the generator never admitted yields no context block.
 
@@ -63,10 +63,10 @@ Source: `WorkflowAgentScope.cs:969-986`; the reachability rule for the data wide
 |---|---|---|
 | `ProvideProgressiveContextPrompt` | `string ProvideProgressiveContextPrompt()` / `(AgentLanguages)` | Compact system prompt. |
 | `ProvideAllContexts` | `string ProvideAllContexts()` / `(AgentLanguages)` | Full self-contained prompt. |
-| `ProvideFrameworkContext` | `string ProvideFrameworkContext(AgentLanguages = English)` | Context blocks for the built-in enums/interfaces/components. |
-| `ProvideCustomerContext` | `string ProvideCustomerContext(AgentLanguages = English)` | Context blocks for registered customer types. |
-| `ProvideFrameworkDataContext` | `string ProvideFrameworkDataContext(AgentLanguages = English)` | Data blocks for `Anchor`, `Offset`, `Size`, `IAccessContext`, `ITaskContext`, `TaskContext`, `ICompileContext`, `IRuntimeContext`. |
-| `ProvideCustomerDataContext` | `string ProvideCustomerDataContext(AgentLanguages = English)` | Data blocks for registered customer data types. |
+| `ProvideFrameworkContext` | `string ProvideFrameworkContext(AgentLanguages language = English)` | Context blocks for the built-in enums/interfaces/components. |
+| `ProvideCustomerContext` | `string ProvideCustomerContext()` | Context blocks for registered customer types, each in the language it was registered under. |
+| `ProvideFrameworkDataContext` | `string ProvideFrameworkDataContext(AgentLanguages language = English)` | Data blocks for the framework's built-in data types under `Framework/Data` (e.g. `Anchor`, `Offset`, `Size`). |
+| `ProvideCustomerDataContext` | `string ProvideCustomerDataContext()` | Data blocks for registered customer data types, each in the language it was registered under. |
 
 `ProvideProgressiveContextPrompt` keeps the initial prompt small: behavioural constraints, the failure-handling protocol, built-in references, the registered-type list with one-line summaries, custom tools, the interaction-safety policy, skills and the output-language directive. Full property/command tables are **not** preloaded — the model is told to call `GetComponentContext` with a full type name before operating on a type.
 
@@ -87,8 +87,8 @@ var providers = scope.CreateContextProviders();           // per-turn: envelope 
 
 Custom tools registered via `WithTools` / `WithQueryTools` are always included, whatever the category flags. See the Tool Budgets page for what happens when a tool is switched off.
 
-**Expected result:** `scope.ProvideTools().Count` is `69` for a scope with node execution enabled and both interaction handlers registered — the 68 built-in tools plus the always-added `ResetToolCallLimit` (see page 06 for the exact per-category breakdown). The `Execution` and `Command` gates are checked inside each tool body, so they do not remove tools from the count; with no interaction handlers it is lower by the `Interaction` tools alone.
+**Expected result:** `scope.ProvideTools().Count` is `71` for a scope with node execution enabled and both interaction handlers registered — 66 unconditional category tools plus `RequestSelection` / `RequestConfirmation` / `EnterPlanMode` / `ExitPlanMode` plus `ResetToolCallLimit` (see page 06 for the exact per-category breakdown). The `Execution` and `Command` gates are checked inside each tool body, so they do not remove tools from the count; with no handlers it is lower by the conditional tools alone.
 
 ## Run declaration
 
-- ⚠️ Not actually run — statically verified only. Signatures and the two-pass discovery behaviour are read from `WorkflowAgentScope.cs` and `AgentHelper.cs`; no scope was constructed from this page.
+- ⚠️ Not actually run — statically verified only (2026-10-18). Signatures and the context-tree discovery behaviour are read from `WorkflowAgentScope.cs` and `AgentHelper.cs`; no scope was constructed from this page.

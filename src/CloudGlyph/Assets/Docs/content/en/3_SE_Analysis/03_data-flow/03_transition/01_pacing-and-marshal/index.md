@@ -71,7 +71,7 @@ TI -> EF: InvokeFinally(sender, args)
 
 > Source: `Src/Core/VeloxDev.Core/TransitionSystem/Runtime/TransitionInterpreter.cs` (`ExecuteSamplingLoopAsync`, `RunPassAsync`, `EmitFrame`, `ArmNextFrame`), `FramePacerCore.cs`, `ReusableTimerWait.cs`, `TransitionRun.cs`.
 
-The load-bearing line is `Pacer.PassAnchor = Timeline.Ticks`. A pass is an **anchor** into an absolute timeline, never a reset — so several runs can share one source (each keeps its own pass and its own place), and `Transition.Seek` is nothing more than writing a different anchor. Two consequences the diagram shows: the pass ends in exactly one place (its far end), because the timeline only ever moves forwards; and the last frame of a pass is the **exact** endpoint (`easedT = 1` forward, `0` reverse), independent of whether `Ease(1)` is exactly `1`.
+The load-bearing line is `run.PassAnchor = timeline.Ticks`. A pass is an **anchor** into an absolute timeline, never a reset — so several runs can share one source (each keeps its own pass and its own place), and `Transition.Seek` is nothing more than writing a different anchor. Two consequences the diagram shows: the pass ends in exactly one place (its far end), because the timeline only ever moves forwards; and the last frame of a pass is the **exact** endpoint (`easedT = 1` forward, `0` reverse), independent of whether `Ease(1)` is exactly `1`.
 
 `FPS` is worth restating: it is a *cap*, not a grid. `ArmNextFrame` re-reads `1000 / max(1, FPS)` every frame, so tightening the cap on a running animation takes effect immediately; waking late just draws a frame further along.
 

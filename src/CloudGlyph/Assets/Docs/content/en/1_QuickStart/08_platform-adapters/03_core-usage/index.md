@@ -100,6 +100,38 @@ private void OnPointerReleased(object sender, MouseButtonEventArgs e)
 
 **Expected result:** pressing an output slot and releasing over an input slot (or vice versa) creates a link; `SlotState` switches through `Sender` / `Receiver` flags and the `SlotView` recolors accordingly.
 
+## 4.1 Connection preview while the pointer moves
+
+The rubber band is drawn over the whole surface, so the visual under the pointer is usually the surface itself. Every adapter therefore reports the candidate receiver geometrically, from the slot anchors, on each pointer move while the virtual link is visible:
+
+```csharp
+// Source: Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowTreeEx.cs (StandardSetPreviewReceiver)
+//         Src/Core/VeloxDev.Core/WorkflowSystem/GUI/Interaction/SlotHitTestEx.cs (HitTest)
+if (tree.VirtualLink.IsVisible)
+{
+    tree.StandardSetPreviewReceiver(
+        SlotHitTestEx.HitTest(tree, worldX, worldY));
+}
+```
+
+- `SlotHitTestEx.HitTest(tree, x, y, radius = 12)` scans the tree's slots, skips ones whose `Anchor` is still `NaN`, and returns the nearest measured slot inside the radius (or `null`).
+- `StandardSetPreviewReceiver` ignores the sender itself, skips re-validation while the same candidate stays under the pointer, and otherwise runs `StandardCheckConnection` plus the optional `PreviewValidating` veto. The result is written to the slot's `PreviewReceiver` bit and to `ConnectionPreviewState` (`Started` → `ValidTarget` / `InvalidTarget`).
+- Use `StandardRefreshConnectionPreview(tree)` after an asynchronous validation verdict to re-check the current candidate.
+
+Where each adapter performs the call:
+
+| Adapter | Call site |
+|---|---|
+| WPF | `WorkflowSurfaceBehavior.OnPreviewMouseMove`, when `VirtualLink.IsVisible` (returns before hover routing) |
+| Avalonia | `WorkflowSurfaceBehavior.OnPointerMoved` |
+| WinUI | `WorkflowSurfaceBehavior.OnPointerMoved` |
+| Jalium | `WorkflowSurfaceBehavior.OnMouseMove` |
+| MAUI | `WorkflowSlotConnectionBehavior.UpdatePointer` |
+| WinForms | `WorkflowSlotConnectionBehavior.UpdatePointer` |
+| Razor | `WorkflowSlotConnectionBehavior.OnSlotConnectionMove` (`[JSInvokable]`) |
+
+**Expected result:** dragging the rubber band over a compatible slot turns the slot's preview state (and the virtual link's stage) valid; moving over an incompatible slot turns it invalid; moving off every slot returns to `Started`. Releasing still performs the actual connection.
+
 ## 5. Grid decorator and minimap overlay
 
 The surface behavior writes into two Core contracts on every layout/scroll pass: the decorator implements `IWorkflowGridDecorator` and the minimap `IWorkflowMinimapOverlay` (which extends the decorator contract with `ViewportWidth`, `ViewportHeight`, `WorkflowTree`, `IsMinimapVisible`). `WorkflowSurfaceBehavior.UpdateGridDecorator` also forwards `decorator.RulerBand` into `SetVirtualizeInset` so nodes under the ruler band are not culled.
@@ -145,6 +177,6 @@ behaviors:WorkflowSurfaceBehavior.LinkMenuKey="LinkContextMenu"
 </ContextMenu>
 ```
 
-The behavior resolves the resource, subscribes to Core's `LinkInteraction` hub, positions the popup at the press, sets the menu's own context to the link under it, and reports open/close back to the hub (which suspends hover while a menu is open). Entries therefore bind straight to that link — `{Binding DeleteCommand}` above is a new action, added or removed inside the template alone. On WinForms and Jalium the same menu is built in `WorkflowTreeView.OnBuildLinkMenu(menu, link)` instead (the base adds "Delete"), and on Razor the tree view passes a `<LinkMenu Context="link"> … </LinkMenu>` fragment.
+The behavior resolves the resource, subscribes to the tree's input route (`WorkflowInput.For(tree)`) `PointerPressed` event, positions the popup at the press, sets the menu's own context to the link under it, and sets `WorkflowInput.IsSuspended = true` while the menu is open so the pointer move that reached the link does not clear the very hover the menu acts on. It also subscribes to the helper's `LinkRemoved` event and closes the menu if that link leaves the tree. Entries therefore bind straight to that link — `{Binding DeleteCommand}` above is a new action, added or removed inside the template alone. On **WinForms** the same menu is built in `WorkflowTreeView.OnBuildLinkMenu(menu, link)` instead (the base adds one "Delete" item; the generated template overrides it with an empty menu); **Jalium now uses the same `LinkMenuKey` + `ContextMenu` resource** as the XAML adapters. On Razor the surface takes a `<LinkMenu Context="link"> … </LinkMenu>` fragment.
 
-**Expected result:** right-pressing a link opens the menu and "Delete" removes that link. While the menu is open the link stays selected even though the pointer is over the menu; if the link leaves the tree while its menu is open, the hub raises `ContextMenuDismissRequested` and the host dismisses the menu.
+**Expected result:** right-pressing a link opens the menu and "Delete" removes that link. While the menu is open the link stays selected even though the pointer is over the menu, because the surface set `WorkflowInput.IsSuspended`; if the link leaves the tree while its menu is open, the helper's `LinkRemoved` event makes the surface close the menu.

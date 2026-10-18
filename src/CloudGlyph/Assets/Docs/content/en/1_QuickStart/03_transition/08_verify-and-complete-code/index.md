@@ -50,7 +50,7 @@ dotnet test Src/Core/VeloxDev.Core.Test/VeloxDev.Core.Test.csproj \
   --filter "FullyQualifiedName~TransitionSystem|FullyQualifiedName~Timing"
 ```
 
-**Expected result (recorded, 2026-10-01):** `测试运行成功。测试总数: 285 / 通过数: 285` in 24.5 s.
+**Expected result (recorded, 2026-10-18):** `已通过! - 失败: 0，通过: 287，已跳过: 0，总计: 287，持续时间: 23 s`.
 
 ## 4. Complete code
 
@@ -128,6 +128,6 @@ Every identifier is defined above: the transition declares `Opacity → 0`, `Ren
 
 - ✅ **The `AUTO TEST` suite was actually built and run on 2026-10-01**, all seven demos rebuilt first, on Windows 11 with .NET 10 SDK. Recorded verdict:
   `测试运行成功。测试总数: 33，通过数: 32，跳过数: 1，总时间: 1.9579 分钟` (exit code 0; the one skip is the `[Ignore]`d `Stress_ReactivatingARowWhileTheDemoIsBusy`). This exercises all seven real demos end to end, including the sampler closed-form check and the timeline-control check.
-- ✅ **The unit tests were actually run on 2026-10-01**: `dotnet test … --filter "FullyQualifiedName~TransitionSystem|FullyQualifiedName~Timing"` → `测试运行成功。测试总数: 285，通过数: 285` in 24.5 s.
+- ✅ **The unit tests were actually run on 2026-10-18**: `dotnet test … --filter "FullyQualifiedName~TransitionSystem|FullyQualifiedName~Timing"` → `已通过! - 失败: 0，通过: 287，已跳过: 0，总计: 287，持续时间: 23 s` (exit code 0).
 - ✅ **The demo builds were verified**: `dotnet build` on WPF, WinForms, Avalonia, MAUI, WinUI, Jalium and Blazor demos reported 0 errors each.
 - ⚠️ **The §4 window was not launched interactively** in this documentation pass; it mirrors `Examples/Transition/WPF/Demo/MainWindow.xaml.cs` (`Animation0`), which the `AUTO TEST` suite drove on screen. Launching it and watching the animation is left as the reader's end-to-end check.

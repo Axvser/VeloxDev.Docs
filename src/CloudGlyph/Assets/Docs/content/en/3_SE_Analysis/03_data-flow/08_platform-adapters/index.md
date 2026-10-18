@@ -1,6 +1,6 @@
 # 08 · Platform Adapters — Data Flow
 
-The sequence diagrams below trace the core data flows of the platform-adapter layer. They are derived from the WPF adapter source, the Core model (`VeloxDev.WorkflowSystem`), and the WPF/Avalonia/WinUI/MAUI demos; per-platform detail not exercised by a demo is `*inferred*` from source. A recurring step is the visible-region feed: the surface writes `Helper.Viewport`, the spatial index re-computes `Helper.VisibleItems`, and `ViewPool` materializes only those views. The WPF/Avalonia/WinUI demos bind `ViewPool` to `Helper.VisibleItems` and the MAUI demo binds a node-only wrapper of it; the WinForms and Blazor demos instead bind the full node collection and rely on the surface for visible-region bookkeeping.
+The sequence diagrams below trace the core data flows of the platform-adapter layer. They are derived from the WPF adapter source, the Core model (`VeloxDev.WorkflowSystem`), and the WPF/Avalonia/WinUI/MAUI demos; per-platform detail not exercised by a demo is `*inferred*` from source. A recurring step is the visible-region feed: the surface writes `Helper.Viewport`, the spatial index re-computes `Helper.VisibleItems`, and `ViewPool` materializes only those views. The WPF/Avalonia/WinUI/WinForms/Blazor demos bind `ViewPool` to `Helper.VisibleItems`; MAUI binds the same collection, but its selector materializes node views only, so links are drawn by one viewport-sized `WorkflowLinkOverlay`. Jalium's generated tree uses the same binding, though no automated demo exercises it (`*inferred*`).
 
 ## (a) Attach & layout wiring → virtualize → pooled materialization
 
@@ -151,6 +151,43 @@ User -> S : release on blank surface instead
 C -> Tree : (surface behavior) ResetVirtualLinkCommand\\nwhen VirtualLink.IsVisible
 @enduml
 ```
+
+## (e2) Connection preview: candidate receiver on every pointer move
+
+While the rubber band is visible the surface does not route hover; it reports the geometric candidate instead. The hit test reads slot anchors, not the visual tree, because the rubber band covers the surface during the drag.
+
+```plantuml
+@startuml
+!theme plain
+actor User
+participant "Surface pointer-move handler\\n(WPF/Avalonia/WinUI/Jalium)\\nor connection behavior\\n(MAUI/WinForms/Razor)" as H
+participant "SlotHitTestEx (Core)" as Hit
+participant "WorkflowTreeEx\\nStandardSetPreviewReceiver" as Set
+participant "WorkflowInput\\n(per tree)" as In
+participant "IWorkflowSlotViewModel" as Slot
+
+User -> H : pointer moves while VirtualLink.IsVisible
+H -> Hit : HitTest(tree, worldX, worldY, radius = 12)
+Hit -> Hit : scan nodes/slots; skip NaN anchors;\\nkeep nearest within radius
+Hit --> H : candidate slot or null
+H -> Set : StandardSetPreviewReceiver(candidate)
+Set -> In : ConnectionSender
+alt no drag in progress
+    Set -> In : ClearConnectionPreview()
+else sender == candidate
+    Set -> Set : treat as null (sender is not its own receiver)
+else candidate unchanged
+    Set -> Set : return (no re-validation)
+else new candidate
+    Set -> Set : StandardCheckConnection(sender, candidate)
+    Set -> In : RaisePreviewValidating (may tighten)
+    Set -> In : SetConnectionPreview(candidate, check)
+    In -> Slot : PreviewReceiver bit + ConnectionPreviewState
+end
+@enduml
+```
+
+The cost per move is a scan of the tree's slots (`O(N·S)`, where `S` is slots per node); repeating the same candidate is `O(1)` after the hit test because the tree skips validation. `StandardRefreshConnectionPreview(tree)` forces the check again when an asynchronous validator returns.
 
 ## (f) Minimap projection & drag navigation
 

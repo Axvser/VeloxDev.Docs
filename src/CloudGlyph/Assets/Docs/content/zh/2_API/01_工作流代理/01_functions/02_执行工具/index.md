@@ -1,6 +1,6 @@
 # 函数 · 执行工具
 
-类别 `Execution` —— **12 个工具**，全部受 `WithAllowNodeExecution(true)` 闸控。它们横跨三个执行层级：节点 EXEC、编译链、编译运行家族。闸门关闭时每个都返回 `... is disabled by host policy. The host must enable node execution via WithAllowNodeExecution(true).`
+类别 `Execution` —— **12 个工具**。其中八个会启动或驱动节点代码，受 `WithAllowNodeExecution(true)` 闸控：四个节点级工具、`RunCompiledWorkflow`、`GetNodeResult`、`StartCompiledWorkflow`、`ContinueCompiledWorkflow`。另外四个是句柄操作（`GetCompiledRunStatus`、`PauseCompiledRun`、`ResumeCompiledRun`、`StopCompiledRun`），在已有运行上工作，不需要该闸门。受闸控的调用在闸门关闭时返回 `... is disabled by host policy. The host must enable node execution via WithAllowNodeExecution(true).` 十二个工具对权限策略而言都是 `AgentActionCategory.Execute`，且都不在预算的只读名单中 —— 因此计为**写**调用。
 
 ## 节点层（4）
 
@@ -28,7 +28,7 @@
 |---|---|---|
 | `StartCompiledWorkflow` | `StartCompiledWorkflow(int startNodeIndex, string? seed = null)` | 启动一次编译运行并**立即**返回 `handle`；用 `GetCompiledRunStatus` 轮询。 |
 | `ContinueCompiledWorkflow` | `ContinueCompiledWorkflow(int startNodeIndex, string? seed = null)` | 启动一次从作用域存储中最近检查点**续跑**的运行。无检查点时返回错误。 |
-| `GetCompiledRunStatus` | `GetCompiledRunStatus(string handle)` | 报告运行状态：`isRunning`、`runStatus`、`outcome`、`isPaused`、`attempts`、`endedWithError`、`data`、`failures`、`failureCount`、`logs`（最后 40 行）、`logFile`。**报告某次运行已结束后退休其句柄。** 纯查询。 |
+| `GetCompiledRunStatus` | `GetCompiledRunStatus(string handle)` | 报告运行状态：`isRunning`、`runStatus`、`outcome`、`isPaused`、`attempts`、`endedWithError`、`data`、`failures`、`failureCount`、`logs`（最后 40 行）、`logFile`。**报告某次运行已结束后退休其句柄。** 不启动代码，但归类为 `Execute`，计为写调用。 |
 | `PauseCompiledRun` | `PauseCompiledRun(string handle)` | 在该运行的下一个节点边界持有它。当宿主自带执行门（`RunsOnOurGate`）时返回**错误**。 |
 | `ResumeCompiledRun` | `ResumeCompiledRun(string handle)` | 让被持有的运行继续（未被持有时为空操作）。同样的 `RunsOnOurGate` 守卫。 |
 | `StopCompiledRun` | `StopCompiledRun(string handle)` | 停止运行：它在当前节点边界以 `outcome: Cancelled` 结束，检查点保留。**无门守卫。** |

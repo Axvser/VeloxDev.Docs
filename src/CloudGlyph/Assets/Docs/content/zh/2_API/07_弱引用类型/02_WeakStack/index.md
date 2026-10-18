@@ -19,7 +19,7 @@ public sealed class WeakStack<T> : IEnumerable<T>
 **返回：** `int` — 目标仍存活的条目数。
 
 **说明：**
-- getter 会先（在锁内）剪除已回收引用，因此在存在死引用时并非 O(1)。
+- getter 在锁内对整个底层栈运行 `Prune()`，因此复杂度是存储包装数（无论死活）的 $O(n)$，并非 $O(1)$。
 - 快速路径：当内部栈完全没有引用时，不取锁直接返回 `0`。
 
 ### `WeakStack<T>.IsEmpty`
@@ -130,6 +130,7 @@ public sealed class WeakStack<T> : IEnumerable<T>
 **说明：**
 - 显式 `IEnumerable.GetEnumerator()` 转发到此方法，因此两个接口产出相同序列。
 - 在锁内剪除已回收引用，只产出仍然存活的条目 —— 由 `WeakStackTests.Enumerable_ReturnsAllLiveItems` 验证。
+- 迭代器在 `yield return` 期间一直持有内部锁，因此枚举会阻塞其它成员直到迭代器被释放。若消费方较慢或会重入栈，请用 `ToList()` 物化。
 
 ## 源文件
 

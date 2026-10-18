@@ -1,6 +1,6 @@
 # MVVM — `VeloxCommand` execution
 
-The five members that dispatch work and ask whether it may run.
+The members that dispatch work and ask whether it may run.
 
 ###### `VeloxCommand.CanExecute`
 
@@ -8,15 +8,15 @@ The five members that dispatch work and ask whether it may run.
 `bool CanExecute(object? parameter)`
 
 | Parameter | Type | Description |
-|---|---|---|
+| --- | --- | --- |
 | `parameter` | `object?` | Forwarded to the `canExecute` predicate. |
 
-**Returns:** `bool` — `(_canExecute?.Invoke(parameter) ?? true) && !_isForceLocked`. With no predicate registered it is `true` unless the command is force-locked.
+**Returns:** `bool` — the predicate's answer combined with the force-lock flag. With no predicate the command is executable unless locked.
 
 **Example:**
 
 ```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandTests.cs, lines 69-77
+// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandTests.cs
 var command = new VeloxCommand(() => { }, canExecute: p => p is string s && s == "yes");
 
 Assert.IsTrue(command.CanExecute("yes"));
@@ -24,7 +24,7 @@ Assert.IsFalse(command.CanExecute("no"));
 Assert.IsFalse(command.CanExecute(null));
 ```
 
-**Notes:** this is the `ICommand` member bound by XAML. It never reflects the queue — see `IVeloxCommandStatus` for that.
+**Notes:** this is the `ICommand` member bound by XAML. It never reflects the queue — see `IVeloxCommandStatus` for that. A `null` argument is executable only when the parameter type can hold `null`; otherwise the answer is `false` rather than an exception.
 
 ###### `VeloxCommand.Execute`
 
@@ -33,29 +33,25 @@ Assert.IsFalse(command.CanExecute(null));
 
 **Returns:** `void` — fire-and-forget; implemented as `_ = ExecuteAsync(parameter)`.
 
-**Notes:** the `ICommand` entry point. The returned task of the underlying call is discarded, so nothing observes a body failure — subscribe to `Failed` or use `ExecuteAndWaitAsync`.
+**Notes:** the `ICommand` entry point. Nothing observes a body failure; subscribe to `Failed` or use `ExecuteAndWaitAsync`.
 
-###### `VeloxCommand.ExecuteAsync`
+###### `VeloxCommand.ExecuteAsync(object?)`
 
 **Signature:**
 `Task ExecuteAsync(object? parameter)`
 
-| Parameter | Type | Description |
-|---|---|---|
-| `parameter` | `object?` | The argument passed to the command body. |
-
 **Returns:** `Task` — completes when the execution has been **accepted**: it starts immediately when below the concurrency cap, otherwise it is enqueued. It does **not** complete when the body finishes.
 
-**Exceptions:** none thrown by the method itself; a body failure surfaces through the `Failed` event, and through `CommandCompletion` if `ExecuteAndWaitAsync` was used.
+**Exceptions:** none thrown by the method itself. A body failure surfaces through the `Failed` event and through `CommandCompletion` if `ExecuteAndWaitAsync` was used.
 
 **Example:**
 
 ```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandCompletionTests.cs, lines 30-42
+// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandCompletionTests.cs
 var gate = new CommandGate();
 var command = new VeloxCommand(gate.RunAsync, semaphore: 1);
 
-_ = command.ExecuteAsync(null);                       // takes the only slot
+_ = command.ExecuteAsync(null);
 await gate.WaitForStartedAsync();
 
 var waiting = command.ExecuteAndWaitAsync(null);
@@ -64,54 +60,63 @@ await CommandTestKit.WaitUntilAsync(() => command.IsBusy() && command.PendingCou
 
 **Notes:** the sequence is `Created` → (`Started` immediately, or `Enqueued` and later `Dequeued` → `Started`) → terminal stage → `Exited`.
 
+###### `VeloxCommand.ExecuteAsync(object?, CancellationToken)`
+
+**Signature:**
+`Task<object?> ExecuteAsync(object? parameter, CancellationToken cancellationToken)`
+
+**Returns:** the body's value, boxed — or `null` when it returned none.
+
+**Exceptions:**
+
+| Exception | Condition |
+| --- | --- |
+| `Exception` | the body threw; the original instance is rethrown |
+| `OperationCanceledException` | the execution was cancelled |
+| `InvalidOperationException` | the call was refused because the command was locked |
+
+**Notes:** the token abandons the wait only. This overload has no default for `cancellationToken` deliberately: a default would make a one-argument call ambiguous with `ExecuteAsync(object?)`.
+
+###### `VeloxCommand.Execute(object?, out object?)`
+
+**Signature:**
+`void Execute(object? parameter, out object? result)`
+
+**Returns:** `void`; `result` receives the body's value.
+
+**Exceptions:** same outcomes as the awaitable twin; on any of them it throws and assigns `result = null`. It blocks on the queue as well as on the body and must not be called from inside the same command's body.
+
 ###### `VeloxCommand.ExecuteAndWaitAsync`
 
 **Signature:**
 `Task<CommandCompletion> ExecuteAndWaitAsync(object? parameter, CancellationToken cancellationToken = default)`
 
 | Parameter | Type | Description |
-|---|---|---|
+| --- | --- | --- |
 | `parameter` | `object?` | The argument to pass to the body. |
 | `cancellationToken` | `CancellationToken` | Abandons the wait only; it does not cancel the execution. Optional. |
 
-**Returns:** `Task<CommandCompletion>` — completes when *this* execution has ended, including the calls that never run.
+**Returns:** `Task<CommandCompletion>` — completes when *this* execution has ended, including calls that never run.
 
 **Exceptions:**
 
 | Exception | Condition |
-|---|---|
+| --- | --- |
 | `OperationCanceledException` | `cancellationToken` fired first. |
 
 **Example:**
 
 ```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandCompletionTests.cs, lines 72-82
+// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandCompletionTests.cs
 var command = new VeloxCommand(() => Task.CompletedTask);
 await command.LockAsync();
 
 var completion = await command.ExecuteAndWaitAsync(null).WaitAsync(CommandTestKit.Timeout);
 
-Assert.AreEqual(CommandOutcome.Refused, completion.Outcome,
-    "a refused call never raises Exited, so this is the only way to observe it");
+Assert.AreEqual(CommandOutcome.Refused, completion.Outcome);
 ```
 
-```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandCompletionTests.cs, lines 44-56
-var boom = new InvalidOperationException("boom");
-var command = new VeloxCommand((_, _) => Task.FromException(boom));
-
-// deliberately no Failed subscriber: the result must not depend on someone having subscribed
-var completion = await command.ExecuteAndWaitAsync(null);
-
-Assert.AreEqual(CommandOutcome.Failed, completion.Outcome);
-Assert.AreSame(boom, completion.Exception);
-```
-
-**Notes:**
-
-- This member is one of the two reasons `VeloxCommand` also implements `IVeloxCommandCompletion`; the same operation is available on an `IVeloxCommand` reference through `VeloxCommandExtensions`.
-- The result is computed from the execution's own outcome, not read back from the events, so it does not depend on a `Failed` subscriber existing.
-- A queued call that the command stays locked on has not ended, so the returned task waits until a slot frees or the queue is cleared.
+**Notes:** the outcome is computed from the execution itself, not read back from events. A queued call that stays queued has not ended, so the task waits until a slot frees or the queue is cleared.
 
 ###### `VeloxCommand.Notify`
 
@@ -123,7 +128,7 @@ Assert.AreSame(boom, completion.Exception);
 **Example:**
 
 ```csharp
-// Source: Demo — Examples/MVVM/Avalonia/Demo/ViewModels/MainWindowViewModel.cs, lines 218-222
+// Source: Demo — Examples/MVVM/Avalonia/Demo/ViewModels/MainWindowViewModel.cs
 private void RefreshCollectionCommands()
 {
     RemoveSelectedItemCommand.Notify();
@@ -131,4 +136,4 @@ private void RefreshCollectionCommands()
 }
 ```
 
-**Notes:** a `CanExecuteChanged` subscriber that throws is swallowed and reported through `HandlerException`.
+**Notes:** a throwing `CanExecuteChanged` subscriber is swallowed and reported through `HandlerException`.

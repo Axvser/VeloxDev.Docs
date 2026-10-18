@@ -44,7 +44,7 @@ public partial class MainWindow
 
 源码：`Src/Generators/VeloxDev.Core.Generator/Theme.cs`。
 
-该生成器响应 **partial 类** 上的 `[ThemeConfig<...>]`（当前支持 2 到 6 个主题类型的元数，即元数据元数 3–7），并为该类生成一段附加的 partial 声明：
+该生成器响应 **partial 类** 上的 `[ThemeConfig<...>]`。它扫描的是 2 到 6 主题的元数（元数据元数 3–7）；特性家族虽然定义了 7 主题元数（元数据元数 8），却没有对应的 provider，因此只有当同一个类还带有被扫描的元数时，它才会被拾取。对被发现的类，生成器生成一段附加的 partial 声明：
 
 - 当基类型尚未实现 `IThemeObject` 时，追加 `: IThemeObject`。
 - 生成 `ExecuteThemeChanging(Type? oldValue, Type? newValue)` / `ExecuteThemeChanged(...)`：先调用基类实现（若存在），再调用 **partial 钩子** `partial void OnThemeChanging(Type? oldValue, Type? newValue)` / `partial void OnThemeChanged(...)` —— 只作无主体的声明，供用户在类的另一部分实现。WPF 示例通过实现 `OnThemeChanged` 弹出 `MessageBox`；Avalonia 示例则显示 `WindowNotificationManager` 通知。
@@ -53,7 +53,7 @@ public partial class MainWindow
 
 **说明：**
 - 只实现 `IThemeObject` 而没有 `[ThemeConfig]` 的类不会被处理。
-- 转换器在登记时通过 `Activator.CreateInstance` 内联实例化 —— 生成器不使用 `ThemeCache.RegisterConverter`。
+- 转换器在登记时通过 `Activator.CreateInstance` 内联实例化 —— `ThemeCache` 中不存在共享转换器注册表，每次登记都会创建自己的转换器实例。
 
 ---
 
@@ -102,4 +102,4 @@ public partial class MainWindow
 
 **说明：**
 - 平台适配器提供实现 —— `BrushConverter`、`ColorConverter`、`DoubleConverter`、`PointConverter`、`CornerRadiusConverter`、`ThicknessConverter`、`ObjectConverter`（均位于适配器程序集的 `VeloxDev.DynamicTheme` 命名空间）——见 [04 PlatformAdapters](../04_平台适配器/index.md)。
-- `ThemeCache` 也暴露一个转换器注册表（`RegisterConverter` / `GetConverter`），用于希望在多个类型间共享单个转换器实例的场景。
+- 转换器按契约是无状态的，由生成器在每次登记时创建；跨类型共享同一个转换器实例不属于这套 API 的表面。

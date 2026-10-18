@@ -19,7 +19,7 @@ public class TransitionEventArgs : TimeLineEventArgs
 | Member | Description |
 |---|---|
 | `Loop` | `int` — which pass of the **running segment** this is, `0` on its first pass. Compare it against `ITransitionEffectCore.LoopTime` to tell "which repeat" apart. |
-| `Cycle` | `long` — how many segments this target has played in total, across every chain it has run; it advances once per pass. |
+| `Cycle` | `long` — how many passes this target has played in total, across every chain it has run; it advances once per pass. |
 | `Handled`, `DeltaTime`, `TotalTime` | inherited unchanged from `TimeLineEventArgs`. |
 
 **Notes:**

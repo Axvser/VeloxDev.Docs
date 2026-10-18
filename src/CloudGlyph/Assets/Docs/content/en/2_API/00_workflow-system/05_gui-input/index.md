@@ -21,14 +21,19 @@ flowchart TD
 
 | Member | Signature | Notes |
 |---|---|---|
-| `For` | `static WorkflowInput For(IWorkflowTreeViewModel tree)` | The one way to get the tree's instance (`:49`) |
-| constructor | `WorkflowInput(IWorkflowTreeViewModel tree)` | `null` throws `ArgumentNullException` (`:42`) |
-| `Tree` | `IWorkflowTreeViewModel` | (`:56`) |
-| `Route` | `void Route(PointerEventArgs e)` / `void Route(KeyEventArgs e)` | Expands the target's ancestor chain and dispatches down it (`:90,104`) |
-| `PointerTarget` | `IWorkflowViewModel?` | Which component the pointer is on — the route's only state (`:62`) |
-| `HoveredLink` | `IWorkflowLinkViewModel?` | `PointerTarget as IWorkflowLinkViewModel` (`:65`) |
-| `HitRadius` | `double` | Hit-test radius for curves; defaults to `LinkHitTestEx.DefaultHitRadius` (`:71`) |
-| `IsSuspended` | `bool` | Set while a host menu is open; pointer tracking stops (`:78`) |
+| `For` | `static WorkflowInput For(IWorkflowTreeViewModel tree)` | The one way to get the tree's instance (`:53`) |
+| constructor | `WorkflowInput(IWorkflowTreeViewModel tree)` | `null` throws `ArgumentNullException` (`:46`) |
+| `Tree` | `IWorkflowTreeViewModel` | (`:60`) |
+| `Route` | `void Route(PointerEventArgs e)` / `void Route(KeyEventArgs e)` | Expands the target's ancestor chain and dispatches down it (`:250,264`) |
+| `PointerTarget` | `IWorkflowViewModel?` | Which component the pointer is on — the route's only persistent state (`:66`) |
+| `HoveredLink` | `IWorkflowLinkViewModel?` | `PointerTarget as IWorkflowLinkViewModel` (`:69`) |
+| `ConnectionSender` | `IWorkflowSlotViewModel?` | The port the drag started from (`:72`) |
+| `PreviewReceiver` | `IWorkflowSlotViewModel?` | The candidate port under the pointer (`:75`) |
+| `PreviewState` | `ConnectionPreviewState` | The current stage of the connection drag (`:78`) |
+| `PreviewCheck` | `ConnectionCheck?` | The check for the candidate; `null` when there is no candidate. An invalid candidate still carries a check, so a view can explain the red band (`:84`) |
+| `HitRadius` | `double` | Hit-test radius for curves; defaults to `LinkHitTestEx.DefaultHitRadius` (`:213`) |
+| `IsSuspended` | `bool` | Set while a host menu is open; pointer tracking stops (`:220`) |
+| `Scroller` | `IWorkflowSurfaceScroller?` | Written by an adapter while attached; how a subscriber scrolls after taking a wheel over (`:238`) |
 
 **Route order.** The target is dispatched first, then each ancestor up to the tree. Every element on the way sees the same argument instance — so one action has one `WorkflowEventHandle`, and an ancestor can read what a handler closer to the target decided.
 
@@ -49,6 +54,48 @@ The capability is deliberately **not** a member of `IWorkflow…ViewModelHelper`
 | `KeyDown` / `KeyUp` | `KeyDownEventArgs` / `KeyUpEventArgs` |
 
 The `sender` is the relay, which is how a subscriber tells which element of the route it is hearing from.
+
+## Connection drag preview
+
+The route also owns the **connection drag**: `ConnectionSender`, `PreviewReceiver`, `PreviewState` and `PreviewCheck`. An adapter reports the candidate with `StandardSetPreviewReceiver` (usually `SlotHitTestEx.HitTest(tree, x, y)` while the rubber band covers the surface); Core computes the verdict, marks `SlotState.PreviewReceiver`, and calls `IConnectionPreviewLink.SetPreview` on the tree's `VirtualLink`.
+
+| Event | Payload | When |
+|---|---|---|
+| `PreviewChanged` | `ConnectionPreviewEventArgs(Sender, Receiver, State, Check)` | Whenever the sender, the candidate or the stage changes — including the end of the drag (`None`). A link view paints the rubber band per stage; it does not decide the connection. |
+| `PreviewValidating` | `ConnectionPreviewValidatingEventArgs(Sender, Receiver, Check)` | Once for each **new** candidate the framework would accept, before it is marked valid. `Reject(message)` turns the candidate red with `ConnectionRejectReason.RejectedByHost` for this preview only. Not raised for candidates the framework already refused, and not re-raised while the pointer stays on the same candidate unless `StandardRefreshConnectionPreview` is called. |
+
+| Stage | Meaning |
+|---|---|
+| `None` | No drag is in progress. |
+| `Started` | The sender is fixed; the pointer is not over a candidate. |
+| `ValidTarget` | The pointer is over a slot the framework would accept. |
+| `InvalidTarget` | The pointer is over a slot, but the connection would be refused (or the host rejected it for this preview). |
+
+**The preview is not the verdict.** `PreviewValidating` can only tighten a framework pass into a red candidate; it can never turn a refusal green. The release-time `IWorkflowTreeEvents.Connecting` veto and `ValidateConnection` remain the final decision.
+
+```csharp
+// Source: Src/Core/VeloxDev.Core.Test/WorkflowSystem/WorkflowConnectionPreviewTests.cs
+input.PreviewValidating += (_, e) =>
+{
+    if (!allow) e.Reject("still checking");
+};
+
+tree.GetHelper().SendConnection(sender);
+tree.StandardSetPreviewReceiver(receiver);   // raises PreviewValidating once
+tree.StandardSetPreviewReceiver(receiver);   // same candidate: no second call
+allow = true;
+tree.StandardRefreshConnectionPreview();      // forces the check again
+```
+
+### `SlotHitTestEx`
+
+`public static class SlotHitTestEx` (`GUI/Interaction/SlotHitTestEx.cs`) finds the nearest **measured** slot anchor within a radius: `HitTest(tree, x, y, radius = DefaultHitRadius)` with `DefaultHitRadius = 12`. A slot whose anchor is still `double.NaN` is skipped; overlapping slots resolve to the nearest anchor. This exists because the rubber band is drawn over the whole surface, so the platform view under the pointer is often the surface itself and cannot answer "which slot".
+
+```csharp
+// Source: Src/Adapters/VeloxDev.WPF/Attached/Workflow/WorkflowSurfaceBehavior.cs:755
+viewModel.StandardSetPreviewReceiver(
+    SlotHitTestEx.HitTest(viewModel, pointer.Horizontal, pointer.Vertical));
+```
 
 ## The fifteen types
 

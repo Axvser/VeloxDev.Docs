@@ -1,20 +1,16 @@
 # Complexity Analysis — Workflow Agent
 
-## `WithAutoDiscovery` assembly scan
+## `WithAutoDiscovery` context-tree walk
 
-`WithAutoDiscovery` runs in two passes. Pass 1 enumerates every type in the target assembly ($T$ types) and does constant-time work per type (abstract/interface checks, `IWorkflow*ViewModel` assignability, attribute presence). Pass 2 deep-scans every *registered* component: for a component with $P$ properties, $F$ fields and $M$ methods, each member is resolved into the enum/interface/data buckets with `HashSet`-guarded dedup (`_globallyDiscoveredTypes`), so re-visits are constant-time.
-
-$$
-T_{\text{discovery}} = O\!\left(T + \sum_{C \in \text{registered}} (P_C + F_C + M_C) \cdot k\right)
-$$
-
-where $k$ is the generic-argument recursion factor (bounded by the maximum generic nesting depth). Registration buckets are `HashSet`s, so `TryRegister*` is $O(1)$ expected. Space is the registered type sets:
+Discovery is **not** an assembly scan. The source generator has already walked the compilation and classified types into the agent-context tree, so `WithAutoDiscovery` performs a fixed set of directory listings under `Customer/` (`Enums`, `Interfaces`, `Data`, `Components/{kind}`) and resolves each admitted type literal. With $R$ registered entries and $L$ directory listings:
 
 $$
-S_{\text{discovery}} = O(R_{\text{comp}} + R_{\text{enum}} + R_{\text{iface}} + R_{\text{data}})
+T_{\text{discovery}} = O(R + L), \qquad S_{\text{discovery}} = O(R_{\text{comp}} + R_{\text{enum}} + R_{\text{iface}} + R_{\text{data}})
 $$
 
-*Source: `WorkflowAgentScope.cs` `WithAutoDiscovery`.*
+Registration buckets are `HashSet`s, so the cross-language dedup (`_globallyDiscoveredTypes`) makes a repeat call $O(R)$ with no new allocations. Nothing is reflected over at runtime; a type the generator never admitted is simply absent.
+
+*Source: `WorkflowAgentScope.cs` `WithAutoDiscovery` / `RegisterDiscovered`.*
 
 ## `WorkflowStateTracker.TakeSnapshot` / diff
 
@@ -24,7 +20,7 @@ $$
 T_{\text{snapshot}} = O(V \cdot P + E), \qquad S_{\text{snapshot}} = O(V \cdot P + E)
 $$
 
-`ComputeDiff` builds `RuntimeId → JObject` dictionaries for nodes and links in $O(V + E)$, then for each node compares scalar/enum properties via `JToken.DeepEquals`:
+`ComputeDiff` builds `RuntimeId → VeloxJsonObject` dictionaries for nodes and links in $O(V + E)$, then for each node compares scalar/enum properties:
 
 $$
 T_{\text{diff}} = O(V + E + V \cdot P') = O(V \cdot P' + E)
@@ -102,7 +98,7 @@ where $d$ is the spawn depth (bounded by the sub-agent depth limit). `ResetChain
 
 ## `WorkflowAgentContextProvider` render cache
 
-`BuildContext` first reads `Scope.ContextKey` ($O(1)$: a `Version` read plus a budget-band computation) and compares it against the published key. On a hit it returns the previous `AIContext` with no lock and no allocation. On a miss it rebuilds instructions and (only if `Version` moved) the tool list:
+`BuildContext` first reads `Scope.ContextKey` ($O(1)$: a `Version` read, the tree's selection revision, and a budget-band computation) and compares it against the published key. On a hit it returns the previous `AIContext` with no lock and no allocation. On a miss it rebuilds instructions and (only if `Version` moved) the tool list:
 
 $$
 T_{\text{render}} = \begin{cases} O(1) & \text{cache hit} \\ O(\text{instructions} + |\text{tools}|) & \text{cache miss} \end{cases}
@@ -130,9 +126,9 @@ $$
 
 | Operation | Time | Space | Basis |
 |---|---|---|---|
-| `WithAutoDiscovery(assembly)` | $O(T + R \cdot m \cdot k)$ | $O(R)$ sets | $T$ types, $R$ registered, $m$ members/component, $k$ generic recursion |
-| `WorkflowStateTracker.TakeSnapshot` | $O(V \cdot P + E)$ | $O(V \cdot P + E)$ | graph walk + scalar reflection |
-| `WorkflowStateTracker` diff | $O(V \cdot P' + E)$ | $O(V + E)$ | `RuntimeId` index + property `DeepEquals` |
+| `WithAutoDiscovery()` | $O(R + L)$ | $O(R)$ sets | context-tree directory listings, $R$ entries, $L$ listings |
+| `WorkflowStateTracker.TakeSnapshot` | $O(V \cdot P + E)$ | $O(V \cdot P + E)$ | graph walk + scalar property emit |
+| `WorkflowStateTracker` diff | $O(V \cdot P' + E)$ | $O(V + E)$ | `RuntimeId` index + property compare |
 | Toolkit dispatch overhead | $O(1)$ | $O(1)$ | tracked wrapper counters + event |
 | `CheckBudget` gate | $O(1)$ (+ $O(d)$ to the root) | $O(1)$ | hash probe + integer compares |
 | `ToolCallLedger.Spend` / `ResetChain` | $O(d)$ | $O(d)$ | walks the spawn chain |

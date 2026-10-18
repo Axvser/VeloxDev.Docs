@@ -29,16 +29,18 @@ All five are read-only queries (they never mark the tree dirty).
 |---|---|---|
 | `GetNodeStatistics` | `GetNodeStatistics(int nodeIndex)` | In-degree, out-degree, total connections, connected node ids, slot utilization. |
 
-## Interaction (up to 2)
+## Interaction (up to 4)
 
-Registered **only** when the safety level is > 0 **and** the corresponding handler is configured. Both are read-only queries.
+Registered purely by handler presence — there is no safety level any more. Both interaction tools are `AgentActionCategory.Interact`, which no permission mode ever puts to the user; the plan-mode pair is registered beside them and asks through the same confirmation handler.
 
-| Tool | Signature | Purpose |
-|---|---|---|
-| `RequestSelection` | `RequestSelection(string prompt, string optionsJson, string freeTextPrompt, bool allowMultiSelect = false)` | Presents single-/multi-choice + a free-text field and waits for the user. Returns `chosen` (single) / `chosenList` (multi) + `freeText`. |
-| `RequestConfirmation` | `RequestConfirmation(string operationKey, string description)` | Requests explicit confirmation: allow-once / allow-always-for-session / deny. Do not proceed if denied. |
+| Tool | Registered when | Signature | Purpose |
+|---|---|---|---|
+| `RequestSelection` | `WithSelectionHandler` was called | `RequestSelection(string prompt, string optionsJson, string freeTextPrompt, bool allowMultiSelect = false)` | Presents single-/multi-choice + a free-text field and waits for the user. Returns `chosen` (single) / `chosenList` (multi) + `freeText`. |
+| `RequestConfirmation` | `WithConfirmationHandler` was called | `RequestConfirmation(string operationKey, string description)` | Requests explicit confirmation: allow-once / allow-always-for-session / deny. Do not proceed if denied. |
+| `EnterPlanMode` | `WithConfirmationHandler` was called | `EnterPlanMode()` | Asks the user, then moves the session to `AgentPermissionMode.Plan`, remembering the mode to restore. |
+| `ExitPlanMode` | `WithConfirmationHandler` was called | `ExitPlanMode()` | Asks the user, then restores the mode the session was in before `Plan`. |
 
-`RequestSelection` is backed by `WorkflowAgentScope.WithSelectionHandler`; `RequestConfirmation` by `WithConfirmationHandler`. The confirmation handler's key is the tool name for tool-approval, and the model-supplied `operationKey` for this tool.
+`RequestSelection` is backed by `WorkflowAgentScope.WithSelectionHandler`; `RequestConfirmation` by `WithConfirmationHandler`. The confirmation handler's key is the tool name for an `Ask` permission decision, and the model-supplied `operationKey` for this tool. `ResetToolCallLimit` also asks under `extend-tool-call-budget`.
 
 ## Example
 
@@ -50,4 +52,4 @@ ExecuteCommandOnNode(0, "ReceiveCommand", null)      → {"status":"ok"}   // wh
 RequestConfirmation("delete-all-nodes", "Delete every node") → {"status":"denied"|...}
 ```
 
-**Expected result:** with no generic commands allowlisted, `ExecuteCommandOnNode` returns an error; with a level > 0 and a confirmation handler, `RequestConfirmation` appears exactly once in `ProvideTools()`.
+**Expected result:** with no generic commands allowlisted, `ExecuteCommandOnNode` returns an error; with both handlers configured, `RequestSelection` / `RequestConfirmation` / `EnterPlanMode` / `ExitPlanMode` each appear exactly once in `ProvideTools()`.

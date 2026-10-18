@@ -1,10 +1,8 @@
 # MVVM — Define Observable Properties
 
-`[VeloxProperty]` is a marker attribute (`AttributeTargets.Field | AttributeTargets.Property`) with no parameters. The generator rewrites the marked member into a public observable property plus `partial` hook declarations, and synthesizes only the notification infrastructure the class does not already have.
+`[VeloxProperty]` (`AttributeTargets.Field | AttributeTargets.Property`, no parameters, not sealed) marks a member that `VeloxDev.Generators.MVVM` rewrites into an observable property.
 
-## 1. Field form (works on every supported target)
-
-Mark a private field; the property name is derived from the field name by dropping a leading `_` and upper-casing the next character (`_count` → `Count`):
+## 1. Field form
 
 ```csharp
 using VeloxDev.MVVM;
@@ -17,7 +15,7 @@ public partial class CounterViewModel
 }
 ```
 
-The generated code below is the real output for exactly this member (see the Run Declaration for how it was produced):
+The property name drops a leading `_` and upper-cases the next character (`_count` → `Count`). The emitted property is:
 
 ```csharp
 public System.Int32 Count
@@ -25,7 +23,7 @@ public System.Int32 Count
     get => this._count;
     set
     {
-        if (global::System.Object.Equals(this._count, value)) return;
+        if(global::System.Object.Equals(this._count, value)) return;
         var old = this._count;
         OnPropertyChanging(nameof(Count));
         OnCountChanging(old, value);
@@ -38,7 +36,7 @@ partial void OnCountChanging(System.Int32 oldValue, System.Int32 newValue);
 partial void OnCountChanged(System.Int32 oldValue, System.Int32 newValue);
 ```
 
-You implement the hooks in your own part of the class; the generator supplies the declarations, so a mismatched signature is a compile error rather than a silently ignored method:
+Implement the hooks in another part of the same class. Because the generator declares them, an incorrect signature is a compile error rather than a silently ignored method.
 
 ```csharp
 public partial class CounterViewModel
@@ -50,52 +48,40 @@ public partial class CounterViewModel
 }
 ```
 
-**Expected result:** `_count` is exposed as `public int Count`. Assigning `Count = 3` runs, in order, (1) `OnPropertyChanging(nameof(Count))` → raises `PropertyChanging`, (2) the `partial OnCountChanging(old, new)` hook, (3) the field assignment, (4) the `partial OnCountChanged(old, new)` hook → prints `[count] 0 -> 3`, (5) `OnPropertyChanged(nameof(Count))` → raises `PropertyChanged`. Assigning the same value again short-circuits at the `Object.Equals` guard: no events, no hooks.
+**Expected result:** `Count = 3` raises `PropertyChanging`, calls `OnCountChanging`, assigns the field, calls `OnCountChanged` (printing `[count] 0 -> 3`), then raises `PropertyChanged`. Assigning the same value again short-circuits at the equality guard: no events, no hooks.
 
 ## 2. Partial-property form (C# 13)
 
-Declare a C# 13 partial property instead of a field. The generator supplies the implementing accessors plus a backing field:
-
 ```csharp
-using VeloxDev.MVVM;
-
-namespace QuickStart.Mvvm;
-
-public partial class CounterViewModel
-{
-    [VeloxProperty] public partial string Greeting { get; set; }
-}
+[VeloxProperty] public partial string Greeting { get; set; }
 ```
 
-This form is used in the repository — `Src/Core/VeloxDev.Core.Extension/Agent/MCP/McpServerConfiguration.cs` annotates its configuration members this way, with no base class and no boilerplate.
+The generator supplies the accessors and a backing field named `_greeting`, and preserves the access modifiers and accessor visibility you declared. A property that is not `partial` cannot be completed; the generator reports `VELOX_MVVM_PROP003` and skips it.
 
-**Expected result:** the same public property and `OnGreetingChanging` / `OnGreetingChanged` hooks are generated; the class still needs no manual `INotifyPropertyChanged` implementation.
+**Expected result:** the same `Greeting` property and `OnGreetingChanging` / `OnGreetingChanged` hooks are generated.
 
 ## 3. Notification infrastructure is detected per class
 
-The MVVM writer walks the class and its bases before emitting, and adds only what is missing (this is what the generated file above shows for a bare `partial class`):
+Before emitting, the writer inspects the class and its bases:
 
-- **No base provides it** → the generator puts `INotifyPropertyChanging` / `INotifyPropertyChanged` on the partial class and emits `public event PropertyChangingEventHandler? PropertyChanging;`, `public event PropertyChangedEventHandler? PropertyChanged;`, `public virtual void OnPropertyChanging(string propertyName)` and `public virtual void OnPropertyChanged(string propertyName)`.
-- **A base already provides events and methods** (for example the demos' own `ObservableViewModelBase`) → the generator reuses them and emits no duplicates.
-- **A well-known MVVM base is recognized** (CommunityToolkit.Mvvm, Prism, ReactiveUI, Caliburn.Micro) → the generated setter delegates to that framework's own notifier (`SetProperty`, `RaiseAndSetIfChanged`, `NotifyOfPropertyChange`) instead of raising the local events.
+- **Nothing supplied** → the type receives `INotifyPropertyChanging` / `INotifyPropertyChanged`, the `PropertyChanging` / `PropertyChanged` events, and `OnPropertyChanging(string)` / `OnPropertyChanged(string)`.
+- **A base already supplies them** (for example the demos' `ObservableViewModelBase`) → the generator emits no duplicates and the setters call the inherited methods.
+- **A known framework base is detected** → the generated setter delegates to that framework's notifier: CommunityToolkit.Mvvm and Prism (`SetProperty(ref T, T, string)`), ReactiveUI (`RaiseAndSetIfChanged`), Caliburn.Micro (`NotifyOfPropertyChange`).
 
-**Expected result:** a bare `partial class` compiles to a type that satisfies both notification interfaces; a class deriving from a base that already implements them gains only the annotated properties and hooks. Subscribing to the events behaves identically in both cases.
+**Expected result:** a bare `partial class` compiles into a type implementing both notification interfaces; a class deriving from a base that already implements them gains only the annotated property and hooks. Subscribing to the events behaves identically.
 
-## 4. Where the generated code goes
+## 4. Diagnostics and generated files
 
-One file per annotated class, named `{ClassName}_{Namespace_With_Underscores}_MVVM.g.cs` from `GetFileName()` in `Src/Generators/VeloxDev.Core.Generator/Writers/MVVMWriter.cs`. Generation is per class: two classes in one namespace produce two files.
+| Diagnostic | Severity | Condition |
+| --- | --- | --- |
+| `VELOX_MVVM_PROP001` | Error | two members map to the same property name, or an existing field cannot back the property (const/static/read-only, or a different type) |
+| `VELOX_MVVM_PROP002` | Warning | the field name yields no valid identifier |
+| `VELOX_MVVM_PROP003` | Warning | the annotated property is not `partial`, so its accessors cannot be completed |
 
-**Expected result:** after building with `-p:EmitCompilerGeneratedFiles=true`, the file appears under `obj/<Configuration>/<TargetFramework>/generated/VeloxDev.Core.Generator/VeloxDev.Generators.MVVM/`. Without that switch it is still compiled in, but only visible through the IDE's generated-file node.
+One file per class: `{ClassName}_{Namespace_With_Underscores}_MVVM.g.cs`. It appears under `obj/<Configuration>/<TargetFramework>/generated/VeloxDev.Core.Generator/VeloxDev.Generators.MVVM/` when the build passes `-p:EmitCompilerGeneratedFiles=true`.
+
+**Expected result:** a bad declaration reports the diagnostic id on the author's own line; a good one produces one generated file per class.
 
 ## Run declaration
 
-- ✅ Actually built and run on 2026-10-01. A console project in a scratch directory referenced `VeloxDev.Core.csproj` plus `VeloxDev.Core.Generator.csproj` as an analyzer (Debug), declared `[VeloxProperty] private int _count;`, `[VeloxProperty] private ObservableCollection<string> _items = [];` and a `partial void OnCountChanged` hook that prints, and was run with `dotnet run -c Debug`. Recorded output (the first three lines come from this page's members):
-
-  ```text
-  [collection] added: ready
-  initial: Count=0, CanExecute(Decrement)=False
-  Items: ready
-  [count] 0 -> 3
-  ```
-
-- The generated shapes quoted in sections 1 and 3 are transcribed verbatim from the emitted file `obj/Debug/net9.0/generated/VeloxDev.Core.Generator/VeloxDev.Generators.MVVM/CounterViewModel_QuickStart_Mvvm_MVVM.g.cs` of that same build, not reconstructed by hand. The `partial`-property form in section 2 was not compiled in this pass (it needs C# 13 language level); its claim is sourced from `McpServerConfiguration.cs`.
+- ⚠️ Not actually run in this documentation pass — statically verified against `Src/Generators/VeloxDev.Core.Generator/Writers/MVVMWriter.cs`, `Base/Analizer.cs` (`MVVMPropertyFactory`) and `Diagnostics.cs`. The emitted setter and hook declarations are transcribed from those templates; the partial-property form is sourced from the writer, not compiled here.

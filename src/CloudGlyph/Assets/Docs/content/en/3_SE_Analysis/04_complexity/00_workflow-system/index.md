@@ -6,7 +6,7 @@ KaTeX is used for the asymptotic bounds. Every figure is grounded in the cited s
 
 | Page | Contents |
 |---|---|
-| [Complexity of the Editor and Spatial Side](00_editor-and-spatial/index.md) | The editor side: spatial hash insert/query, virtualization, undo/redo stacks, selector lookup, JSON serialization |
+| [Complexity of the Editor and Spatial Side](00_editor-and-spatial/index.md) | The editor side: spatial hash insert/query, virtualization, undo/redo stacks, selector lookup, connection-drag slot hit test, JSON serialization |
 | [Complexity of Compilation and Execution](01_compile-and-execute/index.md) | The execution side: compilation (forward and reverse), segment driving, fan-out with a concurrency cap, checkpoint snapshot/restore/re-key, the host-capability seams, `CompiledOutline` |
 
 ## The two bounding shapes

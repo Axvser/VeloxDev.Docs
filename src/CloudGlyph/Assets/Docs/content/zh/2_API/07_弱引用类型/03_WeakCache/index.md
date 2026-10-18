@@ -38,9 +38,14 @@ public sealed class WeakCache<TTargetKey, TCacheKey>
 
 **返回：** `void`
 
+**异常：**
+| 异常 | 条件 |
+|---|---|
+| `ArgumentNullException` | `target` 为 `null` —— 由 `ConditionalWeakTable` 抛出（BCL 契约）。 |
+
 **说明：**
 - 若 `target` 已有条目，会先移除再重新加入，因此存储值被覆盖 —— 由 `WeakCacheTests.AddOrUpdate_OverwritesExisting` 与 `AddOrUpdate_And_TryGetCache_ReturnsValue` 验证。
-- 同时把 `target` 记入弱清扫列表，以便枚举与清扫能找到它；插入时的清扫时机见 `_perceptionThreshold`。
+- 同时把 `target` 记入弱清扫列表，以便枚举与清扫能找到它。清理检查发生在插入*之前*：当 `_counter > _perceptionThreshold`（严格大于）时，移除已回收的记账条目、把 `_counter` 归 `0` 并重新推导阈值；否则只是递增 `_counter`。
 - 在内部锁内执行。
 
 ### `WeakCache<TTargetKey,TCacheKey>.TryGetCache`
@@ -55,8 +60,14 @@ public sealed class WeakCache<TTargetKey, TCacheKey>
 
 **返回：** `bool` — `target` 当前存在条目为 `true`。
 
+**异常：**
+| 异常 | 条件 |
+|---|---|
+| `ArgumentNullException` | `target` 为 `null` —— 由 `ConditionalWeakTable` 抛出（BCL 契约）。 |
+
 **说明：**
 - 因为条目随键一起消亡，已被回收的键直接返回 `false` —— 由 `WeakCacheTests.TryGetCache_Missing_ReturnsFalse` 验证。
+- 这是普通条件弱表读取：它不会清扫记账列表。
 - 在内部锁内执行。
 
 ### `WeakCache<TTargetKey,TCacheKey>.Remove`
@@ -69,6 +80,11 @@ public sealed class WeakCache<TTargetKey, TCacheKey>
 | `target` | `TTargetKey` | 要移除条目的键。 |
 
 **返回：** `void`
+
+**异常：**
+| 异常 | 条件 |
+|---|---|
+| `ArgumentNullException` | `target` 为 `null` —— 由 `ConditionalWeakTable` 抛出（BCL 契约）。 |
 
 **说明：**
 - 移除表条目及清扫列表中任何匹配的引用。
@@ -87,7 +103,7 @@ public sealed class WeakCache<TTargetKey, TCacheKey>
 
 **说明：**
 - 先从清扫列表移除已回收目标，再遍历剩余存活目标，对每个仍保有表条目的目标调用 `action` —— 由 `WeakCacheTests.ForeachCache_IteratesAllEntries` 验证。
-- 在内部锁内执行。
+- 在内部锁内执行，且回调是在持有该锁时调用的。锁在同一线程上可重入，但回调不得阻塞，也不得等待另一个会触碰此缓存的线程。
 
 ## 源文件
 

@@ -38,9 +38,14 @@ Both type parameters must be class types. Because the `ConditionalWeakTable` tre
 
 **Returns:** `void`
 
+**Exceptions:**
+| Exception | Condition |
+|---|---|
+| `ArgumentNullException` | `target` is `null` — thrown by `ConditionalWeakTable` (BCL contract). |
+
 **Notes:**
 - If an entry already exists for `target`, it is removed first and then re-added, so the stored value is overwritten — verified by `WeakCacheTests.AddOrUpdate_OverwritesExisting` and `AddOrUpdate_And_TryGetCache_ReturnsValue`.
-- Also records `target` in the weak sweep list so enumeration and cleanup can find it; sweeps on insert as described under `_perceptionThreshold`.
+- Also records `target` in the weak sweep list so enumeration and cleanup can find it. The cleanup check runs *before* the insert: when `_counter > _perceptionThreshold` (strictly greater) it removes collected tracking entries, resets `_counter` to `0`, and re-derives the threshold; otherwise `_counter` is simply incremented.
 - Runs under the internal lock.
 
 ### `WeakCache<TTargetKey,TCacheKey>.TryGetCache`
@@ -55,8 +60,14 @@ Both type parameters must be class types. Because the `ConditionalWeakTable` tre
 
 **Returns:** `bool` — `true` when `target` currently has an entry.
 
+**Exceptions:**
+| Exception | Condition |
+|---|---|
+| `ArgumentNullException` | `target` is `null` — thrown by `ConditionalWeakTable` (BCL contract). |
+
 **Notes:**
 - Because the entry dies with its key, a collected key simply yields `false` — verified by `WeakCacheTests.TryGetCache_Missing_ReturnsFalse`.
+- This is a plain conditional-weak-table read: it does not prune the tracking list.
 - Runs under the internal lock.
 
 ### `WeakCache<TTargetKey,TCacheKey>.Remove`
@@ -69,6 +80,11 @@ Both type parameters must be class types. Because the `ConditionalWeakTable` tre
 | `target` | `TTargetKey` | The key whose entry should be removed. |
 
 **Returns:** `void`
+
+**Exceptions:**
+| Exception | Condition |
+|---|---|
+| `ArgumentNullException` | `target` is `null` — thrown by `ConditionalWeakTable` (BCL contract). |
 
 **Notes:**
 - Removes the table entry and any matching reference in the sweep list.
@@ -87,7 +103,7 @@ Both type parameters must be class types. Because the `ConditionalWeakTable` tre
 
 **Notes:**
 - First prunes collected targets from the sweep list, then iterates the remaining live targets and invokes `action` for each one that still has a table entry — verified by `WeakCacheTests.ForeachCache_IteratesAllEntries`.
-- Runs under the internal lock.
+- Runs under the internal lock, and the callback is invoked while that lock is held. The lock is re-entrant on the same thread, but the callback must not block or wait on another thread that touches this cache.
 
 ## Source
 

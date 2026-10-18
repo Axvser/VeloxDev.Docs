@@ -11,7 +11,7 @@ There are two ways to switch, and they differ in more than looks:
 
 Both paths notify the same hooks in the same order, and both refuse a switch to the theme that is already current.
 
-- [00 Prepare an Animated Switch](00_prepare/index.md) — `SetPlatformInterpolator` (mandatory for animation), `StartModel`, the effect presets
-- [01 Animated vs Instant Switching](01_transition-and-jump/index.md) — `Transition` / `Jump`, the generated hooks, `SetCurrent`
-- [02 Control a Switch in Flight](02_control-the-switch/index.md) — one timeline per switch, `Pause` / `Resume` / `Seek` / `SetRate` / `Exit`
-- [03 Runtime Overrides & Threading](03_overrides-and-threading/index.md) — `SetThemeValue` / `RestoreThemeValue`, the two caches, which thread a switch writes on
+- [Prepare an Animated Switch](00_prepare/index.md) — `SetPlatformInterpolator` (mandatory for animation), `StartModel`, the effect presets
+- [Animated vs Instant Switching](01_transition-and-jump/index.md) — `Transition` / `Jump`, the generated hooks, `SetCurrent`
+- [Control a Switch in Flight](02_control-the-switch/index.md) — one timeline per switch, `Pause` / `Resume` / `Seek` / `SetRate` / `Exit`
+- [Runtime Overrides & Threading](03_overrides-and-threading/index.md) — `SetThemeValue` / `RestoreThemeValue`, the two caches, which thread a switch writes on

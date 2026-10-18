@@ -6,10 +6,10 @@ All four types are evidence-backed: source lives in `Src/Core/VeloxDev.Core/Weak
 
 | Container | Weakness model | Page |
 |---|---|---|
-| `WeakDelegate<TDelegate>` | Handlers stored as `WeakReference<Delegate>`; a cached combined delegate keeps the invoke path lock-free | [WeakDelegate](00_WeakDelegate/index.md) |
+| `WeakDelegate<TDelegate>` | Handlers stored as `WeakReference<Delegate>`; a cached combined delegate makes the invoke path lock-free and **strongly holds** every handler merged into it | [WeakDelegate](00_WeakDelegate/index.md) |
 | `WeakQueue<T>` | Items held by `Queue<WeakReference<T>>` — FIFO | [WeakQueue](01_WeakQueue/index.md) |
 | `WeakStack<T>` | Items held by `Stack<WeakReference<T>>` — LIFO | [WeakStack](02_WeakStack/index.md) |
-| `WeakCache<TTargetKey,TCacheKey>` | Value bound to a weak key via `ConditionalWeakTable` — the entry dies with its key | [WeakCache](03_WeakCache/index.md) |
+| `WeakCache<TTargetKey, TCacheKey>` | Value bound to a weak key via `ConditionalWeakTable` — the entry dies with its key | [WeakCache](03_WeakCache/index.md) |
 
 ## Namespace and constraints
 

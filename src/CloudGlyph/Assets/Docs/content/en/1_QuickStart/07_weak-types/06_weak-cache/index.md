@@ -53,7 +53,7 @@ cache.ForeachCache((key, value) => Console.WriteLine($"key={key.Value} -> {value
 Because the table does not root its keys, eviction happens on the key's own lifetime, not on an explicit size limit:
 
 - When `key1` loses its last strong reference and the GC runs, its row disappears from the conditional weak table, and a later `TryGetCache(key1, out _)` returns `false`.
-- The cache also keeps a bookkeeping list of `WeakReference<TTargetKey>` entries (to enumerate keys cheaply); those weak references never pin the keys, and stale entries are removed when `ForeachCache` runs or when the insertion counter crosses a cleanup threshold inside `AddOrUpdate` (`AddOrUpdate_ManyItems_TriggersCleanup` exercises this path with 20 live `object` keys).
+- The cache also keeps a bookkeeping list of `WeakReference<TTargetKey>` entries (to enumerate keys cheaply); those weak references never pin the keys, and stale entries are removed when `ForeachCache` runs, when `Remove` targets a known key, or when the insertion counter crosses a cleanup threshold inside `AddOrUpdate` (`AddOrUpdate_ManyItems_TriggersCleanup` exercises this path with 20 live `object` keys).
 - The unit tests use *string literal* keys that are interned by the runtime and therefore never collected, so they prove API behaviour but not eviction. The runnable program on the [Verify & Complete Code](../08_verify-and-complete-code/) page uses real `Payload` keys and shows `TryGetCache` returning `false` after a GC removed a dead key.
 
 **Expected result:** you can predict which associations survive a GC, and you know that adding 20 live keys then reading the last one still succeeds. Detailed GC rules are on the [GC Behavior](../07_gc-behavior/) page.

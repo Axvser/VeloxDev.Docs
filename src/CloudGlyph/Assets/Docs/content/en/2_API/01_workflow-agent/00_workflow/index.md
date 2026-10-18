@@ -28,6 +28,8 @@ Core agent-scope types: `WorkflowAgentScope` (the fluent builder), `WorkflowStat
 | `Todo` | `TodoProvider? { get; private set; }` | Framework todo provider (`WithTodoTracking`). |
 | `AgentMode` | `AgentModeProvider? { get; private set; }` | Framework mode provider (`WithAgentModes`). |
 | `CheckpointStore` | `IExecutionCheckpointStore? { get; private set; }` | Host checkpoint store (`WithCheckpointStore`). |
+| `PermissionPolicy` | `AgentPermissionPolicy { get; }` | The permission policy in force (mode + rules + judge). Never null. |
+| `PermissionMode` | `AgentPermissionMode { get; }` | The mode in force; shorthand for `PermissionPolicy.Mode`. |
 
 ## WorkflowAgentScope — fluent surface
 
@@ -48,8 +50,9 @@ All `With*` return the same scope. Grouped by purpose.
 | Member | Signature |
 |---|---|
 | `WithEnums` / `WithInterfaces` / `WithComponents` / `WithData` | `(Type[] …, AgentLanguages? language = null)` |
-| `WithAutoDiscovery` | `WithAutoDiscovery(Assembly assembly, AgentLanguages? language = null)` |
-| `WithAutoDiscovery` | `WithAutoDiscovery(string assemblyName, AgentLanguages? language = null)` |
+| `WithAutoDiscovery` | `WithAutoDiscovery(AgentLanguages? language = null)` |
+
+`WithAutoDiscovery` does **not** scan an assembly: it reads the compiled agent-context tree's `Customer/` directories (`Enums`, `Interfaces`, `Data`, `Components/{kind}`), so it registers exactly what the source generator admitted.
 
 ### Custom tools
 
@@ -74,15 +77,18 @@ All `With*` return the same scope. Grouped by purpose.
 | `WithAllowedGenericCommands` | `WithAllowedGenericCommands(params string[] commandNames)` | Allowlist for `ExecuteCommandOnNode` / `ExecuteCommandById`. |
 | `WithAutoMarkDirty` | `WithAutoMarkDirty(bool enabled = false)` | Auto dirty-mark after mutations. |
 
-### Interaction & approval
+### Interaction & permissions
 
-| Member | Signature |
-|---|---|
-| `WithInteractionSafety` | `WithInteractionSafety(int level)` |
-| `WithInteractionSafetyPrompt` | `WithInteractionSafetyPrompt(int level, string promptBody)` |
-| `WithSelectionHandler` | `WithSelectionHandler(Func<AgentSelectionEventArgs, Task> handler)` |
-| `WithConfirmationHandler` | `WithConfirmationHandler(Func<AgentConfirmationEventArgs, Task> handler)` |
-| `WithToolApproval` | `WithToolApproval(bool enabled = true)` |
+| Member | Signature | Notes |
+|---|---|---|
+| `WithSelectionHandler` | `WithSelectionHandler(Func<AgentSelectionEventArgs, Task> handler)` | Registers `RequestSelection`; passing `null` unregisters it. |
+| `WithConfirmationHandler` | `WithConfirmationHandler(Func<AgentConfirmationEventArgs, Task> handler)` | Backs `RequestConfirmation`, every `Ask` permission decision, and `ResetToolCallLimit`; also enables `EnterPlanMode` / `ExitPlanMode`. |
+| `WithPermissionMode` | `WithPermissionMode(AgentPermissionMode mode)` | The coarse policy; read per call, so a mid-session move governs the next call. |
+| `SetPermissionMode` | `bool SetPermissionMode(AgentPermissionMode mode)` | Runtime switch; returns whether the mode moved. |
+| `WithModePrompt` | `WithModePrompt(AgentPermissionMode mode, string? promptBody)` | Replaces the shipped prompt text for a mode (`null` restores it). |
+| `WithPermissionRule` | `WithPermissionRule(PermissionDecision decision, params string[] patterns)` | Fine layer beneath the mode; patterns select by tool name, `category:*` or `source:*`. |
+| `WithoutPermissionRules` | `WithoutPermissionRules()` | Removes every rule; the mode is untouched. |
+| `WithPermissionJudge` | `WithPermissionJudge(Func<ToolInvocation, PermissionDecision>? judge)` | Decides `Auto` calls no rule settled; a throwing judge denies. |
 
 ### Hosting & plumbing
 
@@ -113,8 +119,10 @@ All `With*` return the same scope. Grouped by purpose.
 |---|---|---|
 | `ProvideProgressiveContextPrompt` | `string ProvideProgressiveContextPrompt()` / `(AgentLanguages)` | Compact prompt. |
 | `ProvideAllContexts` | `string ProvideAllContexts()` / `(AgentLanguages)` | Full prompt. |
-| `ProvideFrameworkContext` / `ProvideCustomerContext` | `string …(AgentLanguages = English)` | Context blocks. |
-| `ProvideFrameworkDataContext` / `ProvideCustomerDataContext` | `string …(AgentLanguages = English)` | Data blocks. |
+| `ProvideFrameworkContext` | `string ProvideFrameworkContext(AgentLanguages language = English)` | Framework enums/interfaces/components. |
+| `ProvideCustomerContext` | `string ProvideCustomerContext()` | Registered customer types, each in its registration language. |
+| `ProvideFrameworkDataContext` | `string ProvideFrameworkDataContext(AgentLanguages language = English)` | Framework `Data` blocks. |
+| `ProvideCustomerDataContext` | `string ProvideCustomerDataContext()` | Registered customer data blocks, each in its registration language. |
 | `CreateToolkit` | `WorkflowAgentToolkit CreateToolkit()` | One cached instance per scope. |
 | `ProvideTools` | `IList<AITool> ProvideTools()` / `(WorkflowToolCategory)` | Tool set. |
 | `CreateContextProvider` | `AIContextProvider CreateContextProvider()` | A single `WorkflowAgentContextProvider`. |
@@ -139,7 +147,7 @@ Throws `InvalidOperationException` when a component does not implement `IWorkflo
 
 ## WorkflowAgentContextProvider
 
-`public sealed class WorkflowAgentContextProvider : AIContextProvider`. **The sole source of tools and instructions per turn.** Keys its cached render on the scope's `ContextKey` (the `Version` plus a budget-usage band); on an unchanged turn it takes no lock, allocates nothing and returns the very same `AIContext` instance. Its `StateKeys` is per scope (so two providers over one scope share a key, two scopes never do).
+`public sealed class WorkflowAgentContextProvider : AIContextProvider`. **The sole source of tools and instructions per turn.** Keys its cached render on the scope's `ContextKey` (the `Version`, the tree's current selection revision, and a budget-usage band); on an unchanged turn it takes no lock, allocates nothing and returns the very same `AIContext` instance. Its `StateKeys` is per scope (so two providers over one scope share a key, two scopes never do).
 
 ```csharp
 public WorkflowAgentContextProvider(WorkflowAgentScope scope)

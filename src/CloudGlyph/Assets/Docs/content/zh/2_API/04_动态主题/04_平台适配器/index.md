@@ -72,17 +72,17 @@ public override TransitionSchedulerCore? CreateScheduler(object target, ITransit
 
 | 转换器 | 用途 | 可接受的参数（WPF / Avalonia） |
 |---|---|---|
-| `DoubleConverter` | `double` 值 | `double` / `int` / `float`，或可固定区域性解析的 `string`。 |
+| `DoubleConverter` | `double` 值 | WPF：`double` / `int` / `float`，或可固定区域性解析的 `string`；Avalonia 另加 `long` / `decimal` / `bool`。 |
 | `PointConverter` | 平台 `Point` | `"x,y"` 字符串（WPF 手工切分，Avalonia 调 `Point.Parse`），或 `[x, y]` 数值。 |
 | `ThicknessConverter` | 平台 `Thickness` | uniform / `"h,v"` / `"l,t,r,b"` 字符串，或 1 / 2 / 4 个数值参数。 |
 | `CornerRadiusConverter` | 平台 `CornerRadius` | uniform / `"tl,tr,br,bl"` 字符串，或 1 / 4 个数值参数。 |
 | `ColorConverter` | 平台 `Color` | 颜色名/HEX 字符串、ARGB `int`，或 A/R/G/B 分量。 |
 | `BrushConverter` | 平台画刷 | 现有画刷（WPF 为 `Brush`，Avalonia 为 `IBrush`）、资源键、颜色字符串，或委托给 `ColorConverter` 的结果再包成纯色画刷。 |
-| `ObjectConverter` | 任意 `targetType` | 单个资源键字符串；回退到平台类型转换器（`TypeDescriptor` / `TypeUtilities`）。 |
+| `ObjectConverter` | 任意 `targetType` | 单个资源键字符串；随后依次尝试资源查找、显式目标类型表（字符串、数值、`TimeSpan`、平台几何/颜色/字体类型、枚举），Brush 再交给平台画刷解析器。表外类型返回 `null`。 |
 
 **说明：**
 - WPF 面向 `System.Windows` / `System.Windows.Media` 类型，颜色字符串经 `System.Windows.Media.BrushConverter` 解析；资源查找走共享的 `internal` 辅助类 `ThemeResourceLookup`，它遍历 `Application.Current.Resources` 及其合并字典。
-- Avalonia 面向 Avalonia 类型（`IBrush`、`Point` 等），字符串经平台类型原生解析器（`Point.Parse`、`Color.TryParse` 等）解析，优先使用 `Avalonia.Utilities.TypeUtilities.TryConvert`，资源经 `Application.Current.TryFindResource` 查找。
+- Avalonia 面向 Avalonia 类型（`IBrush`、`Point` 等），字符串经平台类型原生解析器（`Point.Parse`、`Color.TryParse` 等）解析，资源经 `Application.Current.TryFindResource` 查找。`ObjectConverter` 刻意使用显式类型表，而不是 `Avalonia.Utilities.TypeUtilities.TryConvert` —— 后者基于反射发现转换器，被标注为 `RequiresUnreferencedCode`；把它排除在外，主题转换才能在裁剪与 AOT 下保持可用。
 - WPF 示例用 `[ThemeConfig<BrushConverter, Light, Dark>(...)]` 标注属性；Avalonia 示例用 `ObjectConverter` + `[ThemeConfig<ObjectConverter, Dark, Light>(...)]`。
 - 转换器就是 `ThemeConfigAttribute<TConverter, ...>` 引用的策略（`TConverter`），并在主题登记时由主题生成器实例化。
 

@@ -28,7 +28,7 @@ Inside this repository every demo and test references the source project directl
 
 Source: `Src/Core/VeloxDev.Core.Extension.Test/VeloxDev.Core.Extension.Test.csproj`.
 
-The library's own `Description` still says "60+ function-calling tools" — that is the README's understated figure. The exact, verifiable count in the current source is **68 built-in tools** across the ten `WorkflowToolCategory` groups — 66 unconditional plus up to two `Interaction` tools registered only when handlers are configured — and `ResetToolCallLimit` is always added on top of that.
+The library's own `Description` still says "60+ function-calling tools" — that is the README's understated figure. The exact, verifiable count in the current source is **66 unconditional category tools** — 20 Query + 3 State + 23 Mutation + 12 Execution + 2 Command + 5 Graph + 1 Analytics — plus up to two `Interaction` tools and two plan-mode tools registered only when the matching handlers are configured, plus the always-added `ResetToolCallLimit`. With both handlers registered, `ProvideTools()` returns **71**.
 
 ## Namespaces you will use
 
@@ -37,7 +37,8 @@ The library's own `Description` still says "60+ function-calling tools" — that
 | `VeloxDev.AI` | attributes and reflection helpers, `AgentLanguages`, `AgentObjectToolkit`, `AgentEmbeddedResources`, `AgentTelemetryExtensions`, event args + notifier interfaces |
 | `VeloxDev.AI.Workflow` | `WorkflowAgentScope`, `AgentEx.AsAgentScope`, `WorkflowStateTracker`, `WorkflowAgentContextProvider`, `AgentContextCollector` |
 | `VeloxDev.AI.Workflow.Functions` | `WorkflowAgentToolkit`, `WorkflowToolCategory`, `CommandInvoker`, `ComponentPatcher`, `TypeIntrospector` |
-| `VeloxDev.AI.MCP` | `McpScope`, `McpServerConfiguration`, `McpServerRunMode`, `McpServerStatus`, `McpSelfServiceLevel`, status view-models, `McpAgentToolkit` |
+| `VeloxDev.AI.MCP` | `McpScope`, `McpServerConfiguration`, `McpServerRunMode`, `McpServerStatus`, status view-models, `McpAgentToolkit` |
+| `VeloxDev.AI.Safety` | `AgentPermissionMode`, `AgentPermissionPolicy`, `AgentPermissionRule`, `PermissionDecision`, `AgentActionCategory`, `ToolInvocation` |
 | `VeloxDev.AI.Skills` | `SkillScope`, `SkillAgentToolkit`, `SkillDescriptor`, `SkillState`, `SkillSourceKind`, `ISkillSource`, status view-models |
 | `VeloxDev.AI.SubAgents` | `SubAgentScope`, `SubAgentAgentToolkit`, `SubAgentAgentContextProvider`, `SubAgentState`/`SubAgentSummary`, the tree view-models |
 | `VeloxDev.AI.Pipelines` | `AgentPipeline`, `AgentEvent` (+ its subclasses), `AgentTranscript`, `AgentTranscriptEntry`, `ToolPipeline`, `AgentPipelineAgent` |

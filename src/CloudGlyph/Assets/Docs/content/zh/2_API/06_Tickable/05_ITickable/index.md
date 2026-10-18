@@ -17,8 +17,6 @@ public interface ITickable
 
 源码：`Src/Core/VeloxDev.Core/Interfaces/Tickable/ITickable.cs`。
 
-这就是原名 `IMonoBehaviour` 的接口，它所在的命名空间也由 `VeloxDev.MonoBehaviour` 改成了 `VeloxDev.TimeLine` —— 因此旧的 `using VeloxDev.MonoBehaviour;` 已经编不过。成员名 `InitializeTickable` / `CloseTickable` 同样是新的（旧名 `InitializeMonoBehaviour` / `CloseMonoBehaviour`）。
-
 **你几乎不需要手写实现。** 源生成器会为任何带 `[Tickable]` 的 `partial` 类写出全部七个成员；`TickManager.RegisterBehaviour` 之所以接受这个接口，只是因为通道就是从这条形状上派发的。手写实现是合法的，测试在需要最小行为时就是这么做的。
 
 | 成员 | 由谁调用 | 典型函数体 |
@@ -61,8 +59,8 @@ public interface ITickable
 **返回：** `void`。
 
 **说明：**
-- 每次注册调用一次，发生在 update 泵的注册排空期间（`ProcessAddedBehaviors`，`TickManager.cs` 第 785-801 行），**早于第一帧帧体**。
-- 被 `SafeExecute` 包住（第 939-942 行），所以此处抛异常只会写进 `Debug.WriteLine`，不会阻止 `InvokeStart` 或循环。
+- 每次注册调用一次，发生在 update 泵的注册排空期间（`ProcessAddedBehaviors`，`TickManager.cs` 第 787-803 行），**早于第一帧帧体**。
+- 被 `SafeExecute` 包住（第 941-944 行），所以此处抛异常只会写进 `Debug.WriteLine`，不会阻止 `InvokeStart` 或循环。
 - 运行在 update 线程，不是调用方线程：`RegisterBehaviour` 只是入队。
 
 #### `ITickable.InvokeStart`
@@ -89,7 +87,7 @@ public interface ITickable
 
 **说明：**
 - 每帧对每个已注册行为调用一次，运行在通道的 update 线程上，按注册顺序。
-- 派发循环是在每个行为**之前**检查 `frameArgs.Handled` 与取消令牌（`ExecuteBehaviorsUpdateSync`，第 689-702 行），所以置位 `Handled` 的那个行为不会被跳过 —— 被跳过的是它之后的一切。
+- 派发循环是在每个行为**之前**检查 `frameArgs.Handled` 与取消令牌（`ExecuteBehaviorsUpdateSync`，第 691-704 行），所以置位 `Handled` 的那个行为不会被跳过 —— 被跳过的是它之后的一切。
 - 异常按行为逐个捕获并写进 `Debug.WriteLine`；循环继续处理下一个行为。
 
 #### `ITickable.InvokeLateUpdate`
@@ -112,8 +110,8 @@ public interface ITickable
 
 **说明：**
 - 运行在 fixed-update 线程上，与 `InvokeUpdate` / `InvokeLateUpdate` **并发**。任何被两者触碰的字段都要自己做同步。
-- 每个欠下的步各自拿到一个 `FrameEventArgs`，逐步构造并立刻归还池中（`FixedUpdateLoop`，第 483-493 行），所以 `InvokeUpdate` 里置位的 `Handled` 永远到不了这个泵。
-- 一次停摆会以连续多次调用的形式补还，上限是采样器每次调用的步数上限。
+- 每个欠下的步各自拿到一个 `FrameEventArgs`，逐步构造并立刻归还池中（`FixedUpdateLoop`，第 485-495 行），所以 `InvokeUpdate` 里置位的 `Handled` 永远到不了这个泵。
+- 一次停摆会以连续多次调用的形式补还，上限是采样器的 `MaxStepsPerCall`（默认 8）。
 
 ## 手写实现
 

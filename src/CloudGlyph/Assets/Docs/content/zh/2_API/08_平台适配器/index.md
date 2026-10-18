@@ -4,7 +4,7 @@
 
 | 命名空间 | 用途 |
 |---|---|
-| `VeloxDev.WorkflowSystem.AttachedBehaviors` | 工作流附加行为与视图容器：`WorkflowSurfaceBehavior`、`WorkflowCanvasTransformBehavior`、`ViewPool`、`ViewManager`、`WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`、`WorkflowMinimapOverlay`，以及适配器特有类型（`WorkflowLinkOverlay`、`WorkflowGridDecorator`、`WorkflowTreeView`、`IWorkflowTemplateSelector`） |
+| `VeloxDev.WorkflowSystem.AttachedBehaviors` | 工作流附加行为与视图容器：`WorkflowSurfaceBehavior`、`WorkflowCanvasTransformBehavior`、`ViewPool`、`ViewManager`、`WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`、`WorkflowMinimapOverlay`，以及适配器特有类型（MAUI 的 `WorkflowLinkOverlay`、Jalium 的 `WorkflowLinkBounds`、WinForms 的 `WorkflowTreeView` / 各角色附加类 / `WorkflowGridDecorator` / `IWorkflowTemplateSelector`） |
 | `VeloxDev.TransitionSystem` | 适配器提供的过渡动画表面 —— `Transition`（承载静态 `Exit`）、`Transition<T>`（`Create` / `Property` / `Effect`）、`Interpolator`、`TransitionEffect`、`TransitionEffects`、`State`、`UIThreadInspector`、`TransitionScheduler`、`TransitionInterpreter`，外加各平台共用的 Core 流程扩展 `TransitionCoreEx`（各适配器成员在 `2_API/03_transition` 特性中记录） |
 | `VeloxDev.DynamicTheme` | 主题值转换器（`BrushConverter`、`DoubleConverter`、`PointConverter`、……）。`VeloxDev.Jalium` 不提供（各适配器转换器集合在 `2_API/04_dynamic-theme` 特性中记录） |
 | `VeloxDev.Adapters.NativeSamplers` | 每种框架值类型对应一个采样器类（如 `BrushSampler`、`ThicknessSampler`、`PaddingSampler`），由该适配器的 `Interpolator` 注册 |
@@ -17,15 +17,17 @@
 
 | 包 | 目标框架（取自 `.csproj`） | 使用的框架表面 |
 |---|---|---|
-| `VeloxDev.WPF` | `netframework4.6.1`；`net5.0-windows`；`netcoreapp3.0` | `System.Windows`（WPF） |
-| `VeloxDev.Avalonia` | `netstandard2.0`；`net6.0` | Avalonia 11.1（`Avalonia.Themes.Fluent`、`Avalonia.Fonts.Inter`） |
-| `VeloxDev.WinUI` | `net8.0-windows10.0.19041.0`；`net10.0-windows10.0.19041.0` | Microsoft.WindowsAppSDK 1.6 / WinUI 3 |
-| `VeloxDev.MAUI` | `net10.0`；`net10.0-windows10.0.19041.0` | .NET MAUI 10.0（Microsoft.Maui.Controls）；Windows TFM 使用 WinUI 3 |
-| `VeloxDev.WinForms` | `netframework4.6.1`；`net5.0-windows`；`netcoreapp3.0` | `System.Windows.Forms` |
-| `VeloxDev.Razor` | `net6.0` | Blazor / Razor（`Microsoft.NET.Sdk.Razor`、ASP.NET Core） |
-| `VeloxDev.Jalium` | `net10.0`（平台中立） | Jalium.UI.Controls（仅跨平台核心） |
+| `VeloxDev.WPF` | `netframework4.6.1`；`net5.0-windows`；`netcoreapp3.0`；`net8.0-windows` | `System.Windows`（WPF） |
+| `VeloxDev.Avalonia` | `netstandard2.0`；`net6.0`；`net8.0` | Avalonia 11.1.0（`Avalonia.Themes.Fluent`、`Avalonia.Fonts.Inter`） |
+| `VeloxDev.WinUI` | `net8.0-windows10.0.19041.0`；`net10.0-windows10.0.19041.0` | Microsoft.WindowsAppSDK 1.6.241114003 / WinUI 3 |
+| `VeloxDev.MAUI` | `net10.0`；`net10.0-windows10.0.19041.0` | .NET MAUI 10.0.20（Microsoft.Maui.Controls）；Windows TFM 使用 WinUI 3（WindowsAppSDK 1.7.250909003） |
+| `VeloxDev.WinForms` | `netframework4.6.1`；`net5.0-windows`；`netcoreapp3.0`；`net8.0-windows` | `System.Windows.Forms` |
+| `VeloxDev.Razor` | `net6.0`；`net8.0` | Blazor / Razor（`Microsoft.NET.Sdk.Razor`、ASP.NET Core） |
+| `VeloxDev.Jalium` | `net10.0`（平台中立） | `Jalium.UI.Controls` 26.10.8（仅跨平台核心；演示另加 `Jalium.UI.Desktop` 26.10.9） |
 
-七个包版本均为 `10.0.0`，依赖 `VeloxDev.Core`（`Debug` 为项目引用，其余为 `10.0.0` 包引用），并由此传递性地暴露工作流引擎、过渡动画引擎与主题层。
+七个包版本均为 `10.0.0`，依赖 `VeloxDev.Core`（`Debug` 为项目引用，其余为 `10.0.0` 包引用），并由此传递性地暴露工作流引擎、过渡动画引擎与主题层。`VeloxDev.Jalium` 是主题层的例外：它不提供 `VeloxDev.DynamicTheme` 转换器。
+
+连接预览是适配器调用的 Core 能力，而不是适配器类型：`WorkflowTreeEx.StandardSetPreviewReceiver`（`IWorkflowTreeViewModel` 上的扩展方法）与 `SlotHitTestEx.HitTest` 位于 Core 的 `VeloxDev.WorkflowSystem` 命名空间（`Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowTreeEx.cs`、`.../GUI/Interaction/SlotHitTestEx.cs`）。
 
 > 跨特性归属：**适配器提供的过渡动画类型**属于过渡动画特性（`2_API/03_transition` 的 `03_adapter-provided` 一节），**适配器主题转换器**属于动态主题特性（`2_API/04_dynamic-theme` 的 `04_PlatformAdapters` 一页）。本特性记录的是：适配器本身、它们承载的工作流附加行为表面，以及 `dotnet new` 视图模板。
 

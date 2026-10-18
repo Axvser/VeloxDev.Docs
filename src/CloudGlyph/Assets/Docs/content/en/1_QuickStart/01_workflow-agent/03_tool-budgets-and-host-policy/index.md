@@ -10,7 +10,7 @@ scope.WithMaxToolCalls(200)          // total cap on all tool calls
     .WithMaxWriteToolCalls(50);      // cap on everything else (mutations, execution, commands)
 ```
 
-- A call counts as **read** when its name is in the toolkit's read-only set — the Query tools plus `TakeSnapshot` / `GetChangesSinceSnapshot`, `GetNodeStatistics`, the five Graph tools, `RequestSelection` / `RequestConfirmation`, `ResetToolCallLimit`, the four compile/plan read tools (`CompileWorkflow`, `CompileNodeResult`, `GetCompileStatus`, `GetExecutionLog`), **plus every skill and sub-agent tool name** (folded in from `SkillAgentToolkit.ToolNames` and `SubAgentAgentToolkit.ToolNames`). Everything else counts as **write**.
+- A call counts as **read** when its name is in the toolkit's read-only set — the Query tools plus `TakeSnapshot` / `GetChangesSinceSnapshot`, `GetNodeStatistics`, the five Graph tools, `RequestSelection` / `RequestConfirmation`, `ResetToolCallLimit`, the four compile/plan read tools (`CompileWorkflow`, `CompileNodeResult`, `GetCompileStatus`, `GetExecutionLog`), **plus every skill and sub-agent tool name** (folded in from `SkillAgentToolkit.ToolNames` and `SubAgentAgentToolkit.ToolNames`). `EnterPlanMode` / `ExitPlanMode` are not in that name list, so they count as **write** calls even though they do not touch the graph.
 - A pre-flight gate (`CheckBudget`) runs inside the marshalled block, before the body. When a limit is already reached it returns a refusal; the body never runs and the call is **not** counted.
 
 Refusal wording (from `LimitRefusal`):
@@ -31,8 +31,7 @@ Every toolkit registers one extra tool, `ResetToolCallLimit` (constant `Workflow
 
 - It never spends the budget (counting it would re-spend the just-zeroed counter — the reset would undo itself).
 - It survives the gate it exists to open: the pre-flight gate returns `null` for it even when the budget is spent.
-- It puts the question to the user through the scope's confirmation handler under the operation key `extend-tool-call-budget`. Asking is the whole safety property — the agent can only ask, never widen its own budget. With **no** handler registered the answer is **deny** (an unanswerable prompt must deny).
-- At interaction safety level 0 the host asked never to be interrupted, so the tool returns `denied` rather than asking.
+- It puts the question to the user through the scope's confirmation handler under the operation key `extend-tool-call-budget`. Asking is the whole safety property — the agent can only ask, never widen its own budget. With **no** handler registered the answer is **deny** (an unanswerable prompt must deny). `AgentActionCategory.Interact` is never put to the mode's policy, so no mode can silence the question.
 - On agreement it calls `ResetChain()`, zeroing this level **and every level above it** — a session whose root allowance stayed spent would refuse the very next call.
 
 **Expected result:** calling `ResetToolCallLimit` with a limit reached and a handler that answers "allow" returns `Tool-call budget reset by the user. You may continue.`; without a handler it returns `status:"denied"`.
@@ -44,7 +43,7 @@ scope.WithAllowNodeExecution(true)                 // enable the code-running to
     .WithAllowedGenericCommands("ReceiveCommand"); // allowlist for ExecuteCommandOnNode/ExecuteCommandById
 ```
 
-- `WithAllowNodeExecution(enabled)` gates the tools that run arbitrary node business code: `ExecuteNode`, `ExecuteNodes`, `BroadcastNode`, `ReverseBroadcastNode`, `RunCompiledWorkflow`, `GetNodeResult`, and the four background run tools (`StartCompiledWorkflow`, `ContinueCompiledWorkflow`, `GetCompiledRunStatus` does not run code but is grouped with them for the compile path, and `StopCompiledRun`). Off by default. A blocked run tool returns `... is disabled by host policy. The host must enable node execution via WithAllowNodeExecution(true).` The compile-only plan tools (`CompileWorkflow`, `CompileNodeResult`, `GetCompileStatus`) never run node code and are **not** gated.
+- `WithAllowNodeExecution(enabled)` gates the tools that run arbitrary node business code: `ExecuteNode`, `ExecuteNodes`, `BroadcastNode`, `ReverseBroadcastNode`, `RunCompiledWorkflow`, `GetNodeResult`, `StartCompiledWorkflow` and `ContinueCompiledWorkflow`. Off by default. A blocked run tool returns `... is disabled by host policy. The host must enable node execution via WithAllowNodeExecution(true).` The compile-only plan tools (`CompileWorkflow`, `CompileNodeResult`, `GetCompileStatus`) never run node code and are **not** gated; neither are the handle operations `GetCompiledRunStatus` / `PauseCompiledRun` / `ResumeCompiledRun` / `StopCompiledRun`.
 - `WithAllowedGenericCommands(params string[])` allowlists command names for `ExecuteCommandOnNode` / `ExecuteCommandById`; the `"Command"` suffix is optional. Never called ⇒ generic command execution is disabled entirely (secure default). This gate is checked per call by `CommandInvoker`.
 
 ## 4. Per-tool switches
@@ -62,47 +61,54 @@ bool on = scope.IsToolEnabled("Undo");          // read the current state
 
 **Expected result:** after `SetToolEnabled("Undo", false)` the next invocation offers no `Undo` tool, and a direct call to it is refused with the host-policy message.
 
-## 5. Tool approval — a code gate
+## 5. Permission modes — the code gate
 
-`WithToolApproval(true)` requires a human to approve **every non-query tool call before it runs**, by putting the tool name to the confirmation handler.
+The session's permission policy replaces the old interaction-safety dial and the separate tool-approval switch. It is one `AgentPermissionMode` plus optional rules, evaluated **per call** before the tool body runs. `PermissionDecision` is `Allow` | `Ask` | `Deny`; a mode is a *named state* the user can switch, and every refusal names the mode and what to switch to.
 
-- Query tools are never asked (a read has nothing to approve). MCP-sourced tools are third-party code and **are** treated as mutations, so they are gated too.
-- The key handed to the confirmation handler is the **tool name**, so "allow for the session" approves that tool for the rest of the session.
-- A denial is reported as `AgentToolOutcome.Refused` and never reaches the body. On refusal the model is told: `'{toolName}' was not approved by the user. The call did not run. Do not retry it, and do not look for another tool that makes the same change — ask the user what they want instead.`
-- This complements `WithInteractionSafety` rather than replacing it: that one shapes what the model is *told* to ask about; this one decides what it may actually do, and cannot be skipped by a model that declines to call `RequestConfirmation`.
-
-## 6. Interaction safety & the two handlers
-
-Interaction safety is one integer 0–3 (default **1**), set with `WithInteractionSafety(level)`:
-
-| Level | Name | Behaviour |
+| Mode | Value | What it permits |
 |---|---|---|
-| 0 | Silent | Fully autonomous. Both interaction tools are skipped and no policy is emitted. |
-| 1 | Cautious (default) | Ask only when intent is genuinely ambiguous or the action is bulk/destructive. |
-| 2 | Balanced | Ask when multiple paths are plausible OR the action touches ≥ 2 nodes/links. |
-| 3 | Strict | Ask before every mutation that is not a pure single-node creation. |
+| `Plan` | 0 | Read and interact only; edits, execution and reach changes are refused. |
+| `Manual` | 1 | Every non-read action is put to the user. |
+| `AutoEdit` | 2 | Reads and graph edits run; execution and reach changes ask. |
+| `Auto` | 3 | Reads, edits and execution run; only reach changes (`Curate`) ask. **Default.** |
+| `Bypass` | 4 | Nothing is asked; explicit `Deny` rules still hold. |
 
 ```csharp
-scope.WithInteractionSafety(3);
-scope.WithInteractionSafetyPrompt(2, "Ask before any structural change that touches more than one node.");
+scope.WithPermissionMode(AgentPermissionMode.AutoEdit)
+     .WithPermissionRule(PermissionDecision.Ask, "DeleteNode", "DeleteSlot")
+     .WithPermissionRule(PermissionDecision.Deny, "category:Curate");
+bool moved = scope.SetPermissionMode(AgentPermissionMode.Manual);  // runtime switch
+```
 
+- **Rules are the fine layer.** Patterns select by tool name (`DeleteNode`, `Get*`), by category (`category:Edit`), or by source (`source:mcp:*`, `source:skill`). A `Deny` rule holds in every mode, including `Bypass`.
+- **The gate is in code.** `ToolPipeline.Confirm` calls `PermissionPolicy.Evaluate(invocation)`; an `Ask` goes to the confirmation handler under the tool name (so "allow for the session" approves that tool), and a `Deny` returns `DescribePermissionRefusal`. A model cannot skip it by declining to call `RequestConfirmation`.
+- **MCP management tools are `Curate`** (they change what the session can reach), so `Auto` still asks for `AddMcpServer`, `SetMcpServerArguments`, `LoadMcpServers` and `UnloadMcpServer`. Tools *exported by* a connected server are third-party code classified `Execute`; `Auto` lets them run, `AutoEdit`/`Manual` ask, and a host rule such as `Ask("source:mcp:*")` can gate them. `WithPermissionJudge` supplies the decision in `Auto` for calls no rule settles; a judge that throws denies.
+- **The Agent has two transitions of its own**, both asking first: `EnterPlanMode` and `ExitPlanMode` (registered only with a confirmation handler). There is deliberately no tool that widens the mode.
+
+**Expected result:** at `Plan`, `CreateNode` returns a refusal naming `Plan`; at `AutoEdit`, it runs without asking, while `ExecuteNode` asks. A `Deny` rule on `DeleteNode` refuses it in every mode.
+
+## 6. Interaction handlers
+
+Two optional tools ask the user directly; registration depends only on the handler, never on a safety level:
+
+```csharp
 scope.WithSelectionHandler(async args =>        // backs RequestSelection
 {
     args.SelectedOption = args.Options.FirstOrDefault();
     await Task.CompletedTask;
 });
-scope.WithConfirmationHandler(async args =>      // backs RequestConfirmation
+scope.WithConfirmationHandler(async args =>      // backs RequestConfirmation / Ask decisions / ResetToolCallLimit
 {
     args.Result = AgentConfirmationResult.AllowOnce;   // or AllowAlways | Deny
     await Task.CompletedTask;
 });
 ```
 
-- `RequestSelection` is registered only when level > 0 **and** `WithSelectionHandler` was called; inside the handler set `args.SelectedOption` (single) or `args.SelectedOptions` / `args.FreeTextResponse`. The nested `WorkflowAgentScope.SelectionResult` offers `Single` / `Multi` / `FreeText` factories for low-level use.
-- `RequestConfirmation` is registered only when level > 0 **and** `WithConfirmationHandler` was called; set `args.Result = AllowOnce | AllowAlways | Deny`. `AllowAlways` is remembered per `operationKey` for the session (`ResolveConfirmationAsync`).
-- `WithInteractionSafetyPrompt(level, body)` replaces a level's policy body (1–3); level 0's silent rule cannot be overridden.
+- `RequestSelection` is registered when `WithSelectionHandler` was called; inside the handler set `args.SelectedOption` (single) or `args.SelectedOptions` / `args.FreeTextResponse`. The nested `WorkflowAgentScope.SelectionResult` offers `Single` / `Multi` / `FreeText` factories for low-level use.
+- `RequestConfirmation` is registered when `WithConfirmationHandler` was called; set `args.Result = AllowOnce | AllowAlways | Deny`. `AllowAlways` is remembered per `operationKey` for the session (`ResolveConfirmationAsync`).
+- With no confirmation handler every `Ask` decision answers as a denial, and `ResetToolCallLimit` also denies.
 
-**Expected result:** at level 0 there are no `RequestSelection` / `RequestConfirmation` tools; at level 3, with both handlers registered, each appears exactly once.
+**Expected result:** with both handlers registered, `RequestSelection` and `RequestConfirmation` each appear exactly once in `ProvideTools()`; with neither, both are absent and the tool count drops by those two plus `EnterPlanMode` / `ExitPlanMode`.
 
 ## 7. UI thread, callbacks & dirty tracking
 
@@ -124,11 +130,4 @@ scope.WithSynchronizationContext(SynchronizationContext.Current)  // marshal eve
 
 ## Run declaration
 
-- ✅ Actually built and ran — the deterministic agent test suite was executed on 2026-10-01:
-
-```text
-dotnet test Src/Core/VeloxDev.Core.Extension.Test/VeloxDev.Core.Extension.Test.csproj --filter "FullyQualifiedName~Agent&FullyQualifiedName!~SubAgentLiveTests"
-已通过! - 失败: 0，通过: 387，已跳过: 0，总计: 387，持续时间: 920 ms
-```
-
-That run covers `ToolSwitchTests`, `ToolApprovalTests`, `CompiledRunControlTests` and the rest of `Agent/**` except `SubAgentLiveTests` (which needs a real model key and is non-deterministic — excluded on purpose). It does not run a conversation against a model.
+- ⚠️ **Not run for this revision** — statically verified against the current source on 2026-10-18. A previously recorded deterministic suite run (2026-10-01, `失败: 0，通过: 387`) exists, but it predates the permission-mode / context-tree redesign, so it is not evidence that the gates described on this page behave as documented today.

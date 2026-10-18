@@ -78,9 +78,10 @@ deactivate Obj
 
 Notes:
 
-- The override store is a `ConditionalWeakTable<IThemeObject, InstanceCache>` inside `ThemeCache` — weak-keyed, so overrides are collected with the instance and never leak (`Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`, lines 18, 131-143).
+- The override store is a `ConditionalWeakTable<IThemeObject, InstanceCache>` inside `ThemeCache` — weak-keyed, so overrides are collected with the instance and never leak (`Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`, lines 18, 104-116).
 - `RestoreThemeValue<T>` is theme-agnostic: it drops the whole property entry (all themes) from `Overrides`, then re-applies the current theme.
-- `GetStaticThemeCache()` / `GetActiveThemeCache()` (generated) expose the merged static dictionary and the runtime overrides for inspection — `Src/Generators/VeloxDev.Core.Generator/Theme.cs`, lines 331-341.
+- `GetStaticThemeCache()` / `GetActiveThemeCache()` (generated) expose the merged static dictionary and the runtime overrides for inspection — `Src/Generators/VeloxDev.Core.Generator/Theme.cs`, lines 332-343.
+- The value is stored and re-applied verbatim: no `TConverter` runs on the override path, and the generated re-apply write is wrapped in `try { ... } catch { }`. Pass the property's own type; a raw `[ThemeConfig]` context array is stored but is not converted.
 
 ## Resolution Order on a Switch
 
@@ -107,4 +108,4 @@ So a runtime override (from `SetThemeValue<T>`) beats a static `[ThemeConfig]` v
 
 Both demos wire this from a button: the scale demo through `OnEditThemeValue` / `OnRestoreThemeValue` (`Examples/Theme/WPF/Demo/MainWindow.xaml.cs`), the trimmed demo through `ThemeValueEx` (`Examples/Theme/WPF Trimmed/Demo/MainWindow.xaml.cs`), which also reads both caches back with `GetStaticThemeCache()` / `GetActiveThemeCache()`.
 
-> Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs` (`GetOrCreateActiveEntry` lines 131-134, `TryGetActiveEntry` lines 139-143), `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` (`PrepareSamplers` current/target lookup lines 474-549), generated members in `Src/Generators/VeloxDev.Core.Generator/Theme.cs` (`SetThemeValue` lines 302-318, `RestoreThemeValue` lines 322-327, `UpdatePropertyToCurrentTheme` lines 345-373).
+> Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs` (`GetOrCreateActiveEntry` lines 104-107, `TryGetActiveEntry` lines 112-116), `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs` (`PrepareSamplers` current/target lookup lines 490-558), generated members in `Src/Generators/VeloxDev.Core.Generator/Theme.cs` (`SetThemeValue` lines 303-319, `RestoreThemeValue` lines 323-328, `UpdatePropertyToCurrentTheme` lines 346-374).

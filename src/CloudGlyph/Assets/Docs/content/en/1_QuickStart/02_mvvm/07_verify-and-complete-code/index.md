@@ -1,47 +1,43 @@
 # MVVM — Verify and Complete Code
 
-This page shows how the feature is verified (demos and automated tests), then gives the single runnable console program the whole Quick Start builds toward.
+This page shows what verifies the feature, then gives the single runnable console program the Quick Start builds toward.
 
 ## 1. Verify with the demos
 
-Two GUI demos ship with the feature, sharing an almost identical view-model:
-
 - `Examples/MVVM/WPF/Demo` (`net9.0-windows`, `UseWPF`) — `MainWindowViewModel.cs`, `MainWindow.xaml`.
 - `Examples/MVVM/Avalonia/Demo` (`net9.0`, Avalonia `11.3.0`) — `ViewModels/MainWindowViewModel.cs`, `Views/MainWindow.axaml`.
+- `Examples/MVVM/Common/Lib/CommandGalleryViewModel.cs` — shared by both demos; contains one method per accepted `[VeloxCommand]` signature, including typed, multi-parameter, generic-method and `ValueTask` forms.
 
-`MainWindowViewModel` is a `partial` class deriving only from a small `ObservableViewModelBase` that supplies the `INotifyPropertyChanged` plumbing. One screen demonstrates every capability from the previous pages: `[VeloxProperty]` scalar and collection fields (`_index`, `_greeting`, `_items`, `_selectedItem`, ...), the generated `partial void OnXxxChanged` hooks, `[VeloxCommand]` buttons (`PlusCommand`, `MinusCommand`, `AddItemCommand`, `RemoveSelectedItemCommand`, `MoveLastToFirstCommand`, `ReplaceItemsCommand`, `ClearItemsCommand`) bound straight from XAML, `canValidate: true` with `CanExecuteMinusCommand` / `CanExecuteRemoveSelectedItemCommand` / `CanExecuteMoveLastToFirstCommand`, the per-item collection hooks and the `OnCollectionChanged<T>` override, and the interrupt APIs (`FreeCommand` vs `FreeCommandAsync`).
+`MainWindowViewModel` derives from a small `ObservableViewModelBase` that supplies the notification plumbing. The screen exercises scalar and collection `[VeloxProperty]` members, property hooks, bound commands (`PlusCommand`, `MinusCommand`, `AddItemCommand`, `RemoveSelectedItemCommand`, `MoveLastToFirstCommand`, `ReplaceItemsCommand`, `ClearItemsCommand`), `canValidate: true`, the collection hooks, the `OnCollectionChanged<T>` override, and the interrupt APIs (`FreeCommand` vs `FreeCommandAsync`).
 
-Neither demo needs configuration: no adapter, no key, no service.
-
-**Expected result:** both projects build with zero warnings (recorded below), and launching one shows the 增加 / 减少 buttons moving a live index with 减少 disabled at index 0, while the collection buttons drive the status texts that echo the generated hooks.
+**Expected result:** both projects build. Launching one shows 增加 / 减少 moving a live index, with 减少 disabled at index 0, and the collection buttons updating the status texts that echo the generated hooks.
 
 ## 2. Verify with the automated tests
 
-`Src/Core/VeloxDev.Core.Test/MVVM/` is the behavioural contract — 20 files:
+`Src/Core/VeloxDev.Core.Test/MVVM/` is the behavioural contract.
 
 | Area | Files |
-|---|---|
-| Construction and the plain execution path | `VeloxCommandTests` |
-| Lifecycle stage order and payload | `VeloxCommandLifecycleTests`, `CommandEventArgsTests` |
-| Queueing, concurrency cap, capacity changes | `VeloxCommandConcurrencyTests` |
+| --- | --- |
+| Construction and plain execution | `VeloxCommandTests` |
+| Stage order and payload | `VeloxCommandLifecycleTests`, `CommandEventArgsTests` |
+| Queueing, capacity, capacity changes | `VeloxCommandConcurrencyTests` |
 | Cancellation and the single-`Canceled` rule | `VeloxCommandCancellationTests` |
 | Lock / interrupt / clear / continue | `VeloxCommandControlTests`, `VeloxCommandLockInvariantTests` |
-| The awaitable result and the read model | `VeloxCommandCompletionTests`, `VeloxCommandStatusTests` |
+| Awaitable result and status | `VeloxCommandCompletionTests`, `VeloxCommandStatusTests` |
 | Per-execution source disposal | `VeloxCommandDisposalTests` |
-| Broken subscribers and the diagnostics hook | `VeloxCommandDiagnosticsTests` |
+| Broken subscribers and diagnostics | `VeloxCommandDiagnosticsTests` |
 | `EventContext` posting | `VeloxCommandEventContextTests` |
-| Generator coverage of every accepted signature | `CommandSignatureTests`, `CommandSignatureViewModel`, `GenericOuterNestedCommandViewModel`, `GlobalNamespaceCommandViewModel` |
-| The rejection side (`VELOXCMD001`) | `CommandSignatureDiagnosticsTests` |
-| Allocation behaviour of unsubscribed stages | `CommandAllocationTests` |
+| Every accepted signature, compiled and executed | `CommandSignatureTests`, `CommandSignatureViewModel` |
+| Typed, multi-parameter and generic commands | `CommandMatrixTests`, `TypedCommandEventTests`, `CommandArityTests` |
+| The rejection side (`VELOX_MVVM_CMD001`) | `CommandSignatureDiagnosticsTests` |
+| Allocation behaviour | `CommandAllocationTests` |
 | Collection subscription tracking | `ObservableCollectionTrackerTests` |
 
-`CommandSignatureTests` is worth noting: it compiles *and executes* one command per documented signature inside the test assembly, so a shape that generates code which does not compile fails there rather than in a demo.
+`CommandSignatureTests` compiles **and executes** one command per documented signature, so a shape whose generated code does not compile fails there rather than in a demo.
 
 **Expected result:** `dotnet test Src/Core/VeloxDev.Core.Test/VeloxDev.Core.Test.csproj` runs the MVVM folder green. This was **not** run in this documentation pass.
 
 ## 3. Complete code
-
-A single console program combining a `[VeloxProperty]` scalar, a `[VeloxProperty]` collection, property hooks, a validated and a non-validated command, a `ValueTask<T>` command with a typed parameter, `ExecuteAndWaitAsync`, the status triple, and a refusal under lock. Every `using` is explicit and the class needs no base class — the generator synthesizes the notification infrastructure:
 
 ```csharp
 using System;
@@ -141,7 +137,7 @@ namespace QuickStart.Mvvm
             Console.WriteLine($"status: IsBusy={vm.IncrementCommand.IsBusy()}, Active={vm.IncrementCommand.ActiveCount()}, Pending={vm.IncrementCommand.PendingCount()}");
 
             var sum = await vm.SumToCommand.ExecuteAndWaitAsync(10);
-            Console.WriteLine($"SumTo(10) -> {sum.Outcome}");
+            Console.WriteLine($"SumTo(10) -> {sum.Outcome}, value={sum.GetResultOrThrow<int>()}");
 
             await vm.IncrementCommand.LockAsync();
             var refused = await vm.IncrementCommand.ExecuteAndWaitAsync(null);
@@ -156,31 +152,8 @@ namespace QuickStart.Mvvm
 }
 ```
 
-There are no `...` omissions; every identifier is defined in the block above. Two generated names are worth tracing: `DecrementCommand` comes from the method name `Decrement`, and `SumToCommand` from `SumToAsync` — the auto-namer removes every `Async` substring, so the property is `SumToCommand`, not `SumToAsyncCommand`. The `ValueTask<int>` body with an `int` parameter is reached through the generated cast thunk, so `ExecuteAndWaitAsync(10)` passes `10` as `limit`.
+Every identifier is defined above. Two generated names are worth tracing: `DecrementCommand` comes from `Decrement`, and `SumToCommand` from `SumToAsync` — the auto-namer removes every `Async` substring. `SumToAsync(int)` is a typed command, so `SumToCommand` is `IVeloxCommand<int, int>` and `ExecuteAndWaitAsync(10)` fills the result channel.
 
-## 4. Run declaration
+## Run declaration
 
-- ✅ Actually built, actually run, on 2026-10-01. The program in section 3 was compiled and executed in a scratch console project (`net9.0`) that project-references `VeloxDev.Core.csproj` and `VeloxDev.Core.Generator.csproj` (the latter as an analyzer, Debug), with `dotnet run -c Debug`. Recorded output, verbatim:
-
-  ```text
-  [collection] added: ready
-  initial: Count=0, CanExecute(Decrement)=False
-  Items: ready
-  [count] 0 -> 3
-  after set: Count=3, CanExecute(Decrement)=True
-  [count] 3 -> 4
-  [collection] added: increment -> 4
-  Increment -> Completed (Succeeded=True)
-  [count] 4 -> 3
-  [collection] added: decrement -> 3
-  Decrement -> Completed
-  status: IsBusy=False, Active=0, Pending=0
-  SumTo(10) -> Completed
-  while locked -> Refused
-  final: Count=3, CanExecute(Decrement)=True
-  Items: ready, increment -> 4, decrement -> 3
-  LastAction: added: decrement -> 3
-  ```
-
-- The same scratch build also produced the generated files quoted on the earlier pages (`dotnet build -c Debug -p:EmitCompilerGeneratedFiles=true`), and both demos were built with `dotnet build <proj> -c Debug` — each reported `0 个警告 0 个错误` (0 warnings, 0 errors).
-- **Not verified in this pass:** `dotnet test` on `Src/Core/VeloxDev.Core.Test` (section 2), and the GUI demos were built but their windows were not launched. The `Replace` and `Reset` collection actions are covered by the generated switch rather than by an executed assertion here.
+- ⚠️ Not actually run in this documentation pass — the program is statically verified against the generator rules and the public runtime signatures, but it was not compiled or executed here. The demo projects and `dotnet test` were not run either; every behavioural statement on these pages is sourced from the files cited and from the tests, not from a transcript produced for this revision.

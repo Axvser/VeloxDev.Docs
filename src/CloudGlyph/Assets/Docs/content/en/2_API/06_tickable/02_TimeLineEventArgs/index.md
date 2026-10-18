@@ -13,7 +13,7 @@ public abstract class TimeLineEventArgs
 
 Source: `Src/Core/VeloxDev.Core/TimeLine/TimeLineEventArgs.cs`.
 
-The base of every payload the time-line system hands to user code. It carries two things: the `Handled` kill switch, and the two clock readings every subscriber of a frame shares (`DeltaTime` / `TotalTime` — moved up here from `FrameEventArgs` so the transition system's arguments inherit them too). It is `abstract`, so it has no public constructor and cannot be instantiated.
+The base of every payload the time-line system hands to user code. It carries the `Handled` kill switch and the two clock readings every subscriber of a frame shares. It is `abstract`, so it has no public constructor and cannot be instantiated.
 
 Base type of `FrameEventArgs` and of `TransitionEventArgs`; the latter now lives in `VeloxDev.TransitionSystem` (see the transition feature's [event arguments](../../03_transition/00_transitionsystem/04_transition-event-args/index.md)).
 
@@ -28,12 +28,9 @@ Base type of `FrameEventArgs` and of `TransitionEventArgs`; the latter now lives
 
 **Example:**
 ```text
-// Source: Src/Core/VeloxDev.Core.Test/TimeLine/TimeLineEventArgsTests.cs (lines 28-36)
+// Source: Src/Core/VeloxDev.Core.Test/TimeLine/TimeLineEventArgsTests.cs (lines 28-37)
 var args = new FrameEventArgs();
 Assert.IsFalse(args.Handled);          // default is false
-
-args = new FrameEventArgs { Handled = true };
-Assert.IsTrue(args.Handled);
 ```
 
 **Notes:**

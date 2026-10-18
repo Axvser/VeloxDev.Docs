@@ -18,7 +18,7 @@
 
 ## 默认名与生成文件
 
-各模板的默认类名依次为 `NodeView`、`SlotView`、`LinkView`、`TreeView`、`TemplateSelector`、`GridDecorator`、`MinimapOverlay`（用 `-n <Name>` 指定实际名）。节点/槽/连接/树模板在 XAML 风格平台生成标记 + 代码后置对（`.xaml`/`.cs` 或 Avalonia/WinUI 等价物）；选择器/装饰层/小地图生成单个代码后置文件。Razor 生成 `.razor`（+ `.razor.cs`）。
+各模板的默认类名依次为 `NodeView`、`SlotView`、`LinkView`、`TreeView`、`TemplateSelector`、`GridDecorator`、`MinimapOverlay`（用 `-n <Name>` 指定实际名）。节点/槽/连接/树模板在 XAML 风格平台生成标记 + 代码后置对（WPF/WinUI/MAUI 为 `.xaml`/`.cs`，Avalonia 为 `.axaml`/`.cs`，Jalium 为 `.jalxaml`/`.cs`）；选择器/装饰层/小地图生成单个 `.cs` 文件。Razor 生成 `.razor`（+ `.razor.cs`）。
 
 ## 七个模板出厂就是接好的
 
@@ -28,21 +28,21 @@
 |---|---|
 | WPF / Avalonia / WinUI / MAUI | `ViewPool.TemplateSelector="{StaticResource WorkflowTemplateSelector}"` —— 画布上的附加属性 |
 | WinForms | `ViewPool.SetTemplateSelector(PART_Canvas, _selector)` —— 这家没有附加属性系统，只能方法调用 |
-| Jalium | `ViewPool.SetTemplateSelector(this, TemplateSelector)`；该属性**自带默认值**，所以生成出来的树视图不会是「没有选择器」的 |
+| Jalium | `behaviors:ViewPool.TemplateSelector="{StaticResource WorkflowTemplateSelector}"` —— 生成的选择器派生自 `DataTemplateSelector`，声明为资源 |
 | Razor | 一个 `<TemplateSelector …>` 组件，它的 `ItemTemplate` 是池唯一的视图来源 |
 
-**选择器是最高优先级的视图来源**，它在平台自己的查找**之前**被问到；有平台查找的那四家（四个 XAML 风格适配器）在它不匹配时**退回**平台查找，而 WinForms / Jalium / Razor 没有可退的东西 —— 那里选择器缺失就是**一个视图都不建、也不报错**（见[视图池](../00_附加行为/01_视图池/index.md)）。要客制化，替换生成的选择器类或那一处引用即可，**不要改池**。
+**选择器是最高优先级的视图来源**，它在平台自己的查找**之前**被问到；WPF/WinUI/Avalonia/Jalium 在它不匹配时**退回**资源查找，而 MAUI / WinForms / Razor 没有可退的东西 —— 那里选择器缺失就是**一个视图都不建、也不报错**（见[视图池](../00_附加行为/01_视图池/index.md)）。要客制化，替换生成的选择器类或那一处引用即可，**不要改池**。
 
 ## 连线右键菜单
 
-树视图模板还声明了**连线的右键菜单**并让表面指向它。接线（右键、定位、开合、向中枢上报）归适配器，不归模板代码后置 —— 四个 XAML 家只多一个附加属性与菜单资源，Razor 传一个片段参数，纯代码的两家重写一个钩子：
+树视图模板还声明了**连线的右键菜单**并让表面指向它。接线（右键、定位、开合、`WorkflowInput.IsSuspended`）归适配器，不归模板代码后置 —— 五个 XAML 家只多一个附加属性与菜单资源，Razor 传一个片段参数，WinForms 重写一个钩子：
 
 | 适配器 | 声明方式 |
 |---|---|
-| WPF / Avalonia | 一个 `ContextMenu` 资源，键经 `WorkflowSurfaceBehavior.LinkMenuKey` 指定 |
+| WPF / Avalonia / Jalium | 一个 `ContextMenu` 资源，键经 `WorkflowSurfaceBehavior.LinkMenuKey` 指定 |
 | WinUI / MAUI | 一个 `MenuFlyout` 资源，用同样的键 |
 | Razor | 表面组件上的 `<LinkMenu Context="link">…</LinkMenu>` 片段参数 |
-| WinForms / Jalium | `WorkflowTreeView.OnBuildLinkMenu(menu, link)` —— 基类只加一个「Delete」条目 |
+| WinForms | `WorkflowTreeView.OnBuildLinkMenu(menu, link)` —— 基类只加一个「Delete」条目（生成的模板覆写为空菜单） |
 
 每个条目绑定它作用于的那条连线，因此增删一个动作只改模板：`MenuItem` / `MenuFlyoutItem` 写 `Command="{Binding DeleteCommand}"`，Razor 按钮写 `@onclick="() => link.DeleteCommand.Execute(null)"`。Avalonia 的菜单资源没有 `x:DataType`，在编译绑定下写 `{ReflectionBinding DeleteCommand}`。
 

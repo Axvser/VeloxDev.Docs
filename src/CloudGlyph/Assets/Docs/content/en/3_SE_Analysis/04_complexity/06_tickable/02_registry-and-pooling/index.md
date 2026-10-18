@@ -7,7 +7,7 @@ Let $C$ be the number of channels created in the process, $N$ the behaviours on 
 ## Channel registry
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 1017-1030)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 1019-1032)
 private static readonly ConcurrentDictionary<string, LoopChannel> _channels = new();
 
 private static LoopChannel GetOrCreateChannel(string name)
@@ -30,7 +30,7 @@ private static LoopChannel GetOrCreateChannel(string name)
 
 The dictionary is lock-free on the read path, which matters because the status queries run at display frequency in the demo: `MainWindow.xaml.cs` polls all thirteen of them every 33 ms. The registry is never pruned, so its space is $O(C)$ and $C$ only grows — a named channel is a process-lifetime object.
 
-Channel construction is the one expensive part of `GetOrCreateChannel`, and it happens once per name: `TimerCore.CreateTimeSource<ITimeSourceControl>()` plus two samplers, three `ObjectPool` instances in the `LoopChannel` constructor (`_frameEventArgsPool`, `_configRequestPool`, `_wrapperPool`, declared at lines 152-154; constructor at 160-167), one `CancellationTokenSource`, and four delegate subscriptions.
+Channel construction is the one expensive part of `GetOrCreateChannel`, and it happens once per name: `TimerCore.CreateTimeSource<ITimeSourceControl>()` plus two samplers, three `ObjectPool` instances in the `LoopChannel` constructor (`_frameEventArgsPool`, `_configRequestPool`, `_wrapperPool`, declared at lines 154-156; constructor at 162-169), one `CancellationTokenSource`, and four delegate subscriptions.
 
 ## Copy-on-write snapshot
 
@@ -45,7 +45,7 @@ Channel construction is the one expensive part of `GetOrCreateChannel`, and it h
 The sort is the only super-linear term in the feature, and it is contained on purpose:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 883-894)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 886-897)
 // Insertion sort — behavior counts are usually small, avoiding LINQ allocations
 for (int i = 1; i < idx; i++)
 {
@@ -67,7 +67,7 @@ The rebuild's amortisation is worth stating: it runs at most once per `MAX_CONFI
 ## The three pools
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 74-92)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 76-94)
 [MethodImpl(MethodImplOptions.AggressiveInlining)]
 public T Get()
 {
@@ -122,4 +122,4 @@ $$
 
 Concretely, per channel: two samplers, one time source, three pools of at most 50 elements each, four queues (empty in steady state), one `CancellationTokenSource`, two threads (or none, in async mode), and the behaviour dictionary plus its snapshot. Nothing in that list scales with the frame rate, and nothing scales with time — a channel that has run for a week holds exactly what it held after a second.
 
-> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 69-93, 152-154, 160-167, 741-751, 872-901, 1017-1030; `Src/Core/VeloxDev.Core/Timing/CompensatingTimeSampler.cs` lines 24-30.
+> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 71-95, 154-156, 162-169, 743-753, 874-903, 1019-1032; `Src/Core/VeloxDev.Core/Timing/CompensatingTimeSampler.cs` lines 24-30.

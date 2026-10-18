@@ -43,7 +43,7 @@ classDiagram
     class StructAssemblerSampler
     class StructAssembler {
         <<internal>>
-        +Create(property, sampleable, start, end) ISampler
+        +Create(sampleable, start, end) ISampler
     }
 
     InterpolatorCore <|-- Interpolator

@@ -1,44 +1,44 @@
 # 弱引用类型 — 前置条件
 
-## 1. 支持目标
+## 1. 支持的目标框架
 
-支持的目标框架来自 `Src/Core/VeloxDev.Core/VeloxDev.Core.csproj` 的 `<TargetFrameworks>` 元素：
+目标框架来自 `Src/Core/VeloxDev.Core/VeloxDev.Core.csproj` 的 `<TargetFrameworks>`：
 
 ```xml
-<TargetFrameworks>netstandard2.0;netframework4.6.1;net5.0;netcoreapp3.0</TargetFrameworks>
+<TargetFrameworks>netstandard2.0;netframework4.6.1;net5.0;netcoreapp3.0;net8.0</TargetFrameworks>
 ```
 
-因此四个弱类型可从 .NET Framework 4.6.1+、.NET Core 3.0+、.NET 5+ 以及任何能引用 `netstandard2.0` 库的平台使用。它们内部没有任何平台相关代码 —— 只是建立在 `WeakReference<T>` 与 `ConditionalWeakTable<TKey, TValue>` 之上的普通集合。
+因此四个弱引用类型可在 .NET Framework 4.6.1+、.NET Core 3.0+、.NET 5+ / .NET 8+，以及任何能引用 `netstandard2.0` 库的平台上使用。源码只是基于 `WeakReference<T>` 与 `ConditionalWeakTable<TKey, TValue>` 的普通集合；唯一的条件编译是 `#if NET` 下给 `WeakCache` 的 `TCacheKey` 参数加的裁剪器注解（`Src/Core/VeloxDev.Core/WeakTypes/WeakCache.cs` 第 1-4 行与第 21-24 行）。
 
-**预期结果：** 最后一页的快速入门控制台程序以 `net10.0` 为目标（与测试项目 `VeloxDev.Core.Test` 的目标一致）。那是*被验证过*的配置，并非最低要求 —— 库本身支持上面列出的更老目标。
+**预期结果：** 最后一页的快速开始控制台程序以 `net10.0` 为目标（与测试项目 `VeloxDev.Core.Test` 相同）。这是*经过测试*的配置，不是最低要求——库本身支持上面列出的更老目标。
 
 ## 2. SDK / 运行时
 
-弱类型不需要源生成器、也不需要运行时服务，因此**消费**它们只需要目标框架所对应的 SDK。本快速入门中所有构建与运行记录使用 .NET SDK 9.0 / 10.0 工具链。
+弱引用类型不需要源生成器，也不需要运行时服务，因此*使用*它们只需要所选目标框架对应的 SDK。最后一页的示例以 `net10.0` 为目标，因此需要 .NET 10 SDK；库的其它目标只需匹配的工具链。本快速开始复现的构建与测试记录由 .NET 10 SDK 针对 `VeloxDev.Core.Test`（`net10.0`）产生。
 
-**预期结果：** `dotnet --list-sdks` 显示你将要使用的 SDK（SDK 9.0+ 工具链即可）。
+**预期结果：** `dotnet --list-sdks` 列出你将用于构建的 SDK；要运行完整示例，其中必须包含 10.x。
 
 ## 3. 包管理器
 
-NuGet / `dotnet` CLI。后续页面所有示例都使用 `dotnet` 命令与 `.csproj`。
+NuGet / `dotnet` CLI。后续页面中的所有示例都使用 `dotnet` 命令与 `.csproj`。
 
-**预期结果：** `dotnet` 解析到 SDK 9.0+ 工具链。
+**预期结果：** `dotnet` 解析到一个能构建项目目标框架的 SDK（`net10.0` 示例需要 10.x）。
 
-## 4. 所需服务
+## 4. 必需服务
 
-无。这些类型是 `VeloxDev.Core` 里的纯 .NET 集合；不需要数据库、网络、消息总线，也不需要 —— 与 VeloxDev 其它特性不同 —— 任何平台适配器。一个纯控制台宿主足以观察集合与 GC 行为。
+无。这些类型就是 `VeloxDev.Core` 里的普通 .NET 集合：不需要数据库、网络、消息总线，也——与其它 VeloxDev 功能不同——不需要平台适配器。一个普通控制台宿主就足以观察回收与 GC 行为。
 
-**预期结果：** 你可以用一个空文件夹和文本编辑器走完本快速入门其余部分。
+**预期结果：** 你可以只用一个空文件夹和一个文本编辑器完成本快速开始的余下部分。
 
-## 5. 行为证据所在位置
+## 5. 行为证据在哪里
 
-弱类型**没有专用 GUI 示例**（`Examples/` 树里只有 Workflow、MVVM、Theme、Transition、AOP 与 Tickable 的示例）。权威的行为证据是 `Src/Core/VeloxDev.Core.Test/WeakTypes/` 下的 MSTest 套件：
+弱引用类型**没有专用 GUI demo**（`Examples/` 只为 Workflow、MVVM、Theme、Transition、AOP 与 Tickable 提供演示）。权威行为证据是 `Src/Core/VeloxDev.Core.Test/WeakTypes/` 下的 MSTest 套件：
 
-- `WeakDelegateTests.cs` —— 订阅/调用、移除、克隆、组合委托缓存与 null 处理器的容忍。
-- `WeakQueueTests.cs` —— FIFO 顺序、窥视不移除、`Clear`、`EnqueueRange`、null 防护、枚举与 `TrimExcess`。
-- `WeakStackTests.cs` —— LIFO 顺序、窥视不移除、`Clear`、`PushRange`、null 防护、枚举与 `TrimExcess`。
-- `WeakCacheTests.cs` —— 增改读、覆盖写、移除、`ForeachCache`，以及触发清理的簿记。
+- `WeakDelegateTests.cs` — 订阅/调用、移除、克隆、组合委托缓存、“订阅像普通事件一样保活处理器”这一性质，以及空处理器容忍。
+- `WeakQueueTests.cs` — FIFO 顺序、peek 不移除、`Clear`、`EnqueueRange`、空值守卫、枚举与 `TrimExcess`。
+- `WeakStackTests.cs` — LIFO 顺序、peek 不移除、`Clear`、`PushRange`、空值守卫、枚举与 `TrimExcess`。
+- `WeakCacheTests.cs` — 增/改/查、覆盖、移除、`ForeachCache`，以及清理触发的驱逐记账。
 
-最后一页那个可运行的程序复现了单元测试刻意不去断言的“GC 后回收”行为（原因见 [GC行为与注意](../07_GC行为与注意/) 页）。
+这些测试钉住顺序与 API 行为；只有 `ASubscriptionKeepsItsHandlerAliveLikeAnOrdinaryEvent` 断言了 GC 结果（强缓存性质），没有任何测试断言以弱方式添加的条目真的会被回收。最后一页的可运行程序为四个类型都复现了*GC 后回收*行为（测试为何避开这一点，见 GC 行为页）。
 
-**预期结果：** 读完本页你知道该特性无头、无需外部搭建，并由测试而非示例来验证。
+**预期结果：** 读完本页后，你知道该功能是无界面的、不需要外部环境，并且由测试而非 demo 验证。

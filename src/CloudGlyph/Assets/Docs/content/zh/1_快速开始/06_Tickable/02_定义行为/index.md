@@ -1,8 +1,8 @@
-# 02 · 定义行为
+# 定义行为
 
-一个「行为」就是一个带 `[Tickable]` 的 `partial` 类。特性选定**通道**，并可选地指定该通道的**目标帧率**。类的其余部分就是最普通的 C#。
+一个行为就是一个带 `[Tickable]` 的 `partial` 类。特性选择**通道**，并可选指定该通道的**目标帧率**。类的其余部分都是普通 C#。
 
-## 1. 特性本身
+## 1. 特性
 
 `Src/Core/VeloxDev.Core/TimeLine/TickableAttribute.cs`：
 
@@ -15,11 +15,11 @@ public sealed class TickableAttribute(string channel = TickManager.DEFAULT_CHANN
 }
 ```
 
-从这个声明可以推出三件事，而这三件事都很容易搞错：
+由此有三点容易搞错：
 
-- **只能标在类上，不能标在成员上。** `AllowMultiple = false` 且 `Inherited = false`，所以派生类**不会**继承基类的 `[Tickable]`。每个想要钩子的类都要自己带上该特性。
-- **通道是一个字符串。** 默认值 `TickManager.DEFAULT_CHANNEL`，即字面量 `"default"`。
-- **`fps` 是目标帧率，不是倍率；`-1` 表示「别动这个通道的帧率」。** 当值 `>= 1` 时，生成的注册代码还会调用 `TickManager.SetTargetFPS(fps, channel)`；为 `-1` 时一行帧率调用都不会生成。演示中 `DemoChannel.Name` 就是 `TickManager.DEFAULT_CHANNEL`，类声明为 `[Tickable(DemoChannel.Name)]` —— 只给通道，`fps` 留在 `-1`，这样窗口自己那句 `SetTargetFPS(30, ...)` 不会被覆盖。见 `Examples/Tickable/WPF/Demo/MainWindow.Hooks.cs` 第 30 行。
+- **只作用于类，且不被继承。** `AllowMultiple = false`、`Inherited = false`，所以派生类**不会**继承基类上的 `[Tickable]`。每个想要钩子的类都自己带特性。
+- **通道是字符串。** 默认 `TickManager.DEFAULT_CHANNEL`，即字面量 `"default"`。
+- **`fps` 是目标帧率，不是倍率；`-1` 表示「不要碰通道」。** 值 `>= 1` 时生成的注册还会调用 `TickManager.SetTargetFPS(fps, channel)`；值为 `-1` 时完全不生成帧率调用。示例中的 `DemoChannel.Name` 就是 `TickManager.DEFAULT_CHANNEL`，类声明为 `[Tickable(DemoChannel.Name)]`（`MainWindow.Hooks.cs` 第 23 行）—— 只给通道，`fps` 留在 `-1`，所以窗口自己的 `SetTargetFPS(30, ...)` 不会被覆盖。
 
 ## 2. 类
 
@@ -37,11 +37,11 @@ public partial class BouncingBall
 }
 ```
 
-**预期结果：** `dotnet build` 成功。生成器已经往编译里加了一份实现 `ITickable` 的 `BouncingBall` 分部声明。
+**预期结果：** `dotnet build` 成功。生成器已为 `BouncingBall` 添加了第二个声明，实现 `ITickable`。
 
 ## 3. 生成器写了什么
 
-生成器（`Src/Generators/VeloxDev.Core.Generator/Writers/TickWriter.cs`）向编译追加一个 partial 类。去掉 `global::` 前缀后，`TickWriter.GenerateBody`（第 69-122 行）生成的内容是：
+`Src/Generators/VeloxDev.Core.Generator/Writers/TickWriter.cs` 向编译追加一个 partial 声明。`TickWriter.GenerateBody`（第 74-127 行）生成如下内容（省略 `global::` 前缀）：
 
 ```csharp
 public void InitializeTickable()
@@ -68,22 +68,22 @@ partial void LateUpdate(global::VeloxDev.TimeLine.FrameEventArgs e);
 partial void FixedUpdate(global::VeloxDev.TimeLine.FrameEventArgs e);
 ```
 
-有两点值得记住：
+两点值得记住：
 
-- **那句 `SetTargetFPS` 只在 `fps >= 1` 时出现。** 写成 `[Tickable("demo")]` 时它不存在，通道保持原有帧率。
-- **你只会调用 `InitializeTickable()` 与 `CloseTickable()` 这两个方法。** 没有别的东西替你调用它们。注册本质是一次**入队**，所以 `InitializeTickable()` 可以在通道启动之前调用 —— 队列会在通道的第一帧被排空。
+- **只有 `fps >= 1` 时才生成 `SetTargetFPS` 那一行。** 写成 `[Tickable("demo")]` 时该行不存在，通道保持原有帧率。
+- **你只需要调用 `InitializeTickable()` 与 `CloseTickable()`。** 没有别的东西替你调用它们。注册是一次*入队*，所以 `InitializeTickable()` 可以在通道启动之前调用 —— 排空发生在通道第一帧之前。
 
-## 4. 五个钩子与它们的时机
+## 4. 五个钩子与运行时机
 
-| 钩子 | 运行线程 | 频率 |
+| 钩子 | 运行在 | 频率 |
 |---|---|---|
-| `Awake` | Update 泵，注册队列的首次排空 | 每次注册一次 |
-| `Start` | Update 泵，紧随 `Awake` | 每次注册一次 |
-| `Update` | Update 泵 | 每帧 |
-| `LateUpdate` | Update 泵 | 每帧，在所有行为的 `Update` 之后 |
-| `FixedUpdate` | FixedUpdate 泵 | 每步间隔一次（默认 16 ms），与 Update 泵并发 |
+| `Awake` | update 泵，注册队列排空时 | 每次注册一次 |
+| `Start` | update 泵，紧接 `Awake` | 每次注册一次 |
+| `Update` | update 泵 | 每帧 |
+| `LateUpdate` | update 泵 | 每帧，在所有行为的 `Update` 之后 |
+| `FixedUpdate` | fixed-update 泵 | 每个步长（默认 16 ms），与 update 泵并发 |
 
-`Awake` 与 `Start` **在第一帧帧体之前**运行，位置是 Update 线程上的 `ProcessAddedBehaviors`（`TickManager.cs` 第 785-801 行）：
+`Awake` 与 `Start` 在**第一帧帧体之前**、于 update 线程上运行，来自 `ProcessAddedBehaviors`（`TickManager.cs` 第 787-803 行）：
 
 ```csharp
 var wrapper = _wrapperPool.Get();
@@ -92,15 +92,14 @@ wrapper.Reset(behavior, Interlocked.Increment(ref _instanceCounter));
 _behaviors[RuntimeHelpers.GetHashCode(behavior)] = wrapper;
 SafeExecute(behavior.InvokeAwake);
 SafeExecute(behavior.InvokeStart);
-added = true;
 ```
 
-由于这段排空发生在采样之前，在 `Awake` 里读 `TickManager.TotalFrames(channel)` 得到的仍是**第一帧之前**的计数 —— WPF 演示把它显示成生命周期证据（`SimState.AwakeFrameOrdinal`）。
+因为该代码块在帧采样之前被排空，在 `Awake` 中读取 `TickManager.TotalFrames(channel)` 会看到**第一帧之前**的计数 —— WPF 示例显示的 `SimState.AwakeFrameOrdinal` 就是这条证据。
 
-**预期结果：** 类能编译，你能指出五个自己拥有的钩子函数体，和两个自己调用的生成方法。
+**预期结果：** 类能编译；你能指出自己拥有的五个钩子函数体，以及要调用的两个生成方法。
 
 ## 说明
 
-- 钩子是 `partial void`，没实现的那个会被编译器整个移除 —— 不需要写空重写，跳过的也没有任何开销。
-- `InvokeUpdate` 之类是 `ITickable` 的表面，不是用户 API。你只调用入口（`InitializeTickable` / `CloseTickable`），其余交给泵。
-- 钩子里抛出的异常会按行为逐个捕获并写进 `Debug.WriteLine`（见 `ExecuteBehaviorsUpdateSync`，`TickManager.cs` 第 689-702 行）。抛异常的钩子既不会停下循环，也不会在 Release 构建里出现在控制台上。
+- 钩子是 `partial void`，未实现的会被编译器移除 —— 不需要写空重写，跳过的钩子也没有开销。
+- `InvokeUpdate` 等是 `ITickable` 的表面，不是用户 API。调用 `InitializeTickable` / `CloseTickable`，其余交给泵。
+- 钩子抛出的异常按行为逐个捕获并写入 `Debug.WriteLine`（`ExecuteBehaviorsUpdateSync`，`TickManager.cs` 第 691-704 行）。抛异常的钩子不会停下循环，在 Release 构建中也悄无声息。

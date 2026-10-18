@@ -26,7 +26,8 @@ VeloxDev/
 │   │   ├── VeloxDev.WinUI/                ← WinUI 3
 │   │   ├── VeloxDev.MAUI/                 ← .NET MAUI
 │   │   ├── VeloxDev.WinForms/             ← Windows Forms
-│   │   └── VeloxDev.Razor/                ← Razor / Blazor
+│   │   ├── VeloxDev.Razor/                ← Razor / Blazor
+│   │   └── VeloxDev.Jalium/               ← Jalium (platform-neutral net10.0)
 │   ├── Generators/
 │   │   └── VeloxDev.Core.Generator/       ← Roslyn source generators (WorkflowBuilder, MVVM, Command, AOP, Theme, Tickable)
 │   └── Templates/                         ← dotnet new item templates (WPF/Avalonia/WinUI/MAUI/WinForms/Razor)
@@ -48,8 +49,8 @@ VeloxDev/
 
 | Project | Path | Role |
 |---|---|---|
-| `VeloxDev.Core` | `Src/Core/VeloxDev.Core` | All feature cores; multi-targets `netstandard2.0; netframework4.6.1; net5.0; netcoreapp3.0` |
-| `VeloxDev.Core.Extension` | `Src/Core/VeloxDev.Core.Extension` | Workflow Agent (AI tools), MCP scope, JSON serialization (`netstandard2.0`) |
+| `VeloxDev.Core` | `Src/Core/VeloxDev.Core` | All feature cores; multi-targets `netstandard2.0;netframework4.6.1;net5.0;netcoreapp3.0;net8.0` |
+| `VeloxDev.Core.Extension` | `Src/Core/VeloxDev.Core.Extension` | Workflow Agent (AI tools), MCP scope, JSON serialization (`netstandard2.0;net8.0`) |
 | `VeloxDev.Core.Generator` | `Src/Generators/VeloxDev.Core.Generator` | Roslyn incremental generators (analyzer package, `netstandard2.0`) |
 | `VeloxDev.WPF` | `Src/Adapters/VeloxDev.WPF` | WPF adapter (`UseWPF`) |
 | `VeloxDev.Avalonia` | `Src/Adapters/VeloxDev.Avalonia` | Avalonia adapter |
@@ -57,6 +58,7 @@ VeloxDev/
 | `VeloxDev.MAUI` | `Src/Adapters/VeloxDev.MAUI` | .NET MAUI adapter (`UseMaui`) |
 | `VeloxDev.WinForms` | `Src/Adapters/VeloxDev.WinForms` | Windows Forms adapter (`UseWindowsForms`) |
 | `VeloxDev.Razor` | `Src/Adapters/VeloxDev.Razor` | Razor/Blazor adapter (Razor SDK) |
+| `VeloxDev.Jalium` | `Src/Adapters/VeloxDev.Jalium` | Jalium adapter (single `net10.0`, platform-neutral; `Jalium.UI.Controls` 26.10.8 floor) |
 | `VeloxDev.*.Templates` | `Src/Templates` | `dotnet new` item templates |
 
 ## Adapter Internal Layout (`VeloxDev.Avalonia` example)

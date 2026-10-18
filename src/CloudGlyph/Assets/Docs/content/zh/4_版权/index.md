@@ -1,7 +1,7 @@
 # 版权
 
-VeloxDev 项目的许可证、归属与法律声明。
+VeloxDev 的许可证、署名与法律声明。
 
 | 类别 | 文档 |
 |---|---|
-| [许可证信息](00_许可证信息) | MIT 许可证 · Copyright (c) 2025 Axvser |
+| [许可信息](00_许可信息/index.md) | MIT License · Copyright (c) 2025 Axvser |

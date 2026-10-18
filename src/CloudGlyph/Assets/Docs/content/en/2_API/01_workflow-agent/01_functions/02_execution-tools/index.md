@@ -1,6 +1,6 @@
 # Functions · Execution Tools
 
-Category `Execution` — **12 tools**, all gated by `WithAllowNodeExecution(true)`. They span the three execution levels: node EXEC, the compiled chain, and the compiled-run family. Every one returns `... is disabled by host policy. The host must enable node execution via WithAllowNodeExecution(true).` when the gate is off.
+Category `Execution` — **12 tools**. The eight that start or drive node code are gated by `WithAllowNodeExecution(true)`: the four node-level tools, `RunCompiledWorkflow`, `GetNodeResult`, `StartCompiledWorkflow`, `ContinueCompiledWorkflow`. The other four are handle operations (`GetCompiledRunStatus`, `PauseCompiledRun`, `ResumeCompiledRun`, `StopCompiledRun`) and work on an existing run without that gate. A gated call with the gate off returns `... is disabled by host policy. The host must enable node execution via WithAllowNodeExecution(true).` All twelve are `AgentActionCategory.Execute` for the permission policy, and none is in the budget's read-only name list — so they count as **write** calls.
 
 ## Node level (4)
 
@@ -28,7 +28,7 @@ Their result shape and the Terminal error contract are on the `VeloxDev.AI.Workf
 |---|---|---|
 | `StartCompiledWorkflow` | `StartCompiledWorkflow(int startNodeIndex, string? seed = null)` | Starts a compiled run and returns **at once** with a `handle`; poll with `GetCompiledRunStatus`. |
 | `ContinueCompiledWorkflow` | `ContinueCompiledWorkflow(int startNodeIndex, string? seed = null)` | Starts a run that **carries on** from the last checkpoint in the scope's store. Errors when there is no checkpoint. |
-| `GetCompiledRunStatus` | `GetCompiledRunStatus(string handle)` | Reports on a run: `isRunning`, `runStatus`, `outcome`, `isPaused`, `attempts`, `endedWithError`, `data`, `failures`, `failureCount`, `logs` (last 40), `logFile`. **Retires the handle** once it has reported the run as finished. Pure query. |
+| `GetCompiledRunStatus` | `GetCompiledRunStatus(string handle)` | Reports on a run: `isRunning`, `runStatus`, `outcome`, `isPaused`, `attempts`, `endedWithError`, `data`, `failures`, `failureCount`, `logs` (last 40), `logFile`. **Retires the handle** once it has reported the run as finished. Does not start code, but is classified `Execute` and counts as a write call. |
 | `PauseCompiledRun` | `PauseCompiledRun(string handle)` | Holds the run at its next node boundary. Returns an **error** when the host brought its own execution gate (`RunsOnOurGate`). |
 | `ResumeCompiledRun` | `ResumeCompiledRun(string handle)` | Lets a held run go again (a no-op when it was not held). Same `RunsOnOurGate` guard. |
 | `StopCompiledRun` | `StopCompiledRun(string handle)` | Stops the run: it ends at the current node boundary with `outcome: Cancelled`, checkpoint retained. **No gate guard.** |

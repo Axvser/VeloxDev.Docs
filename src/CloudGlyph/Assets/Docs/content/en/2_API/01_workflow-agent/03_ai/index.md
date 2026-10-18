@@ -87,7 +87,50 @@ Nested `PropertyDescriptor`, `SetResult`. Tested by `AgentPropertyAccessorTests`
 
 Tested by `AgentToolCallEventArgsTests`; host dialogs in `Examples/Workflow/WinForms/Demo/Dialogs/AgentSelectionDialog.cs` and `AgentConfirmationDialog.cs`.
 
-## Generic object toolkit (Extension)
+## Permission policy (`VeloxDev.AI.Safety`)
+
+The code gate behind every non-read tool call. A tool declares its `AgentActionCategory` on the line that registers it; the policy decides `Allow` / `Ask` / `Deny` per call.
+
+### `AgentPermissionMode`
+
+`public enum AgentPermissionMode` — a named state the user can switch:
+
+| Value | Meaning |
+|---|---|
+| `Plan = 0` | Read and interact only; graph edits, execution and reach changes are denied. |
+| `Manual = 1` | Every non-read action asks. |
+| `AutoEdit = 2` | Reads and edits run; execution and reach changes ask. |
+| `Auto = 3` | Reads, edits and execution run; only `Curate` asks. **Default** (`AgentPermissionPolicy.DefaultMode`). |
+| `Bypass = 4` | Nothing asks; explicit `Deny` rules still hold. |
+
+### `AgentActionCategory`
+
+`public enum AgentActionCategory` — what a tool *does* (deliberately not `WorkflowToolCategory`, which is a surface filter): `Read = 0` (inspection), `Edit = 1` (undoable graph change), `Execute = 2` (runs code, not undoable), `Curate = 3` (changes what the session can reach), `Interact = 4` (asking; never put to the user).
+
+### `AgentPermissionPolicy`
+
+`public sealed class AgentPermissionPolicy` — immutable; every change returns a new policy.
+
+| Member | Signature | Notes |
+|---|---|---|
+| `Mode` | `AgentPermissionMode { get; }` | Mode in force. |
+| `Rules` | `IReadOnlyList<AgentPermissionRule> { get; }` | In the order added. |
+| `Judge` | `Func<ToolInvocation, PermissionDecision>? { get; }` | Consulted in `Auto` for calls no rule settled. |
+| `DefaultMode` | `static AgentPermissionMode DefaultMode` | `Auto`. |
+| `For` | `static AgentPermissionPolicy For(AgentPermissionMode mode)` | Empty policy in a mode. |
+| `WithMode` / `WithRule(s)` / `WithoutRules` / `WithJudge` | policy factories | Each returns a new policy. |
+| `Evaluate` | `PermissionDecision Evaluate(ToolInvocation invocation)` | Deny rule → Plan refusals → Ask rule → Allow rule → `Auto` judge → mode default. |
+| `ModeDefault` | `static PermissionDecision ModeDefault(AgentPermissionMode, AgentActionCategory)` | The mode/category matrix. |
+
+### `AgentPermissionRule` / `PermissionDecision` / `ToolInvocation`
+
+`public sealed record AgentPermissionRule(PermissionDecision Decision, string Pattern)`. Patterns select by tool name (`DeleteNode`, `Get*`), `category:Edit`, or `source:mcp:*` / `source:skill`. Matching is case-insensitive; `*` matches any run of characters. A `Deny` rule holds in every mode.
+
+`public enum PermissionDecision` — `Allow = 0`, `Ask = 1`, `Deny = 2`.
+
+`public sealed record ToolInvocation(string Name, AgentActionCategory Category, string? Source, IReadOnlyDictionary<string, object?> Arguments)` carries the call being judged. `Source` is `null` for the workflow's own tools, or `mcp:<server>` / `skill` / `subagent` / `custom`. Source: `Agent/Safety/*.cs`; tests `Agent/Safety/AgentPermissionPolicyTests.cs`.
+
+
 
 ### `AgentObjectToolkit`
 

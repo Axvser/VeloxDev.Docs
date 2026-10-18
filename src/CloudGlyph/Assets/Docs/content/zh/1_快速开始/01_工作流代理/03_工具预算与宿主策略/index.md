@@ -10,8 +10,8 @@ scope.WithMaxToolCalls(200)          // 所有工具调用的总上限
     .WithMaxWriteToolCalls(50);      // 其余一切（变更、执行、命令）的上限
 ```
 
-- 当调用的名字位于工具包的只读集合中时计为**读** —— Query 工具，加上 `TakeSnapshot` / `GetChangesSinceSnapshot`、`GetNodeStatistics`、五个 Graph 工具、`RequestSelection` / `RequestConfirmation`、`ResetToolCallLimit`、四个编译/计划读工具（`CompileWorkflow`、`CompileNodeResult`、`GetCompileStatus`、`GetExecutionLog`），以及**每一个技能与子代理工具名**（从 `SkillAgentToolkit.ToolNames` 与 `SubAgentAgentToolkit.ToolNames` 合并进来）。其余一切计为**写**。
-- 一个预检闸门（`CheckBudget`）在编组块内、函数体之前运行。当某上限已达时返回拒绝；函数体从不运行，且该调用**不**计数。
+- 当调用的名字位于工具包的只读集合中时计为**读** —— Query 工具，加上 `TakeSnapshot` / `GetChangesSinceSnapshot`、`GetNodeStatistics`、五个 Graph 工具、`RequestSelection` / `RequestConfirmation`、`ResetToolCallLimit`、四个编译/计划读工具（`CompileWorkflow`、`CompileNodeResult`、`GetCompileStatus`、`GetExecutionLog`），以及**每一个技能与子代理工具名**（从 `SkillAgentToolkit.ToolNames` 与 `SubAgentAgentToolkit.ToolNames` 合并进来）。`EnterPlanMode` / `ExitPlanMode` 不在该名单中，因此尽管它们不触碰图，也计为**写**调用。
+- 一个预检闸门（`CheckInvocation`）在编组块内、函数体之前运行。当某上限已达时返回拒绝；函数体从不运行，且该调用**不**计数。
 
 拒绝措辞（来自 `LimitRefusal`）：
 
@@ -31,8 +31,7 @@ reopens the budget. Do not retry this call, and do not tell the user you can con
 
 - 它从不消耗预算（若计数，就会重新增加刚被清零的计数器 —— 重置会自我撤销）。
 - 它挺过它本就为之存在的闸门：即使预算已花光，预检闸门对它也返回 `null`。
-- 它经作用域的确认处理器、以操作键 `extend-tool-call-budget` 把问题交给用户。询问本身就是全部安全属性 —— agent 只能问，永不能自行放宽自己的预算。**没有**注册处理器时答案是**拒绝**（一个无法回答的提示必须拒绝）。
-- 在交互安全级别 0 时，宿主已要求永不被打断，工具因而返回 `denied` 而非询问。
+- 它经作用域的确认处理器、以操作键 `extend-tool-call-budget` 把问题交给用户。询问本身就是全部安全属性 —— agent 只能问，永不能自行放宽自己的预算。**没有**注册处理器时答案是**拒绝**（一个无法回答的提示必须拒绝）。`AgentActionCategory.Interact` 从不交给模式策略，因此没有任何模式能压下这个问题。
 - 用户同意后它调用 `ResetChain()`，清零本级**以及其上的每一级** —— 若根额度仍被花光，下一次调用就会立刻被拒绝。
 
 **预期结果：** 在某上限已达时调用 `ResetToolCallLimit`，处理器答「允许」则返回 `Tool-call budget reset by the user. You may continue.`；无处理器则返回 `status:"denied"`。
@@ -44,7 +43,7 @@ scope.WithAllowNodeExecution(true)                 // 启用运行代码的工�
     .WithAllowedGenericCommands("ReceiveCommand"); // ExecuteCommandOnNode/ExecuteCommandById 的白名单
 ```
 
-- `WithAllowNodeExecution(enabled)` 闸控运行任意节点业务代码的工具：`ExecuteNode`、`ExecuteNodes`、`BroadcastNode`、`ReverseBroadcastNode`、`RunCompiledWorkflow`、`GetNodeResult`，以及四个后台运行工具。默认关闭。被拦的运行工具返回 `... is disabled by host policy. The host must enable node execution via WithAllowNodeExecution(true).` 只编译的计划工具（`CompileWorkflow`、`CompileNodeResult`、`GetCompileStatus`）从不运行节点代码，**不**受闸控。
+- `WithAllowNodeExecution(enabled)` 闸控运行任意节点业务代码的工具：`ExecuteNode`、`ExecuteNodes`、`BroadcastNode`、`ReverseBroadcastNode`、`RunCompiledWorkflow`、`GetNodeResult`、`StartCompiledWorkflow` 与 `ContinueCompiledWorkflow`。默认关闭。被拦的运行工具返回 `... is disabled by host policy. The host must enable node execution via WithAllowNodeExecution(true).` 只编译的计划工具（`CompileWorkflow`、`CompileNodeResult`、`GetCompileStatus`）从不运行节点代码，**不**受闸控；句柄操作 `GetCompiledRunStatus` / `PauseCompiledRun` / `ResumeCompiledRun` / `StopCompiledRun` 也不受闸控。
 - `WithAllowedGenericCommands(params string[])` 为 `ExecuteCommandOnNode` / `ExecuteCommandById` 列出命令白名单；`"Command"` 后缀可省。从不调用 ⇒ 通用命令执行被完全禁用（安全默认）。该闸门由 `CommandInvoker` 逐次调用检查。
 
 ## 4. 逐工具开关
@@ -62,47 +61,54 @@ bool on = scope.IsToolEnabled("Undo");          // 读取当前状态
 
 **预期结果：** `SetToolEnabled("Undo", false)` 后，下一次调用不再提供 `Undo`，直接调用它会被宿主策略消息拒绝。
 
-## 5. 工具审批 —— 一道代码闸门
+## 5. 权限模式 —— 代码闸门
 
-`WithToolApproval(true)` 要求人工在**每个非查询工具调用运行之前**批准它，方式是把工具名交给确认处理器。
+会话的权限策略取代了旧的交互安全档位和独立的工具审批开关。它由一个 `AgentPermissionMode` 加可选规则组成，**逐次调用**在函数体运行前评估。`PermissionDecision` 为 `Allow` | `Ask` | `Deny`；模式是用户可以切换的**具名状态**，每次拒绝都会点名该模式以及该切到哪一档。
 
-- 查询工具从不询问（读没有什么可批准的）。MCP 来源的工具是第三方代码，**也**被当作变更，因此同样受闸控。
-- 交给确认处理器的键是**工具名**，所以「本会话允许」即批准该工具直至会话结束。
-- 拒绝被报告为 `AgentToolOutcome.Refused`，且从不触达函数体。被拒时模型会被告知：`'{toolName}' was not approved by the user. The call did not run. Do not retry it, and do not look for another tool that makes the same change — ask the user what they want instead.`
-- 它与 `WithInteractionSafety` 互补而非替代：后者塑造模型被**告知**去问什么；前者决定它实际能做什么，且无法被一个拒绝调用 `RequestConfirmation` 的模型绕过。
-
-## 6. 交互安全与两个处理器
-
-交互安全是一个 0–3 的整数（默认 **1**），用 `WithInteractionSafety(level)` 设置：
-
-| 级别 | 名称 | 行为 |
+| 模式 | 值 | 允许什么 |
 |---|---|---|
-| 0 | 静默 | 完全自主。两个交互工具被跳过，且不输出策略。 |
-| 1 | 谨慎（默认） | 仅在意向确实含糊或动作为批量/破坏性时询问。 |
-| 2 | 平衡 | 存在多条合理路径、或动作触及 ≥ 2 个节点/链接时询问。 |
-| 3 | 严格 | 在每一个非「纯单节点创建」的变更前询问。 |
+| `Plan` | 0 | 只读与交互；编辑、执行与可达性变更一律拒绝。 |
+| `Manual` | 1 | 每个非读动作都交给用户。 |
+| `AutoEdit` | 2 | 读与图编辑直接运行；执行与可达性变更询问。 |
+| `Auto` | 3 | 读、编辑与执行直接运行；只有可达性变更（`Curate`）询问。**默认。** |
+| `Bypass` | 4 | 什么都不问；显式 `Deny` 规则仍然生效。 |
 
 ```csharp
-scope.WithInteractionSafety(3);
-scope.WithInteractionSafetyPrompt(2, "在触及多个节点的结构性改动前先询问。");
+scope.WithPermissionMode(AgentPermissionMode.AutoEdit)
+     .WithPermissionRule(PermissionDecision.Ask, "DeleteNode", "DeleteSlot")
+     .WithPermissionRule(PermissionDecision.Deny, "category:Curate");
+bool moved = scope.SetPermissionMode(AgentPermissionMode.Manual);  // 运行时切换
+```
 
+- **规则是细粒度层。** 模式按工具名（`DeleteNode`、`Get*`）、按类别（`category:Edit`）或按来源（`source:mcp:*`、`source:skill`）选择。`Deny` 规则在所有模式下生效，包括 `Bypass`。
+- **闸门在代码里。** `ToolPipeline.Confirm` 调用 `PermissionPolicy.Evaluate(invocation)`；`Ask` 以工具名交给确认处理器（因此「本会话允许」即批准该工具），`Deny` 返回 `DescribePermissionRefusal`。模型无法靠不调用 `RequestConfirmation` 绕过它。
+- **MCP 管理工具是 `Curate`**（它们改变会话可达范围），因此 `Auto` 仍会询问 `AddMcpServer`、`SetMcpServerArguments`、`LoadMcpServers` 与 `UnloadMcpServer`。已连接服务器*导出的*工具是第三方代码，归类为 `Execute`；`Auto` 让它们运行，`AutoEdit`/`Manual` 会询问，宿主也可用 `Ask("source:mcp:*")` 这样的规则闸控它们。`WithPermissionJudge` 为 `Auto` 中无规则裁决的调用提供决定；judge 抛异常即拒绝。
+- **Agent 自己只有两个模式转换**，且都先询问：`EnterPlanMode` 与 `ExitPlanMode`（仅在配置了确认处理器时注册）。刻意没有能把模式放宽的工具。
+
+**预期结果：** 在 `Plan` 下，`CreateNode` 返回点名 `Plan` 的拒绝；在 `AutoEdit` 下它直接运行，而 `ExecuteNode` 会询问。`DeleteNode` 上的 `Deny` 规则在任何模式下都拒绝它。
+
+## 6. 交互处理器
+
+两个可选工具直接询问用户；注册只取决于处理器，与任何安全级别无关：
+
+```csharp
 scope.WithSelectionHandler(async args =>        // 支撑 RequestSelection
 {
     args.SelectedOption = args.Options.FirstOrDefault();
     await Task.CompletedTask;
 });
-scope.WithConfirmationHandler(async args =>      // 支撑 RequestConfirmation
+scope.WithConfirmationHandler(async args =>      // 支撑 RequestConfirmation / Ask 决定 / ResetToolCallLimit
 {
     args.Result = AgentConfirmationResult.AllowOnce;   // 或 AllowAlways | Deny
     await Task.CompletedTask;
 });
 ```
 
-- 仅当级别 > 0 **且**调用了 `WithSelectionHandler` 时才注册 `RequestSelection`；在处理内设置 `args.SelectedOption`（单选）或 `args.SelectedOptions` / `args.FreeTextResponse`。嵌套的 `WorkflowAgentScope.SelectionResult` 提供 `Single` / `Multi` / `FreeText` 工厂供底层使用。
-- 仅当级别 > 0 **且**调用了 `WithConfirmationHandler` 时才注册 `RequestConfirmation`；设置 `args.Result = AllowOnce | AllowAlways | Deny`。`AllowAlways` 按 `operationKey` 本会话内记住（`ResolveConfirmationAsync`）。
-- `WithInteractionSafetyPrompt(level, body)` 替换某级别（1–3）的策略正文；级别 0 的静默规则不可覆盖。
+- 调用了 `WithSelectionHandler` 时才注册 `RequestSelection`；在处理内设置 `args.SelectedOption`（单选）或 `args.SelectedOptions` / `args.FreeTextResponse`。嵌套的 `WorkflowAgentScope.SelectionResult` 提供 `Single` / `Multi` / `FreeText` 工厂供底层使用。
+- 调用了 `WithConfirmationHandler` 时才注册 `RequestConfirmation`；设置 `args.Result = AllowOnce | AllowAlways | Deny`。`AllowAlways` 按 `operationKey` 本会话内记住（`ResolveConfirmationAsync`）。
+- 没有确认处理器时，每个 `Ask` 决定都按拒绝作答，`ResetToolCallLimit` 也拒绝。
 
-**预期结果：** 级别 0 时没有 `RequestSelection` / `RequestConfirmation` 工具；级别 3 且注册了两个处理器时，每个各出现一次。
+**预期结果：** 两个处理器都注册时，`RequestSelection` 与 `RequestConfirmation` 在 `ProvideTools()` 中各出现一次；都未注册时两者缺席，工具计数再少掉 `EnterPlanMode` / `ExitPlanMode`。
 
 ## 7. UI 线程、回调与脏标记
 
@@ -124,11 +130,4 @@ scope.WithSynchronizationContext(SynchronizationContext.Current)  // 把每次�
 
 ## 运行声明
 
-- ✅ 实际构建并运行 —— 2026-10-01 执行了确定性 agent 测试套件：
-
-```text
-dotnet test Src/Core/VeloxDev.Core.Extension.Test/VeloxDev.Core.Extension.Test.csproj --filter "FullyQualifiedName~Agent&FullyQualifiedName!~SubAgentLiveTests"
-已通过! - 失败: 0，通过: 387，已跳过: 0，总计: 387，持续时间: 920 ms
-```
-
-该运行覆盖了 `ToolSwitchTests`、`ToolApprovalTests`、`CompiledRunControlTests` 以及 `Agent/**` 的其余部分，唯独排除 `SubAgentLiveTests`（需要真实模型密钥且非确定性）。它并未对模型运行任何对话。
+- ⚠️ **本次修订未运行** —— 2026-10-18 对照当前源码静态核验。曾有一次 2026-10-01 的确定性测试记录（`失败: 0，通过: 387`），但它早于权限模式 / 上下文树重构，不能作为本页所述闸门今天行为的证据。

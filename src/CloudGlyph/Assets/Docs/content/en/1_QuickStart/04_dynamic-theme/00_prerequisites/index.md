@@ -1,9 +1,9 @@
 # Dynamic Theme — Prerequisites
 
-- **Supported targets** (from `VeloxDev.Core.csproj` `<TargetFrameworks>`): `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0`. The theme engine (`ThemeManager`, `ThemeCache`, `[ThemeConfig]`, `ITheme`, ...) is consumable from .NET Framework 4.6.1+, .NET Core 3.0+ and .NET 5+.
+- **Supported targets** (from `VeloxDev.Core.csproj` `<TargetFrameworks>`): `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0` / `net8.0`. The theme engine (`ThemeManager`, `ThemeCache`, `[ThemeConfig]`, `ITheme`, ...) is consumable from .NET Framework 4.6.1+, .NET Core 3.0+, .NET 5+ and .NET 8+.
 - **Per-framework adapter targets** (from each adapter csproj) — add the adapter matching your GUI framework to obtain the theme value converters and the platform `Interpolator`:
-    - `VeloxDev.WPF`: `netframework4.6.1` / `net5.0-windows` / `netcoreapp3.0`
-    - `VeloxDev.Avalonia`: `netstandard2.0` / `net6.0`
+    - `VeloxDev.WPF`: `netframework4.6.1` / `net5.0-windows` / `netcoreapp3.0` / `net8.0-windows`
+    - `VeloxDev.Avalonia`: `netstandard2.0` / `net6.0` / `net8.0`
 - **SDK / runtime:** a .NET SDK able to build the target you pick; WPF needs `<UseWPF>true</UseWPF>` on a Windows TFM. The in-repo demos build against `net9.0-windows` (WPF) and `net9.0` (Avalonia) — *tested* configurations, not requirements.
 - **Package manager:** NuGet via the `dotnet` CLI or Visual Studio (`dotnet add package ...`).
 - **Required services:** no database, key or external service. To *see* a theme switch you need a running GUI host (a WPF/Avalonia window). Animated switching additionally needs the platform `Interpolator` installed once through `ThemeManager.SetPlatformInterpolator` (see [Prepare an Animated Switch](../03_switch-at-runtime/00_prepare/index.md)); instant `Jump<T>` switching does not need it.

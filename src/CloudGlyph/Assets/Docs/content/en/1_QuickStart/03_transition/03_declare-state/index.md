@@ -25,7 +25,7 @@ public static class QuickStart
     public static readonly Transition<Rectangle> Animation0 =
         Transition<Rectangle>.Create()
             .Property(r => r.Opacity, 0)                                   // double target
-            .Property(r => ((TranslateTransform)r.RenderTransform).X, 800) // nested path
+            .Property(r => ((TranslateTransform)r.RenderTransform).X, 200d) // nested path
             .Property(r => r.Fill, new SolidColorBrush(Colors.Orange))     // Brush target
             .Effect(new TransitionEffect
             {
@@ -36,7 +36,7 @@ public static class QuickStart
 }
 ```
 
-This is the exact shape of `Animation0` in `Examples/Transition/WPF/Demo/MainWindow.xaml.cs` (there it is a `static readonly` member of the window's partial class). The generic `Property<TValue>` overload accepts any value type — every adapter declares it **except Razor**, which offers only typed overloads; each adapter adds typed overloads for the platform's value types (`Brush`, `Transform` collections, `Color`, `Point`, `CornerRadius`, `Thickness`, `Size`, ... and the numerics `int` / `double` / `float` / `decimal`), so the target value is stored already typed.
+This is the exact shape of `Animation0` in `Examples/Transition/WPF/Demo/MainWindow.xaml.cs` (there it is a `static readonly` member of the window's partial class, and the 200 is its `LoadTravel` constant). The generic `Property<TValue>` overload accepts any value type — every adapter declares it **except Razor**, which offers only typed overloads; each adapter adds typed overloads for the platform's value types (`Brush`, `Transform` collections, `Color`, `Point`, `CornerRadius`, `Thickness`, `Size`, ... and the numerics `int` / `double` / `float`, plus `decimal` on every adapter except Jalium), so the target value is stored already typed.
 
 **Expected result:** the fluent chain returns the same `Transition<Rectangle>` with three declared properties (`Opacity`, `RenderTransform.X`, `Fill`) and one 2-second auto-reverse effect. Nothing animates yet.
 
@@ -49,7 +49,7 @@ foreach (var kvp in QuickStart.Animation0.GetState().Values)
     Console.WriteLine($"{kvp.Key.Path} = {kvp.Value}");
 ```
 
-**Expected result:** the loop prints `Opacity = 0`, `RenderTransform.X = 800` and `Fill = <brush>`. `GetState()` also exposes the `Interpolators` and `Options` dictionaries for the per-property samplers/options you attached.
+**Expected result:** the loop prints `Opacity = 0`, `RenderTransform.X = 200` and `Fill = <brush>`. `GetState()` also exposes the `Interpolators` and `Options` dictionaries for the per-property samplers/options you attached.
 
 ## 4. Express a reset
 
@@ -62,8 +62,8 @@ private static Transition<BoxModel> CreateReset(string color)
     return Transition<BoxModel>.Create()
         .Property(b => b.X, 0)
         .Property(b => b.Y, 0)
-        .Property(b => b.Width, 120)
-        .Property(b => b.Height, 80)
+        .Property(b => b.Width, 60)   // SamplerBench.BodyWidth / BodyHeight in the Blazor demo
+        .Property(b => b.Height, 60)
         .Property(b => b.Opacity, 1)
         .Property(b => b.Rotate, 0)
         .Property(b => b.Scale, 1)
@@ -85,13 +85,13 @@ This is `CreateReset` / the reset branch in `Examples/Transition/Blazor/Demo/Dem
 Two path mistakes are rejected rather than silently animating nothing:
 
 - **`TransitionPathConflictException`** (`VeloxDev.TransitionSystem`) — thrown while the transition is being **built**, from `StateCore.SetValue`, when a newly declared path sits above or below one already on the same transition (an object must be expressed by exactly one path). Re-declaring the identical path is a plain overwrite and is allowed. The check covers one transition's value paths only: conflicts **between** two transitions, and paths registered through `SetInterpolator` / `SetOptions`, are not checked.
-- **`TransitionPathUnsampleableException`** (`VeloxDev.TransitionSystem`) — thrown **synchronously by `Execute`** when a declared path can never animate: its leaf is a reference type with no registered sampler and no custom interpolator. Value types are exempt (a struct can still be assembled member by member). This is unrelated to `TransitionProperty.UnreadablePath`, where a path is valid but does not match the current target's runtime type — that stays a per-frame skip.
+- **`TransitionPathUnsampleableException`** (`VeloxDev.TransitionSystem`) — thrown **synchronously by `Execute`** when a declared path can never animate: its leaf is a reference type with no registered sampler and no custom interpolator. Value types are exempt from this check (a struct implementing `ISampleable` is assembled member by member; one that does not is skipped with a `Warn`). This is unrelated to `TransitionProperty.UnreadablePath`, where a path is valid but does not match the current target's runtime type — that stays a per-frame skip.
 
 ```csharp
 // Parent and child paths on one transition -> TransitionPathConflictException
 Transition<Rectangle>.Create()
     .Property(r => r.RenderTransform, [new TranslateTransform(200, 0)])
-    .Property(r => ((TranslateTransform)r.RenderTransform).X, 800); // throws
+    .Property(r => ((TranslateTransform)r.RenderTransform).X, 200d); // throws
 ```
 
 **Expected result:** the conflict throws where the second `Property` is called; the unsampleable path throws from `Execute`, before any frame is scheduled.

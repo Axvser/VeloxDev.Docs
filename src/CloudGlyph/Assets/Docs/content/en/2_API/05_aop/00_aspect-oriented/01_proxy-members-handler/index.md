@@ -1,10 +1,10 @@
-# AOP runtime — `ProxyMembers` & `ProxyHandler`
+# AOP runtime — hook contracts
 
-The hook contracts of the runtime. `ProxyMembers` selects which member kind a `ProxyEx.SetProxy` call registers against; `ProxyHandler` is the signature shared by the `start`, `coverage` and `end` hooks.
+Four types define what can be hooked and what a hook looks like: `ProxyMembers` selects the accessor, `ProxyHandler` is the delegate signature, `AspectHooks` bundles the three stages, and `IAopHookTarget` is the installation surface implemented by the generated proxy.
+
+All four live in `Src/Core/VeloxDev.Core/AspectOriented/ProxyEx.cs` (the enum and `ProxyEx`) and `AspectHooks.cs` (the delegate, `AspectHooks`, `IAopHookTarget`).
 
 ## Type: `ProxyMembers` (enum)
-
-Declared in `Src/Core/VeloxDev.Core/AspectOriented/ProxyEx.cs`:
 
 ```csharp
 public enum ProxyMembers
@@ -15,65 +15,74 @@ public enum ProxyMembers
 }
 ```
 
-Selects which hook table a registration writes to. Internally every `ProxyInstance` keeps three tables — `GetterActions`, `SetterActions`, `MethodActions` — keyed by the dispatched member name.
+Selects the interception key `ProxyEx.SetProxy` builds:
 
-| Member | Hook table | Dispatched member-name key |
+| Member | Key written | Example |
 |---|---|---|
-| `ProxyMembers.Getter` | `GetterActions` | `get_{Member}` (e.g. `get_Name`) |
-| `ProxyMembers.Setter` | `SetterActions` | `set_{Member}` (e.g. `set_Name`) |
-| `ProxyMembers.Method` | `MethodActions` | the bare method name (e.g. `Reset`) |
+| `Getter` | `"get_" + memberName` | `get_Name` |
+| `Setter` | `"set_" + memberName` | `set_Name` |
+| `Method` | `memberName` verbatim | `Reset` |
 
-**Notes:** each table maps a key to a `Tuple<ProxyHandler?, ProxyHandler?, ProxyHandler?>` — the `(start, coverage, end)` triple. A property is therefore intercepted through two independent registrations: one `Getter` entry under `get_*` and one `Setter` entry under `set_*`.
+A property's getter and setter are separate members with separate hook sets.
 
 ## Type: `ProxyHandler` (delegate)
-
-Declared in `Src/Core/VeloxDev.Core/AspectOriented/ProxyInstance.cs`:
 
 ```csharp
 public delegate object? ProxyHandler(object?[]? parameters, object? previous);
 ```
 
-The shared signature for `start`, `coverage` and `end`.
-
-### Invoke
-
-**Signature:** `object? Invoke(object?[]? parameters, object? previous)`
-
 | Parameter | Type | Description |
 |---|---|---|
-| `parameters` | `object?[]?` | The intercepted member's arguments, boxed. For a setter, `parameters[0]` is the value being written; for `AOP_OnMemberAdded`, `parameters[1]` is the `NotifyCollectionChangedEventArgs` |
-| `previous` | `object?` | The result chained from the previous stage: `null` for `start`, the `start` result `R0` for `coverage`, the `coverage` / reflection result `R1` for `end` |
+| `parameters` | `object?[]?` | Getter: `null`. Setter: one element, the value written. Method: the arguments, or `null` when the method has none. |
+| `previous` | `object?` | `null` for `start`; the `start` result for `coverage`; the produced result for `end`. |
 
-**Returns:** `object?` — only a non-null `coverage` handler's return value is honored as the member's result; `start` and `end` return values are currently discarded by the dispatcher.
+**Returns:** `object?` — honored only for `coverage`, where it becomes the member's result.
 
-**Exceptions:** none declared — a handler may throw, and the exception propagates out of `ProxyInstance.Invoke` to the proxy caller.
+**Exceptions:** none declared. A handler may throw; the exception propagates to the proxy caller and the remaining stages do not run.
 
-### The three-stage pipeline
+## Type: `AspectHooks` (sealed class)
 
-For one proxied member call, the dispatcher — ProxyInstance.Invoke ([proxyinstance](../03_proxyinstance/index.md)) — runs:
+```csharp
+public sealed class AspectHooks(ProxyHandler? start, ProxyHandler? coverage, ProxyHandler? end)
+{
+    public ProxyHandler? Start { get; }
+    public ProxyHandler? Coverage { get; }
+    public ProxyHandler? End { get; }
+}
+```
+
+One set per member. A set is installed whole: you cannot replace one stage while keeping another. `null` for the whole set clears that member's aspects (the generated `SetHooks` assigns the slot).
+
+## Type: `IAopHookTarget` (interface)
+
+```csharp
+public interface IAopHookTarget
+{
+    void SetHooks(string memberKey, AspectHooks? hooks);
+}
+```
+
+Implemented explicitly by every generated proxy. User code reaches it only through `ProxyEx.SetProxy`.
+
+**Exceptions:**
+
+| Exception | Condition |
+|---|---|
+| `System.ArgumentOutOfRangeException` | `memberKey` matches no interceptable member of the proxied type |
+
+An unknown key throws rather than doing nothing: a silently ignored aspect is the failure mode this API is designed to prevent.
+
+## Stage order
+
+For a member with hooks, the generated proxy runs:
 
 ```text
-R0 = start?.Invoke(parameters, null)              // before the member body
-R1 = coverage != null ? coverage.Invoke(parameters, R0)   // replaces the body
-                     : reflect the real target member(parameters)
-end?.Invoke(parameters, R1)                        // after the body
+R0 = Start?.Invoke(parameters, null)
+R1 = Coverage is null ? <the member's own body> : Coverage.Invoke(parameters, R0)
+End?.Invoke(parameters, R1)
 return R1
 ```
 
-Demo-verified handlers, `Examples/AOP/WPF/Demo/MainWindow.xaml.cs` (`ConfigureAOP`):
+`Start` sees no result; `Coverage` replaces the body when non-null; `End` observes the final result and its own return value is discarded. A `void` member has `R1 == null`.
 
-```csharp
-// start — runs before Name is read
-p.SetProxy(ProxyMembers.Getter, nameof(TeamViewModel.Name),
-    (_, _) => { MessageBox.Show($"a read operation happened at [{DateTime.Now}]"); return null; },
-    null,
-    null);
-
-// end — runs after Name is changed; parameters[0] is the new value
-p.SetProxy(ProxyMembers.Setter, nameof(TeamViewModel.Name),
-    null,
-    null,
-    (p, _) => { MessageBox.Show($"the name of team has been changed to {p?[0]}"); return null; });
-```
-
-Related pages: [ProxyEx](../02_proxyex/index.md) registers these hooks; [ProxyInstance](../03_proxyinstance/index.md) dispatches them.
+Related pages: [ProxyEx](../02_proxyex/index.md) installs these sets; [Generated proxy](../03_proxy-class/index.md) runs them.

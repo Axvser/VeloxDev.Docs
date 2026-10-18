@@ -18,9 +18,9 @@ $$
 \sum n \approx \left\lfloor \frac{r \cdot T}{h} \right\rfloor
 $$
 
-independent of how the interval was chopped into wake-ups. `TickableBusTests.FixedUpdatePushesTrackTheVirtualClockNotTheWakeCadence` asserts this with a 4× rate and a 600 ms window, accepting the measured count within a $\pm 30\% / +20\%$ band around $\frac{r \cdot T}{h} = 150$ — the band exists because a 600 ms window contains a non-integral number of steps and the sampler may hold a partial one.
+independent of how the interval was chopped into wake-ups. `TickableBusTests.FixedUpdatePushesTrackTheVirtualClockNotTheWakeCadence` asserts this with a 4× rate and a 600 ms window, accepting the measured count within a −30% / +20% band around $\frac{r \cdot T}{h} = 150$ — the band exists because a 600 ms window contains a non-integral number of steps and the sampler may hold a partial one.
 
-The old implementation differs precisely here: it pushed **at most one step per wake-up**, so its count was $\min(\lfloor r \cdot \Delta t / h \rfloor, 1)$ per wake and its ceiling was one step per wake regardless of $r$. Measured over a second, the old form gave about $1000/h$ pushes no matter the rate; the new form gives about $r \cdot 1000 / h$.
+What this buys is a push count that is independent of how the interval was chopped into wake-ups: the sampler keeps the fraction, so a late wake delivers the steps it owes instead of losing them.
 
 ## Per-step total
 
@@ -31,7 +31,7 @@ t_i = \bigl(\text{firstStep} + i\bigr) \cdot h, \qquad i = 0 \ldots n-1, \qquad 
 $$
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 583-599)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 478-496)
 var count = _fixedSampler.Advance(out var sample);
 if (count > 0)
 {
@@ -54,7 +54,7 @@ The alternative — reporting the last reading $n$ times — is what the code co
 
 ## The two bounds: burst and debt
 
-The sampler keeps three integer quantities apart — `_acc` (sub-step remainder), `_earned` (steps time has paid for) and `_delivered` (steps handed out) — so that `PendingSteps = _earned - _delivered` is the debt at any instant (`CompensatingTimeSampler.cs` lines 32-44, 104). Two independent caps act on it:
+The sampler keeps three integer quantities apart — `_acc` (sub-step remainder), `_earned` (steps time has paid for) and `_delivered` (steps handed out) — so that `PendingSteps = _earned - _delivered` is the debt at any instant (`CompensatingTimeSampler.cs` lines 38-43, 105). Two independent caps act on it:
 
 | Cap | Constant | Default | What it bounds |
 |---|---|---|---|
@@ -94,7 +94,7 @@ Bounded work per wake-up, at the price of a bounded amount of simulation time th
 There is one more path, and it is the one that makes a paused channel cost exactly nothing:
 
 ```csharp
-// Src/Core/VeloxDev.Core/Timing/CompensatingTimeSampler.cs (lines 133-141)
+// Src/Core/VeloxDev.Core/Timing/CompensatingTimeSampler.cs (lines 134-142)
 if (epoch != _epoch)
 {
     _epoch = epoch;
@@ -115,7 +115,7 @@ The cost of the check is one `long` comparison per `Advance` — $O(1)$.
 Sleeping on the thread path is never a single `Thread.Sleep` of the whole interval:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 862-870)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 864-872)
 private static void Sleep(TimeSpan duration, CancellationToken token)
 {
     var chunk = TimeSpan.FromMilliseconds(MAX_SLEEP_CHUNK_MS);
@@ -140,7 +140,7 @@ At the lowest permitted target FPS ($1$), a frame budget is $1000$ ms; without c
 The update pump is paced against the **wall clock**, not the virtual one:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 836-847)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 838-849)
 private void FrameRateControlSync(long frameStartTime, CancellationToken token)
 {
     // 目标帧率约束的是采样节奏，不是虚拟时钟，所以这里量的是墙钟——rate 减半不应该让帧率也减半。
@@ -169,4 +169,4 @@ $$
 
 which is the practical reason the dispatch constant matters. If one behaviour takes 30 ms, no target above ~33 fps is reachable, and `CurrentFPS` — measured from the wall clock — is the number that reports it. `TargetFPS` will keep claiming 60.
 
-> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 446-507, 557-620, 836-870; `Examples/Tickable/WPF/Demo/MainWindow.xaml` lines 63-64; `Src/Core/VeloxDev.Core.Test/TimeLine/TickableBusTests.cs` lines 255-319.
+> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 448-509, 559-622, 838-872; `Examples/Tickable/WPF/Demo/MainWindow.xaml` lines 63-64; `Src/Core/VeloxDev.Core.Test/TimeLine/TickableBusTests.cs` lines 255-319.

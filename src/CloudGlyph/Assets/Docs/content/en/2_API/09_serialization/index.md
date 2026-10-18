@@ -4,7 +4,7 @@
 
 Sources: `Src/Core/VeloxDev.Core/Serialization/*.cs` (engine, annotations, `ViewModelSerializer`), `Src/Core/VeloxDev.Core.Extension/CompiledGraphEx.cs`, `CheckpointEx.cs`.
 
-**The design in one line:** closed world, zero reflection. A type is written only if the source generator emitted a reader and a writer for it (`Src/Core/VeloxDev.Core/Serialization/VeloxJsonSerializer.cs:21`). An unseen type fails with an explanation rather than serializing an empty shell, and that is what makes the engine trim- and AOT-friendly.
+**The design in one line:** closed world, zero reflection. A type is written only if the source generator emitted a reader and a writer for it (`Src/Core/VeloxDev.Core/Serialization/VeloxJsonSerializer.cs:11-19`). An unseen type fails with an explanation rather than serializing an empty shell, and that is what makes the engine trim- and AOT-friendly.
 
 ```mermaid
 flowchart TD
@@ -40,15 +40,25 @@ internal sealed partial class ContractModel
 public sealed class ExecutionCheckpoint
 ```
 
-**Member collection** — public properties with a public setter, in declaration order; `[VeloxProperty]`-promoted fields next; inherited members last (`Base/VeloxJsonModel.cs:912-1025`). The order is a byte-level contract of the format.
+**Member collection** — public properties with a public setter, in declaration order; `[VeloxProperty]`-promoted fields next; inherited members last (`Base/VeloxJsonModel.cs:912-1026`). The order is a byte-level contract of the format.
 
-The generator only runs when the consuming assembly references `VeloxDev.MVVM` (`Base/VeloxJsonModel.cs:333`), and the MSBuild property `VeloxJsonSerialization=false` turns it off entirely (`Src/Generators/VeloxDev.Core.Generator/VeloxJson.cs:34`).
+The generator only runs when the compilation can see `VeloxDev.MVVM.VeloxPropertyAttribute` — that type ships in `VeloxDev.Core`, so a project referencing it qualifies (`Base/VeloxJsonModel.cs:333-334`). The MSBuild property `VeloxJsonSerialization=false` turns it off entirely (`Src/Generators/VeloxDev.Core.Generator/VeloxJson.cs:34`).
+
+### Generated metadata
+
+Each contributing assembly gets one generated file, `<SanitizedAssemblyName>_VeloxJson.g.cs` (`Src/Generators/VeloxDev.Core.Generator/VeloxJson.cs:69-73`). It holds:
+
+- one `internal sealed` writer and reader per type, implementing `IVeloxJsonWriter` / `IVeloxJsonReader`;
+- a `[ModuleInitializer]` that registers each pair plus the `$type` name, passing `declaresType` (`Writers/VeloxJsonCodeWriter.cs:503-507`);
+- a header comment listing every type the assembly can write, its written name, its include reason, and a `*` on types reached only through inheritance, a map key, or a type-parameter constraint (`Writers/VeloxJsonCodeWriter.cs:58-72`).
+
+The generator runs once per target framework, so the metadata is repeated per TFM.
 
 ---
 
 ## `ViewModelSerializer` — the entry point
 
-**Signature:** `public static class ViewModelSerializer` (`Serialization/ViewModelSerializer.cs:55`). Every method is constrained `where T : INotifyPropertyChanged`.
+**Signature:** `public static class ViewModelSerializer` (`Serialization/ViewModelSerializer.cs:55`). Every generic method is constrained `where T : INotifyPropertyChanged`; `DeserializeToType` is the only member without a type parameter.
 
 | Member | Signature | Notes |
 |---|---|---|
@@ -161,9 +171,9 @@ These are public so generated code can call them, but they are that code's contr
 
 ## What this format is not
 
-It is **not** interchangeable with `System.Text.Json` or Newtonsoft. Three structural differences: the type discriminator's value is the registry key (a generic name carries its type arguments, nested levels joined with `+`), collection shapes are decided by declared type, and the member set comes from the generator rather than from reflection. A foreign type tag does not resolve, and the reader silently falls back to the declared type — which loses polymorphism for concrete classes and throws `MissingReader` for an interface or abstract type.
+It is **not** interchangeable with `System.Text.Json` or Newtonsoft. Three structural differences: the type discriminator's value is the registry key (a generic name carries its type arguments, nested levels joined with `+`), collection shapes are decided by declared type, and the member set comes from the generator rather than from reflection. A foreign type tag does not resolve, and the reader silently falls back to the declared type — which loses polymorphism for concrete classes and throws the `InvalidOperationException` built by `MissingReader` for an interface or abstract type.
 
 Two more measured behaviours worth knowing:
 
-- **Numbers do not keep their type through an `object` member.** JSON has one integer type: an `int` that went in comes back `long`, a `float` comes back `double`. The engine's own fields are exact; a node that pattern-matches a payload on `int` will not match after a resume.
-- **Untyped members degrade rather than fail.** An `object`-declared member is read back as a JSON dictionary, not the original type.
+- **Numbers do not keep their type through an `object` member.** JSON has one integer type: an `int` that went in comes back `long`. A non-integral number has no numeric token the untyped reader maps back — `ReadUnknown` returns `long` for integral text and the bare token text otherwise (`VeloxJsonSerializer.cs:348-372`). The engine's own fields are exact; a node that pattern-matches a payload on `int` will not match after a resume.
+- **Untyped members degrade rather than fail.** An `object`-declared member naming no registered type is read back as a `Dictionary<string, object?>`, not the original type (`VeloxJsonSerializer.cs:453-501`).

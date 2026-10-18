@@ -1,6 +1,6 @@
 # Data Flow — Workflow Agent
 
-The workflow-agent feature operates a GUI workflow tree through 68 built-in `AITool`s and, for its compiled run/result tools, reuses the GUI's own `CompilerEx` model (`CompilerViewModel.CompileAsync` + `RuntimeEngine`). Each page below traces one sequence flow with PlantUML, covering the normal path and its error/async branches.
+The workflow-agent feature operates a GUI workflow tree through 66 unconditional built-in `AITool`s (plus conditional interaction/plan tools) and, for its compiled run/result tools, reuses the GUI's own `CompilerEx` model (`CompilerViewModel.CompileAsync` + `RuntimeEngine`). Each page below traces one sequence flow with PlantUML, covering the normal path and its error/async branches.
 
 | # | Flow | Page |
 |---|---|---|

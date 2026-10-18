@@ -14,13 +14,14 @@
 
 源码：`Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`。
 
+注册表本身是一个私有静态字段（`private static readonly ConcurrentDictionary<Type, ISampler> Interpolators`），只能通过下列成员访问 —— 调用方无法整体替换或清空它。
+
 | 成员 | 签名 | 描述 |
 |---|---|---|
-| `NativeInterpolators` | `public static ConcurrentDictionary<Type, ISampler> NativeInterpolators { get; protected set; }` | 按类型注册的采样器表。 |
-| `TryGetInterpolator` | `public static bool TryGetInterpolator(Type type, out ISampler? sampler)` | 查找某类型已注册的采样器。 |
+| `TryGetInterpolator` | `public static bool TryGetInterpolator(Type type, out ISampler? sampler)` | 查找某类型已注册的采样器：先精确类型，再按由近及远遍历基类，最后扫描注册表找出可赋值的接口，取全名按序最小者。 |
 | `RegisterInterpolator` | `public static bool RegisterInterpolator(Type type, ISampler sampler)` | 注册采样器（原子的「后写者胜」）。 |
 | `UnregisterInterpolator` | `public static bool UnregisterInterpolator(Type type, out ISampler? sampler)` | 移除已注册的采样器。 |
-| `Prepare`（实例、`virtual`，带优先级类型参数） | `public virtual SamplerSet<TPriorityCore> Prepare<TPriorityCore>(object target, IFrameState state, ITransitionEffectCore effect, IUIThreadInspector<TPriorityCore> inspector)` | 把状态中的每个属性归一化进一个 `SamplerSet<TPriorityCore>`。由主题切换所走的 `TransitionSchedulerCore.Execute` 调用；`ThemeManager` 自己从不调用它。 |
+| `Prepare`（实例、`virtual`，带优先级类型参数） | `public virtual SamplerSet<TPriorityCore> Prepare<TPriorityCore>(object target, IFrameState state, ITransitionEffectCore effect, ITransitionHost<TPriorityCore> host)` | 把状态中的每个属性归一化进一个 `SamplerSet<TPriorityCore>`。由主题切换所走的 `TransitionSchedulerCore.Execute` 调用；`ThemeManager` 自己从不调用它。 |
 | `CreateScheduler`（实例、`virtual`） | `public virtual TransitionSchedulerCore? CreateScheduler(object target, ITransitionEffectCore effect)` | 平台接缝：返回为 `target` 做动画的调度器；平台承载不了 `effect` 时返回 `null`。默认返回 `null`。 |
 
 **说明：**
@@ -84,7 +85,8 @@
 
 **说明：**
 - `ThemeManager.PrepareSamplers` 用 `TransitionProperty.FromProperty(propertyInfo)` 包装每个动画属性，随后通过 `SetValue` 写入起始/结束值。
-- `FromProperty` 是反射驱动的入口：主题系统在*每一场*切换中，为每个已注册目标的每个主题属性重建一条路径，而声明式路径只构建一次并存在字段里。因此它走一个静态的 `ConcurrentDictionary<PropertyInfo, TransitionProperty>`，返回**共享**实例而不重新构造，使每条路径的 getter/setter 表达式按属性编译一次，而不是每场切换编译一次。提交 `58ae23b3` 实测：在 1000 个双属性元素上，未记忆化的代价是首帧前约 1.6 s 的 UI 线程停顿与 29 MB 分配，记忆化后约为 10 ms 与 6 MB。
+- `FromProperty` 是反射驱动的入口：主题系统在*每一场*切换中，为每个已注册目标的每个主题属性重建一条路径，而声明式路径只构建一次并存在字段里。因此它走一个静态的 `ConditionalWeakTable<PropertyInfo, TransitionProperty>`，返回**共享**实例而不重新构造，使每条路径的 getter/setter 表达式按属性编译一次，而不是每场切换编译一次。源码注释测得：在 1000 个双属性元素上，未记忆化的代价是首帧前约 2 秒的 UI 线程停顿。
+- 这张备忘录刻意使用弱键：条目链是路径 → 段 → `PropertyInfo` → `Type` → `Assembly`，强键会把该程序集钉在进程的整个生命周期里，令可回收的 `AssemblyLoadContext` 永远无法卸载。
 - 共享是安全的：路径不可变，而没有要冻结的索引实参时 `BindTo` 返回实例自身——这里永远如此。惰性编译是幂等的，并发首次使用最多编译两次、丢弃一次。
 
 ## 命名空间：`VeloxDev.TransitionSystem`
@@ -109,7 +111,7 @@
 
 `public interface ISampler`
 
-无状态、线程安全的采样器。采样器通常是注册在 `InterpolatorCore.NativeInterpolators` 中的共享单例。一次运行开始时，`InterpolatorCore.Prepare` 对每个属性调用一次 `NormalizeStart` / `NormalizeEnd`，随后由解释器在每个采样帧调用一次 `InsertFrame`。
+无状态、线程安全的采样器。采样器通常是通过 `RegisterInterpolator` 注册进 `InterpolatorCore` 进程级注册表的共享单例。一次运行开始时，`InterpolatorCore.Prepare` 对每个属性调用一次 `NormalizeStart` / `NormalizeEnd`，随后由解释器在每个采样帧调用一次 `InsertFrame`。
 
 源码：`Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ISampler.cs`。
 

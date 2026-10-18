@@ -1,6 +1,6 @@
 # 工作流代理 — API：子代理
 
-`VeloxDev.AI.SubAgents` 命名空间（实现在 `Src/Core/VeloxDev.Core.Extension/Agent/SubAgents/`）让代理能够**在后台派发子代理**，每个子代理拿到派发者能力的一份收窄切片。公开面由七个类型组成：子系统本身与它的上下文提供器、面向 Agent 的工具包、状态与摘要那一对，以及两个树视图模型。
+`VeloxDev.AI.SubAgents` 命名空间（实现在 `Src/Core/VeloxDev.Core.Extension/Agent/SubAgents/`）让代理能够**在后台派发子代理**，每个子代理拿到派发者能力的一份收窄切片。公开面由八个类型组成：子系统本身与它的上下文提供器、面向 Agent 的工具包、状态与摘要那一对、可绑定行，以及两个树视图模型。
 
 入口：`SubAgentScope.ForClient(chatClient)` → `workflowScope.WithSubAgents(subAgents)`。此后模型通过五个工具触达本子系统（`SpawnSubAgent`、`WaitSubAgents`、`GetSubAgentResult`、`ListSubAgents`、`CancelSubAgent`）。
 
@@ -23,7 +23,7 @@
 | `WithSubAgents` | `WorkflowAgentScope WithSubAgents(SubAgentScope)` | 挂上子系统，调用 `SubAgentScope.Attach(this)`，转交 UI `SynchronizationContext`，并把该子系统的提供器与本作用域的 `ToolPipeline` 组合后注册。`null` 抛 `ArgumentNullException`。 |
 | `AllowNodeExecution` | `bool { get; }` —— **internal** | spawn 用它判断节点执行能否往下交。internal，测试经 `InternalsVisibleTo` 触达。 |
 | `MaxReadToolCalls` / `MaxWriteToolCalls` | `int? { get; }` —— **internal** | spawn 用来夹取读/写档位；请求沉默时由子代理继承。 |
-| `GrantInteractionTo` | `void GrantInteractionTo(WorkflowAgentScope child)` —— **internal** | 把交互安全等级、各等级的提示词覆盖表、以及两个处理器一起复制到子作用域上。 |
+| `GrantInteractionTo` | `void GrantInteractionTo(WorkflowAgentScope child)` —— **internal** | 把整份权限策略（模式、每条规则、judge）、各模式的提示词覆盖表、以及两个交互处理器一起复制到派生子作用域上。 |
 | `GrantCustomToolsTo` | `void GrantCustomToolsTo(WorkflowAgentScope child, IReadOnlyCollection<string> granted)` —— **internal** | 按授予结果重新注册本作用域自定义工具**分组**的子集，连用法说明一起。 |
 | `ParentLedger` | `ToolCallLedger? { get; set; }` —— **internal** | 子作用域链上去的外层账本，让它的调用记在根上。由 `CreateToolkit()` 读取。 |
 

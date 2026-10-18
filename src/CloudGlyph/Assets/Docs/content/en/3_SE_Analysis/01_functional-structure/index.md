@@ -14,7 +14,7 @@ The wiki is organized around **features**, not directories. A feature is a cohes
 | **aop** | `VeloxDev.Core` (`#if NET`) | `ProxyEx`, `ProxyInstance`, `AopCache`, `IAspectOriented` | `DispatchProxy`, generator | Demo + Test |
 | **tickable** | `VeloxDev.Core` | `TickManager`, `TickableAttribute`, `ITickable` | Roslyn generator | Demo + Test |
 | **weak-types** | `VeloxDev.Core` | `WeakDelegate`, `WeakQueue`, `WeakStack`, `WeakCache` | — | Test |
-| **platform-adapters** | 6 adapters + `Src/Templates` | Attached workflow behaviors, per-platform Transition/Theme wiring, `dotnet new` templates | per-framework SDK | README + Demo + Source |
+| **platform-adapters** | 7 adapters + `Src/Templates` | Attached workflow behaviors, per-platform Transition/Theme wiring, `dotnet new` templates | per-framework SDK | README + Demo + Source |
 | **serialization** | `VeloxDev.Core` (+ `VeloxDev.Core.Extension` for the compiled-graph and checkpoint documents) | `ViewModelSerializer`, `SerializationOptions`, `ArchivableAttribute`, `ArchiveAttribute`, `ArchiveOptions`, `CompiledGraphEx`, `CheckpointEx` | Roslyn generator | Demo + Test |
 
 ## Module Responsibility Boundaries
@@ -36,7 +36,7 @@ flowchart TD
         AGT[Workflow Agent<br/>66 tools · state tracker]
         MCP[MCP scope<br/>stdio servers]
     end
-    subgraph Adapters [VeloxDev.WPF / Avalonia / WinUI / MAUI / WinForms / Razor]
+    subgraph Adapters [VeloxDev.WPF / Avalonia / WinUI / MAUI / WinForms / Razor / Jalium]
         AB[Attached workflow behaviors<br/>surface · drag · connect · pool · minimap]
         PA[PlatformAdapters<br/>interpolator · theme converters · UI thread]
     end

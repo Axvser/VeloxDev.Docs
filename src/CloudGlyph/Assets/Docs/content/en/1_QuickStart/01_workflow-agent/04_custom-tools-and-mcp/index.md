@@ -19,7 +19,7 @@ scope.WithQueryTools(null, lookupTool);                        // read-only cust
 - An `AIFunction` custom tool is wrapped with `TrackedAIFunction`, so it gets the same UI-thread marshalling, budget accounting, `ToolCalled` callback and auto-dirty treatment as a built-in. A non-`AIFunction` tool is added as-is and gets none of that.
 - The optional `promptContext` is injected as a "Custom Tools" section in the prompt. Registration is remembered per group, so a **sub-agent spawn can grant a subset** with the matching guidance — never the guidance for a tool the child did not receive.
 
-**Expected result:** `scope.ProvideTools()` contains your tool names alongside the 68 built-ins.
+**Expected result:** `scope.ProvideTools()` contains your tool names alongside the 66 unconditional built-ins (71 with both handlers registered).
 
 ## 2. Attach MCP servers
 
@@ -49,18 +49,20 @@ Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`
 
 ## 3. The MCP management tools
 
-`McpAgentToolkit` exposes server management to the model. Registration is conditional:
+`McpAgentToolkit` exposes server management to the model. Registration depends on whether the scope is a **granted view** (the narrowed MCP surface handed to a spawned child):
 
-| Tool | Registered when |
-|---|---|
-| `ListMcpServers` | always — pure query |
-| `LoadMcpServers` | `!IsGrantedView` (i.e. the host owns the scope, not a narrowed sub-agent view) |
-| `UnloadMcpServer` | `!IsGrantedView` |
-| `AddMcpServer` | `SelfServiceLevel != McpSelfServiceLevel.Closed` **and** `!IsGrantedView` |
+| Tool | Registered when | Category |
+|---|---|---|
+| `ListMcpServers` | always — pure query | `Read` |
+| `LoadMcpServers` | `!IsGrantedView` | `Curate` |
+| `UnloadMcpServer` | `!IsGrantedView` | `Curate` |
+| `DescribeMcpServer` | always — pure query | `Read` |
+| `AddMcpServer` | `!IsGrantedView` | `Curate` |
+| `SetMcpServerArguments` | `!IsGrantedView` | `Curate` |
 
-`McpSelfServiceLevel` is a ladder: `Closed = 0` (the demo's choice — the agent may load/unload/inspect only the host's pre-registered servers), `RemoteConfirmed = 1`, `AllConfirmed = 2`, `Unrestricted = 3`. Raise it with `McpScope.WithSelfService(level)`.
+There is no self-service ladder any more (`McpSelfServiceLevel` and `McpScope.WithSelfService` are gone). What may run is decided at call time by the **permission mode and the host's rules**: `Curate` actions are the ones that still ask in `AgentPermissionMode.Auto`, and the refusal names the mode. A granted view registers only the two read tools, because loading installs software and unloading tears down a connection the parent may still be using.
 
-**Expected result:** at `Closed`, `ListMcpServers` / `LoadMcpServers` / `UnloadMcpServer` / `DescribeMcpServer` are offered and no `AddMcpServer`; raising the level adds `AddMcpServer`.
+**Expected result:** at `AgentPermissionMode.Auto` the model is offered all six tools, and calling `AddMcpServer` is put to the confirmation handler; switch to `Bypass` and it runs without asking (unless a `Deny` rule matches).
 
 ## 4. Run modes and configuration
 
@@ -74,7 +76,7 @@ Source: `Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`
 | `Exe` | Executes `{root}/exe/{package}` directly. |
 | `Http` | Connects to a remote server at `Endpoint` (Streamable HTTP, SSE fallback). |
 
-`McpServerConfiguration.Options` is an anonymous-object blob: for `Http` — `headers`, `oauth`, `connectionTimeout`, `transportMode`, `ownsSession`; for stdio — `env`, `workingDirectory`. Unknown keys are rejected.
+`McpServerConfiguration.Options` is a `IReadOnlyDictionary<string, object?>?` (a map, not an anonymous object): for `Http` — `headers`, `oauth`, `connectionTimeout`, `transportMode`, `ownsSession`; for stdio — `env`, `workingDirectory`. Unknown keys are rejected.
 
 **Expected result:** a bad configuration (unknown `Options` key, missing `Package` for a local mode) fails that server alone — its status becomes `Error`, `ServerError` fires, and it contributes zero tools; the rest of the batch loads.
 
@@ -89,4 +91,4 @@ scope.WithTools("Use Ping to check connectivity.", ping)
 
 ## Run declaration
 
-- ⚠️ Not actually run — statically verified only. The wiring and the conditional tool registration are read from `WorkflowAgentScope.WithMcps` and `McpAgentToolkit.CreateTools`; no MCP server was loaded from this page. (The deterministic `Agent/**` test suite passed — see the Tool Budgets page — but that suite does not launch a real MCP server.)
+- ⚠️ Not actually run — statically verified only (2026-10-18). The wiring and the granted-view/management-tool registration are read from `WorkflowAgentScope.WithMcps` and `McpAgentToolkit.CreateTools`; no MCP server was loaded from this page, and the previously recorded `Agent/**` suite run predates the permission-mode redesign.

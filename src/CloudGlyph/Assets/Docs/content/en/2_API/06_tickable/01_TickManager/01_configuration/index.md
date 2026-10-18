@@ -1,6 +1,6 @@
 # `TickManager` — Configuration
 
-Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 1000-1103 (the static surface) and 201-270 (`LoopChannel` implementations).
+Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 1008-1105 (the static surface) and 205-272 (`LoopChannel` implementations).
 
 Every member here takes `string channel = TickManager.DEFAULT_CHANNEL`.
 
@@ -13,7 +13,7 @@ Every member here takes `string channel = TickManager.DEFAULT_CHANNEL`.
 
 **Notes:**
 - A compile-time constant, so it is usable as a parameter default, an attribute argument and a `switch` label.
-- `Examples/Tickable/WPF/Demo/SimState.cs` line 21 shows the pattern worth copying: `public const string Name = TickManager.DEFAULT_CHANNEL;`, then `[Tickable(DemoChannel.Name)]` — the channel is named once and read back on screen.
+- `Examples/Tickable/WPF/Demo/SimState.cs` line 13 shows the pattern worth copying: `public const string Name = TickManager.DEFAULT_CHANNEL;`, then `[Tickable(DemoChannel.Name)]` — the channel is named once and read back on screen.
 
 #### Property: `TickManager.UseAsyncLoop`
 
@@ -23,7 +23,7 @@ Every member here takes `string channel = TickManager.DEFAULT_CHANNEL`.
 **Returns:** `bool` — whether a channel drives its frames with `async`/`await` + `Task.Delay` instead of native `Thread`s.
 
 **Notes:**
-- The initializer is build-target dependent (lines 1006-1011):
+- The initializer is build-target dependent (lines 1008-1013):
 
 ```csharp
 public static bool UseAsyncLoop { get; set; } =
@@ -60,16 +60,16 @@ public static bool UseAsyncLoop { get; set; } =
 
 **Returns:** `void`.
 
-**Exceptions:** none — an out-of-range value is **silently ignored**, not clamped and not reported (lines 205-206).
+**Exceptions:** none — an out-of-range value is **silently ignored**, not clamped and not reported (lines 207-208).
 
 **Example:**
 ```text
-// Source: Examples/Tickable/WPF/Demo/MainWindow.xaml.cs (line 75)
+// Source: Examples/Tickable/WPF/Demo/MainWindow.xaml.cs (line 66)
 TickManager.SetTargetFPS(60, DemoChannel.Name);
 ```
 
 **Notes:**
-- Queued as a `ConfigChangeRequest` pulled from `_configRequestPool`; the update pump applies it in `ProcessConfigChanges` (lines 768-783), where the target FPS field and the cached frame duration are written together.
+- Queued as a `ConfigChangeRequest` pulled from `_configRequestPool`; the update pump applies it in `ProcessConfigChanges` (lines 770-785), where the target FPS field and the cached frame duration are written together.
 - Default 60. The pacing constrains the *sampling cadence*, not the virtual clock — halving the time scale does not halve the frame rate.
 
 #### `TickManager.SetFixedUpdateInterval`
@@ -84,16 +84,16 @@ TickManager.SetTargetFPS(60, DemoChannel.Name);
 
 **Returns:** `void`.
 
-**Exceptions:** none — out of range is ignored (line 223).
+**Exceptions:** none — out of range is ignored (line 225).
 
 **Example:**
 ```text
-// Source: Examples/Tickable/WPF/Demo/MainWindow.xaml.cs (line 83)
+// Source: Examples/Tickable/WPF/Demo/MainWindow.xaml.cs (line 74)
 TickManager.SetFixedUpdateInterval(16, DemoChannel.Name);
 ```
 
 **Notes:**
-- Deliberately **not** routed through the config queue: that queue is drained by the *update* loop, while the sampler belongs to the *fixed* loop. The value goes into a volatile field (`_pendingFixedIntervalMs`) and the fixed pump writes `_fixedSampler.Step` on its own thread (lines 457-463) — writing it from the update thread would race `Advance` over the accumulator it resets.
+- Deliberately **not** routed through the config queue: that queue is drained by the *update* loop, while the sampler belongs to the *fixed* loop. The value goes into a volatile field (`_pendingFixedIntervalMs`) and the fixed pump writes `_fixedSampler.Step` on its own thread (lines 459-465) — writing it from the update thread would race `Advance` over the accumulator it resets.
 - Default 16 ms. A step of zero is not a legal value, which is why zero is free to mean "nothing pending".
 
 #### `TickManager.SetTimeScale`
@@ -115,7 +115,7 @@ TickManager.SetFixedUpdateInterval(16, DemoChannel.Name);
 
 **Example:**
 ```text
-// Source: Examples/Tickable/WPF/Demo/MainWindow.xaml.cs (line 91)
+// Source: Examples/Tickable/WPF/Demo/MainWindow.xaml.cs (line 80)
 TickManager.SetTimeScale(1f, DemoChannel.Name);
 
 // Source: Src/Core/VeloxDev.Core.Test/TimeLine/TickableBusTests.cs (line 252)
@@ -123,7 +123,7 @@ Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => TickManager.SetTimeScale
 ```
 
 **Notes:**
-- Applied straight to the bus (line 238) instead of through the config queue: the bus serialises its own writers, and the queue only existed when the rate was a channel-owned field.
+- Applied straight to the bus (line 242) instead of through the config queue: the bus serialises its own writers, and the queue only existed when the rate was a channel-owned field.
 - Because it is the *clock's* rate, `FrameEventArgs.DeltaTime` and `FrameEventArgs.TotalTime` both follow it, and so does every animation anchored to `TickManager.Bus(channel)` — while the frame *cadence* does not (`TickableBusTests.TheChannelsRateScalesTheAnimationButNotTheFrameCadence`).
 - A rate of `0` freezes the clock without pausing it: no frames are dispatched, `IsPaused` stays `false`, `SystemStatus` still reports `"Running"`, and `Resume()` will not restart it. Only a non-zero rate does.
 
@@ -140,7 +140,7 @@ Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => TickManager.SetTimeScale
 **Returns:** `void`.
 
 **Notes:**
-- "Main thread" means the channel's **update** thread, not a UI thread. `ProcessMainThreadOperations` (lines 753-766) drains at most 64 actions per frame before processing config, add and remove queues.
+- "Main thread" means the channel's **update** thread, not a UI thread. `ProcessMainThreadOperations` (lines 755-768) drains at most 64 actions per frame before processing config, add and remove queues.
 - Actions are wrapped in `try/catch` and failures go to `Debug.WriteLine` only.
 - In a UI host you still marshal to the dispatcher yourself, and doing it from inside a hook is the failure mode with no symptom — the engine swallows every hook exception.
 

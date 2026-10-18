@@ -1,35 +1,15 @@
 # Tickable — API 参考
 
-tickable 特性在 .NET 侧提供一套类似 Unity 的帧驱动行为循环。用 `[Tickable]` 标记 `partial` 类后，Roslyn 源生成器（`VeloxDev.Core.Generator`）会让该类实现 `VeloxDev.TimeLine.ITickable`；静态 `TickManager` 随即驱动每个通道的 Update / LateUpdate / FixedUpdate 循环，并把每一帧转发给行为中 `partial void` 钩子。
-
-## 名称对照 —— 2026-10-01 被改掉的一切
-
-该特性原名 *monobehaviour*。命名空间 `VeloxDev.TimeLine` 从未改变，改变的是下面这些名字。API 参考只使用新名 —— 没有兼容别名，旧名在程序集里已经不存在。
-
-| 旧名（2026-10-01 之前） | 现名 |
-|---|---|
-| `MonoBehaviourAttribute` | `TickableAttribute` |
-| `MonoBehaviourManager` | `TickManager` |
-| `IMonoBehaviour` | `ITickable` |
-| `MonoBehaviourChannelEventArgs` | `TickChannelEventArgs` |
-| `InitializeMonoBehaviour` | `InitializeTickable` |
-| `CloseMonoBehaviour` | `CloseTickable` |
-| 命名空间 `VeloxDev.MonoBehaviour` | 命名空间 `VeloxDev.TimeLine` |
-| `Interfaces/MonoBehaviour/` | `Interfaces/Tickable/` |
-| `MonoWriter.cs`（生成器） | `TickWriter.cs` |
-| `Examples/MonoBehaviour/WPF/Demo/` | `Examples/Tickable/WPF/Demo/` |
-| `MonoBehaviourManagerTests.cs`（测试） | `TickManagerTests.cs` |
-
-**未变：** 五个生命周期钩子名 —— `Awake`、`Start`、`Update`、`LateUpdate`、`FixedUpdate` —— 以及命名空间 `VeloxDev.TimeLine`。
+tickable 特性在 .NET 侧提供一套帧驱动行为循环。用 `[Tickable]` 标记 `partial` 类后，Roslyn 源生成器（`VeloxDev.Core.Generator`）会让该类实现 `VeloxDev.TimeLine.ITickable`；静态 `TickManager` 随即驱动每个通道的 Update / LateUpdate / FixedUpdate 循环，并把每一帧转发给行为中 `partial void` 钩子。
 
 ## 命名空间
 
-全部随 `VeloxDev.Core` 包分发；改名之后它们全都在**同一个**命名空间里。
+全部随 `VeloxDev.Core` 包分发。
 
 | 命名空间 | 承载的公开 API |
 |---|---|
 | `VeloxDev.TimeLine` | `TickableAttribute`、`TickManager`、`TickChannelEventArgs`、`ITickable`、`TimeLineEventArgs`、`FrameEventArgs` |
-| `VeloxDev.Timing` | `ITimeSourceControl`、`ITimeSource` —— 通道的时钟，经 `TickManager.Bus` 取得。属于共享基础设施，随过渡动画特性一并记录 |
+| `VeloxDev.Timing` | `ITimeSource`、`ITimeSourceControl` —— 通道的时钟，经 `TickManager.Bus` 取得。属于共享基础设施，随过渡动画特性一并记录 |
 
 ## 模型
 
@@ -50,9 +30,9 @@ public partial class Behaviour
 
 - `[Tickable]` 选定循环通道，并可选指定注册时的目标帧率。
 - `InitializeTickable()`（由生成器生成）负责注册实例；`CloseTickable()`（由生成器生成）负责注销。
-- `TickManager` 拥有各通道的循环；生命周期与配置均为线程安全操作，在帧边界生效。
+- `TickManager` 拥有各通道的循环。每个修改器都可从任意线程调用；目标帧率变更在帧边界生效，速率直接作用于总线，步长变更交给 fixed 泵。
 - 行为将 `FrameEventArgs.Handled = true` 置位后，会跳过该帧阶段其余行为。
-- 各通道的 `OnChannelStarted` / `OnChannelPaused` / `OnChannelResumed` / `OnChannelStopped` 事件上报生命周期迁移。
+- `OnChannelStarted` / `OnChannelPaused` / `OnChannelResumed` / `OnChannelStopped` 事件上报所有通道的生命周期迁移。
 
 证据来源：源码（`Src/Core/VeloxDev.Core/TimeLine/`、`Src/Core/VeloxDev.Core/Interfaces/Tickable/`）、源生成器（`Src/Generators/VeloxDev.Core.Generator/Tickable.cs` 与 `Writers/TickWriter.cs`）、WPF 示例（`Examples/Tickable/WPF/Demo/`）与 MSTest 测试套件（`Src/Core/VeloxDev.Core.Test/TimeLine/`）。
 
@@ -61,13 +41,13 @@ public partial class Behaviour
 | 类型 | 种类 | 公开成员 | 页面 |
 |---|---|---|---|
 | `TickableAttribute` | sealed class : `Attribute` | 2 属性、1 构造函数 | [TickableAttribute](00_TickableAttribute/index.md) |
-| `TickManager` | 静态类 | 4 事件、2 个公开属性（`UseAsyncLoop`、`ChannelNames`）、1 个公开常量（`DEFAULT_CHANNEL`）、27 个公开静态方法 —— 合计 34 个公开成员 | [TickManager](01_TickManager/index.md) |
+| `TickManager` | 静态类 | 4 事件、3 个属性/常量（`DEFAULT_CHANNEL`、`UseAsyncLoop`、`ChannelNames`）、27 个静态方法 —— 合计 34 个公开成员 | [TickManager](01_TickManager/index.md) |
 | `TimeLineEventArgs` | 抽象类 | 3 属性 | [TimeLineEventArgs](02_TimeLineEventArgs/index.md) |
-| `FrameEventArgs` | class : `TimeLineEventArgs` | 2 个只读属性 + 3 个继承 | [FrameEventArgs](03_FrameEventArgs/index.md) |
+| `FrameEventArgs` | class : `TimeLineEventArgs` | 2 个只读属性（internal set）+ 3 个继承 | [FrameEventArgs](03_FrameEventArgs/index.md) |
 | `TickChannelEventArgs` | sealed class : `EventArgs` | 1 属性 | [TickChannelEventArgs](04_TickChannelEventArgs/index.md) |
 | `ITickable` | 接口 | 7 个方法 | [ITickable](05_ITickable/index.md) |
 
-`TransitionEventArgs` **不再属于本特性**：它已从 `VeloxDev.TimeLine` 移入 `VeloxDev.TransitionSystem`，不再 `sealed`，并携带 `Loop` / `Cycle`（另有带类型的 `TransitionEventArgs<TStage, TValue>` 与 `WarnStage` / `ErrorStage` 枚举）。它随过渡动画特性记录 —— 见[过渡事件参数](../03_过渡动画/00_transitionsystem/04_过渡事件参数/index.md)。
+`TransitionEventArgs` **不属于本特性**：它位于 `VeloxDev.TransitionSystem`，随过渡动画特性记录。
 
 以下内容**不属于**公开表面，也不应出现在用户代码里 —— 它们是 `TickManager` 内部的 `private`：嵌套类型 `LoopChannel`、`BehaviorWrapper`、`ConfigChangeRequest`、`ObjectPool<T>`，以及 `GetOrCreateChannel`、所有返回 `LoopChannel` 的方法和各泵方法。公开途径只有静态门面与 `TickManager.Bus`。
 

@@ -157,7 +157,7 @@ public sealed class TransitionPathConflictException : Exception
 
 ### Exception: `TransitionPathUnsampleableException`
 
-Thrown **synchronously by `Transition<T>.Execute(...)`** when a declared path can never animate: its leaf is a reference type with no custom interpolator and no registered sampler, so there is nothing to interpolate with. A value type is exempt — one can still be assembled member by member.
+Thrown **synchronously by `Transition<T>.Execute(...)`** when a declared path can never animate: its leaf is a reference type with no custom interpolator and no registered sampler, so there is nothing to interpolate with. A value type is exempt from this check — a struct implementing `ISampleable` is assembled member by member, and one that does not is skipped with a `Warn`.
 
 ```csharp
 public sealed class TransitionPathUnsampleableException : Exception

@@ -87,7 +87,50 @@
 
 由 `AgentToolCallEventArgsTests` 覆盖；宿主对话框位于 `Examples/Workflow/WinForms/Demo/Dialogs/AgentSelectionDialog.cs` 与 `AgentConfirmationDialog.cs`。
 
-## 通用对象工具包（Extension）
+## 权限策略（`VeloxDev.AI.Safety`）
+
+每次非读工具调用背后的代码闸门。工具在注册它的那一行声明 `AgentActionCategory`；策略逐次调用决定 `Allow` / `Ask` / `Deny`。
+
+### `AgentPermissionMode`
+
+`public enum AgentPermissionMode` —— 用户可以切换的具名状态：
+
+| 值 | 含义 |
+|---|---|
+| `Plan = 0` | 只读与交互；图编辑、执行与可达性变更一律拒绝。 |
+| `Manual = 1` | 每个非读动作都询问。 |
+| `AutoEdit = 2` | 读与编辑直接运行；执行与可达性变更询问。 |
+| `Auto = 3` | 读、编辑与执行直接运行；只有 `Curate` 询问。**默认**（`AgentPermissionPolicy.DefaultMode`）。 |
+| `Bypass = 4` | 什么都不问；显式 `Deny` 规则仍生效。 |
+
+### `AgentActionCategory`
+
+`public enum AgentActionCategory` —— 工具*做什么*（刻意不同于 `WorkflowToolCategory`，后者是表面过滤器）：`Read = 0`（检查）、`Edit = 1`（可撤销的图变更）、`Execute = 2`（运行代码，不可撤销）、`Curate = 3`（改变会话可达范围）、`Interact = 4`（询问；从不交给用户）。
+
+### `AgentPermissionPolicy`
+
+`public sealed class AgentPermissionPolicy` —— 不可变；每次修改返回新策略。
+
+| 成员 | 签名 | 说明 |
+|---|---|---|
+| `Mode` | `AgentPermissionMode { get; }` | 当前模式。 |
+| `Rules` | `IReadOnlyList<AgentPermissionRule> { get; }` | 按添加顺序。 |
+| `Judge` | `Func<ToolInvocation, PermissionDecision>? { get; }` | 在 `Auto` 中为无规则裁决的调用提供决定。 |
+| `DefaultMode` | `static AgentPermissionMode DefaultMode` | `Auto`。 |
+| `For` | `static AgentPermissionPolicy For(AgentPermissionMode mode)` | 某模式下的空策略。 |
+| `WithMode` / `WithRule(s)` / `WithoutRules` / `WithJudge` | 策略工厂 | 各自返回新策略。 |
+| `Evaluate` | `PermissionDecision Evaluate(ToolInvocation invocation)` | Deny 规则 → Plan 拒绝 → Ask 规则 → Allow 规则 → `Auto` judge → 模式默认。 |
+| `ModeDefault` | `static PermissionDecision ModeDefault(AgentPermissionMode, AgentActionCategory)` | 模式/类别矩阵。 |
+
+### `AgentPermissionRule` / `PermissionDecision` / `ToolInvocation`
+
+`public sealed record AgentPermissionRule(PermissionDecision Decision, string Pattern)`。模式按工具名（`DeleteNode`、`Get*`）、`category:Edit` 或 `source:mcp:*` / `source:skill` 选择。匹配不区分大小写；`*` 匹配任意字符段。`Deny` 规则在所有模式下生效。
+
+`public enum PermissionDecision` —— `Allow = 0`、`Ask = 1`、`Deny = 2`。
+
+`public sealed record ToolInvocation(string Name, AgentActionCategory Category, string? Source, IReadOnlyDictionary<string, object?> Arguments)` 携带被裁决的调用。`Source` 对 workflow 自己的工具为 `null`，或为 `mcp:<server>` / `skill` / `subagent` / `custom`。源码：`Agent/Safety/*.cs`；测试 `Agent/Safety/AgentPermissionPolicyTests.cs`。
+
+
 
 ### `AgentObjectToolkit`
 

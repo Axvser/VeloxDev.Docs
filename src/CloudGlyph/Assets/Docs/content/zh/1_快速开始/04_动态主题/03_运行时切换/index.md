@@ -11,7 +11,7 @@
 
 两条路径通知同一组钩子、顺序也相同，并且都会拒绝「切到当前主题」这种空切换。
 
-- [00 准备一场带动画的切换](00_准备/index.md) —— `SetPlatformInterpolator`（带动画时的强制项）、`StartModel`、effect 预设
-- [01 带动画与即时切换](01_带动画与即时切换/index.md) —— `Transition` / `Jump`、生成的钩子、`SetCurrent`
-- [02 控制运行中的切换](02_控制切换/index.md) —— 一场切换一条时间轴，`Pause` / `Resume` / `Seek` / `SetRate` / `Exit`
-- [03 运行时覆盖与线程](03_运行时覆盖与线程/index.md) —— `SetThemeValue` / `RestoreThemeValue`、两个缓存、切换写在哪个线程上
+- [准备一场带动画的切换](00_准备/index.md) —— `SetPlatformInterpolator`（带动画时的强制项）、`StartModel`、effect 预设
+- [带动画与即时切换](01_带动画与即时切换/index.md) —— `Transition` / `Jump`、生成的钩子、`SetCurrent`
+- [控制运行中的切换](02_控制切换/index.md) —— 一场切换一条时间轴，`Pause` / `Resume` / `Seek` / `SetRate` / `Exit`
+- [运行时覆盖与线程](03_运行时覆盖与线程/index.md) —— `SetThemeValue` / `RestoreThemeValue`、两个缓存、切换写在哪个线程上

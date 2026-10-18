@@ -10,7 +10,7 @@ $$
 T_{\text{serialize}} = O(P), \qquad T_{\text{deserialize}} = O(P)
 $$
 
-where $P$ is bounded by $O(V + E + \text{member count})$ for a workflow tree of $V$ nodes and $E$ links — and, crucially, is *bounded by the compiled member set* rather than by what a runtime walk happens to find. A read-only member such as a node's `Helper` is not a candidate at all (`Src/Generators/VeloxDev.Core.Generator/Base/VeloxJsonModel.cs:912-1025`), so it can never contribute to $P$.
+where $P$ is bounded by $O(V + E + \text{member count})$ for a workflow tree of $V$ nodes and $E$ links — and, crucially, is *bounded by the compiled member set* rather than by what a runtime walk happens to find. A read-only member such as a node's `Helper` is not a candidate at all (`Src/Generators/VeloxDev.Core.Generator/Base/VeloxJsonModel.cs:912-1026`), so it can never contribute to $P$.
 
 Both directions are a single pass: the reader is a forward-only cursor over one document (`NextMember` advances, `MemberNameEquals` compares in place), so a member that appears late in the document is not re-visited for a member that appears early.
 
@@ -20,13 +20,13 @@ $$
 T_{\text{resolve}} = O(1)
 $$
 
-`WriterFor(type)` / `ReaderFor(type)` are dictionary reads against an immutable snapshot held behind a `volatile` field (`VeloxJsonRegistry.cs:83-96`). There is no lock on the read path and no cache to warm: the snapshot a reader sees is a complete, self-consistent table, because every registration publishes a **new** snapshot rather than mutating the old one.
+`WriterFor(type)` / `ReaderFor(type)` are dictionary reads against an immutable snapshot held behind a `volatile` field (`VeloxJsonRegistry.cs:100-103,267-280`). There is no lock on the read path and no cache to warm: the snapshot a reader sees is a complete, self-consistent table, because every registration publishes a **new** snapshot rather than mutating the old one.
 
 That is the whole reason the hot path is branch-light — and it is also why registry writes are deliberately boring: they happen once per assembly load and are never on a measured path.
 
 ## Per-member allocation
 
-Member names are compared **in place** rather than interned, so neither the writer nor the reader allocates a string per member. That leaves per-member cost at:
+The reader compares member names **in place** rather than interning them, and the writer emits them as literals; neither allocates a string per member. That leaves per-member cost at:
 
 $$
 T_{\text{member}} = O(1) + O(\text{escaping})
@@ -50,5 +50,5 @@ The measured advantage over `System.Text.Json` and Newtonsoft is **not** asympto
 | `Serialize` (write) | $O(P)$ | $O(P)$ output | one visit per object; repeats become references |
 | `Deserialize` (read) | $O(P)$ | $O(P)$ | forward-only cursor, member order irrelevant |
 | Per-member | $O(1)$ | $O(1)$ as a rule | names compared in place, never interned |
-| Registry registration | $O(1)$ amortized | $O(\text{new snapshot})$ | once per assembly load, off the measured path |
+| Registry registration | $O(T)$ once per entry | $O(T)$ new snapshot | copies one table under the gate; happens once per assembly load, off the measured path |
 | `CompiledGraphEx` snapshot | $O(P_{\text{graph}})$ | $O(P_{\text{graph}})$ | the writer stops at the graph boundary by declared-type exclusion |

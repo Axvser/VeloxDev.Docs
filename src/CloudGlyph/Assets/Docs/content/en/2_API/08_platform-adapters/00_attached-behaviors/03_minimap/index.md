@@ -10,7 +10,7 @@
 | Avalonia | `public class WorkflowMinimapOverlay : Control, IWorkflowMinimapOverlay` | Control render (StyledProperties) |
 | WinUI | `public class WorkflowMinimapOverlay : Canvas, IWorkflowMinimapOverlay` | XAML `Rectangle` / `Line` shapes |
 | MAUI | `public class WorkflowMinimapOverlay : GraphicsView, IDrawable, IWorkflowMinimapOverlay` | `IDrawable.Draw(ICanvas, RectF)` |
-| WinForms | `public static class WorkflowMinimapOverlay` | paints the registered control's surface |
+| WinForms | `public class WorkflowMinimapOverlay : Panel, IWorkflowMinimapOverlay, IWorkflowMinimapScrollSource` | paints itself (`OnPaint`), anchored top-right |
 | Jalium | `public class WorkflowMinimapOverlay : FrameworkElement, IWorkflowMinimapOverlay` | OnRender geometry |
 | Razor | `partial class WorkflowMinimapOverlay : ComponentBase, IWorkflowMinimapOverlay, IAsyncDisposable` | SVG/DOM via JS interop |
 
@@ -71,9 +71,9 @@ public interface IWorkflowMinimapOverlay : IWorkflowGridDecorator
 }
 ```
 
-## WinForms static overlay
+## WinForms overlay
 
-`WorkflowMinimapOverlay` on WinForms is a static attached-style holder: `SetIsEnabled(Control, bool)` / `SetWorkflowTree(Control, IWorkflowTreeViewModel?)` and matching getters. The behavior registers paint handling on the control; the actual thumbnail is drawn into the control's `Paint` surface. *Detail inferred from source — no automated demo draws it.*
+`WorkflowMinimapOverlay` on WinForms is a `Panel` subclass, not a static holder. It paints itself in `OnPaint`, anchors itself to the host's top-right corner (`AnchorStyles.Top | AnchorStyles.Right`, margin `CornerMargin = 12`, default size 200×140), and implements `IWorkflowMinimapScrollSource`: a viewport drag raises `ViewportScrollRequested(double, double)`, which `WorkflowTreeView` subscribes to and turns into a surface pan. Assign it to `WorkflowTreeView.MinimapOverlay`; the tree view adds it to the control tree and wires the event. Colors are `Color` CLR properties (`MinimapBackground`, `MinimapBorderBrush`, `NodeBrush`, `ViewportStroke`).
 
 ## Razor component
 

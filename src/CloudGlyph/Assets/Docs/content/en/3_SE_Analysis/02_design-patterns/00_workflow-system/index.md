@@ -17,5 +17,6 @@ Design-pattern analysis for the workflow-system feature (editor VM layer + the C
 | [Strategy (runtime)](10_strategy-runtime/index.md) | `IRedirectable` whole-graph re-run toward a predecessor Order |
 | [Strategy Family (Host Capabilities)](11_host-capabilities/index.md) | The 2026-09-27 host seams as a Strategy family, with Null Object as every default |
 | [Memento (Checkpoints)](12_checkpoint-memento/index.md) | `ExecutionCheckpoint` as Memento: snapshot boundary, `Rekey` guard, resume refusal |
+| [Connection Preview](13_connection-preview/index.md) | The drag preview as a Chain of Rules with one host-policy hook: same check as completion, tighten-only veto, preview bits owned by the drag |
 
 Inside `00_class-diagram` the three diagrams are on [Class Diagram: Core / Execution Model](00_class-diagram/00_core-model/index.md), [Component Model](00_class-diagram/01_component-model/index.md) and [Class Diagram of the Runtime Capability Layer](00_class-diagram/02_runtime-capabilities/index.md).

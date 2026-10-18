@@ -1,19 +1,14 @@
 # AOP runtime — `AspectOrientedAttribute` & `IAspectOriented`
 
-The declaration surface of the AOP feature: `AspectOrientedAttribute` marks which members of a `partial` class should be exposed through a dynamic proxy, and `IAspectOriented` is the empty marker contract that every generated AOP interface inherits.
-
 ## Type: `AspectOrientedAttribute`
 
-`Src/Core/VeloxDev.Core/AspectOriented/AspectOrientedAttribute.cs`:
+Declared in `Src/Core/VeloxDev.Core/AspectOriented/AspectOrientedAttribute.cs`:
 
 ```csharp
-namespace VeloxDev.AspectOriented
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field,
+    AllowMultiple = false, Inherited = false)]
+public class AspectOrientedAttribute : Attribute
 {
-    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field,
-        AllowMultiple = false, Inherited = false)]
-    public class AspectOrientedAttribute : Attribute
-    {
-    }
 }
 ```
 
@@ -21,21 +16,19 @@ namespace VeloxDev.AspectOriented
 
 **Signature:** `AspectOrientedAttribute()`
 
-| Parameter | Type | Description |
-|---|---|---|
-| *(none)* | | Parameterless constructor (the attribute carries no state) |
-
-**Returns:** `AspectOrientedAttribute`
+No parameters, no state.
 
 **Exceptions:** none.
 
-### Attribute semantics
+### Semantics
 
-- **Targets:** `Method`, `Property` or `Field` only; `AllowMultiple = false`, `Inherited = false`.
-- **Detection:** the generators match the attribute by its simple name `AspectOriented` (`Base/AnalizeHelper.IsAopClass`, `Writers/AopWriter.ReadAopConfig`). As soon as one member of a class carries it, the whole containing `partial` class becomes an AOP target and the generators emit its AOP interface, a partial-class glue and the `Aop(this T)` extension (see [Generated API](../../01_generated-api/index.md)).
-- **Exposure:** members that the generator surfaces on the proxy interface must be `public` (a `private` field is only surfaced when a `[VeloxProperty]` / `[Observable]` generator turns it into a public property).
+- **Targets:** methods, properties, and fields only.
+- **Detection is textual:** `AnalizeHelper.IsAopClass` matches the attribute's simple name `AspectOriented`, and `AopSurface` compares `att.ToString() == "AspectOriented"` per member. Write `[AspectOriented]` unqualified.
+- **Class must be `partial`:** the discovery filter only accepts partial class declarations (`Analizer.Filters.IsCandidateClass`). A non-partial class is skipped without a diagnostic.
+- **One marked member makes the whole class a target.** All marked members across all partial declarations are collected (`AnalizeHelper.Members`).
+- **Exposure rules:** methods must be `public`; properties need a public accessor; fields surface only when a property-generating attribute (`[VeloxProperty]`, `[Observable]`) is present as well. See [Generated API](../../01_generated-api/index.md).
 
-Demo-verified marking, `Examples/AOP/WPF/Demo/TeamViewModel.cs`:
+Demo marking, `Examples/AOP/WPF/Demo/TeamViewModel.cs`:
 
 ```csharp
 public partial class TeamViewModel
@@ -52,24 +45,22 @@ public partial class TeamViewModel
 }
 ```
 
-Here the two fields also carry `[VeloxProperty]` (MVVM), so they surface on the proxy interface as the `Name` and `Members` properties; the two `[AspectOriented]` public methods (`Reset`, plus `AOP_OnMemberAdded` / `AOP_OnMemberRemoved` later in the file) are exposed directly.
+The two fields surface as the `Name` and `Members` properties; `Reset` surfaces as a method.
 
 ## Type: `IAspectOriented`
 
-`Src/Core/VeloxDev.Core/Interfaces/AspectOriented/IAspectOriented.cs`:
+Declared in `Src/Core/VeloxDev.Core/Interfaces/AspectOriented/IAspectOriented.cs`:
 
 ```csharp
-namespace VeloxDev.AspectOriented
+public interface IAspectOriented
 {
-    public interface IAspectOriented
-    {
-    }
 }
 ```
 
-Empty marker interface with no members. Its roles:
+An empty marker. Its roles:
 
-- **Base contract** of every generated AOP interface — the generator writes the base type `global::VeloxDev.AspectOriented.IAspectOriented`.
-- **Generic constraint** shared by `ProxyEx.CreateProxy<T>`, `ProxyEx.SetProxy<T>` and `AopCache.Resolve<TClass, TInterface>`. `Aop.GetTarget<TTarget>` takes `IAspectOriented` as its *parameter* type instead — its own constraint is `TTarget : class` (see [proxyex](../02_proxyex/index.md) and [proxy-lifecycle](../04_proxy-lifecycle/index.md)).
+- **Base contract** of every generated AOP interface.
+- **Constraint** on `ProxyEx.SetProxy<T>` and `AopCache.Resolve<TClass, TInterface>`.
+- **Parameter type** of `Aop.GetTarget<TTarget>` (whose own constraint is `TTarget : class`).
 
-Related pages: [ProxyMembers & ProxyHandler](../01_proxy-members-handler/index.md), [ProxyEx](../02_proxyex/index.md), [ProxyInstance](../03_proxyinstance/index.md).
+The generated interface also inherits `IAopHookTarget`, which has a member; that is why the user's own class does **not** implement either interface — the proxy class does. See [Generated proxy](../03_proxy-class/index.md).

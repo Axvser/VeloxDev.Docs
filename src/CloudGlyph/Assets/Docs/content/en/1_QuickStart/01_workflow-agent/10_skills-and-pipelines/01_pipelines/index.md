@@ -54,7 +54,7 @@ A stage implements `IAgentPipelineStage.OnEventAsync(AgentEvent, Func<AgentEvent
 |---|---|---|
 | `MarshalTo` | `Func<SynchronizationContext?>?` | Marshals the call onto the host's UI context. |
 | `Refuse` | `Func<string, string?>?` | Returns a refusal message (or `null`) before the body runs — the budget/host-policy gate. |
-| `Confirm` | `Func<string, CancellationToken, ValueTask<string?>>?` | The human gate (`WithToolApproval`). |
+| `Confirm` | `Func<string, CancellationToken, ValueTask<string?>>?` | The permission gate (`PermissionPolicy.Evaluate`). |
 
 Because there is **one instance per scope**, `Refuse` and `Confirm` reach an MCP- or skill-sourced tool exactly as they reach a built-in: a switch or budget cannot be honoured on one path and ignored on another.
 
@@ -76,4 +76,4 @@ Because there is **one instance per scope**, `Refuse` and `Confirm` reach an MCP
 
 ## Run declaration
 
-- ✅ Actually built and ran — the deterministic agent test suite (2026-10-01, `已通过! 失败: 0，通过: 387`) includes `Pipelines/**` (`AgentPipelineTests`, `AgentTranscriptTests`, `TranscriptWiringTests`), covering stage order, event dropping, failure isolation, the transcript roles and the markdown fence. Those run over an offline scripted `IChatClient`, not a live model.
+- ⚠️ **Not run for this revision** — statically verified against the current source on 2026-10-18. The deterministic `Pipelines/**` tests exist and passed in a 2026-10-01 run (387 tests), but that run predates the permission-mode redesign and is not used as current evidence.

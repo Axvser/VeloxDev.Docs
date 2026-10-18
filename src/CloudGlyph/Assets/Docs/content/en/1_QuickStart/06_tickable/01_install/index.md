@@ -1,6 +1,6 @@
-# 01 · Install & Add the Analyzer
+# Install and Add the Analyzer
 
-The feature needs two packages: the runtime library and the source generator. The generator is an **analyzer**, so it must not be referenced at runtime — `ReferenceOutputAssembly="false"` in a project reference, or an `Analyzer` include from a package.
+The feature needs two packages: the runtime library and the source generator. The generator is an **analyzer**, so it must not be referenced at runtime.
 
 ## 1. Create the project
 
@@ -21,13 +21,11 @@ dotnet add package VeloxDev.Core --version 10.0.0
 
 ## 3. Add the generator
 
-From NuGet:
-
 ```text
 dotnet add package VeloxDev.Core.Generator --version 10.0.0
 ```
 
-Then make sure the package is treated as an analyzer rather than a library. In `TickDemo.csproj`:
+A package places its generator under `analyzers/dotnet/cs`, so `dotnet add package` is enough — no `OutputItemType` is needed for a package reference. To keep the analyzer out of your own package's dependencies, mark it private:
 
 ```xml
 <ItemGroup>
@@ -38,10 +36,9 @@ Then make sure the package is treated as an analyzer rather than a library. In `
 </ItemGroup>
 ```
 
-Or, when working inside this repository, reference the generator project the way the demo does — `Examples/Tickable/WPF/Demo/Demo.csproj` lines 15-23:
+When working inside this repository, reference the generator project the way the demo does (`Examples/Tickable/WPF/Demo/Demo.csproj` lines 15-23) — a `ProjectReference` does **not** flow an analyzer to the referencing project:
 
 ```xml
-<!-- 本项目用 [Tickable]，analyzer 不随 ProjectReference 传递。 -->
 <ItemGroup>
   <ProjectReference Include="..\..\..\..\Src\Generators\VeloxDev.Core.Generator\VeloxDev.Core.Generator.csproj"
                     OutputItemType="Analyzer"
@@ -52,11 +49,11 @@ Or, when working inside this repository, reference the generator project the way
 </ItemGroup>
 ```
 
-**Expected result:** `dotnet build` succeeds. If the analyzer is missing you get no error at build time — you get `CS0103` / `CS0535` errors on the generated members the moment you try to use them. That failure mode is the one to watch for: a class that is `partial` but never becomes `ITickable` almost always means the generator is not attached.
+**Expected result:** `dotnet build` succeeds. If the analyzer is missing, the build still succeeds — the failure appears when you use the generated surface: `CS0103` ("The name 'InitializeTickable' does not exist") or `CS1061` on the hook entry points. A class that is `partial` but never becomes `ITickable` almost always means the generator is not attached.
 
 ## 4. Confirm the generator is attached
 
-Add a throwaway class to `Program.cs` and build:
+Add a probe class and build:
 
 ```csharp
 using VeloxDev.TimeLine;
@@ -66,14 +63,17 @@ public partial class Probe
 {
 }
 
-// Program.cs
-Console.WriteLine(typeof(Probe).GetInterfaces().Length);
+public static class Program
+{
+    public static void Main()
+        => Console.WriteLine(typeof(Probe).GetInterfaces().Length);
+}
 ```
 
-**Expected result:** the project builds. To look at the generated file, build with `-p:EmitCompilerGeneratedFiles=true`; it then lands at
+**Expected result:** the program prints `1` — `Probe` implements `VeloxDev.TimeLine.ITickable`. To look at the generated file, build with `-p:EmitCompilerGeneratedFiles=true`; it then lands at
 
 ```text
 obj/Debug/<tfm>/generated/VeloxDev.Core.Generator/VeloxDev.Generators.Tickable/<ClassName>_<NamespaceSegment>_Tick.g.cs
 ```
 
-For the class `BouncingBall` in namespace `TickVerify` that is `BouncingBall_TickVerify_Tick.g.cs`; a class in the global namespace gets the segment `Global`. Without `EmitCompilerGeneratedFiles` the file is not written to disk at all — its absence there is not evidence that the generator did not run. If the generated members are missing from the compile, the analyzer is not attached — re-check step 3.
+For the class `BouncingBall` in namespace `TickVerify` that is `BouncingBall_TickVerify_Tick.g.cs`; a class in the global namespace gets the segment `Global`. Without `EmitCompilerGeneratedFiles` the file is not written to disk at all — its absence there is not evidence that the generator did not run.

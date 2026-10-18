@@ -41,7 +41,7 @@ classDiagram
         +Next() int
         +LogWriteFailed event
         +SnapshotLogs() string[]
-        +Snapshot() ExecutionCheckpoint
+        -Snapshot() ExecutionCheckpoint
     }
     class BranchRuntimeContext {
         <<internal>>

@@ -2,20 +2,20 @@
 
 ## 1. 用自动化测试验证
 
-行为证据位于 `Src/Core/VeloxDev.Core.Test/WeakTypes/` 下的 MSTest 套件。2026-10-01 只跑弱类型测试、对应当前 `master`，得到：
+行为证据位于 `Src/Core/VeloxDev.Core.Test/WeakTypes/` 的 MSTest 套件。仅运行弱引用类型测试（2026-10-01 对 `master` 的记录输出；2026-10-18 文档修订期间未重新运行）：
 
 ```text
 总共 1 个测试文件与指定模式相匹配。
 已通过! - 失败:     0，通过:    35，已跳过:     0，总计:    35，持续时间: 55 ms - VeloxDev.Core.Test.dll (net10.0)
 ```
 
-这是对 `VeloxDev.Core.Test` 项目（目标 `net10.0`）执行 `dotnet test --filter "FullyQualifiedName~WeakTypes"`：跨 `WeakDelegateTests`（8）、`WeakQueueTests`（10）、`WeakStackTests`（10）与 `WeakCacheTests`（7）共 35 个测试，全部通过。测试固定的是 API 表面与顺序规则，但刻意不断言 GC 驱逐（测试里的字符串键与短命条目在各自的测试期间都被钉住）—— 见 [GC行为与注意](../07_GC行为与注意/) 页。
+这是在 `VeloxDev.Core.Test` 项目（目标 `net10.0`）上运行 `dotnet test --filter "FullyQualifiedName~WeakTypes"` 的结果：`WeakDelegateTests`（8）、`WeakQueueTests`（10）、`WeakStackTests`（10）与 `WeakCacheTests`（7）共 35 个测试全部通过。测试钉住 API 面与顺序规则，但有意不断言 GC 驱逐（测试中的字符串键与短命条目在每个测试期间保持 root）——见 GC 行为页。
 
-**预期结果：** 对 `VeloxDev.Core.Test` 执行 `dotnet test` 会绿色通过 `WeakTypes` 测试。
+**预期结果：** 在 `VeloxDev.Core.Test` 上运行 `dotnet test` 时，`WeakTypes` 测试全部通过。
 
 ## 2. 完整代码
 
-一个自包含的控制台程序（目标 `net10.0`），跑遍四个类型。每个“死”的 `Payload`/处理器/键都在辅助方法内部创建，辅助方法返回后即不可达；随后 `ForceGc` 回收它们，控制台只报告存活项。所有 `using` 显式给出；唯一的外部依赖是对 `VeloxDev.Core` 的引用（见[安装依赖](../01_安装依赖/)页）：
+一个自包含控制台程序（目标 `net10.0`），覆盖四个类型。每个“该死”的 `Payload`/处理器/键都在辅助方法内创建，因此辅助方法返回后它不可达；随后 `ForceGc` 回收它，控制台只报告幸存条目。所有 `using` 都显式写出；唯一外部要求是引用 `VeloxDev.Core`（见安装页）：
 
 ```csharp
 using System;
@@ -140,9 +140,9 @@ namespace WeakTypesQuickStart
 }
 ```
 
-## 3. 记录到的输出
+## 3. 记录输出
 
-下面是某次运行的控制台输出逐字转写（见运行声明）。它稳定，是因为每个死对象都在辅助方法内部创建，而辅助方法的栈帧在 GC 运行前就已返回：
+下面的记录是一次运行的逐字控制台输出（见运行声明）。它是稳定的，因为每个死对象都在辅助方法内创建，而该方法的帧在 GC 运行前已返回：
 
 ```text
 == WeakQueue ==
@@ -165,13 +165,13 @@ ForeachCache: key=100 value=value-100
 TryGetCache(key1) after Remove: False
 ```
 
-## 4. 对照各页阅读输出
+## 4. 对照页面读输出
 
-- `WeakQueue` / `WeakStack`：在填充辅助函数里创建的 `Payload(1)`/`Payload(3)`（队列）与 `Payload(10)`/`Payload(30)`（栈）已被回收，因此 `Count after GC: 1`，只有仍存活的 `alive` 项（`Value = 2`）被出队/出栈（[弱队列](../04_弱队列/)与[弱栈](../05_弱栈/)页，以及[GC行为与注意](../07_GC行为与注意/)页里的清扫规则）。
-- `WeakDelegate`：以 `CanUpdateCache: false` 添加的死订阅者已被回收，因此第一次调用只触发 `liveSub`（`counter` 为 1）；`Clone()` 再从存活处理器重建，克隆调用把它抬到 2（[弱委托订阅](../03_弱委托订阅/)页）。
-- `WeakCache`：死掉的 `Payload(200)` 键已被回收，所以对一个全新键 `TryGetCache` 返回 `False`，`ForeachCache` 只访问 `key1`（`key=100 value=value-100`）；随后 `Remove(key1)` 让查找变为 `False`（[弱缓存](../06_弱缓存/)页）。
+- `WeakQueue` / `WeakStack`：在填充辅助方法中创建的 `Payload(1)`/`Payload(3)`（队列）与 `Payload(10)`/`Payload(30)`（栈）已被回收，因此 `Count after GC: 1`，且只有仍存活的 `alive` 条目（`Value = 2`）被出队/弹出（弱队列页、弱栈页，以及 GC 行为页的清扫规则）。
+- `WeakDelegate`：以 `CanUpdateCache: false` 添加的死订阅者已被回收，因此第一次调用只触发 `liveSub`（`counter` 为 1）；随后 `Clone()` 从存活处理器重建，克隆的调用把它升到 2（弱委托页）。
+- `WeakCache`：死掉的 `Payload(200)` 键已被回收，因此对一个全新键调用 `TryGetCache` 为 `False`，`ForeachCache` 只访问 `key1`（`key=100 value=value-100`）；随后 `Remove(key1)` 使查询变为 `False`（弱缓存页）。
 
 ## 5. 运行声明
 
-- ✅ 已于 2026-10-01 实际构建并运行（`dotnet run -c Debug`，目标 `net10.0`，项目引用本仓库的 `VeloxDev.Core`）。记录到的输出见第 3 节逐字转写；多次运行输出完全一致。同日还完整执行了 `WeakTypes` MSTest 套件（35/35 通过，见第 1 节）。
-- 关于配置的说明：程序在 `Debug` 下运行，因为 `VeloxDev.Core` 的 `Release` 还原当前在编译之前就失败。它的 `VeloxDev.Core.Generator` 包引用固定在 `10.0.0`，而该版本尚未发布到 nuget.org（`NU1102`；那里当前最高只到 `9.0.153`），所以 `-c Release` 无法还原。弱类型源码两个配置都会编译；只有工作流系统的生成器路径在 `Release` 下被挡住。
+- ⚠️ 2026-10-18 文档修订期间未重新运行——仅做静态核验。第 2 节的控制台程序曾在 2026-10-01 以 `dotnet run -c Debug` 构建并执行（目标 `net10.0`，对 `VeloxDev.Core` 使用项目引用）；第 3 节的记录就是那次运行的逐字输出，连续运行产生相同输出。`WeakTypes` MSTest 套件（35/35）也在同一天通过（第 1 节）。
+- 当时运行的配置说明：`Release` 无法还原，因为 `VeloxDev.Core.Generator` 包引用被钉在 `10.0.0`，该版本当时尚未发布到 nuget.org（`NU1102`）。`Debug` 则使用本地生成器源码。弱引用类型源码本身与配置无关；若你今天复现示例，首选 `dotnet run -c Release`，而辅助方法中的生命周期安排使记录在两种配置下都保持稳定。

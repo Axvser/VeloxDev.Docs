@@ -50,14 +50,16 @@ else RequestConfirmation(operationKey, description)
 end
 
 deactivate Tool
-Agent -> Agent: Level>=2: do not substitute an alternative action after a deny
+Agent -> Agent: a Deny is not worked around; ask the user what to do instead
 Agent --> User: reports the decision / blocker in its reply
 @enduml
 ```
 
 Notes:
 
-- The interaction tools are only registered when a handler exists **and** safety level > 0; a `Deny` is not worked around — higher safety levels forbid substituting an alternative action.
+- The interaction tools are registered when the matching handler exists; there is no safety-level gate. `RequestSelection` / `RequestConfirmation` are `AgentActionCategory.Interact`, which no permission mode ever puts to the user.
+- An `Ask` permission decision (from the mode or a rule) reaches the same confirmation handler, keyed by the **tool name**; a `Deny` decision never asks and returns `DescribePermissionRefusal`, which names the mode or rule.
+- `EnterPlanMode` / `ExitPlanMode` ask through the confirmation handler under the keys `mode:plan` / `mode:exit-plan` before moving the mode.
 - `SelectionResult` (single/multi/free-text) is returned from the host layer to the toolkit (`WorkflowAgentScope.SelectionResult`).
 
-> Source: `WorkflowAgentScope.cs`, `WithSelectionHandler`/`WithConfirmationHandler`/`ResolveConfirmationAsync` lines 324-450; `WorkflowAgentToolkit.cs`, `RequestSelection` lines 2153-2194, `RequestConfirmation` lines 2197-2208.
+> Source: `WorkflowAgentScope.cs` (`WithSelectionHandler`, `WithConfirmationHandler`, `ResolveConfirmationAsync`, `PermissionPolicy`); `WorkflowAgentToolkit.cs` (`RequestSelection`, `RequestConfirmation`, `EnterPlanMode`, `ExitPlanMode`).

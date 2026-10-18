@@ -139,17 +139,17 @@
 
 <div class="cg-wrapper">
 
-  <!-- 项目名称与描述 -->
+  <!-- Project name and description -->
   <h1 class="cg-title">
     <span class="gradient-text">VeloxDev</span>
   </h1>
   <p class="cg-subtitle">
-    在任何 .NET GUI 上构建现代、可由 AI 操控的工作流编辑器 —— WPF · Avalonia · WinUI · MAUI · WinForms · Razor · Jalium
+    在任何 .NET GUI 上构建现代、可由 AI 控制的工作流编辑器 —— WPF · Avalonia · WinUI · MAUI · WinForms · Razor · Jalium
   </p>
 
   <hr class="gradient-rule" />
 
-  <!-- 三步工作流 -->
+  <!-- Three-step workflow -->
   <div class="cg-steps">
     <div class="step-card cg-step" style="animation-delay: 0s;">
       <div class="step-icon" style="font-size: clamp(1.4em, 4vw, 2em); margin-bottom: 6px;">⛓️</div>
@@ -159,7 +159,7 @@
     <div class="step-card cg-step" style="animation-delay: 0.12s;">
       <div class="step-icon-delayed" style="font-size: clamp(1.4em, 4vw, 2em); margin-bottom: 6px;">🤖</div>
       <div style="font-weight: 600; font-size: clamp(0.8em, 2vw, 0.95em);">自动化</div>
-      <div style="font-size: clamp(0.65em, 1.6vw, 0.78em); opacity: 0.7; margin-top: 4px;"><code>60+ Agent 工具 · MCP</code></div>
+      <div style="font-size: clamp(0.65em, 1.6vw, 0.78em); opacity: 0.7; margin-top: 4px;"><code>60+ Agent tools · MCP</code></div>
     </div>
     <div class="step-card cg-step" style="animation-delay: 0.24s;">
       <div class="step-icon-slow" style="font-size: clamp(1.4em, 4vw, 2em); margin-bottom: 6px;">🚀</div>
@@ -168,34 +168,37 @@
     </div>
   </div>
 
-  <!-- 功能网格 -->
+  <!-- Feature grid -->
   <div class="cg-feats">
     <div class="feat-card cg-feat" style="animation-delay: 0s;">
       <a class="feat-link" href="../1_快速开始/00_工作流系统/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">⛓️</span> 工作流<br><span style="opacity: 0.6;">Tree · Node · Slot · Link · 撤销/重做</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.05s;">
-      <a class="feat-link" href="../1_快速开始/01_工作流代理/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🤖</span> Workflow Agent<br><span style="opacity: 0.6;">60+ 工具 · MCP · 编译器</span></a>
+      <a class="feat-link" href="../1_快速开始/01_工作流代理/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🤖</span> 工作流代理<br><span style="opacity: 0.6;">60+ 工具 · MCP · 编译器</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.1s;">
       <a class="feat-link" href="../1_快速开始/02_MVVM/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🪶</span> MVVM<br><span style="opacity: 0.6;">源生成器 · 异步命令</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.15s;">
-      <a class="feat-link" href="../1_快速开始/03_过渡动画/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎞️</span> 过渡动画<br><span style="opacity: 0.6;">插值 · 缓动 · 流式 API</span></a>
+      <a class="feat-link" href="../1_快速开始/03_过渡动画/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎞️</span> 过渡动画<br><span style="opacity: 0.6;">插值 · 缓动 · Fluent API</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.2s;">
-      <a class="feat-link" href="../1_快速开始/04_动态主题/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎨</span> 主题<br><span style="opacity: 0.6;">运行时切换 · 动画过渡</span></a>
+      <a class="feat-link" href="../1_快速开始/04_动态主题/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🎨</span> 动态主题<br><span style="opacity: 0.6;">运行时切换 · 动画</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.25s;">
-      <a class="feat-link" href="../1_快速开始/05_AOP/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌀</span> AOP<br><span style="opacity: 0.6;">切面代理 · 前置/覆盖/后置</span></a>
+      <a class="feat-link" href="../1_快速开始/05_AOP/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🌀</span> AOP<br><span style="opacity: 0.6;">切面代理 · Start/Coverage/End</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.3s;">
-      <a class="feat-link" href="../1_快速开始/06_Tickable/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">⚙️</span> Tickable<br><span style="opacity: 0.6;">帧驱动循环 · Tick 模拟</span></a>
+      <a class="feat-link" href="../1_快速开始/06_Tickable/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">⚙️</span> Tickable<br><span style="opacity: 0.6;">帧驱动循环 · 基于 Tick</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.35s;">
-      <a class="feat-link" href="../1_快速开始/07_弱引用类型/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📎</span> 弱引用类型<br><span style="opacity: 0.6;">WeakDelegate · WeakQueue · WeakStack · WeakCache</span></a>
+      <a class="feat-link" href="../1_快速开始/07_弱引用类型/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">📎</span> 弱引用<br><span style="opacity: 0.6;">WeakDelegate · WeakQueue · WeakStack · WeakCache</span></a>
     </div>
     <div class="feat-card cg-feat" style="animation-delay: 0.4s;">
-      <a class="feat-link" href="../1_快速开始/08_平台适配器/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🧩</span> 适配器<br><span style="opacity: 0.6;">7 个 GUI —— WPF · Avalonia · WinUI · MAUI · WinForms · Razor · Jalium</span></a>
+      <a class="feat-link" href="../1_快速开始/08_平台适配器/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🧩</span> 平台适配器<br><span style="opacity: 0.6;">7 家 GUI —— WPF · Avalonia · WinUI · MAUI · WinForms · Razor · Jalium</span></a>
+    </div>
+    <div class="feat-card cg-feat" style="animation-delay: 0.45s;">
+      <a class="feat-link" href="../1_快速开始/09_序列化/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🗃️</span> 序列化<br><span style="opacity: 0.6;">标注类型 · JSON 往返 · 重建对象图</span></a>
     </div>
   </div>
 

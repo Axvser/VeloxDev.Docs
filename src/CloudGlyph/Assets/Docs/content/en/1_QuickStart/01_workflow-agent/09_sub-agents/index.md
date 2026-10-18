@@ -96,5 +96,5 @@ Two separate consumption figures:
 
 ## Run declaration
 
-- ✅ Actually built and ran — the deterministic agent test suite (2026-10-01, `已通过! 失败: 0，通过: 387`) includes all `SubAgents/**` except `SubAgentLiveTests`. It covers the narrowing rules, the one-pot ledger, depth clamping, the dispatch/poll contract, cancellation, token metrics and the tree view-models.
+- ⚠️ **Not run for this revision** — statically verified against the current source on 2026-10-18. The `SubAgents/**` tests exist and passed in a 2026-10-01 run (387 tests), but that run predates the permission-mode redesign and is not used as current evidence.
 - ⚠️ `SubAgentLiveTests` (a real model dispatching a real child) needs `API_KEY_DEEPSEEK` and is non-deterministic; it is **excluded** and no claim here rests on it.

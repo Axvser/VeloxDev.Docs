@@ -21,14 +21,19 @@ flowchart TD
 
 | 成员 | 签名 | 说明 |
 |---|---|---|
-| `For` | `static WorkflowInput For(IWorkflowTreeViewModel tree)` | 取这棵树的实例的唯一入口（`:49`） |
-| 构造函数 | `WorkflowInput(IWorkflowTreeViewModel tree)` | `null` 抛 `ArgumentNullException`（`:42`） |
-| `Tree` | `IWorkflowTreeViewModel` | （`:56`） |
-| `Route` | `void Route(PointerEventArgs e)` / `void Route(KeyEventArgs e)` | 展开目标的祖先链并沿链派发（`:90,104`） |
-| `PointerTarget` | `IWorkflowViewModel?` | 指针落在哪个组件上 —— 这是路由持有的唯一状态（`:62`） |
-| `HoveredLink` | `IWorkflowLinkViewModel?` | 即 `PointerTarget as IWorkflowLinkViewModel`（`:65`） |
-| `HitRadius` | `double` | 曲线的命中半径；默认 `LinkHitTestEx.DefaultHitRadius`（`:71`） |
-| `IsSuspended` | `bool` | 宿主菜单打开时置位，指针跟踪停止（`:78`） |
+| `For` | `static WorkflowInput For(IWorkflowTreeViewModel tree)` | 取这棵树的实例的唯一入口（`:53`） |
+| 构造函数 | `WorkflowInput(IWorkflowTreeViewModel tree)` | `null` 抛 `ArgumentNullException`（`:46`） |
+| `Tree` | `IWorkflowTreeViewModel` | （`:60`） |
+| `Route` | `void Route(PointerEventArgs e)` / `void Route(KeyEventArgs e)` | 展开目标的祖先链并沿链派发（`:250,264`） |
+| `PointerTarget` | `IWorkflowViewModel?` | 指针落在哪个组件上 —— 这是路由持有的唯一持续状态（`:66`） |
+| `HoveredLink` | `IWorkflowLinkViewModel?` | 即 `PointerTarget as IWorkflowLinkViewModel`（`:69`） |
+| `ConnectionSender` | `IWorkflowSlotViewModel?` | 拖拽开始的端口（`:72`） |
+| `PreviewReceiver` | `IWorkflowSlotViewModel?` | 指针下的候选端口（`:75`） |
+| `PreviewState` | `ConnectionPreviewState` | 连接拖拽的当前阶段（`:78`） |
+| `PreviewCheck` | `ConnectionCheck?` | 候选的检查；无候选时为 `null`。无效候选仍携带检查，视图因此能解释红带（`:84`） |
+| `HitRadius` | `double` | 曲线的命中半径；默认 `LinkHitTestEx.DefaultHitRadius`（`:213`） |
+| `IsSuspended` | `bool` | 宿主菜单打开时置位，指针跟踪停止（`:220`） |
+| `Scroller` | `IWorkflowSurfaceScroller?` | 适配器挂载期间写入；订阅者接管滚轮后经它滚动（`:238`） |
 
 **路由顺序。** 目标先派发，然后逐级祖先直到树。链上每个元素看到的是**同一个参数实例** —— 所以一次动作只有一个 `WorkflowEventHandle`，祖先也能读到更靠近目标的那一级做了什么决定。
 
@@ -49,6 +54,48 @@ flowchart TD
 | `KeyDown` / `KeyUp` | `KeyDownEventArgs` / `KeyUpEventArgs` |
 
 `sender` 是这个中转，订阅者据此判断自己听到的是链上的哪一级。
+
+## 连接拖拽预览
+
+路由还持有**连接拖拽**：`ConnectionSender`、`PreviewReceiver`、`PreviewState` 与 `PreviewCheck`。适配器用 `StandardSetPreviewReceiver` 上报候选（通常是橡皮筋覆盖表面时的 `SlotHitTestEx.HitTest(tree, x, y)`）；Core 计算裁决、标记 `SlotState.PreviewReceiver`，并对树的 `VirtualLink` 调用 `IConnectionPreviewLink.SetPreview`。
+
+| 事件 | 载荷 | 何时 |
+|---|---|---|
+| `PreviewChanged` | `ConnectionPreviewEventArgs(Sender, Receiver, State, Check)` | 发送端、候选或阶段变化时 —— 包括拖拽结束（`None`）。链接视图按阶段绘制橡皮筋；它不决定连接。 |
+| `PreviewValidating` | `ConnectionPreviewValidatingEventArgs(Sender, Receiver, Check)` | 对每个框架会接受的**新**候选在标记为有效之前触发一次。`Reject(message)` 仅为本次预览以 `ConnectionRejectReason.RejectedByHost` 把候选变红。框架已拒绝的候选不会触发；指针停在同一候选上时也不会重复触发，除非调用 `StandardRefreshConnectionPreview`。 |
+
+| 阶段 | 含义 |
+|---|---|
+| `None` | 没有拖拽进行。 |
+| `Started` | 发送端已固定；指针不在候选上。 |
+| `ValidTarget` | 指针在一个框架会接受的槽上。 |
+| `InvalidTarget` | 指针在一个槽上，但连接会被拒绝（或宿主为本次预览拒绝了它）。 |
+
+**预览不是裁决。** `PreviewValidating` 只能把框架通过的候选收紧为红色；它绝不能把拒绝变绿。释放时的 `IWorkflowTreeEvents.Connecting` 否决与 `ValidateConnection` 仍是最终决定。
+
+```csharp
+// Source: Src/Core/VeloxDev.Core.Test/WorkflowSystem/WorkflowConnectionPreviewTests.cs
+input.PreviewValidating += (_, e) =>
+{
+    if (!allow) e.Reject("still checking");
+};
+
+tree.GetHelper().SendConnection(sender);
+tree.StandardSetPreviewReceiver(receiver);   // raises PreviewValidating once
+tree.StandardSetPreviewReceiver(receiver);   // same candidate: no second call
+allow = true;
+tree.StandardRefreshConnectionPreview();      // forces the check again
+```
+
+### `SlotHitTestEx`
+
+`public static class SlotHitTestEx`（`GUI/Interaction/SlotHitTestEx.cs`）在半径内寻找最近的**已测量**槽锚点：`HitTest(tree, x, y, radius = DefaultHitRadius)`，`DefaultHitRadius = 12`。锚点仍为 `double.NaN` 的槽被跳过；重叠槽取最近锚点。它存在的原因是橡皮筋覆盖整个表面，指针下的平台视图往往就是表面本身，无法回答「哪个槽」。
+
+```csharp
+// Source: Src/Adapters/VeloxDev.WPF/Attached/Workflow/WorkflowSurfaceBehavior.cs:755
+viewModel.StandardSetPreviewReceiver(
+    SlotHitTestEx.HitTest(viewModel, pointer.Horizontal, pointer.Vertical));
+```
 
 ## 那十五个类型
 

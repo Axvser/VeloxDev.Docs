@@ -1,6 +1,6 @@
 # Design Patterns — Tickable
 
-`VeloxDev.TimeLine` runs a Unity-like, frame-driven lifecycle for classes decorated with `[Tickable]`. The static `TickManager` is a facade, a channel registry and an observable at once: it owns one named `LoopChannel` engine per channel and republishes that channel's state transitions process-wide. A Roslyn source generator turns the attribute into an `ITickable` implementation whose entry points forward to the user's `partial void` hooks — the engine fixes the loop skeleton, the user supplies the variable steps (Template Method). Both pumps park on a shared time source rather than polling a flag, which is what lets one `Pause()` stop a frame loop and an animation together (Adapter to a shared clock). The hot-path argument type is pooled.
+`VeloxDev.TimeLine` runs a frame-driven lifecycle for classes decorated with `[Tickable]`. The static `TickManager` is a facade, a channel registry and an observable at once: it owns one named `LoopChannel` engine per channel and republishes that channel's state transitions process-wide. A Roslyn source generator turns the attribute into an `ITickable` implementation whose entry points forward to the user's `partial void` hooks — the engine fixes the loop skeleton, the user supplies the variable steps (Template Method). Both pumps park on a shared time source rather than polling a flag, which is what lets one `Pause()` stop a frame loop and an animation together (Adapter to a shared clock). The hot-path argument type is pooled.
 
 This page is the overview: the class diagram and the pattern inventory. Each pattern has its own sub-page.
 
@@ -102,7 +102,7 @@ classDiagram
     TickChannelEventArgs --|> EventArgs
 ```
 
-> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` (the `TickManager` region at 1046-1156, `LoopChannel` at 99-996), `Src/Core/VeloxDev.Core/Interfaces/Tickable/ITickable.cs`, `Src/Generators/VeloxDev.Core.Generator/Writers/TickWriter.cs`, `Src/Core/VeloxDev.Core/Interfaces/Timing/ITimeSourceControl.cs`, `Examples/Tickable/WPF/Demo/MainWindow.Hooks.cs`.
+> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` (the `TickManager` region at 1050-1156, `LoopChannel` at 101-998), `Src/Core/VeloxDev.Core/Interfaces/Tickable/ITickable.cs`, `Src/Generators/VeloxDev.Core.Generator/Writers/TickWriter.cs`, `Src/Core/VeloxDev.Core/Interfaces/Timing/ITimeSourceControl.cs`, `Examples/Tickable/WPF/Demo/MainWindow.Hooks.cs`.
 
 ## Pattern inventory
 

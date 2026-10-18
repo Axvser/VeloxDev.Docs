@@ -17,8 +17,6 @@ public interface ITickable
 
 Source: `Src/Core/VeloxDev.Core/Interfaces/Tickable/ITickable.cs`.
 
-This is the interface formerly named `IMonoBehaviour`, and the namespace it lives in is now `VeloxDev.TimeLine` rather than `VeloxDev.MonoBehaviour` — so the old `using VeloxDev.MonoBehaviour;` no longer compiles. The member names `InitializeTickable` / `CloseTickable` are also new (`InitializeMonoBehaviour` / `CloseMonoBehaviour`).
-
 **You almost never implement this by hand.** The source generator writes all seven members for any `partial` class carrying `[Tickable]`, and `TickManager.RegisterBehaviour` takes the interface only because that is the shape the channel dispatches through. Implementing it manually is legal and is what the tests do when they want a minimal behaviour.
 
 | Member | Called by | Typical body |
@@ -61,8 +59,8 @@ This is the interface formerly named `IMonoBehaviour`, and the namespace it live
 **Returns:** `void`.
 
 **Notes:**
-- Called once per registration, during the update pump's registration drain (`ProcessAddedBehaviors`, `TickManager.cs` lines 785-801), **before the first frame body**.
-- Wrapped in `SafeExecute` (lines 939-942), so an exception here is logged to `Debug.WriteLine` and does not prevent `InvokeStart` or the loop from running.
+- Called once per registration, during the update pump's registration drain (`ProcessAddedBehaviors`, `TickManager.cs` lines 787-803), **before the first frame body**.
+- Wrapped in `SafeExecute` (lines 941-944), so an exception here is logged to `Debug.WriteLine` and does not prevent `InvokeStart` or the loop from running.
 - Called on the update thread, not the caller's thread: `RegisterBehaviour` only enqueues.
 
 #### `ITickable.InvokeStart`
@@ -89,7 +87,7 @@ This is the interface formerly named `IMonoBehaviour`, and the namespace it live
 
 **Notes:**
 - One call per frame per registered behaviour, on the channel's update thread, in registration order.
-- The dispatch loop checks `frameArgs.Handled` and the cancellation token **before** each behaviour (`ExecuteBehaviorsUpdateSync`, lines 689-702), so a behaviour that sets `Handled` is not skipped — everything after it is.
+- The dispatch loop checks `frameArgs.Handled` and the cancellation token **before** each behaviour (`ExecuteBehaviorsUpdateSync`, lines 691-704), so a behaviour that sets `Handled` is not skipped — everything after it is.
 - Exceptions are caught per behaviour and written to `Debug.WriteLine`; the loop continues with the next behaviour.
 
 #### `ITickable.InvokeLateUpdate`
@@ -112,8 +110,8 @@ This is the interface formerly named `IMonoBehaviour`, and the namespace it live
 
 **Notes:**
 - Runs on the fixed-update thread, **concurrently** with `InvokeUpdate` / `InvokeLateUpdate`. Any field both touch needs its own synchronisation.
-- Each owed step gets its own `FrameEventArgs`, built per step and returned to the pool immediately (`FixedUpdateLoop`, lines 483-493), so a `Handled` flag set in `InvokeUpdate` never reaches this pump.
-- A stall is repaid as several calls in a row, up to the sampler's per-call cap.
+- Each owed step gets its own `FrameEventArgs`, built per step and returned to the pool immediately (`FixedUpdateLoop`, lines 485-495), so a `Handled` flag set in `InvokeUpdate` never reaches this pump.
+- A stall is repaid as several calls in a row, up to the sampler's `MaxStepsPerCall` cap (default 8).
 
 ## Implementing it by hand
 

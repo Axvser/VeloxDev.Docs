@@ -58,6 +58,18 @@ $$
 
 *Source: `Src/Core/VeloxDev.Core/WorkflowSystem/SelectorEx/SlotEnumerator.cs`, `TrySelect` lines 255-258.*
 
+## Connection-drag slot hit test (`SlotHitTestEx.HitTest`)
+
+While a connection drag is in progress, adapters ask `SlotHitTestEx.HitTest(tree, x, y, radius)` which slot anchor is under the pointer. The implementation is a full scan over every node and every slot; no spatial index is consulted:
+
+$$
+T_{\text{slotHit}} = O\left(\sum_{i=1}^{V} |\text{slots}(i)|\right), \qquad S_{\text{slotHit}} = O(1)
+$$
+
+Each measured anchor costs one subtract, two multiplies and a compare ($dx^2 + dy^2$); unmeasured anchors (`NaN`) are skipped. Overlapping slots resolve to the nearest anchor; ties keep the first encountered. This is deliberately simpler than routing through `SpatialGridHashMap`: a drag is a short, pointer-rate gesture, and the graph's slot count is small compared with the node count workloads the spatial index exists for. A very large graph (tens of thousands of slots) would make each pointer move linear; the escape hatch is a host-side spatial query feeding `StandardSetPreviewReceiver` directly.
+
+*Source: `Src/Core/VeloxDev.Core/WorkflowSystem/GUI/Interaction/SlotHitTestEx.cs` (`HitTest` lines 29-56, `DefaultHitRadius = 12`). Test: `Src/Core/VeloxDev.Core.Test/WorkflowSystem/WorkflowConnectionPreviewTests.cs` (`SlotHitTest_FindsTheNearestMeasuredSlot`, `SlotHitTest_SkipsAnUnmeasuredAnchor`).*
+
 ## Serialization (`ViewModelSerializer.Serialize` / `Deserialize`)
 
 The writer walks the object graph through **generated** readers and writers — there is no reflection, and therefore no runtime contract cache to warm. Each object is visited once: `VeloxJsonWriter.WriteStartObject` gives it an object id, and a second encounter writes a reference marker instead of the object again, which is what keeps a graph with `Parent` back-references from expanding. Traversal is linear in the number of written members. With $P$ = written members (bounded by $O(V + E + \text{custom members})$, $V$ nodes, $E$ links):
@@ -89,5 +101,6 @@ $$
 | `WorkflowSpatialEx.Virtualize` | expected $O(m + v)$ | $O(1)$ scratch | two spatial queries + visible reconcile |
 | Undo / Redo | $O(1)$ per action | $O(n)$ | concurrent stacks |
 | `SlotEnumerator.TrySelect` | $O(1)$ expected | $O(\text{members})$ | dictionary lookup |
+| `SlotHitTestEx.HitTest` | $O(\text{slots})$ | $O(1)$ | linear scan over nodes and slots |
 | `ViewModelSerializer.Serialize` / `Deserialize` | $O(P)$ | $O(P)$ | generated traversal, one visit per object (id / reference marker) |
 | `CompiledGraphEx.SerializeCompiledGraph` (snapshot) | $O(P_{\text{graph}})$ | $O(P_{\text{graph}})$ | writer stops at the graph boundary |

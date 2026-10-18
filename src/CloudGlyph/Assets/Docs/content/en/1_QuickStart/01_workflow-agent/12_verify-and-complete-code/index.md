@@ -5,7 +5,7 @@
 | Area | Demo | Test |
 |---|---|---|
 | scope fluent surface + context prompts | `AgentHelper.ProvideAgent` | `WorkflowAgentContextProviderTests`, `ComposedProvidersTests`, `CapabilityEnvelopeTests`, `AgentCapabilityProvidersTests` |
-| 68 tools, categories, switches | — | `ToolSwitchTests`, `WorkflowLifecycleFidelityTests`, `NodeGeometryToolTests`, `WorkflowSerializationTests` |
+| 66 category tools, categories, switches | — | `ToolSwitchTests`, `WorkflowLifecycleFidelityTests`, `NodeGeometryToolTests`, `WorkflowSerializationTests` |
 | budgets + `ResetToolCallLimit` | `WithMaxToolCalls(200)` | `BudgetResetTests`, `SubAgentBudgetTests`, `ComposedProvidersTests` |
 | tool approval | — | `ToolApprovalTests` |
 | thread affinity | `WithSynchronizationContext` | `ToolThreadAffinityTests` |
@@ -33,6 +33,7 @@ using System.Threading;
 using VeloxDev.AI;
 using VeloxDev.AI.MCP;
 using VeloxDev.AI.Pipelines;
+using VeloxDev.AI.Safety;
 using VeloxDev.AI.SubAgents;
 using VeloxDev.AI.Workflow;
 using VeloxDev.WorkflowSystem;
@@ -67,7 +68,7 @@ public static class AgentHost
         var scope = tree.AsAgentScope()
             .WithPromptLanguage(AgentLanguages.English)
             .WithOutputLanguage(AgentLanguages.Chinese)
-            .WithAutoDiscovery(assemblyName: "VeloxDev.Core")
+            .WithAutoDiscovery()
             .WithAutoMarkDirty(false)
             .WithMaxToolCalls(200)
             .WithMaxReadToolCalls(120)
@@ -89,8 +90,7 @@ public static class AgentHost
                 args.Result = AgentConfirmationResult.AllowOnce;
                 return Task.CompletedTask;
             })
-            .WithInteractionSafety(3)
-            .WithToolApproval(false)
+            .WithPermissionMode(AgentPermissionMode.AutoEdit)
             .WithSkills("skills")
             .WithMcps(mcp)
             .WithSubAgents(subAgents)
@@ -111,7 +111,7 @@ public static class AgentHost
 }
 ```
 
-Symbols traced: `AsAgentScope` (`Agent/Workflow/AgentEx`), the `With*` chain (`WorkflowAgentScope.cs`), `SubAgentScope.ForClient` (`SubAgentScope.cs` line 160), `McpServerConfiguration` / `McpServerRunMode` (`Agent/MCP/`), `WithPipeline` (`AgentPipelineExtensions`), `AgentTranscript`, and the OpenAI client construction (`AgentHelper.cs`, `ProvideAgent`).
+Symbols traced: `AsAgentScope` (`Src/Core/VeloxDev.Core.Extension/AgentEx.cs`), the `With*` chain (`WorkflowAgentScope.cs`), `SubAgentScope.ForClient` (`SubAgentScope.cs`), `McpServerConfiguration` / `McpServerRunMode` (`Agent/MCP/`), `WithPipeline` (`AgentPipelineExtensions`), `AgentTranscript`, and the OpenAI client construction (`AgentHelper.cs`, `ProvideAgent`).
 
 ## 3. Build and run
 
@@ -125,11 +125,6 @@ dotnet run
 ## Run declaration
 
 - ⚠️ **Not actually run end-to-end** — the conversation requires a real `IChatClient` and an API key that were not available. This page's program was **not** compiled or executed as written.
-- ✅ The **library and its deterministic tests** were built and run on 2026-10-01:
+- ⚠️ **Not run for this revision** — statically verified against the current source on 2026-10-18. A previously recorded deterministic suite run (2026-10-01, `失败: 0，通过: 387`) exists, but it predates the permission-mode / context-tree redesign; the APIs on this page were checked by reading source, not by executing the program.
 
-```text
-dotnet test Src/Core/VeloxDev.Core.Extension.Test/VeloxDev.Core.Extension.Test.csproj --filter "FullyQualifiedName~Agent&FullyQualifiedName!~SubAgentLiveTests"
-已通过! - 失败: 0，通过: 387，已跳过: 0，总计: 387，持续时间: 920 ms
-```
-
-`SubAgentLiveTests` was excluded on purpose (needs `API_KEY_DEEPSEEK`, non-deterministic). Do not read that run as proof the sample above runs — it proves the **APIs** it uses behave as documented, not that a model answered.
+`SubAgentLiveTests` was excluded from that earlier run on purpose (needs `API_KEY_DEEPSEEK`, non-deterministic). Do not read that run as proof the sample above runs.

@@ -9,7 +9,7 @@ public sealed class TickableAttribute(string channel = TickManager.DEFAULT_CHANN
 
 Source: `Src/Core/VeloxDev.Core/TimeLine/TickableAttribute.cs`.
 
-Two usages of the attribute are rejected by the runtime rather than by the compiler's attribute rules, so they are worth stating explicitly: it applies to **classes only** (not to members, structs, records-as-classes being the exception — a `record class` is a class and is accepted), and it is **not inherited**, so `[Tickable]` on a base type does not put a derived type on any channel.
+Two facts follow from that declaration: it applies to **classes only** (a `record class` counts as a class), and it is **not inherited**, so `[Tickable]` on a base type does not put a derived type on any channel.
 
 ### Constructor
 
@@ -29,7 +29,7 @@ Two usages of the attribute are rejected by the runtime rather than by the compi
 
 **Example:**
 ```text
-// Source: Examples/Tickable/WPF/Demo/MainWindow.Hooks.cs (line 30)
+// Source: Examples/Tickable/WPF/Demo/MainWindow.Hooks.cs (line 23)
 [Tickable(DemoChannel.Name)]
 public partial class MainWindow
 
@@ -38,8 +38,8 @@ public partial class MainWindow
 ```
 
 **Notes:**
-- The generator reads the attribute by symbol, not by name, so a fully qualified or aliased form works too (`Src/Generators/VeloxDev.Core.Generator/Writers/TickWriter.cs` lines 19-27).
-- The generator resolves **named** arguments after positional ones, so `[Tickable(Channel = "x")]` and `[Tickable("x")]` are equivalent, and a named argument wins over a positional one (`TickWriter.cs` lines 39-48).
+- The generator reads the attribute by symbol, not by name, so a fully qualified or aliased form works too (`Src/Generators/VeloxDev.Core.Generator/Writers/TickWriter.cs` lines 20-29).
+- The generator resolves **named** arguments after positional ones, so `[Tickable(Channel = "x")]` and `[Tickable("x")]` are equivalent, and a named argument wins over a positional one (`TickWriter.cs` lines 34-50).
 - `TargetFPS <= 0` is not clamped by the attribute — the *generator* simply declines to emit the call.
 
 #### Property: `TickableAttribute.Channel`

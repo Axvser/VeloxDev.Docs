@@ -29,7 +29,7 @@ public partial class MainWindow : Window { }
 
 转换器类型必须实现 `IThemeValueConverter`（`object? Convert(Type targetType, string propertyName, object?[] parameters)`）；它由上下文数组构造出具体属性值 —— `BrushConverter` 会把 `["#ffffff"]` 变成 `SolidColorBrush`。当 `InitializeTheme()` 运行时，生成器产出的代码会实例化转换器并对每个主题调用一次 `Convert(propertyType, propertyName, context)`，结果存入共享的 `ThemeCache`。
 
-该特性支持**1 个转换器 + 2–7 个主题**（`ThemeConfigAttribute.cs` 中共 6 个泛型元数）。三主题映射使用第三个主题类型与第三个上下文数组：
+该特性支持**1 个转换器 + 2–7 个主题**（`ThemeConfigAttribute.cs` 中共 6 个泛型元数）。生成器本身扫描元数据元数 3–7（2 到 6 个主题）；7 主题那一行只有在同一个类还带有 2 到 6 主题的行时才会被拾取。三主题映射使用第三个主题类型与第三个上下文数组：
 
 ```csharp
 [ThemeConfig<BrushConverter, Light, Dark, Solarized>(

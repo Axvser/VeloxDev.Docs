@@ -15,8 +15,8 @@ The engine contract is pinned by `Src/Core/VeloxDev.Core.Test/DynamicTheme/Theme
 
 ## Quick Start — Sub-pages
 
-- [00 Prerequisites](00_prerequisites/index.md) — supported target frameworks, SDK/workloads, the demos and the tests
-- [01 Install & Add Dependency](01_install/index.md) — `VeloxDev.Core` (brings the source generator) plus the platform adapter
-- [02 Declare & Register](02_declare-and-register/index.md) — theme classes, `[ThemeConfig]` + converters, turning a class into an `IThemeObject`
-- [03 Switch at Runtime](03_switch-at-runtime/index.md) — interpolator setup, `Transition` / `Jump` / `SetCurrent`, callbacks, controlling a switch, runtime overrides
-- [04 Verify & Complete Code](04_verify-and-complete-code/index.md) — verify with the minimal and scale demos and with both test files, the single runnable program, the run declaration
+- [Prerequisites](00_prerequisites/index.md) — supported target frameworks, SDK/workloads, the demos and the tests
+- [Install & Add Dependency](01_install/index.md) — `VeloxDev.Core` (brings the source generator) plus the platform adapter
+- [Declare & Register](02_declare-and-register/index.md) — theme classes, `[ThemeConfig]` + converters, turning a class into an `IThemeObject`
+- [Switch at Runtime](03_switch-at-runtime/index.md) — interpolator setup, `Transition` / `Jump` / `SetCurrent`, callbacks, controlling a switch, runtime overrides
+- [Verify & Complete Code](04_verify-and-complete-code/index.md) — verify with the minimal and scale demos and with both test files, the single runnable program, the run declaration

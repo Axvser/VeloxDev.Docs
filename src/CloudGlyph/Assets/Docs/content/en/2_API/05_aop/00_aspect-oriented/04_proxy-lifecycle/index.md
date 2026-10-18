@@ -1,6 +1,6 @@
 # AOP runtime — `Aop` & `AopCache`
 
-The lifecycle helpers behind the generated `Aop()` entry point. `Aop` keeps the proxy-to-target reverse map (for unwrapping a proxy back to the original instance); `AopCache` caches one proxy per target instance so `Aop()` returns a stable proxy.
+Two static helpers behind the generated `Aop()` extension. `AopCache` returns one proxy per target instance; `Aop` maps a proxy back to its target. Both are weak in the direction that matters, so a proxy and its target are collected together.
 
 ## Type: `Aop` (static)
 
@@ -25,14 +25,14 @@ public static class Aop
 
 | Parameter | Type | Description |
 |---|---|---|
-| `proxy` | `object` | The AOP proxy |
-| `target` | `object` | The original instance the proxy wraps |
+| `proxy` | `object` | The generated proxy |
+| `target` | `object` | The instance it wraps |
 
 **Returns:** `void`
 
-**Exceptions:** none declared (a duplicate key throws `ArgumentException`, but `Aop()` registers each proxy once through `AopCache`).
+**Exceptions:** none declared. `ConditionalWeakTable.Add` throws `ArgumentException` for a duplicate key; the generated factory calls `Map` once per created proxy, so this is not reachable through `Aop()`.
 
-**Notes:** adds `proxy → target` to a static `ConditionalWeakTable<object, object>`. Called by the generated `Aop()` extension right after `ProxyEx.CreateProxy`. The weak table keeps the proxy alive only as long as the target.
+**Notes:** called by the generated `Aop()` factory immediately after constructing the proxy.
 
 ### Aop.GetTarget\<TTarget\>
 
@@ -40,57 +40,63 @@ public static class Aop
 
 | Parameter | Type | Description |
 |---|---|---|
-| `proxy` | `IAspectOriented` | The AOP proxy to reverse-map |
+| `proxy` | `IAspectOriented` | The proxy to reverse-map |
 
-**Returns:** `TTarget?` — the original target instance, or `null` if the proxy was never mapped.
+**Returns:** `TTarget?` — the target, or `null` when the proxy was never mapped.
 
-**Exceptions:** none.
+**Exceptions:** none declared; an incompatible `TTarget` throws `InvalidCastException` on the cast.
 
-**Notes:** reverse lookup on the same `ConditionalWeakTable` — amortized `O(1)`. The signature is inferred from the runtime source (no demo/test exercises it); a natural use is `var original = Aop.GetTarget<TeamViewModel>(team);`.
+**Notes:** amortized `O(1)`. Covered by `AopProxyTests.GetTargetReversesTheProxy`:
+
+```csharp
+Assert.AreSame(fixture, Aop.GetTarget<AopFixture>(fixture.Aop()));
+```
 
 ## Type: `AopCache` (static)
 
 `Src/Core/VeloxDev.Core/AspectOriented/AopCache.cs`:
 
 ```csharp
-public static class AopCache
+private static class Entry<
+    TClass,
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] TInterface>
+    where TClass : class
+    where TInterface : class, IAspectOriented
 {
-    private static class Entry<TClass, TInterface>
-        where TClass : class
-        where TInterface : class, IAspectOriented
-    {
-        public static readonly ConditionalWeakTable<TClass, TInterface> Instances = [];
-    }
+    public static readonly ConditionalWeakTable<TClass, TInterface> Instances = [];
+}
 
-    public static TInterface Resolve<TClass, TInterface>(
-        TClass instance,
-        Func<TClass, TInterface> factory)
-        where TInterface : class, IAspectOriented
-        where TClass : class
-    {
-        return Entry<TClass, TInterface>.Instances
-            .GetValue(instance, k => factory(k));
-    }
+public static TInterface Resolve<
+    TClass,
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] TInterface>(
+    TClass instance,
+    Func<TClass, TInterface> factory)
+    where TInterface : class, IAspectOriented
+    where TClass : class
+{
+    return Entry<TClass, TInterface>.Instances
+        .GetValue(instance, k => factory(k));
 }
 ```
 
 ### AopCache.Resolve\<TClass, TInterface\>
 
-**Signature:** `TInterface Resolve<TClass, TInterface>(TClass instance, Func<TClass, TInterface> factory) where TInterface : class, IAspectOriented where TClass : class`
+**Signature:** `TInterface Resolve<TClass, TInterface>(TClass instance, Func<TClass, TInterface> factory)`
 
 | Parameter | Type | Description |
 |---|---|---|
-| `instance` | `TClass` | The target instance keying the cache |
-| `factory` | `Func<TClass, TInterface>` | Creates the proxy when `instance` has no cached proxy yet |
+| `instance` | `TClass` | The target; the cache key |
+| `factory` | `Func<TClass, TInterface>` | Constructs the proxy if none is cached |
 
-**Returns:** `TInterface` — the cached proxy if one exists, otherwise the `factory` result, which is then stored.
+**Returns:** `TInterface` — the cached proxy, or the factory result, which is then stored.
 
-**Exceptions:** none declared.
+**Exceptions:** none declared. Exceptions from `factory` propagate and nothing is cached.
 
 **Notes:**
 
-- Each `(TClass, TInterface)` pair gets its own `ConditionalWeakTable<TClass, TInterface>` through the nested generic `Entry<TClass, TInterface>` (CLR generic specialization) — no per-class cache code is needed.
-- Uses `ConditionalWeakTable.GetValue` semantics: the factory runs at most once per instance, and the entry lives as long as the instance (weak keys), so the proxy is garbage-collected together with its target.
-- This is what makes repeated `_teamData.Aop()` calls return the same proxy (`Examples/AOP/WPF/Demo/MainWindow.xaml.cs`).
+- The nested generic `Entry<TClass, TInterface>` gives each `(TClass, TInterface)` pair its own `ConditionalWeakTable` through CLR generic specialization. No per-class cache code is generated.
+- `ConditionalWeakTable.GetValue` is thread-safe: concurrent first calls may each run the factory, but exactly one result is stored and returned thereafter.
+- The weak key is the target; the value keeps the proxy alive while the target is alive. The test `AProxyIsCollectableOnceItsTargetIs` asserts that dropping the target lets both be collected. There is no static registry rooting proxies.
+- `TInterface` carries `DynamicallyAccessedMembers(PublicParameterlessConstructor)` solely to satisfy the trimmer's annotation on `ConditionalWeakTable`; `GetOrCreateValue` is never called. Concrete generated interfaces satisfy the annotation without a parameterless constructor.
 
-Related pages: [ProxyEx](../02_proxyex/index.md) provides the `factory`'s internals; the generated `Aop()` that calls `Resolve` is described in [Generated API](../../01_generated-api/index.md).
+Related pages: [ProxyEx](../02_proxyex/index.md) installs hooks on the returned proxy; [Generated API](../../01_generated-api/index.md) shows the `Aop()` extension that calls `Resolve`.

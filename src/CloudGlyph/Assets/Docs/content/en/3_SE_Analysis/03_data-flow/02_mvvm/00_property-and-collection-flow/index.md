@@ -20,11 +20,11 @@ note right of GVM: merged with the hand-written partial into one type
 == runtime: generated setter drives INPC ==
 Body -> GVM: Count = newValue
 activate GVM
-GVM -> GVM: Object.Equals guard (returns early if unchanged)
-GVM -> GVM: OnPropertyChanging(nameof(Count))  -> PropertyChanging
-GVM -> GVM: OnCountChanging(old, value)  (user partial hook)
+GVM -> GVM: equality guard (returns early if unchanged)
+GVM -> GVM: OnPropertyChanging(nameof(Count)) -> PropertyChanging
+GVM -> GVM: OnCountChanging(old, value) (user partial hook)
 GVM -> GVM: assign the backing field this._count
-GVM -> GVM: OnCountChanged(old, value)  (user partial hook)
+GVM -> GVM: OnCountChanged(old, value) (user partial hook)
 GVM -> Bind: OnPropertyChanged(nameof(Count)) fires PropertyChanged
 Bind -> Bind: re-reads Count, refreshes the bound control
 GVM --> Body
@@ -32,13 +32,13 @@ deactivate GVM
 @enduml
 ```
 
-> Source: `Src/Core/VeloxDev.Core/MVVM/VeloxCommand.cs` is not involved here; the setter shape is emitted by `MVVMPropertyFactory.GetSetterBodyLines` (`Src/Generators/VeloxDev.Core.Generator/Base/Analizer.cs`, line 466) and confirmed verbatim in a generated file.
+> Source: the setter shape is emitted by `MVVMPropertyFactory.GetSetterBodyLines` (`Src/Generators/VeloxDev.Core.Generator/Base/Analizer.cs`).
 
 ```csharp
-// Source: Generated — obj/Debug/net9.0/generated/VeloxDev.Core.Generator/VeloxDev.Generators.MVVM/CounterViewModel_QuickStart_Mvvm_MVVM.g.cs
+// Source: Src/Generators/VeloxDev.Core.Generator/Base/Analizer.cs (Default setter mode)
 set
 {
-    if (global::System.Object.Equals(this._count, value)) return;
+    if(global::System.Object.Equals(this._count, value)) return;
     var old = this._count;
     OnPropertyChanging(nameof(Count));
     OnCountChanging(old, value);
@@ -68,7 +68,7 @@ activate Getter
 Getter -> Tracker: EnsureSubscribed(this._items, OnItemsCollectionChanged)
 activate Tracker
 Tracker -> Tracker: ConditionalWeakTable.GetOrCreateValue(collection)
-Tracker -> Tracker: Entry.TryAdd(handler)  -> dedupe by (Method, Target)
+Tracker -> Tracker: Entry.TryAdd(handler) -> dedupe by (Method, Target)
 Tracker -> Coll: CollectionChanged += handler
 Tracker --> Getter
 deactivate Tracker
@@ -77,7 +77,7 @@ deactivate Getter
 
 Ctor -> Coll: Add("ready")
 activate Coll
-Coll -> Handler: CollectionChanged(sender, e)  [Action = Add]
+Coll -> Handler: CollectionChanged(sender, e) [Action = Add]
 activate Handler
 Handler -> Handler: OnCollectionChanged(nameof(Items), e, oldItems, newItems)
 Handler -> Hooks: OnItemAddedToItems(enumerated NewItems)
@@ -89,10 +89,10 @@ deactivate Coll
 @enduml
 ```
 
-> Source: generated getter and the `OnItemsCollectionChanged` switch — `CounterViewModel_QuickStart_Mvvm_MVVM.g.cs`; tracker behaviour — `Src/Core/VeloxDev.Core/MVVM/ObservableCollectionTracker.cs` lines 24-36 (`EnsureSubscribed`) and 100-118 (`MethodTargetEqualityComparer`).
+> Source: `MVVMPropertyFactory.GenerateCollectionMembers` (`Base/Analizer.cs`); tracker behaviour — `Src/Core/VeloxDev.Core/MVVM/ObservableCollectionTracker.cs`.
 
 ```csharp
-// Source: Generated — CounterViewModel_QuickStart_Mvvm_MVVM.g.cs, the collection getter
+// Source: Base/Analizer.cs — the generated collection getter
 get
 {
     global::VeloxDev.MVVM.ObservableCollectionTracker.EnsureSubscribed(this._items, OnItemsCollectionChanged);
@@ -102,7 +102,7 @@ get
 
 ## (c) Replacing the whole collection
 
-Replacement is where the tracker's `Unsubscribe` matters: without it the discarded collection would keep a handler pointing back into this view-model.
+Replacement is where `Unsubscribe` matters: without it the discarded collection would keep a handler pointing back into this view-model.
 
 ```plantuml
 @startuml
@@ -123,7 +123,7 @@ Setter -> Setter: OnItemsChanging(old, value)
 Setter -> Tracker: Unsubscribe(old, OnItemsCollectionChanged)
 activate Tracker
 Tracker -> Old: CollectionChanged -= handler
-Tracker -> Tracker: Entry.Remove(handler)  (the record survives)
+Tracker -> Tracker: Entry.Remove(handler) (the record survives)
 Tracker --> Setter
 deactivate Tracker
 Setter -> Hooks: OnItemRemovedFromItems(enumerate old)
@@ -141,23 +141,26 @@ deactivate Setter
 @enduml
 ```
 
-> Source: generated collection setter — `CounterViewModel_QuickStart_Mvvm_MVVM.g.cs`; `Unsubscribe` — `Src/Core/VeloxDev.Core/MVVM/ObservableCollectionTracker.cs` lines 47-59.
+> Source: `MVVMPropertyFactory.GetSetterBodyLines` and `GenerateCollectionMembers` (`Base/Analizer.cs`); `Unsubscribe` — `ObservableCollectionTracker.cs`.
 
 ## Per-action dispatch
 
-The generated `OnItemsCollectionChanged` maps the raw `NotifyCollectionChangedAction` onto the user hooks:
+The generated `OnItemsCollectionChanged` calls `OnCollectionChanged<T>` first, then maps `NotifyCollectionChangedAction` onto the user hooks:
 
 ```csharp
-// Source: Generated — CounterViewModel_QuickStart_Mvvm_MVVM.g.cs
+// Source: Base/Analizer.cs — GenerateCollectionMembers
+var oldItems = e.OldItems is null ? null : EnumerateItemsItems(e.OldItems);
+var newItems = e.NewItems is null ? null : EnumerateItemsItems(e.NewItems);
+OnCollectionChanged(nameof(Items), e, oldItems, newItems);
 switch (e.Action)
 {
-    case global::System.Collections.Specialized.NotifyCollectionChangedAction.Add when e.NewItems is not null:
+    case NotifyCollectionChangedAction.Add when e.NewItems is not null:
         OnItemAddedToItems(EnumerateItemsItems(e.NewItems));
         break;
-    case global::System.Collections.Specialized.NotifyCollectionChangedAction.Remove when e.OldItems is not null:
+    case NotifyCollectionChangedAction.Remove when e.OldItems is not null:
         OnItemRemovedFromItems(EnumerateItemsItems(e.OldItems));
         break;
-    case global::System.Collections.Specialized.NotifyCollectionChangedAction.Replace:
+    case NotifyCollectionChangedAction.Replace:
         if (e.OldItems is not null)
         {
             OnItemRemovedFromItems(EnumerateItemsItems(e.OldItems));
@@ -167,10 +170,10 @@ switch (e.Action)
             OnItemAddedToItems(EnumerateItemsItems(e.NewItems));
         }
         break;
-    case global::System.Collections.Specialized.NotifyCollectionChangedAction.Move when e.NewItems is not null:
+    case NotifyCollectionChangedAction.Move when e.NewItems is not null:
         OnItemMovedInItems(EnumerateItemsItems(e.NewItems));
         break;
-    case global::System.Collections.Specialized.NotifyCollectionChangedAction.Reset:
+    case NotifyCollectionChangedAction.Reset:
         OnItemsResetInItems();
         break;
 }
@@ -179,10 +182,10 @@ switch (e.Action)
 ## Error and edge paths
 
 | Path | Behaviour |
-|---|---|
-| Value unchanged | `Object.Equals` guard returns before any notification or hook. |
-| Collection is not `INotifyCollectionChanged` | `EnsureSubscribed` / `Unsubscribe` return immediately (`ObservableCollectionTracker.cs` lines 28-29, 51-52). |
-| `null` collection in `Unsubscribe` | Same early return; no exception. |
-| Handler arrives as a fresh method-group delegate | Deduped by `(Method, Target)`, so the invocation list does not grow (`MethodTargetEqualityComparer`, lines 100-118). |
+| --- | --- |
+| Value unchanged | The equality guard returns before any notification or hook. |
+| Collection is not `INotifyCollectionChanged` | `EnsureSubscribed` / `Unsubscribe` return immediately. |
+| `null` collection | Same early return; no exception. |
+| Handler arrives as a fresh method-group delegate | Deduped by `(Method, Target)`, so the invocation list does not grow. |
 | Collection garbage-collected | Its `ConditionalWeakTable` entry goes with it — no leak. |
-| Handler throws | The event's own invocation list unwinds; for command events it would be swallowed, but collection handlers are plain .NET event subscribers and are not guarded by the tracker. |
+| Handler throws | Collection handlers are plain .NET event subscribers and are not guarded by the tracker. |

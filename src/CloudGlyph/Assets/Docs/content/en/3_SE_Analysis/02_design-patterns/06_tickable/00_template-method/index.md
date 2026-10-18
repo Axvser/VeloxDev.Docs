@@ -4,20 +4,20 @@ The loop skeleton is fixed inside the private `LoopChannel`; the variable steps 
 
 | Role | Element | Source |
 |---|---|---|
-| Skeleton (thread path) | `LoopChannel.UpdateLoop` | `TickManager.cs` 509-554 |
-| Skeleton (thread path) | `LoopChannel.FixedUpdateLoop` | `TickManager.cs` 446-507 |
-| Skeleton (async path) | `UpdateLoopAsync` / `FixedUpdateLoopAsync` | `TickManager.cs` 622-682 / 557-620 |
-| Per-behaviour execution | `ExecuteBehaviorsUpdateSync` / `…LateUpdateSync` / `…FixedUpdateSync` | `TickManager.cs` 689-734 |
-| Hook methods | `partial void Awake` / `Start` / `Update` / `LateUpdate` / `FixedUpdate` | `Examples/Tickable/WPF/Demo/MainWindow.Hooks.cs` 52-168 |
-| Bridge | the generated `Invoke*` methods | `Writers/TickWriter.cs` 80-121 |
-| Registration entry points | the generated `InitializeTickable()` / `CloseTickable()` | `Writers/TickWriter.cs` 81-89 |
+| Skeleton (thread path) | `LoopChannel.UpdateLoop` | `TickManager.cs` 511-556 |
+| Skeleton (thread path) | `LoopChannel.FixedUpdateLoop` | `TickManager.cs` 448-509 |
+| Skeleton (async path) | `UpdateLoopAsync` / `FixedUpdateLoopAsync` | `TickManager.cs` 624-684 / 559-622 |
+| Per-behaviour execution | `ExecuteBehaviorsUpdateSync` / `…LateUpdateSync` / `…FixedUpdateSync` | `TickManager.cs` 691-736 |
+| Hook methods | `partial void Awake` / `Start` / `Update` / `LateUpdate` / `FixedUpdate` | `Examples/Tickable/WPF/Demo/MainWindow.Hooks.cs` 45-161 |
+| Bridge | the generated `Invoke*` methods | `Writers/TickWriter.cs` 74-127 |
+| Registration entry points | the generated `InitializeTickable()` / `CloseTickable()` | `Writers/TickWriter.cs` 85-94 |
 
 ## The skeleton
 
 `UpdateLoop` is the invariant algorithm. Everything in it is fixed except the three lines that dispatch into user code:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 509-554, abridged to the shape)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 511-556, abridged to the shape)
 private void UpdateLoop(CancellationToken token)
 {
     _isUpdateThreadActive = true;
@@ -67,11 +67,11 @@ private void UpdateLoop(CancellationToken token)
 
 The fixed parts, in order: activity timestamp → stall check → main-thread drain → sample → build args → dispatch Update → dispatch LateUpdate → return the args to the pool → publish stats → pace → count the frame. A subclass-based design would put `ExecuteBehaviors*` behind `protected virtual` methods; here they are private and the extension point is the *behaviour*, not the loop. There is nothing to subclass because `LoopChannel` is `private sealed` — the only way in is `ITickable`.
 
-`FixedUpdateLoop` is a different skeleton with the same spirit: apply a pending step-size change on its own thread, stall-check, `Advance` the compensating sampler, then push `count` steps in a loop, each building and returning its own args (lines 457-499).
+`FixedUpdateLoop` is a different skeleton with the same spirit: apply a pending step-size change on its own thread, stall-check, `Advance` the compensating sampler, then push `count` steps in a loop, each building and returning its own args (lines 459-501).
 
 ## The bridge
 
-The generator writes the only code that knows both halves. `TickWriter.GenerateBody` (lines 69-122) emits, into a partial declaration of the user's class:
+The generator writes the only code that knows both halves. `TickWriter.GenerateBody` (lines 74-127) emits, into a partial declaration of the user's class:
 
 ```csharp
 public void InitializeTickable()
@@ -100,7 +100,7 @@ partial void FixedUpdate(global::VeloxDev.TimeLine.FrameEventArgs e);
 
 Two properties of this generated code matter:
 
-- **The `SetTargetFPS` line is conditional.** `TickWriter` builds it only when the resolved attribute FPS is `>= 1` (`var setFpsLine = TargetFPS >= 1 ? … : string.Empty;`, line 76). With `[Tickable("demo")]` no FPS call is emitted at all, so registration cannot silently overwrite a channel setting.
+- **The `SetTargetFPS` line is conditional.** `TickWriter` builds it only when the resolved attribute FPS is `>= 1` (`var setFpsLine = TargetFPS >= 1 ? … : string.Empty;`, line 81). With `[Tickable("demo")]` no FPS call is emitted at all, so registration cannot silently overwrite a channel setting.
 - **The `partial void` declarations are what make the hooks optional.** A hook the user does not write is removed by the compiler, with no empty override and no virtual call. This is the Template Method with a *zero-cost* absent step, which is not something a `virtual`-based template can offer.
 
 ## The lifecycle steps
@@ -108,7 +108,7 @@ Two properties of this generated code matter:
 Registration is deferred, and that is the part of the template that is easiest to misread. `RegisterBehaviour` enqueues; the drain happens at the top of the frame, before the sample:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 785-801)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 787-803)
 private void ProcessAddedBehaviors()
 {
     bool added = false;
@@ -128,7 +128,7 @@ private void ProcessAddedBehaviors()
 }
 ```
 
-`ProcessMainThreadOperations` (line 753) calls this before `_updateSampler.Sample()`, so `Awake` and `Start` always precede the first `Update` — whether registration happened before or after `Start`. The WPF demo turns this into a visible measurement rather than a claim: `SimState.AwakeAtUpdateCount` and `AwakeFrameOrdinal` record the `Update` counter and the engine frame ordinal at the moment `Awake` ran.
+`ProcessMainThreadOperations` (line 755) calls this before `_updateSampler.Sample()`, so `Awake` and `Start` always precede the first `Update` — whether registration happened before or after `Start`. The WPF demo turns this into a visible measurement rather than a claim: `SimState.AwakeAtUpdateCount` and `AwakeFrameOrdinal` record the `Update` counter and the engine frame ordinal at the moment `Awake` ran.
 
 | Hook | Driver | Frequency |
 |---|---|---|
@@ -138,4 +138,4 @@ private void ProcessAddedBehaviors()
 | `LateUpdate` | update pump | Every frame, after every behaviour's `Update` — unless `Handled` was raised |
 | `FixedUpdate` | fixed-update pump | Every step interval (default 16 ms), concurrently, in batches after a stall |
 
-> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 446-554, 689-734, 753-801; `Src/Generators/VeloxDev.Core.Generator/Writers/TickWriter.cs` lines 64-125.
+> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 448-556, 691-736, 755-803; `Src/Generators/VeloxDev.Core.Generator/Writers/TickWriter.cs` lines 74-127.

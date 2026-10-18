@@ -60,4 +60,4 @@ A row never lies about reachability: `ExecuteNode` shows `IsEnabled:true` but `I
 
 ## Run declaration
 
-- ✅ Actually built and ran — the deterministic agent test suite (2026-10-01, `已通过! 失败: 0，通过: 387`) includes `Dashboard/AgentDashboardViewModelTests` (20 tests), covering tool gating notes, the checkbox round-trip, call counts across slices, skill and MCP convergence, and off-thread change marshalling.
+- ⚠️ **Not run for this revision** — statically verified against the current source on 2026-10-18. `AgentDashboardViewModelTests` exists and passed in a 2026-10-01 run (387 tests), but that run predates the permission-mode redesign and is not used as current evidence.

@@ -240,19 +240,20 @@ Notes:
 
 *Sources: `WorkflowSlotUpdateGate.cs`, `WorkflowLinkRenderEx.cs`, `WorkflowGuard.cs`.*
 
-### Link interaction (`LinkInteraction`)
+### Connection preview (`ConnectionCheck` and friends)
 
-The hub every GUI forwards link input into, one instance per tree. `LinkInteraction.For(IWorkflowTreeViewModel)` returns the shared instance; a host publishes translated input with `Publish(PointerEvent)`, `Publish(KeyEvent)`, and — when its own menu opens or closes — `Publish(ContextMenuEvent)`, then subscribes to the outcome instead of re-deriving hit testing per platform.
+The connection drag is a first-class, UI-agnostic state on `WorkflowInput` (see the GUI Input section). Its public surface is small and lives beside the input route:
 
-| Member | Kind | Description |
-|---|---|---|
-| `For(tree)` | static | The one hub for a tree (kept as long as the tree lives). |
-| `HoveredLink`, `HitRadius` | property | The link under the pointer; reach either side of a drawn curve. |
-| `AutoHighlight`, `AutoDelete`, `IsSuspended` | property | Hover highlight and Delete-to-remove are on by default; `IsSuspended` is set while a host menu is open, so pointer movement over the menu does not clear the selection. |
-| `HoverChanged`, `LinkPressed`, `LinkDeleteRequested` | event | Outcome events; Delete is requested, not performed, unless `AutoDelete` is on. |
-| `PreviewHoverChanged`, `PreviewLinkPressed`, `PreviewLinkDeleteRequested` | event | Preview phase, refusable per event through `WorkflowEventHandle.PreventDefault`. |
-| `ContextMenuRequesting`, `ContextMenuRequested` | event | Right-press phases for whoever shows the menu; refusing in `Requesting` suppresses `Requested` by construction. |
-| `ContextMenuOpened`, `ContextMenuClosed` | event | Raised after `Publish(ContextMenuEvent)` reports a menu on screen / gone; hover suspension tracks them. |
-| `ContextMenuDismissRequested` | event | Raised when the link an open menu was about leaves the tree, asking the host to take that menu down — so a menu never outlives its link. The host closes it and reports `ContextMenuPhase.Closed`. |
+| Type | Members / meaning |
+|---|---|
+| `ConnectionPreviewState` | `None`, `Started`, `ValidTarget`, `InvalidTarget` — the stage the virtual link paints. |
+| `ConnectionCheck` | `readonly struct`: `IsValid`, `Reason` (`ConnectionRejectReason`), `Message`; `Valid`, `Rejected(reason, message)`. It is the framework's verdict for one sender/receiver pair, with no side effects. |
+| `ConnectionRejectReason` | `None`, `SenderCannotSend`, `ReceiverCannotReceive`, `SameNode`, `RejectedByRule`, `RejectedByHost`. |
+| `IConnectionPreviewLink` | Optional capability of the virtual link: `Preview` (`ConnectionPreviewState`) and `SetPreview(state)`. `LinkDefaultViewModel` implements it. |
+| `ConnectionPreviewEventArgs` | `Sender`, `Receiver`, `State`, `Check` — the payload of `WorkflowInput.PreviewChanged`. |
+| `ConnectionPreviewValidatingEventArgs` | `Sender`, `Receiver`, `Check`, and `Reject(message)` — lets a host refuse a framework-valid candidate for this preview only. |
+| `SlotHitTestEx` | `DefaultHitRadius` (12) and `HitTest(tree, x, y, radius)` — finds the nearest measured slot anchor, without the platform visual tree. Adapters call it while the rubber band covers the surface. |
 
-*Sources: `WorkflowSystem/GUI/Events/LinkInteraction.cs`, `WorkflowSystem/GUI/Events/Link/*.cs`, `WorkflowSystem/GUI/Events/Menu/*.cs`.*
+`ConnectionCheck` deliberately excludes the release-time `IWorkflowTreeEvents.Connecting` veto: that event is a per-attempt decision and may depend on state a preview must not consume. A preview can only **tighten** the framework's verdict, never relax it.
+
+*Sources: `Interfaces/WorkflowSystem/ConnectionCheck.cs`, `Interfaces/WorkflowSystem/IConnectionPreviewLink.cs`, `GUI/Events/WorkflowInput.cs`, `GUI/Events/Tree/ConnectionPreviewEventArgs.cs`, `GUI/Events/Tree/ConnectionPreviewValidatingEventArgs.cs`, `GUI/Interaction/SlotHitTestEx.cs`.*

@@ -1,6 +1,6 @@
 # `TickManager` — 事件
 
-源码：`Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` 第 1037-1042 行（静态事件）与第 1024-1027 行（把通道自身事件转发到它们的订阅）。
+源码：`Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` 第 1041-1044 行（静态事件）与第 1023-1031 行（把通道自身事件转发到它们的订阅）。
 
 ```csharp
 public static event EventHandler<TickChannelEventArgs>? OnChannelStarted;
@@ -22,8 +22,8 @@ public static event EventHandler<TickChannelEventArgs>? OnChannelStopped;
 `public static event EventHandler<TickChannelEventArgs>? OnChannelStarted`
 
 **说明：**
-- 由 `LoopChannel.Started` 触发，`Start()` 在它自己的最后一句触发（第 326 行）—— 此时两个泵已经创建并启动，所以处理器里查询 `IsRunning` 会得到 `true`。
-- 对已在运行的通道重复调用 `Start` **不会**触发它：`Start` 在第 276 行就返回了。
+- 由 `LoopChannel.Started` 触发，`Start()` 在它自己的最后一句触发（第 330 行）—— 此时两个泵已经创建并启动，所以处理器里查询 `IsRunning` 会得到 `true`。
+- 对已在运行的通道重复调用 `Start` **不会**触发它：`Start` 在第 278 行就返回了。
 
 #### `TickManager.OnChannelPaused`
 
@@ -49,13 +49,13 @@ public static event EventHandler<TickChannelEventArgs>? OnChannelStopped;
 `public static event EventHandler<TickChannelEventArgs>? OnChannelStopped`
 
 **说明：**
-- 由 `StopAsync` 中的 `LoopChannel.Stopped` 触发（第 373 行），在泵已 join、统计已重置之后。
-- 对未运行的通道调用 `StopAsync` 时**不会**触发：`StopAsync` 在第 331 行就返回了。
+- 由 `StopAsync` 中的 `LoopChannel.Stopped` 触发（第 377 行），在泵已 join、统计已重置之后。
+- 对未运行的通道调用 `StopAsync` 时**不会**触发：`StopAsync` 在第 333 行就返回了。
 - `RestartAsync` 每次重启触发它一次，随后由末尾的 `Start()` 触发 `OnChannelStarted`。
 
 ## 转发是怎么接的
 
-`LoopChannel` 声明了自己的实例事件（`Started`、`Paused`、`Resumed`、`Stopped`，第 169-172 行）。`GetOrCreateChannel` 在通道构造时把它们订阅一次，并用新建的 `TickChannelEventArgs`（带通道名）各自重新触发（第 1021-1029 行）：
+`LoopChannel` 声明了自己的实例事件（`Started`、`Paused`、`Resumed`、`Stopped`，第 171-174 行）。`GetOrCreateChannel` 在通道构造时把它们订阅一次，并用新建的 `TickChannelEventArgs`（带通道名）各自重新触发（第 1023-1031 行）：
 
 ```csharp
 private static LoopChannel GetOrCreateChannel(string name)

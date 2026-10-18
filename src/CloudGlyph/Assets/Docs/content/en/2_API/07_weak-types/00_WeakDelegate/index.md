@@ -11,7 +11,7 @@ public sealed class WeakDelegate<TDelegate>
 
 Internally each registered handler is stored as `WeakReference<Delegate>` in a list, and the container also caches a *combined delegate* (the result of `Delegate.Combine` over the live handlers) in a `volatile` field. The cache is what makes the common "invoke everyone" path lock-free and reflection-free. Adding or removing a handler rebuilds the cache by default, and a rebuild first drops handlers whose target was already collected.
 
-**Note on weak semantics.** The cached combined delegate is a *strong* reference to the currently combined handlers. A handler added with the default `CanUpdateCache: true` therefore stays reachable through the container until the cache is rebuilt without it (typically a later `RemoveHandler`). Pass `CanUpdateCache: false` at add time to keep the new handler out of the strong cache, so it becomes collectible once nothing else references it — this is the pattern the Quick Start probe exercises.
+**Note on weak semantics.** The cached combined delegate is a *strong* reference to the currently combined handlers. A handler added with the default `CanUpdateCache: true` therefore stays reachable through the container until the cache is rebuilt without it (typically a later `RemoveHandler`). Pass `CanUpdateCache: false` at add time to keep the new handler out of the strong cache, so it becomes collectible once nothing else references it — this is the pattern the Quick Start probe exercises. The reprieve lasts until the next rebuild: a handler that is still alive when a rebuild runs is merged into the new strong cache; one that was collected beforehand is dropped.
 
 ## Methods
 
@@ -45,8 +45,8 @@ Internally each registered handler is stored as `WeakReference<Delegate>` in a l
 **Returns:** `void`
 
 **Notes:**
-- Removes every stored entry that still resolves to that exact delegate instance (reference equality on the weakly-held target).
-- After removal with the default flag, the cached combined delegate no longer references the handler, so it becomes collectible.
+- Removes every stored entry whose weakly-held target compares equal to `handler` under the `Delegate` `==` operator (delegate equality: same target and method, not object identity). Because the scan runs from the tail, removing a handler that was added twice removes both entries.
+- With the default flag the cache is rebuilt inside the same lock after each matched removal; the cached combined delegate then no longer references the handler, so it becomes collectible.
 
 ### `WeakDelegate<TDelegate>.GetInvocationList`
 
@@ -86,8 +86,9 @@ Assert.AreEqual(42, result);
 ```
 
 **Notes:**
-- Generic path for when the delegate signature is unknown: calls `GetInvocationList()?.DynamicInvoke(objects)`. Because invocation goes through reflection, an exception thrown by a handler surfaces as `TargetInvocationException` (the semantics of `Delegate.DynamicInvoke`).
+- Generic path for when the delegate signature is unknown: calls `GetInvocationList()?.DynamicInvoke(objects)`. When no live handler exists the null-conditional makes the call a no-op. Because invocation goes through reflection, an exception thrown by a handler surfaces as `TargetInvocationException` (the semantics of `Delegate.DynamicInvoke`).
 - When the signature is known at compile time, prefer taking `GetInvocationList()` and invoking it in a typed way — that avoids reflection on every call.
+- The method itself takes no lock; it reads the volatile cache through `GetInvocationList()` and locks only on a cache miss.
 
 ### `WeakDelegate<TDelegate>.Clone`
 

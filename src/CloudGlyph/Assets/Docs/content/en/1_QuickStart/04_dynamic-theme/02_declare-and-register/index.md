@@ -29,7 +29,7 @@ public partial class MainWindow : Window { }
 
 The converter type must implement `IThemeValueConverter` (`object? Convert(Type targetType, string propertyName, object?[] parameters)`); it builds the concrete property value from its context array — `BrushConverter` turns `["#ffffff"]` into a `SolidColorBrush`. When `InitializeTheme()` runs, the generator-emitted code instantiates the converter and calls `Convert(propertyType, propertyName, context)` once per theme, storing the results in the shared `ThemeCache`.
 
-The attribute supports **one converter plus 2–7 themes** (6 generic arities in `ThemeConfigAttribute.cs`). A three-theme mapping uses a third theme type and a third context array:
+The attribute supports **one converter plus 2–7 themes** (6 generic arities in `ThemeConfigAttribute.cs`). The generator itself scans metadata arities 3–7 (2 to 6 themes); a 7-theme row is picked up only when the same class also carries a 2-to-6-theme row. A three-theme mapping uses a third theme type and a third context array:
 
 ```csharp
 [ThemeConfig<BrushConverter, Light, Dark, Solarized>(

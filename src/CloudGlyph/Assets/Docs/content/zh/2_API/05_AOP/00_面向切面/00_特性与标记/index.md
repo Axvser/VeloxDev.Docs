@@ -1,19 +1,14 @@
 # AOP 运行时 — `AspectOrientedAttribute` 与 `IAspectOriented`
 
-AOP 功能的声明面：`AspectOrientedAttribute` 标记某个 `partial` 类中应经由动态代理暴露的成员；`IAspectOriented` 是所有生成 AOP 接口继承的空标记契约。
-
 ## 类型：`AspectOrientedAttribute`
 
-`Src/Core/VeloxDev.Core/AspectOriented/AspectOrientedAttribute.cs`：
+声明于 `Src/Core/VeloxDev.Core/AspectOriented/AspectOrientedAttribute.cs`：
 
 ```csharp
-namespace VeloxDev.AspectOriented
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field,
+    AllowMultiple = false, Inherited = false)]
+public class AspectOrientedAttribute : Attribute
 {
-    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field,
-        AllowMultiple = false, Inherited = false)]
-    public class AspectOrientedAttribute : Attribute
-    {
-    }
 }
 ```
 
@@ -21,21 +16,19 @@ namespace VeloxDev.AspectOriented
 
 **签名：** `AspectOrientedAttribute()`
 
-| 参数 | 类型 | 说明 |
-|---|---|---|
-| （无） | | 无参构造函数（该特性不携带任何状态） |
-
-**返回：** `AspectOrientedAttribute`
+无参数、无状态。
 
 **异常：** 无。
 
-### 特性语义
+### 语义
 
-- **目标：** 仅 `Method`、`Property`、`Field`；`AllowMultiple = false`，`Inherited = false`。
-- **识别：** 生成器按特性简单名 `AspectOriented` 匹配（`Base/AnalizeHelper.IsAopClass`、`Writers/AopWriter.ReadAopConfig`）。只要类中一个成员带有该特性，整个包含它的 `partial` 类就成为 AOP 目标，生成器随之产出其 AOP 接口、partial 类胶水与 `Aop(this T)` 扩展（见 [生成器产物](../../01_生成的API/index.md)）。
-- **暴露：** 生成器放到代理接口上的成员必须是 `public`（私有字段只有在 `[VeloxProperty]` / `[Observable]` 生成器将其变成公有属性后才会上接口）。
+- **目标：** 仅方法、属性、字段。
+- **识别是文本匹配：** `AnalizeHelper.IsAopClass` 匹配特性的简单名 `AspectOriented`，`AopSurface` 逐成员比较 `att.ToString() == "AspectOriented"`。请写不带限定名的 `[AspectOriented]`。
+- **类必须是 `partial`：** 发现过滤器只接受 partial 类声明（`Analizer.Filters.IsCandidateClass`）。非 partial 类会被静默跳过。
+- **一个成员被标记，整个类就成为目标。** 所有 partial 声明中的被标记成员都会被收集（`AnalizeHelper.Members`）。
+- **暴露规则：** 方法须为 `public`；属性至少有一个公有访问器；字段只有在同时带有属性生成特性（`[VeloxProperty]`、`[Observable]`）时才出现。详见 [生成器产物](../../01_生成的API/index.md)。
 
-Demo 验证的标记，`Examples/AOP/WPF/Demo/TeamViewModel.cs`：
+Demo 中的标记，`Examples/AOP/WPF/Demo/TeamViewModel.cs`：
 
 ```csharp
 public partial class TeamViewModel
@@ -52,24 +45,22 @@ public partial class TeamViewModel
 }
 ```
 
-此处两个字段同时带有 `[VeloxProperty]`（MVVM），因此以 `Name` 与 `Members` 属性形式出现在代理接口上；两个 `[AspectOriented]` 公有方法（`Reset`，以及文件后面出现的 `AOP_OnMemberAdded` / `AOP_OnMemberRemoved`）被直接暴露。
+两个字段以 `Name` 与 `Members` 属性出现；`Reset` 以方法出现。
 
 ## 类型：`IAspectOriented`
 
-`Src/Core/VeloxDev.Core/Interfaces/AspectOriented/IAspectOriented.cs`：
+声明于 `Src/Core/VeloxDev.Core/Interfaces/AspectOriented/IAspectOriented.cs`：
 
 ```csharp
-namespace VeloxDev.AspectOriented
+public interface IAspectOriented
 {
-    public interface IAspectOriented
-    {
-    }
 }
 ```
 
-无任何成员的空标记接口。它的作用：
+空标记接口。它的作用：
 
-- **作为所有生成 AOP 接口的基契约** —— 生成器写入基类型 `global::VeloxDev.AspectOriented.IAspectOriented`。
-- **作为公共泛型约束** —— 被 `ProxyEx.CreateProxy<T>`、`ProxyEx.SetProxy<T>` 与 `AopCache.Resolve<TClass, TInterface>` 共同使用。`Aop.GetTarget<TTarget>` 则以 `IAspectOriented` 作为其**形参**类型 —— 它自身的泛型约束是 `TTarget : class`（见 [proxyex](../02_proxyex/index.md) 与 [代理生命周期](../04_代理生命周期/index.md)）。
+- **基契约：** 每个生成的 AOP 接口都继承它。
+- **约束：** 用于 `ProxyEx.SetProxy<T>` 与 `AopCache.Resolve<TClass, TInterface>`。
+- **形参类型：** `Aop.GetTarget<TTarget>` 的形参（其自身约束是 `TTarget : class`）。
 
-相关页面：[ProxyMembers 与 ProxyHandler](../01_代理成员处理器/index.md)、[ProxyEx](../02_proxyex/index.md)、[ProxyInstance](../03_proxyinstance/index.md)。
+生成的接口还继承 `IAopHookTarget`，而后者带有成员；因此用户自己的类**不**实现这两个接口 —— 实现它们的是代理类。参见 [生成的代理](../03_生成的代理/index.md)。

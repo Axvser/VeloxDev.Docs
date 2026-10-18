@@ -1,6 +1,6 @@
 # `TickManager` — Events
 
-Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 1037-1042 (the static events) and 1024-1027 (the subscription that forwards a channel's own events to them).
+Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 1041-1044 (the static events) and 1023-1031 (the subscription that forwards a channel's own events to them).
 
 ```csharp
 public static event EventHandler<TickChannelEventArgs>? OnChannelStarted;
@@ -22,8 +22,8 @@ public static event EventHandler<TickChannelEventArgs>? OnChannelStopped;
 `public static event EventHandler<TickChannelEventArgs>? OnChannelStarted`
 
 **Notes:**
-- Raised by `LoopChannel.Started`, which `Start()` fires at its very end (line 326) — after the pumps have been created and started, so a handler can query `IsRunning` and get `true`.
-- **Not** raised by a redundant `Start` on a running channel: `Start` returns at line 276 before it reaches the event.
+- Raised by `LoopChannel.Started`, which `Start()` fires at its very end (line 330) — after the pumps have been created and started, so a handler can query `IsRunning` and get `true`.
+- **Not** raised by a redundant `Start` on a running channel: `Start` returns at line 278 before it reaches the event.
 
 #### `TickManager.OnChannelPaused`
 
@@ -49,13 +49,13 @@ public static event EventHandler<TickChannelEventArgs>? OnChannelStopped;
 `public static event EventHandler<TickChannelEventArgs>? OnChannelStopped`
 
 **Notes:**
-- Raised by `LoopChannel.Stopped` from `StopAsync` (line 373), after the pumps are joined and the statistics reset.
-- **Not** raised when `StopAsync` is called on a channel that is not running: `StopAsync` returns at line 331 before reaching the event.
+- Raised by `LoopChannel.Stopped` from `StopAsync` (line 377), after the pumps are joined and the statistics reset.
+- **Not** raised when `StopAsync` is called on a channel that is not running: `StopAsync` returns at line 333 before reaching the event.
 - `RestartAsync` raises it once per restart, followed by `OnChannelStarted` from the `Start()` at its end.
 
 ## How the forwarding works
 
-`LoopChannel` declares its own instance events (`Started`, `Paused`, `Resumed`, `Stopped`, lines 169-172). `GetOrCreateChannel` subscribes them exactly once, at channel construction, and re-raises each with a fresh `TickChannelEventArgs` carrying the channel name (lines 1021-1029):
+`LoopChannel` declares its own instance events (`Started`, `Paused`, `Resumed`, `Stopped`, lines 171-174). `GetOrCreateChannel` subscribes them exactly once, at channel construction, and re-raises each with a fresh `TickChannelEventArgs` carrying the channel name (lines 1023-1031):
 
 ```csharp
 private static LoopChannel GetOrCreateChannel(string name)

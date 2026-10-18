@@ -13,16 +13,20 @@ using System;
 using VeloxDev.WeakTypes;
 
 var stack = new WeakStack<Payload>();       // Payload is the helper from the Complete Code page
-stack.Push(new Payload(1));
-stack.Push(new Payload(2));
+var first = new Payload(1);                 // keep locals alive so Count is deterministic
+var second = new Payload(2);
+stack.Push(first);
+stack.Push(second);
 
 Console.WriteLine($"Count: {stack.Count}");             // 2
 if (stack.TryPeek(out var top)) Console.WriteLine($"Top: {top}");       // 2 (top, not removed)
 while (stack.TryPop(out var item)) Console.WriteLine($"Popped: {item}"); // 2 then 1
 Console.WriteLine($"IsEmpty: {stack.IsEmpty}");         // True
+GC.KeepAlive(first);
+GC.KeepAlive(second);
 ```
 
-**Expected result:** items leave in LIFO order (last pushed first) and `TryPeek` leaves the top intact — matching `Push_MultipleItems_LIFO_Order` and `TryPeek_ReturnsTopWithoutRemoving` in `WeakStackTests.cs`.
+**Expected result:** items leave in LIFO order (last pushed first) and `TryPeek` leaves the top intact — matching `Push_MultipleItems_LIFO_Order` and `TryPeek_ReturnsTopWithoutRemoving` in `WeakStackTests.cs`. The `GC.KeepAlive` calls keep the payloads reachable for the duration of the snippet.
 
 ## 2. Range push, clear, trim
 

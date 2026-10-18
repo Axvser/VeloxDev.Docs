@@ -48,4 +48,4 @@ with **no data**. The check is `if (role == CompileRole.Terminal && !context.Tar
 
 ## Run declaration
 
-- ✅ Actually built and ran — the deterministic agent test suite (2026-10-01, `已通过! 失败: 0，通过: 387`) covers the Terminal path through `WorkflowLifecycleFidelityTests`. The sibling-branch error contract and its recovery steps are read from `WorkflowAgentToolkit.RunCompiledRoleAsync`, which the suite does not exercise on a branching graph (the demo graphs it drives have no sibling router on a cone).
+- ⚠️ **Not run for this revision** — statically verified against the current source on 2026-10-18. The Terminal path and the sibling-branch error contract are read from `WorkflowAgentToolkit.RunCompiledRoleAsync`; the previously recorded suite run predates the permission-mode redesign, and it never exercised a branching graph.

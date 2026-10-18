@@ -4,17 +4,16 @@
 
 ### Class: `ThemeCache`
 
-Central store of theme property values. It eliminates per-class generated static dictionaries by storing all theme data in one location, keyed by the declaring type. All members are static and thread-safe (guarded by an internal lock).
+Central store of theme property values. It eliminates per-class generated static dictionaries by storing all theme data in one location, keyed by the declaring type. All members are static; the static store and its registration path are guarded by an internal lock, and the per-instance store is a `ConditionalWeakTable`.
 
 Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`.
 
-##### Storage Model
+#### Storage Model
 
 - **Static (default) per-type configuration:** `Type → (propertyName → PropertyEntry(PropertyInfo, (themeType → value)))`, stored in a `Dictionary<Type, Dictionary<string, PropertyEntry>>`.
 - **Active (runtime-override) per-instance cache:** `ConditionalWeakTable<IThemeObject, InstanceCache>` — no strong references, so per-instance overrides never leak.
-- **Shared converter registry:** `Dictionary<string, IThemeValueConverter>` with an incrementing key index (reserved for converters registered once and reused across types).
 
-##### Methods
+#### Methods
 
 #### ThemeCache.IsTypeRegistered
 
@@ -46,31 +45,6 @@ Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`.
 - Thread-safe; a duplicate registration for the same `type` is silently ignored (first registration wins).
 - Called from generated `IThemeObject.InitializeTheme()` implementations; each value dictionary holds one converted value per theme type.
 
-#### ThemeCache.RegisterConverter
-
-**Signature:**
-`public static string RegisterConverter(IThemeValueConverter converter)`
-
-| Parameter | Type | Description |
-|---|---|---|
-| `converter` | `IThemeValueConverter` | A converter instance to reuse across types. |
-
-**Returns:** `string` — the generated registry key (format `__velox_global_converter_{n}__`).
-
-**Notes:**
-- The key is passed later to `GetConverter`. Note: the theme generator currently instantiates converters inline (`Activator.CreateInstance`) and does not call this method; the registry exists for scenarios that want a single shared converter instance.
-
-#### ThemeCache.GetConverter
-
-**Signature:**
-`public static IThemeValueConverter? GetConverter(string key)`
-
-| Parameter | Type | Description |
-|---|---|---|
-| `key` | `string` | The converter key returned by `RegisterConverter`. |
-
-**Returns:** `IThemeValueConverter?` — the converter, or `null` if the key is unknown.
-
 #### ThemeCache.GetStaticForType
 
 **Signature:**
@@ -80,10 +54,10 @@ Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`.
 |---|---|---|
 | `type` | `Type` | The declaring type. |
 
-**Returns:** `Dictionary<string, Dictionary<PropertyInfo, Dictionary<Type, object?>>>` — a merged dictionary of all theme properties for `type` and its base types (walks the inheritance chain, base first, so derived properties override base ones of the same name).
+**Returns:** `Dictionary<string, Dictionary<PropertyInfo, Dictionary<Type, object?>>>` — a newly built merged dictionary of all theme properties for `type` and its base types (walks the inheritance chain, base first, so derived properties of the same name replace base ones).
 
 **Notes:**
-- Backs the generated `GetStaticThemeCache()` method and is used at switch time to obtain per-theme default values.
+- Backs the generated `GetStaticThemeCache()` method and is used at switch time to obtain per-theme default values. A new dictionary is allocated on every call; its value dictionaries are the cached instances.
 
 #### ThemeCache.GetOrCreateActiveEntry
 
@@ -108,21 +82,7 @@ Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`.
 |---|---|---|
 | `instance` | `IThemeObject` | The theme-aware instance. |
 
-**Returns:** `InstanceCache?` — the active override cache, or `null` if the instance is not registered.
-
-#### ThemeCache.RemoveActiveEntry
-
-**Signature:**
-`public static void RemoveActiveEntry(IThemeObject instance)`
-
-| Parameter | Type | Description |
-|---|---|---|
-| `instance` | `IThemeObject` | The theme-aware instance. |
-
-**Returns:** `void`
-
-**Notes:**
-- Removes the instance's active cache entry.
+**Returns:** `InstanceCache?` — the active override cache, or `null` if the instance has no entry. This is the lookup the generated `RestoreThemeValue<T>` uses.
 
 #### ThemeCache.TryGetDefaultValue
 
@@ -153,4 +113,4 @@ Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeCache.cs`.
 
 **Notes:**
 - Only properties actually overridden at runtime are stored here. During a theme switch, dynamic content takes precedence over the static defaults.
-- It is the value type of the `ConditionalWeakTable<IThemeObject, InstanceCache>` used by `ThemeManager`.
+- It is the value type of `ThemeCache`'s private `ConditionalWeakTable<IThemeObject, InstanceCache>`. (`ThemeManager` keeps a separate weak table as its own registration guard.)

@@ -1,63 +1,43 @@
-# MVVM — `VeloxCommand` 的构造
+# MVVM — `VeloxCommand` 构造
 
-构造 `VeloxCommand` 的全部方式。选哪一种只决定方法体是否拿到“每次执行的 `CancellationToken`” —— 其它一切（排队、生命周期事件、中断上报）完全相同。
+构造 `VeloxCommand` 的所有方式。选择只决定两件事：方法体是否接收每次执行的 `CancellationToken`，以及返回值是否被 `IVeloxCommandResult` 捕获。
 
-拿不到 token 的方法体在被中断时仍会上报 `Canceled`，只是无法真正停止，于是会继续跑到返回。该区别由内部的 `_isCtsNeeded` 记录。
+不接收 token 的方法体被中断时仍会上报 `Canceled`，只是无法停止，会继续跑完。
 
 ###### `VeloxCommand(Func<object?, CancellationToken, Task> command, Predicate<object?>? canExecute = null, int semaphore = 1)`
 
-主构造函数。创建一个方法体同时接收参数与每次执行取消令牌的命令。
+主构造函数。方法体同时接收实参与每次执行的 token。
 
 | 参数 | 类型 | 说明 |
-|---|---|---|
+| --- | --- | --- |
 | `command` | `Func<object?, CancellationToken, Task>` | 要调用的方法体。 |
-| `canExecute` | `Predicate<object?>?` | 可执行性谓词；为 `null` 时命令始终可执行。可选。 |
-| `semaphore` | `int` | 最大并发执行数。必须 ≥ 1。可选，默认 `1`。 |
+| `canExecute` | `Predicate<object?>?` | 可执行性谓词；`null` 表示恒可执行。 |
+| `semaphore` | `int` | 最大并发执行数，必须 ≥ 1。默认 `1`。 |
 
-**Exceptions:**
+**异常：**
 
 | 异常 | 条件 |
-|---|---|
+| --- | --- |
 | `ArgumentNullException` | `command` 为 `null`。 |
 | `ArgumentOutOfRangeException` | `semaphore` 小于 1。 |
 
-###### `VeloxCommand(Func<Task> command, Predicate<object?>? canExecute = null, int semaphore = 1)`
+###### `VeloxCommand(Func<Task> command, …)` / `VeloxCommand(Action<object?> command, …)` / `VeloxCommand(Action command, …)`
 
-从无参方法体创建命令。方法体永远拿不到 token，因此被中断时会报 `Canceled` 而方法体并不会真正停止。
-
-**Exceptions:** 同主构造函数。
-
-###### `VeloxCommand(Action<object?> command, Predicate<object?>? canExecute = null, int semaphore = 1)`
-
-从接收参数的同步方法体创建命令。方法体永远拿不到 token。
-
-**Exceptions:** 同主构造函数。
-
-###### `VeloxCommand(Action command, Predicate<object?>? canExecute = null, int semaphore = 1)`
-
-从无参同步方法体创建命令。
-
-**Exceptions:** 同主构造函数。
+不接收 token 的方法体。`canExecute` 与 `semaphore` 契约相同；容量小于 1 同样抛 `ArgumentOutOfRangeException`。`null` 方法体不会在构造时检查：传给基类的是非空包装 lambda，因此会在执行到达它时表现为 `NullReferenceException`。
 
 ###### `VeloxCommand.CreateTaskOnlyWithParameter`
 
 **Signature:**
 `static VeloxCommand CreateTaskOnlyWithParameter(Func<object?, Task> command, Predicate<object?>? canExecute = null, int semaphore = 1)`
 
-| 参数 | 类型 | 说明 |
-|---|---|---|
-| `command` | `Func<object?, Task>` | 只接收参数的方法体。 |
-| `canExecute` | `Predicate<object?>?` | 可执行性谓词。可选。 |
-| `semaphore` | `int` | 并发容量，≥ 1。可选，默认 `1`。 |
+**返回：** 等待 `command(parameter)` 的命令；方法体永不接收 token。
 
-**Returns:** `VeloxCommand` —— 一个 await `command(parameter)` 的命令；方法体永远拿不到 token。
-
-**Exceptions:** `command` 为 `null` 时抛 `ArgumentNullException`；`semaphore < 1` 时抛 `ArgumentOutOfRangeException`。
+**异常：** `semaphore < 1` 时抛 `ArgumentOutOfRangeException`。
 
 **Example:**
 
 ```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandTests.cs, lines 86-100
+// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandTests.cs
 object? received = null;
 var command = VeloxCommand.CreateTaskOnlyWithParameter(p =>
 {
@@ -77,39 +57,55 @@ Assert.AreEqual("test", received);
 **Signature:**
 `static VeloxCommand CreateTaskOnlyWithCancellationToken(Func<CancellationToken, Task> command, Predicate<object?>? canExecute = null, int semaphore = 1)`
 
-**Returns:** `VeloxCommand` —— 一个 await `command(ct)` 的命令；每次执行都会创建 token，因此方法体确实可被取消。
+**返回：** 等待 `command(ct)` 的命令；每次执行创建一个 token，因此方法体真正可取消。
 
-**Exceptions:** `command` 为 `null` 时抛 `ArgumentNullException`；`semaphore < 1` 时抛 `ArgumentOutOfRangeException`。
-
-###### `VeloxCommand.CreateTaskOnlyWithValueTaskParameter`
+###### `VeloxCommand.CreateTaskOnlyWithResult`
 
 **Signature:**
-`static VeloxCommand CreateTaskOnlyWithValueTaskParameter(Func<object?, ValueTask> command, Predicate<object?>? canExecute = null, int semaphore = 1)`
+`static VeloxCommand CreateTaskOnlyWithResult(Func<object?, Task<object?>> command, Predicate<object?>? canExecute = null, int semaphore = 1)`
 
-**Returns:** `VeloxCommand` —— 与 `CreateTaskOnlyWithParameter` 相同，但面向返回 `ValueTask` 的方法体。方法体永远拿不到 token。
+**返回：** 方法体接收实参、返回值、且不接收 token 的命令。返回值由 `IVeloxCommandResult.ExecuteAsync(object?, CancellationToken)` 交回。
 
-**Exceptions:** `command` 为 `null` 时抛 `ArgumentNullException`；`semaphore < 1` 时抛 `ArgumentOutOfRangeException`。
-
-**Notes:**
-
-- **条件编译：** 只在 `#if !NETSTANDARD2_0 && !NETFRAMEWORK` 下存在，因此在 `netstandard2.0` 与 `netframework4.6.1` 目标上不存在。
-- 它是**具名**工厂而不是 `CreateTaskOnlyWithParameter` 的重载。若让 `Func<object?, ValueTask>` 与 `Func<object?, Task>` 并存，会让每个 `async` lambda 调用点产生歧义（`CS0121`），而 `async p => { … }` 正是调用方写命令的方式。
-
-###### `VeloxCommand.CreateTaskOnlyWithValueTaskCancellationToken`
+###### `VeloxCommand.CreateTaskWithResult`
 
 **Signature:**
-`static VeloxCommand CreateTaskOnlyWithValueTaskCancellationToken(Func<CancellationToken, ValueTask> command, Predicate<object?>? canExecute = null, int semaphore = 1)`
+`static VeloxCommand CreateTaskWithResult(Func<object?, CancellationToken, Task<object?>> command, Predicate<object?>? canExecute = null, int semaphore = 1)`
 
-**Returns:** `VeloxCommand` —— 与 `CreateTaskOnlyWithCancellationToken` 相同，但面向返回 `ValueTask` 的方法体。每次执行都会创建 token。
+**返回：** `CreateTaskOnlyWithResult` 的可取消版本。
 
-**Exceptions:** `command` 为 `null` 时抛 `ArgumentNullException`；`semaphore < 1` 时抛 `ArgumentOutOfRangeException`。
+###### `VeloxCommand.CreateTypedTaskOnlyWithParameter<T>`
 
-**Notes:** 与 `CreateTaskOnlyWithValueTaskParameter` 相同的 `#if !NETSTANDARD2_0 && !NETFRAMEWORK` 守卫。
+**Signature:**
+`static VeloxCommand<T, object?> CreateTypedTaskOnlyWithParameter<T>(Func<T, Task> command, Predicate<T>? canExecute = null, int semaphore = 1)`
+
+**返回：** 接收 `T`、无 token 的强类型命令。生成器为"单强类型形参 + 无返回值"使用它。
+
+###### `VeloxCommand.CreateTypedWithParameter<T>`
+
+**Signature:**
+`static VeloxCommand<T, object?> CreateTypedWithParameter<T>(Func<T, CancellationToken, Task> command, Predicate<T>? canExecute = null, int semaphore = 1)`
+
+**返回：** 接收 `T` 与执行 token 的强类型命令。
+
+**异常：** `command` 为 `null` 时抛 `ArgumentNullException`（该工厂把方法体直接交给基类构造函数）。
+
+###### `VeloxCommand.CreateTaskOnlyWithValueTaskParameter` / `CreateTaskOnlyWithValueTaskCancellationToken`
+
+**Signatures:**
+`static VeloxCommand CreateTaskOnlyWithValueTaskParameter(Func<object?, ValueTask> command, …)`
+`static VeloxCommand CreateTaskOnlyWithValueTaskCancellationToken(Func<CancellationToken, ValueTask> command, …)`
+
+**返回：** `CreateTaskOnlyWithParameter` 与 `CreateTaskOnlyWithCancellationToken` 的 `ValueTask` 版本。
+
+**说明：**
+
+- **条件编译：** 只在 `#if !NETSTANDARD2_0 && !NETFRAMEWORK` 下存在。
+- 它们是*命名*工厂而不是重载：把 `Func<object?, ValueTask>` 放在 `Func<object?, Task>` 旁边会让每个 `async` lambda 调用点产生歧义（`CS0121`）。
 
 **Example:**
 
 ```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandTests.cs, lines 119-135
+// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandTests.cs
 var gate = new CommandGate();
 var command = VeloxCommand.CreateTaskOnlyWithValueTaskCancellationToken(
     ct => new ValueTask(gate.RunWithTokenAsync(ct)));
@@ -121,23 +117,23 @@ await gate.WaitForStartedAsync();
 await command.InterruptAsync();
 await CommandTestKit.WaitUntilAsync(() => recorder.ExitCount >= 1);
 
-Assert.HasCount(0, recorder.Of(CommandEventType.Failed),
-    "a ValueTask body that honours the token is cancelled, not failed");
+Assert.HasCount(0, recorder.Of(CommandEventType.Failed));
 ```
 
 ## 生成的调用点
 
-Command 生成器完全不用 `ValueTask` 那两个工厂 —— 它改为生成 `.AsTask()` 转换 thunk，这样生成的代码在所有目标框架上都可用：
+Command 生成器不使用 `ValueTask` 工厂：它发出 `.AsTask()` thunk，因此生成代码在所有目标框架上都能工作。强类型形参使用强类型工厂：
 
 ```csharp
-// Source: Generated — obj/Debug/net9.0/generated/VeloxDev.Core.Generator/VeloxDev.Generators.Command/CounterViewModel_QuickStart_Mvvm_Commands.g.cs
-_buffer_SumToCommand ??= global::VeloxDev.MVVM.VeloxCommand.CreateTaskOnlyWithParameter(
-    command: parameter => SumToAsync((int)parameter!).AsTask(),
-    canExecute: _ => true,
-    semaphore: 1);
+// Source: generated — *_Commands.g.cs（形状由 CommandSignatureDiagnosticsTests 钉住）
+_buffer_SaveCommand ??= global::VeloxDev.MVVM.VeloxCommand<string, global::System.Object?>
+    .CreateTypedTaskOnlyWithParameter<global::System.String>(
+        command: Save,
+        canExecute: _ => true,
+        semaphore: 1);
 ```
 
-**Notes:**
+**说明：**
 
-- 特性上的 `semaphore` 经 writer 的 `Math.Max(1, semaphore)` 传入，所以生成的命令绝不会走 `ArgumentOutOfRangeException` 分支；只有手写构造才可能。
-- 由“拿不到 token 的方法体”构建的命令不会分发 `CancellationTokenSource`，因此对它而言 `CommandEventArgs.Cts`（internal）为 `null` —— 也就没有东西需要释放。
+- 特性的 `semaphore` 经 `Math.Max(1, semaphore)` 传递，因此生成的命令永远不会走 `ArgumentOutOfRangeException` 路径。
+- 无 token 的方法体不分配 `CancellationTokenSource`，因此内部 `Cts` 为 `null`，无需释放。

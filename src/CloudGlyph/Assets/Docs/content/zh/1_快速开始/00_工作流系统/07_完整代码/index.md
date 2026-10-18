@@ -1,17 +1,17 @@
-# Workflow System — 完整代码
+# 工作流系统 — 完整代码
 
-下面的程序就是整条核心流程 —— 搭画布、正向编译、编译一个结果、序列化并重建 —— 全在一个 `Program.cs` 里。它用到的每样东西都在本快速开始的前面几页定义过，没有任何省略。
+下面的程序把整个核心流程 —— 构建画布、正向编译、结果编译、序列化并重建 —— 放在一个 `Program.cs` 里。它用到的一切都在本快速开始的更早页面中定义过；没有任何省略。
 
-| 标识符 | 定义在哪 |
+| 标识符 | 定义位置 |
 |---|---|
 | `QuickTree`、`QuickSlot`、`QuickLink` | `Components.cs` —— 见 `02_定义组件` |
 | `TickerNode` / `BiasNode` / `PrinterNode` 及其 Helper | `TickerNode.cs`、`BiasNode.cs`、`PrinterNode.cs` —— 见 `02_定义组件` |
 | `FlakyNode` / `FlakyHelper` | 见 `10_重试与补偿` |
 | `BoomNode` / `BoomHelper` | 见 `10_重试与补偿` |
 | `SourceNode`、`LeftNode`、`RightNode`、`BranchClock` | `FanOutNodes.cs` —— 见 `12_并行与大纲` |
-| 项目文件（引用、`net10.0`） | 见 `01_安装` |
+| 工程文件（引用、`net10.0`） | 见 `01_安装与创建项目` |
 
-组件与节点文件在各自页面里全文给出；每个文件声明一个组件（或一个节点加它的 Helper）。把它们和 `Program.cs` 一起建在 `WorkflowQuickStart` 项目里。
+组件与节点文件在那些页面上全文给出；每个文件声明一个组件（或一个节点加它的 Helper）。把它们与 `Program.cs` 一起创建在 `WorkflowQuickStart` 工程里。
 
 `Program.cs`：
 
@@ -27,7 +27,7 @@ namespace WorkflowQuickStart
     {
         private static async Task Main()
         {
-            // 1. 在可编辑画布上搭出这张图。
+            // 1. Build the graph on an editable canvas.
             var tree = new QuickTree();
             tree.Layout.OriginSize = new Size(2400, 850);
             var helper = tree.GetHelper();
@@ -50,7 +50,7 @@ namespace WorkflowQuickStart
 
             Console.WriteLine($"[1] Nodes={tree.Nodes.Count} Links={tree.Links.Count}");
 
-            // 2. 正向（Root）编译 + 运行时运行。
+            // 2. Forward (Root) compile + runtime run.
             var compiler = new CompilerViewModel();
             var rootGraph = (await compiler.CompileAsync(
                 ticker, CompileRole.Root, CancellationToken.None))[0];
@@ -62,14 +62,14 @@ namespace WorkflowQuickStart
             foreach (var row in CompiledOutline.Of(rootGraph))
                 Console.WriteLine($"[2] outline: {new string(' ', row.Depth * 2)}{row.Kind} | {row.Label}");
 
-            // 3. 终端（结果）编译 + 运行时运行。
+            // 3. Terminal (result) compile + runtime run.
             var resultGraph = (await compiler.CompileAsync(
                 bias, CompileRole.Terminal, CancellationToken.None))[0];
             var result = new RuntimeContext { Target = bias };
             await new RuntimeEngine().RunAsync(resultGraph, result, CancellationToken.None);
             Console.WriteLine($"[3] result: {result.Status} data={result.Data} reached={result.TargetReached}");
 
-            // 4. 把整棵树序列化成 JSON，重建，再跑一遍。
+            // 4. Serialize the whole tree to JSON, rebuild, re-run.
             var json = tree.Serialize();
             var copy = json.Deserialize<QuickTree>();
             var tickerCopy = copy.Nodes.OfType<TickerNode>().Single();
@@ -79,7 +79,7 @@ namespace WorkflowQuickStart
             await new RuntimeEngine().RunAsync(copyGraphs[0], copyCtx, CancellationToken.None);
             Console.WriteLine($"[4] copy: Nodes={copy.Nodes.Count} Links={copy.Links.Count} {copyCtx.Status} data={copyCtx.Data}");
 
-            // 5. 执行门：握住运行，再放开。
+            // 5. Execution gate: hold the run, then let it go.
             var gate = new ManualExecutionGate();
             gate.Pause();
             var gated = new RuntimeContext { ExecutionGate = gate };
@@ -90,7 +90,7 @@ namespace WorkflowQuickStart
             await gatedRun;
             Console.WriteLine($"[5] resumed: status={gated.Status} data={gated.Data} outcome={gated.Outcome}");
 
-            // 6. 干净一轮上的观察者 + 错误接收器。
+            // 6. Observer + error sink on a clean run.
             var observed = new List<string>();
             var sink = new List<string>();
             var observedCtx = new RuntimeContext
@@ -106,7 +106,7 @@ namespace WorkflowQuickStart
             Console.WriteLine($"[6] observed: {string.Join(", ", observed)}");
             Console.WriteLine($"[6] sink on a clean run: {sink.Count} records");
 
-            // 7. 检查点：第一个节点之后停下，再从保存下来的位置恢复。
+            // 7. Checkpoint: stop after the first node, then resume from the saved place.
             var store = new InMemoryCheckpointStore();
             var cts = new CancellationTokenSource();
             var partial = new RuntimeContext
@@ -123,7 +123,7 @@ namespace WorkflowQuickStart
             }
             catch (OperationCanceledException) { }
             var saved = (await store.LoadAsync(CancellationToken.None))!;
-            Console.WriteLine($"[7] checkpoint: attempt={saved.Attempt} outputs={saved.Outputs.Count} shape=<三个 RuntimeId GUID>");
+            Console.WriteLine($"[7] checkpoint: attempt={saved.Attempt} outputs={saved.Outputs.Count} shape=<three RuntimeId GUIDs>");
 
             var resumed = new RuntimeContext();
             await new RuntimeEngine().RunAsync(rootGraph, resumed, CancellationToken.None, saved);
@@ -140,7 +140,7 @@ namespace WorkflowQuickStart
                 Console.WriteLine($"[7] refused on a serialized copy: {ex.Message.Split(':')[0]} status={refused.Status}");
             }
 
-            // 8. 抖动节点上的重试策略。
+            // 8. Retry policy on a flaky node.
             var flakyTree = new QuickTree();
             var flaky = new FlakyNode { Anchor = new Anchor(0, 0, 0) };
             flakyTree.GetHelper().CreateNode(flaky);
@@ -154,7 +154,7 @@ namespace WorkflowQuickStart
             Console.WriteLine($"[8] retry: status={retryCtx.Status} data={retryCtx.Data} drives={FlakyHelper.Attempts} attempt={retryCtx.Attempt}");
             Console.WriteLine($"[8] retry logs: {string.Join(" | ", retryCtx.Logs)}");
 
-            // 9. 日志写入器 + 有界的日志保留。
+            // 9. Log writer + bounded log retention.
             var logPath = Path.Combine(Path.GetTempPath(), "veloxqs-run.log");
             if (File.Exists(logPath)) File.Delete(logPath);
             RuntimeContext capped;
@@ -168,7 +168,7 @@ namespace WorkflowQuickStart
             Console.WriteLine($"[9] retained: {string.Join(" | ", capped.SnapshotLogs())}");
             Console.WriteLine($"[9] file head: {fileLines[0]}");
 
-            // 10. 失败一轮上的补偿。
+            // 10. Compensation on a failing run.
             var boomTree = new QuickTree();
             var boom = new BoomNode { Anchor = new Anchor(0, 0, 0) };
             boomTree.GetHelper().CreateNode(boom);
@@ -186,7 +186,7 @@ namespace WorkflowQuickStart
             catch (InvalidOperationException) { }
             Console.WriteLine($"[10] compensate: status={boomCtx.Status} outcome={boomCtx.Outcome} currentOrder={boomCtx.CurrentOrder} reversed=[{string.Join(", ", compensated)}]");
 
-            // 11. 并行扇出：默认并发，MaxParallelBranches = 1 时串行。
+            // 11. Parallel fan-out: concurrent by default, serialised when MaxParallelBranches = 1.
             var fanTree = new QuickTree();
             var fanHelper = fanTree.GetHelper();
             var source = new SourceNode { Anchor = new Anchor(0, 0, 0) };
@@ -237,8 +237,8 @@ namespace WorkflowQuickStart
 }
 ```
 
-**预期结果：** 第 1–4 步与前面几页一致（`Nodes=3 Links=2`、`Completed data=tick->bias->print`、`reached=True`、重建的副本跑出同一条链）；第 5–11 步走一遍宿主能力层。完整的实测输出在 `13_验证与运行声明`。
+**预期结果：** 第 1–4 步镜像更早的页面（`Nodes=3 Links=2`、`Completed data=tick->bias->print`、`reached=True`、重建副本重跑同一条链）；第 5–11 步演练宿主能力层。完整记录输出在 `13_验证与运行声明`。
 
-没有省略号，上面每个标识符都在本文件里定义，或在本页顶部的表格点名的某个组件文件里定义。`namespace WorkflowQuickStart` 必须与各组件文件用的那个一致。
+没有省略号，上面每个标识符都在本文件或顶部表格列出的组件文件中定义。`namespace WorkflowQuickStart` 必须与组件文件使用的命名空间一致。
 
-下一步去 `08_暂停与恢复` 看第一项能力，或去 `13_验证与运行声明` 看实测运行。
+前往 `08_暂停与恢复` 看第一项能力，或到 `13_验证与运行声明` 看记录运行。

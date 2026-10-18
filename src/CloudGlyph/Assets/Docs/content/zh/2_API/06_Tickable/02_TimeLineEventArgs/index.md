@@ -13,7 +13,7 @@ public abstract class TimeLineEventArgs
 
 源码：`Src/Core/VeloxDev.Core/TimeLine/TimeLineEventArgs.cs`。
 
-时间线系统交给用户代码的每一种载荷的基类。它携带两样东西：`Handled` 终止开关，以及同一帧里每个订阅者共享的两个时钟读数（`DeltaTime` / `TotalTime` —— 从 `FrameEventArgs` 上移到这里，好让过渡系统的事件参数也继承它们）。它是 `abstract`，因此没有公开构造函数，也无法实例化。
+时间线系统交给用户代码的每一种载荷的基类。它携带 `Handled` 终止开关，以及同一帧里每个订阅者共享的两个时钟读数。它是 `abstract`，因此没有公开构造函数，也无法实例化。
 
 它是 `FrameEventArgs` 与 `TransitionEventArgs` 的基类；后者现已移入 `VeloxDev.TransitionSystem`（见过渡动画特性的[事件参数](../../03_过渡动画/00_transitionsystem/04_过渡事件参数/index.md)）。
 
@@ -28,12 +28,9 @@ public abstract class TimeLineEventArgs
 
 **示例：**
 ```text
-// 源码：Src/Core/VeloxDev.Core.Test/TimeLine/TimeLineEventArgsTests.cs（第 28-36 行）
+// 源码：Src/Core/VeloxDev.Core.Test/TimeLine/TimeLineEventArgsTests.cs（第 28-37 行）
 var args = new FrameEventArgs();
 Assert.IsFalse(args.Handled);          // 默认 false
-
-args = new FrameEventArgs { Handled = true };
-Assert.IsTrue(args.Handled);
 ```
 
 **说明：**

@@ -13,16 +13,20 @@ using System;
 using VeloxDev.WeakTypes;
 
 var queue = new WeakQueue<Payload>();       // Payload is the helper from the Complete Code page
-queue.Enqueue(new Payload(1));
-queue.Enqueue(new Payload(2));
+var first = new Payload(1);                 // keep locals alive so Count is deterministic
+var second = new Payload(2);
+queue.Enqueue(first);
+queue.Enqueue(second);
 
 Console.WriteLine($"Count: {queue.Count}");             // 2
 if (queue.TryPeek(out var head)) Console.WriteLine($"Head: {head}");   // 1 (front, not removed)
 while (queue.TryDequeue(out var item)) Console.WriteLine($"Next: {item}");  // 1 then 2
 Console.WriteLine($"IsEmpty: {queue.IsEmpty}");         // True
+GC.KeepAlive(first);
+GC.KeepAlive(second);
 ```
 
-**Expected result:** items leave in FIFO order (front first) and `TryPeek` leaves the front intact — matching `Enqueue_MultipleItems_FIFO_Order` and `TryPeek_ReturnsFrontWithoutRemoving` in `WeakQueueTests.cs`.
+**Expected result:** items leave in FIFO order (front first) and `TryPeek` leaves the front intact — matching `Enqueue_MultipleItems_FIFO_Order` and `TryPeek_ReturnsFrontWithoutRemoving` in `WeakQueueTests.cs`. The `GC.KeepAlive` calls keep the two payloads strongly reachable, so `Count` cannot drop between statements; without them the queue alone does not keep the items alive.
 
 ## 2. Range add, clear, trim
 

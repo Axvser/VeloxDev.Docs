@@ -14,13 +14,14 @@ Base class for platform interpolators and holder of the static per-type sampler 
 
 Source: `Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`.
 
+The registry itself is a private static field (`private static readonly ConcurrentDictionary<Type, ISampler> Interpolators`) and is reachable only through the members below — a caller cannot replace or clear it wholesale.
+
 | Member | Signature | Description |
 |---|---|---|
-| `NativeInterpolators` | `public static ConcurrentDictionary<Type, ISampler> NativeInterpolators { get; protected set; }` | The per-type sampler registry. |
-| `TryGetInterpolator` | `public static bool TryGetInterpolator(Type type, out ISampler? sampler)` | Looks up a registered sampler for a type. |
+| `TryGetInterpolator` | `public static bool TryGetInterpolator(Type type, out ISampler? sampler)` | Looks up a registered sampler for a type: exact type first, then base classes nearest-first, then a scan of the registry for an assignable interface, choosing the ordinally-first full name. |
 | `RegisterInterpolator` | `public static bool RegisterInterpolator(Type type, ISampler sampler)` | Registers a sampler (atomic last-writer-wins). |
 | `UnregisterInterpolator` | `public static bool UnregisterInterpolator(Type type, out ISampler? sampler)` | Removes a registered sampler. |
-| `Prepare` (instance, `virtual`) | `public virtual SamplerSet<TPriorityCore> Prepare<TPriorityCore>(object target, IFrameState state, ITransitionEffectCore effect, IUIThreadInspector<TPriorityCore> inspector)` | Normalizes every property in a state snapshot into a `SamplerSet<TPriorityCore>`. Called by `TransitionSchedulerCore.Execute` on the path a theme switch takes; `ThemeManager` never calls it itself. |
+| `Prepare` (instance, `virtual`) | `public virtual SamplerSet<TPriorityCore> Prepare<TPriorityCore>(object target, IFrameState state, ITransitionEffectCore effect, ITransitionHost<TPriorityCore> host)` | Normalizes every property in a state snapshot into a `SamplerSet<TPriorityCore>`. Called by `TransitionSchedulerCore.Execute` on the path a theme switch takes; `ThemeManager` never calls it itself. |
 | `CreateScheduler` (instance, `virtual`) | `public virtual TransitionSchedulerCore? CreateScheduler(object target, ITransitionEffectCore effect)` | The platform seam: hands back the scheduler that animates `target`, or `null` when the platform cannot carry `effect`. Default returns `null`. |
 
 **Notes:**
@@ -84,7 +85,8 @@ Source: `Src/Core/VeloxDev.Core/TransitionSystem/Binding/TransitionProperty.cs`.
 
 **Notes:**
 - `ThemeManager.PrepareSamplers` wraps each animated property with `TransitionProperty.FromProperty(propertyInfo)` and later writes start/end values through `SetValue`.
-- `FromProperty` is the reflection-driven entry point: a theme switch rebuilds a path for every themed property of every registered target on *every* switch, where a declaration-based path is built once and held in a field. It therefore goes through a static `ConcurrentDictionary<PropertyInfo, TransitionProperty>` and returns a **shared** instance rather than constructing one, so the per-path getter/setter expression is compiled once per property instead of once per switch. The commit `58ae23b3` measured the un-memoized cost at ~1.6 s of UI-thread stall and 29 MB allocated before the first frame for a thousand two-property elements, against ~10 ms and 6 MB after.
+- `FromProperty` is the reflection-driven entry point: a theme switch rebuilds a path for every themed property of every registered target on *every* switch, where a declaration-based path is built once and held in a field. It therefore goes through a static `ConditionalWeakTable<PropertyInfo, TransitionProperty>` and returns a **shared** instance rather than constructing one, so the per-path getter/setter expression is compiled once per property instead of once per switch. The source remarks measure the un-memoized cost at roughly two seconds of UI-thread stall for a thousand two-property elements before the first frame.
+- The memo is weakly keyed deliberately: the entry chain is path → segment → `PropertyInfo` → `Type` → `Assembly`, so a strong key would pin that assembly for the life of the process and prevent a collectible `AssemblyLoadContext` from unloading.
 - Sharing is safe because a path is immutable, and `BindTo` returns the instance itself when there are no index arguments to freeze — always the case here. The lazy compile is idempotent, so a concurrent first use can only compile twice and discard one.
 
 ## Namespace: `VeloxDev.TransitionSystem`
@@ -109,7 +111,7 @@ Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ITransitionProperty.
 
 `public interface ISampler`
 
-Stateless, thread-safe sampler. A sampler is normally a shared singleton registered in `InterpolatorCore.NativeInterpolators`. `InterpolatorCore.Prepare` calls `NormalizeStart` / `NormalizeEnd` once per property when a run starts, and the interpreter then calls `InsertFrame` once per sampled frame.
+Stateless, thread-safe sampler. A sampler is normally a shared singleton registered in `InterpolatorCore`'s process-wide registry through `RegisterInterpolator`. `InterpolatorCore.Prepare` calls `NormalizeStart` / `NormalizeEnd` once per property when a run starts, and the interpreter then calls `InsertFrame` once per sampled frame.
 
 Source: `Src/Core/VeloxDev.Core/Interfaces/TransitionSystem/ISampler.cs`.
 

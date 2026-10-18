@@ -6,7 +6,7 @@ The four types solve different leak/lifetime problems. Use the table to choose, 
 
 | Scenario | Type | Why |
 |---|---|---|
-| An event-like publisher that must not keep dead subscribers alive (a "weak event") | `WeakDelegate<TDelegate>` | Each handler is a `WeakReference<Delegate>`; when the subscriber is collected the handler disappears from the next rebuild. See [WeakDelegate](../03_weak-delegate/). |
+| An event-like publisher that must not keep dead subscribers alive (a "weak event") | `WeakDelegate<TDelegate>` | Each handler is stored as a `WeakReference<Delegate>`. Handlers merged into the strong combined cache stay rooted until a rebuild; add with `CanUpdateCache: false` for a genuinely collectible subscription. See [WeakDelegate](../03_weak-delegate/). |
 | FIFO buffer of items that must not pin their producers — process work only while the producing object is still alive | `WeakQueue<T>` | Entries are `WeakReference<T>`; a queued item whose only reference is the queue is collected, and access skips/prunes dead entries. See [WeakQueue](../04_weak-queue/). |
 | LIFO (undo/redo, back-stack) of short-lived states that must not keep their owner reachable | `WeakStack<T>` | Same weak-entry model as the queue, LIFO order. See [WeakStack](../05_weak-stack/). |
 | A per-target value that should vanish when its target key vanishes (ephemeral side-table) | `WeakCache<TTargetKey, TCacheKey>` | Built on `ConditionalWeakTable<TTargetKey, TCacheKey>`, which does not root the key. See [WeakCache](../06_weak-cache/). |

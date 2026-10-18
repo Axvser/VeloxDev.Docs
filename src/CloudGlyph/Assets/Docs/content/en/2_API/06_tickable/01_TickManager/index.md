@@ -6,9 +6,9 @@ Namespace `VeloxDev.TimeLine`. Assembly `VeloxDev.Core`. A static, thread-safe f
 public static class TickManager
 ```
 
-Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` (1163 lines).
+Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` (1167 lines).
 
-`TickManager` is the only public entry point to the feature's runtime. Every member is `static`; every member except `ChannelNames` takes a trailing `string channel = DEFAULT_CHANNEL` argument. Channels are created lazily by `GetOrCreateChannel` and held in a process-wide `ConcurrentDictionary<string, LoopChannel>` (`_channels`, line 1017) — so the manager is process-global state and its channels outlive any behaviour registered on them.
+`TickManager` is the only public entry point to the feature's runtime. Every member is `static`; every member except `ChannelNames` takes a trailing `string channel = DEFAULT_CHANNEL` argument. Channels are created lazily by `GetOrCreateChannel` and held in a process-wide `ConcurrentDictionary<string, LoopChannel>` (`_channels`, line 1019) — so the manager is process-global state and its channels outlive any behaviour registered on them.
 
 ## What is public and what is not
 
@@ -17,7 +17,7 @@ Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` (1163 lines).
 | The 34 static members documented below | nested `LoopChannel`, `BehaviorWrapper`, `ConfigChangeRequest`, `ObjectPool<T>` |
 | `TickChannelEventArgs` (a separate top-level type) | `GetOrCreateChannel`, `RebuildCachedWrappers`, `ProcessAddedBehaviors`, `ExecuteBehaviors*Sync`, `CreateFrameEventArgs`, `Sleep`, `ForceCleanup`, … |
 
-`LoopChannel` is `private sealed` (line 99). It is where the two pumps, the channel's time source and the channel's own events live, and nothing outside `TickManager` can name it. The only public door to a channel's clock is `TickManager.Bus`.
+`LoopChannel` is `private sealed` (line 101). It is where the two pumps, the channel's time source and the channel's own events live, and nothing outside `TickManager` can name it. The only public door to a channel's clock is `TickManager.Bus`.
 
 ## Member index
 
@@ -48,10 +48,10 @@ These constants are `private` but they define the public behaviour, so they are 
 | `MAX_SLEEP_CHUNK_MS` | `50` | Long sleeps are chunked so a stop is noticed within this |
 | `MIN_SLEEP_MS` | `1` | Back-off when the clock advanced by zero |
 
-Source: `TickManager.cs` lines 10-33.
+Source: `TickManager.cs` lines 11-35.
 
 ## Other types on this page's boundary
 
 - **`TickChannelEventArgs`** — the payload of the four static events; documented separately ([TickChannelEventArgs](../04_TickChannelEventArgs/index.md)).
 - **`ITickable`** — what `RegisterBehaviour` accepts; documented separately ([ITickable](../05_ITickable/index.md)).
-- **`ITimeSourceControl`** (`VeloxDev.Timing`) — what `Bus` returns. It is shared infrastructure documented with the transition feature; the members this feature's users need are `IsAdvancing`, `IsPaused`, `Rate`, `Position`, `Epoch`, `Pause()`, `Resume()`, `SetRate(double)` and `WaitWhileStalledAsync(CancellationToken)`.
+- **`ITimeSourceControl`** (`VeloxDev.Timing`) — what `Bus` returns. It extends `ITimeSource`: `ITimeSource` exposes `TicksPerSecond`, `Ticks`, `Position`, `Rate`, `IsPaused`, `IsAdvancing`, `Epoch` and `WaitWhileStalledAsync(CancellationToken)`; `ITimeSourceControl` adds `Pause()`, `Resume()`, `SetRate(double)`, `Seek(TimeSpan)` and `Wake()`. It is shared infrastructure documented with the transition feature.

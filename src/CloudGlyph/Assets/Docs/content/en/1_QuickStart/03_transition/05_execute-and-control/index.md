@@ -96,7 +96,7 @@ Six properties of the contract, each of which a caller meets the moment they use
 - **A pass has a number, not only a time.** Seeking by `cycle` exists because an absolute timeline cannot otherwise name a pass — a zero-duration pass consumes no time at all. Jumping past the last pass the effect allows finishes the animation, exactly as running off the end would.
 - **Seeking while paused draws the new position without resuming.**
 
-The three readers answer for *nothing running* rather than throwing: `Cycle` gives `0`, `Position` gives `TimeSpan.Zero`, `Rate` gives `0`, and `IsPaused` gives `false`.
+The four readers answer for *nothing running* rather than throwing: `Cycle` gives `0`, `Position` gives `TimeSpan.Zero`, `Rate` gives `0`, and `IsPaused` gives `false`.
 
 ```csharp
 // the demo's "next pass" button

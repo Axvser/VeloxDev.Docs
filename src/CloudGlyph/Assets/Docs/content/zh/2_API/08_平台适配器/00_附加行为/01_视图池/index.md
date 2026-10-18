@@ -13,7 +13,7 @@
 | WinUI | `sealed class : DependencyObject` | `INotifyCollectionChanged?` | `DataTemplateSelector?` |
 | MAUI | `sealed class` | `BindableProperty` `INotifyCollectionChanged?` | `DataTemplateSelector?` |
 | WinForms | `sealed class` | 静态 `SetItemsSource(Control, INotifyCollectionChanged?)` | 静态 `SetTemplateSelector(Control, IWorkflowTemplateSelector?)` |
-| Jalium | `public static class` | 附加 `INotifyCollectionChanged?` | 附加 `IWorkflowTemplateSelector?` |
+| Jalium | `public static class` | 附加 `INotifyCollectionChanged?` | 附加 `DataTemplateSelector?` |
 
 成员遵循附加属性约定 `GetItemsSource(container)` / `SetItemsSource(container, value)`（`TemplateSelector` 同理）；WPF 的 XML 注释展示了预期的 XAML 用法：
 
@@ -23,7 +23,7 @@
 </ScrollViewer>
 ```
 
-`ItemsSource` 改变时（WPF/Avalonia/WinUI/MAUI）池为该容器创建一个 `ViewManager`、将其挂到集合上，并在 `Unloaded` / 旧值替换时清理。**Jalium** 还额外暴露 `internal static void UpdateRenderTransforms(Panel panel, Transform transform)`，把表面的画布变换镜像到池化视图。
+`ItemsSource` 改变时（WPF/Avalonia/WinUI/MAUI/Jalium）池为该容器创建一个 `ViewManager`、将其挂到集合上，并在 `Unloaded` / 旧值替换时清理。Jalium 的池化 Node/Link `DataTemplate` 把 `RenderTransform` 绑定到 `WorkflowSurfaceBehavior.CanvasTransform`，因此池本身不改写变换。
 
 ## 类：`ViewManager`
 
@@ -36,23 +36,22 @@
 | WinUI | `ViewManager(Panel panel)` | `void SetTemplateSelector(DataTemplateSelector?)`；`void Attach(INotifyCollectionChanged)`；`void Detach()` |
 | MAUI | `ViewManager(Layout layout)` | `void Attach(INotifyCollectionChanged)`；`void Detach()` |
 | WinForms | `ViewManager(Control host)`（`: IDisposable`） | `void SetTemplateSelector(IWorkflowTemplateSelector)`；`void Attach(INotifyCollectionChanged)`；`void Detach()`；`void Dispose()` |
-| Jalium | `ViewManager(Panel host)`（`: IDisposable`） | `void SetTemplateSelector(IWorkflowTemplateSelector)`；`void Attach(INotifyCollectionChanged)`；`void Detach()`；`void Dispose()` |
+| Jalium | `ViewManager(Panel host)`（`: IDisposable`） | `void SetTemplateSelector(DataTemplateSelector)`；`void Attach(INotifyCollectionChanged)`；`void Detach()`；`void Dispose()` |
 
 **渲染（已验证，WPF）：** 按每个 dispatcher `Background` 滴答 **3** 个一批渲染视图。被移除项折叠为 `Visibility.Collapsed`、解绑并归还池。其它适配器实现相同的批处理语义；是否逐字复用同样的批次大小属 `*推断所得*`。
 
-**模板查找：选择器最先被问到，而只有一部分适配器有「退回」可言。** 四个 XAML 风格适配器的顺序是 `ViewPool.TemplateSelector` → 容器资源树 → `Application.Current.Resources`，所以**选择器没匹配上会退回平台自己的查找**。**WinForms / Jalium / Razor 没有平台查找可退** —— 它们的池只经选择器创建视图（`IWorkflowTemplateSelector` 工厂，或 Razor 的 `ItemTemplate` 组件），选择器为空或不匹配就是**一个视图都不建、也不报错**。（WPF/Avalonia/WinForms/Jalium/Razor 已核；MAUI 那条链属 `*推断所得*`。）
+**模板查找：选择器最先被问到，而只有一部分适配器有「退回」可言。** WPF、WinUI 与 Jalium 的顺序是 `ViewPool.TemplateSelector` → 容器/可视祖先资源树 → `Application.Current.Resources`；Avalonia 走 `_panel.DataTemplates` / 祖先 `DataTemplates` / `Application.Current.DataTemplates`，所以**选择器没匹配上会退回平台自己的查找**。**MAUI、WinForms 与 Razor 没有资源退回** —— MAUI 与 WinForms 只经选择器创建视图（`DataTemplateSelector` / `IWorkflowTemplateSelector` 工厂），Razor 只经 `ItemTemplate` 组件，选择器为空或不匹配就是**一个视图都不建、也不报错**。（WPF/Avalonia/WinUI/MAUI/WinForms/Jalium/Razor 已核。）
 **四家共有的一个坑：** 解析出的模板按**条目 `Type`** 缓存，而缓存**先于**选择器被读 —— 选择器若**按实例**判定（同类型、不同视图），只有第一次的判定会被整个类型沿用。
 
 **Avalonia 说明：** 有选择器时它是**带着条目**被问的 —— 池以 `IDataTemplate.Build(item)` 建视图 —— 所以自定义 `IDataTemplate` 必须按这个参数分派（`Match` 选出选择器，`Build` 再选并物化内层模板）。忽略该参数的选择器会**什么都不画，且不报错**。
 
 ## 接口：`IWorkflowTemplateSelector`
 
-WinForms 与 Jalium 用一个小工厂契约（命名空间 `VeloxDev.WorkflowSystem.AttachedBehaviors`）替代 XAML 的 `DataTemplateSelector` / `IDataTemplate`。WinForms 在 `ViewManager.cs` 中声明；Jalium 在独立文件中声明。
+WinForms 用一个小工厂契约（命名空间 `VeloxDev.WorkflowSystem.AttachedBehaviors`，声明在 `ViewManager.cs`）替代 XAML 的 `DataTemplateSelector` / `IDataTemplate`。Jalium 使用平台 `DataTemplateSelector`，因此没有 `IWorkflowTemplateSelector`。
 
 | 适配器 | 签名 |
 |---|---|
 | WinForms | `Control CreateView(object item)` |
-| Jalium | `FrameworkElement CreateView(object item)` |
 
 ## Razor 组件：`ViewPool`
 

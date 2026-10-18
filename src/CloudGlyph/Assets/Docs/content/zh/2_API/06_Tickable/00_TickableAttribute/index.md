@@ -9,7 +9,7 @@ public sealed class TickableAttribute(string channel = TickManager.DEFAULT_CHANN
 
 源码：`Src/Core/VeloxDev.Core/TimeLine/TickableAttribute.cs`。
 
-有两种用法会被属性规则本身排掉，因此值得明说：它只能标在**类**上（不能标在成员上；`record class` 属于类，可以），并且**不被继承** —— 基类上的 `[Tickable]` 不会把派生类放进任何通道。
+该声明有两点直接后果：它只能标在**类**上（`record class` 也算类），并且**不被继承** —— 基类上的 `[Tickable]` 不会把派生类放进任何通道。
 
 ### 构造函数
 
@@ -29,7 +29,7 @@ public sealed class TickableAttribute(string channel = TickManager.DEFAULT_CHANN
 
 **示例：**
 ```text
-// 源码：Examples/Tickable/WPF/Demo/MainWindow.Hooks.cs（第 30 行）
+// 源码：Examples/Tickable/WPF/Demo/MainWindow.Hooks.cs（第 23 行）
 [Tickable(DemoChannel.Name)]
 public partial class MainWindow
 
@@ -38,8 +38,8 @@ public partial class MainWindow
 ```
 
 **说明：**
-- 生成器按符号而不是按名字解析该特性，所以完全限定名或别名形式同样可用（`Src/Generators/VeloxDev.Core.Generator/Writers/TickWriter.cs` 第 19-27 行）。
-- 生成器在位置参数之后解析**命名参数**，所以 `[Tickable(Channel = "x")]` 与 `[Tickable("x")]` 等价；两者同时给出时命名参数胜出（`TickWriter.cs` 第 39-48 行）。
+- 生成器按符号而不是按名字解析该特性，所以完全限定名或别名形式同样可用（`Src/Generators/VeloxDev.Core.Generator/Writers/TickWriter.cs` 第 20-29 行）。
+- 生成器在位置参数之后解析**命名参数**，所以 `[Tickable(Channel = "x")]` 与 `[Tickable("x")]` 等价；两者同时给出时命名参数胜出（`TickWriter.cs` 第 34-50 行）。
 - `TargetFPS <= 0` 不会在特性里被钳制 —— 是*生成器*选择不生成那句调用。
 
 #### 属性：`TickableAttribute.Channel`

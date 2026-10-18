@@ -107,6 +107,8 @@ classDiagram
     class Interaction {
         +RequestSelection()
         +RequestConfirmation()
+        +EnterPlanMode()
+        +ExitPlanMode()
     }
 
     WorkflowToolCategory --> Query
@@ -138,7 +140,14 @@ classDiagram
 | `Composite` | `1 << 8` | **0 (reserved)** |
 | `Interaction` | `1 << 9` | up to 2 |
 
-**68 built-in tools** (20 + 23 + 12 + 2 + 5 + 0 + 1 + 3 + 0 + 2) when both interaction handlers are configured. `ResetToolCallLimit` is added unconditionally; developer-registered tools and subsystem tools join whatever flags were asked for.
+**66 unconditional built-in tools** (20 + 23 + 12 + 2 + 5 + 0 + 1 + 3 + 0) — `Layout` and `Composite` contribute none. On top of them:
+
+- `RequestSelection` / `RequestConfirmation` (up to 2) when their handlers exist;
+- `EnterPlanMode` / `ExitPlanMode` (2) when a confirmation handler exists — added outside the category mask;
+- `ResetToolCallLimit`, always;
+- developer-registered tools and subsystem tools.
+
+With both handlers registered the total is **71**.
 
 ## Why two groups are empty
 
@@ -149,6 +158,6 @@ The flags still exist so a host can pass them without error and so the enum docu
 
 ## Why `Interaction` is conditional
 
-`Interaction` is populated only when `WithInteractionSafety(level)` is > 0 **and** the matching handler (`WithSelectionHandler` / `WithConfirmationHandler`) is registered — so the same `All` value yields a different tool count depending on the host's configuration. `CreateTools(categories)` is the single point that decides what reaches the model: it applies the per-tool switches on top of the category flags, and `CreateAllTools` (internal) returns the unfiltered surface a host UI enumerates.
+`Interaction` is populated only when the matching handler (`WithSelectionHandler` / `WithConfirmationHandler`) is registered — there is no safety level any more — so the same `All` value yields a different tool count depending on the host's configuration. `EnterPlanMode` / `ExitPlanMode` sit beside the category, gated on the confirmation handler. `CreateTools(categories)` is the single point that decides what reaches the model: it applies the per-tool switches on top of the category flags, and `CreateAllTools` (internal) returns the unfiltered surface a host UI enumerates.
 
 **Expected result:** `scope.ProvideTools(WorkflowToolCategory.Query)` returns exactly the 20 Query tools (plus any custom/subsystem tools and `ResetToolCallLimit`); adding `Layout` or `Composite` to the mask changes nothing.

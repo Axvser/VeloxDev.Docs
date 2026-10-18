@@ -3,14 +3,14 @@
 | Pattern | Where | Role |
 |---|---|---|
 | Builder | `WorkflowAgentScope` | Fluent `With*` configuration; every method returns the same scope and bumps `Version` on a real change. |
-| Facade | `WorkflowAgentToolkit` | One 68-tool surface hides reflection, command dispatch and compact JSON. |
+| Facade | `WorkflowAgentToolkit` | One 66-tool category surface (plus conditional interaction/plan tools) hides reflection, command dispatch and compact JSON. |
 | Decorator | `TrackedAIFunction` (internal) | Wraps every `AIFunction` so each call is marshalled, gated, counted and reported. |
 | Memento | `WorkflowStateTracker` | JSON snapshots + property-level diffs so the model sees change, not the whole state. |
 | Command | The Mutation tools | Each dispatches exactly one `IWorkflow*ViewModel` command; Core owns undo/redo. |
 | Adapter | `McpScope` / `McpAgentToolkit` | Local (stdio) and remote (HTTP) MCP servers exposed as `AITool`s. |
 | Adapter | `SkillScope` / `SkillAgentToolkit` | Embedded and file Agent Skills exposed as four `AITool`s. |
 | Strategy | `WorkflowToolCategory` | A `[Flags]` mask selects which tool groups are built. |
-| Strategy | Interaction handlers | `WithInteractionSafety` level 0–3 picks the policy; the two handlers plug the behaviour. |
+| Strategy | Permission modes | `AgentPermissionMode` + `AgentPermissionRule` select what runs, asks or is denied; the two interaction handlers plug the behaviour. |
 | Observer | `AgentPipeline` + the notifier interfaces | Run/tool events published to a stage chain; `ToolCalled` raised on the scope. |
 | Chain of responsibility | `AgentPipeline` | `TextPipeline` → `ToolPipeline` → `AccountingStage`; a stage may drop an event for the stages after it. |
 | Mediator (gate) | `ToolPipeline` | One shared policy per scope enforces budgets, switches and approval across every slice. |
@@ -20,7 +20,7 @@
 
 ## The two structural themes of the subsystem layer
 
-1. **One gate, every slice.** Budgets, per-tool switches and tool approval live on one `ToolPipeline` instance per scope, handed to the MCP and skill providers as well as used by the built-ins. A switch therefore cannot be honoured on one path and ignored on another.
+1. **One gate, every slice.** Budgets, per-tool switches and the permission policy (`Allow`/`Ask`/`Deny`) live on one `ToolPipeline` instance per scope, handed to the MCP and skill providers as well as used by the built-ins. A switch or a `Deny` therefore cannot be honoured on one path and ignored on another.
 
 2. **Narrowing is intersection, always.** A spawn's tool list, skill set, MCP server set, budget caps, node-execution flag and dirty-marking mode are each intersected with what the parent actually holds, and whatever is dropped is reported back in the spawn's own result. The parent is the ceiling by construction.
 

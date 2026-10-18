@@ -105,4 +105,4 @@ Source: `WorkflowAgentToolkit.cs` (`StartCompiledAsync`, `DriveAsync`, `GetCompi
 - **Continue never invents a start.** With nothing written yet it returns `"no checkpoint"` rather than silently starting a fresh run. Test: `CarryingOn_WithNothingWrittenYet_IsRefused`.
 - **Failures and the log travel with the result.** With a retry policy on the session, `failures` carries `Warning` and `Error` records and `logFile` is an absolute path containing the retry lines. Test: `TheFailureRecords_AndTheLogFile_TravelWithTheResult`.
 
-**Run declaration:** the four `CompiledRunControlTests` above passed in the deterministic suite on 2026-10-01 (`已通过! 失败: 0，通过: 387`); the `RunsOnOurGate` guard and the 40-line log tail are verified against source only.
+**Run declaration:** ⚠️ not run for this revision — statically verified against the current source on 2026-10-18. The four `CompiledRunControlTests` passed in a recorded 2026-10-01 suite run, but that run predates the permission-mode redesign; the `RunsOnOurGate` guard and the 40-line log tail are verified against source only.

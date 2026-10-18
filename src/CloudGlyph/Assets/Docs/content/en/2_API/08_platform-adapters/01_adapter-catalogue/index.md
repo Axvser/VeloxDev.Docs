@@ -6,13 +6,13 @@ Each adapter package ships the same three core namespaces (four where theme wiri
 
 | Adapter | Namespaces shipped | Workflow behavior files (`Attached/Workflow/*`) |
 |---|---|---|
-| WPF | `AttachedBehaviors`, `TransitionSystem`, `DynamicTheme`, `Adapters.NativeSamplers` | `WorkflowSurfaceBehavior`, `WorkflowCanvasTransformBehavior`, `ViewPool`, `ViewManager`, `WorkflowNodeDragBehavior`, `WorkflowSlotConnectionBehavior`, `WorkflowSlotLayoutBehavior`, `WorkflowMinimapOverlay` |
-| Avalonia | same four | the WPF set **plus** `PlatformDetection` (internal, touch-platform detection) |
+| WPF | `AttachedBehaviors`, `TransitionSystem`, `DynamicTheme`, `Adapters.NativeSamplers` | `WorkflowSurfaceBehavior`, `WorkflowCanvasTransformBehavior`, `ViewPool`, `ViewManager`, `WorkflowNodeDragBehavior`, `WorkflowSlotConnectionBehavior`, `WorkflowSlotLayoutBehavior`, `WorkflowMinimapOverlay`, `WorkflowEvents` |
+| Avalonia | same four | the WPF set |
 | WinUI | same four | the WPF set |
-| MAUI | same four | the WPF set **minus** `WorkflowCanvasTransformBehavior`; **plus** `WorkflowLinkOverlay` |
-| WinForms | same four | `WorkflowTreeView`, `WorkflowNodeAttachment`, `WorkflowSlotAttachment`, `WorkflowLinkAttachment`, `WorkflowGridDecorator`, `WorkflowMinimapOverlay`, `WorkflowTemplateSelector`, `WorkflowSurfaceBehavior`, `WorkflowCanvasTransformBehavior`, `ViewPool`, `ViewManager`, `WorkflowNodeDragBehavior`, `WorkflowSlotConnectionBehavior`, `WorkflowSlotLayoutBehavior`, paint helpers `WorkflowSurfaceColors` / `WorkflowSurfaceGraphics` / `WorkflowSurfaceGrid`, `IWorkflowMinimapScrollSource`, `IWorkflowSurfaceNodeView`, `ModelChangeRelay`, and `NativeWindowStyleHelper` (internal); `ViewManager.cs` also declares `IWorkflowTemplateSelector` |
-| Razor | same four | component set: `WorkflowSurfaceBehavior`, `ViewPool`, `WorkflowGridDecorator`, `WorkflowMinimapOverlay`, `WorkflowNodeDragBehavior`, `WorkflowSlotConnectionBehavior`, `WorkflowSlotLayoutBehavior` (`.razor` partial classes) **plus** static `WorkflowCanvasTransformBehavior`, `WorkflowGeometryScope`, `WorkflowRuntimeIds` |
-| Jalium | `AttachedBehaviors`, `TransitionSystem`, `Adapters.NativeSamplers` (**no `DynamicTheme`**) | per-role attachments `WorkflowNodeAttachment`, `WorkflowSlotAttachment`, `WorkflowLinkAttachment`, plus `WorkflowTreeView`, `WorkflowGridDecorator`, `WorkflowMinimapOverlay`, `WorkflowTemplateSelector`, `WorkflowPortLayout` / `WorkflowPortGeometry`, `ViewPool`, `ViewManager`, and `IWorkflowTemplateSelector` — there is **no** standalone `WorkflowSurfaceBehavior` / `WorkflowCanvasTransformBehavior`; `WorkflowTreeView` owns the surface |
+| MAUI | same four | `WorkflowSurfaceBehavior`, `ViewPool`, `ViewManager`, `WorkflowNodeDragBehavior`, `WorkflowSlotConnectionBehavior`, `WorkflowSlotLayoutBehavior`, `WorkflowMinimapOverlay`, `WorkflowEvents`, **plus** `WorkflowLinkOverlay`; **no** `WorkflowCanvasTransformBehavior` |
+| WinForms | same four | `WorkflowTreeView`, `WorkflowNodeAttachment`, `WorkflowSlotAttachment`, `WorkflowLinkAttachment`, `WorkflowGridDecorator`, `WorkflowMinimapOverlay` (both `Panel` subclasses), `WorkflowTemplateSelector`, `WorkflowSurfaceBehavior`, `WorkflowCanvasTransformBehavior`, `ViewPool`, `ViewManager`, `WorkflowNodeDragBehavior`, `WorkflowSlotConnectionBehavior`, `WorkflowSlotLayoutBehavior`, `WorkflowBindingExtensions`, paint helpers `WorkflowSurfaceColors` / `WorkflowSurfaceGraphics` / `WorkflowSurfaceGrid`, `SvgPathParser`, `IWorkflowMinimapScrollSource`, `IWorkflowSurfaceNodeView`, `ModelChangeRelay`, and `NativeWindowStyleHelper` (internal); `ViewManager.cs` also declares `IWorkflowTemplateSelector` |
+| Razor | same four | component set: `WorkflowSurfaceBehavior`, `ViewPool`, `WorkflowGridDecorator`, `WorkflowMinimapOverlay`, `WorkflowNodeDragBehavior`, `WorkflowSlotConnectionBehavior`, `WorkflowSlotLayoutBehavior` (`.razor` partial classes) **plus** static `WorkflowCanvasTransformBehavior`, `WorkflowGeometryScope`, `WorkflowRuntimeIds`, `WorkflowPresentation`, and the `SurfacePointerKind` enum |
+| Jalium | `AttachedBehaviors`, `TransitionSystem`, `Adapters.NativeSamplers` (**no `DynamicTheme`**) | `WorkflowSurfaceBehavior`, `ViewPool`, `ViewManager`, `WorkflowNodeDragBehavior`, `WorkflowSlotConnectionBehavior`, `WorkflowSlotLayoutBehavior`, `WorkflowMinimapOverlay`, `WorkflowLinkBounds`, `WorkflowEvents`; **no** separate `WorkflowCanvasTransformBehavior` (the surface exposes `CanvasTransform`), and no `WorkflowTreeView` / attachments / `IWorkflowTemplateSelector` — the templates supply the grid decorator and a `DataTemplateSelector` |
 
 ### Class shapes per adapter
 
@@ -20,12 +20,12 @@ The **same public names** map to different framework base types; see the linked 
 
 | Behavior | WPF | WinUI | Jalium | Avalonia | MAUI | WinForms | Razor |
 |---|---|---|---|---|---|---|---|
-| `WorkflowSurfaceBehavior` | `sealed : DependencyObject` | `sealed : DependencyObject` | n/a (code-only; `WorkflowTreeView` owns the surface) | `sealed : AvaloniaObject` | `sealed` (attached `BindableProperty`) | `sealed` (state table) | `ComponentBase` |
+| `WorkflowSurfaceBehavior` | `sealed : DependencyObject` | `sealed : DependencyObject` | `static class` (attached DPs; host `FrameworkElement`) | `sealed : AvaloniaObject` | `sealed` (attached `BindableProperty`) | `sealed` (state table) | `ComponentBase` |
 | `ViewPool` | `sealed : DependencyObject` | `sealed : DependencyObject` | `static class` | `sealed : AvaloniaObject` | `sealed` (attached `BindableProperty`) | `sealed` (state table) | `ComponentBase` |
 | `ViewManager` ctor | `(Panel)` | `(Panel)` | `(Panel)` : `IDisposable` | `(Panel, IDataTemplate?)` | `(Layout)` | `(Control)` : `IDisposable` | n/a (component) |
-| node/slot behaviors | `sealed : DependencyObject` | `sealed : DependencyObject` | n/a (per-role `Workflow*Attachment` instead) | `sealed : AvaloniaObject` | `sealed` (attached `BindableProperty`) | `sealed` (state table) | `ComponentBase` |
-| `WorkflowMinimapOverlay` | `FrameworkElement` | `Canvas` | `FrameworkElement` | `Control` | `GraphicsView : IDrawable` | `static class` (paints control) | `ComponentBase` |
-| `WorkflowCanvasTransformBehavior` | static (attached DP) | static (attached DP) | not shipped | `sealed : AvaloniaObject` | not shipped | static (holds `Offset`) | static (CSS) |
+| node/slot behaviors | `sealed : DependencyObject` | `sealed : DependencyObject` | `sealed : DependencyObject` | `sealed : AvaloniaObject` | `sealed` (attached `BindableProperty`) | `sealed` (state table) | `ComponentBase` |
+| `WorkflowMinimapOverlay` | `FrameworkElement` | `Canvas` | `FrameworkElement` | `Control` | `GraphicsView : IDrawable` | `Panel` (paints itself) | `ComponentBase` |
+| `WorkflowCanvasTransformBehavior` | static (attached DP) | static (attached DP) | not shipped — `WorkflowSurfaceBehavior.CanvasTransform` attached DP | `sealed : AvaloniaObject` | not shipped | static (holds `Offset`) | static (CSS) |
 
 ## Transition wiring per adapter (summary)
 

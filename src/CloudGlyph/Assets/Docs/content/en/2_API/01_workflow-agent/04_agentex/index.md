@@ -4,7 +4,7 @@ Two entry points bind the agent to the host: `AgentEx.AsAgentScope` (tree → sc
 
 ## AgentEx
 
-`public static class AgentEx` — namespace `VeloxDev.AI.Workflow`; source `Src/Core/VeloxDev.Core.Extension/Agent/Workflow/`.
+`public static class AgentEx` — namespace `VeloxDev.AI.Workflow`; source `Src/Core/VeloxDev.Core.Extension/AgentEx.cs`.
 
 | Member | Signature | Notes |
 |---|---|---|
@@ -28,7 +28,7 @@ using VeloxDev.AI.Workflow;
 // 1. tree -> scope
 var scope = tree.AsAgentScope()
     .WithPromptLanguage(AgentLanguages.English)
-    .WithAutoDiscovery(assemblyName: "Lib")
+    .WithAutoDiscovery()
     .WithAllowNodeExecution(true)
     .WithMaxToolCalls(200)
     .WithTranscript(transcript);

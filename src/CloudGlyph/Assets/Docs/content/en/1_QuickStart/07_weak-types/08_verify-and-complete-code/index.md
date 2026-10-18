@@ -2,7 +2,7 @@
 
 ## 1. Verify with the automated tests
 
-The behavioural evidence lives in the MSTest suite under `Src/Core/VeloxDev.Core.Test/WeakTypes/`. Running only the weak-types tests on 2026-10-01 against the current `master` produced:
+The behavioural evidence lives in the MSTest suite under `Src/Core/VeloxDev.Core.Test/WeakTypes/`. Running only the weak-types tests against `master` on 2026-10-01 produced (recorded output; the suite was not re-run during the 2026-10-18 documentation revision):
 
 ```text
 总共 1 个测试文件与指定模式相匹配。
@@ -173,5 +173,5 @@ TryGetCache(key1) after Remove: False
 
 ## 5. Run declaration
 
-- ✅ Actually built and ran on 2026-10-01 (`dotnet run -c Debug`, target `net10.0`, against a project reference to `VeloxDev.Core` from this repository). Recorded output is shown verbatim in section 3; consecutive runs produced identical output. The complete `WeakTypes` MSTest suite (35/35) was also executed green on the same date (section 1).
-- Note on configuration: the program is run in `Debug` because a `Release` restore of `VeloxDev.Core` currently fails before compilation. Its `VeloxDev.Core.Generator` package reference is pinned to `10.0.0`, and that version is not yet published to nuget.org (`NU1102`; the highest listed there is `9.0.153`), so `-c Release` cannot restore. The weak-types sources are compiled by both configurations; only the workflow-system generator path is blocked in `Release`.
+- ⚠️ Not re-run during the 2026-10-18 documentation revision — statically verified only. The console program in section 2 was previously built and executed on 2026-10-01 with `dotnet run -c Debug` (target `net10.0`, project reference to `VeloxDev.Core`); the transcript in section 3 is that run's verbatim output, and consecutive runs produced identical output. The `WeakTypes` MSTest suite (35/35) was executed green on the same date (section 1).
+- Configuration note from that run: `Release` could not restore because the `VeloxDev.Core.Generator` package reference was pinned to `10.0.0`, which was not yet published to nuget.org at the time (`NU1102`). `Debug` uses the local generator source instead. The weak-types sources themselves are configuration-independent; if you reproduce the sample today, `dotnet run -c Release` is the preferred mode and the helper-method lifetimes keep the transcript stable either way.

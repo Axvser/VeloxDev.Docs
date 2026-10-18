@@ -5,9 +5,10 @@
 | 命名空间 | 内容 |
 |---|---|
 | `VeloxDev.AI.Workflow` | `WorkflowAgentScope` 流式构建器、`WorkflowStateTracker`、`WorkflowAgentContextProvider`、`AgentContextCollector` |
-| `VeloxDev.AI.Workflow.Functions` | `WorkflowAgentToolkit`（**68** 个内置 `AITool`）、`WorkflowToolCategory`、`CommandInvoker`、`ComponentPatcher`、`TypeIntrospector` |
+| `VeloxDev.AI.Workflow.Functions` | `WorkflowAgentToolkit`（66 个无条件内置 `AITool` + 条件工具）、`WorkflowToolCategory`、`CommandInvoker`、`ComponentPatcher`、`TypeIntrospector` |
 | `VeloxDev.AI` | 特性、`AgentLanguages`、反射工具、事件参数与通知契约、`AgentObjectToolkit`、`AgentEmbeddedResources`、`AgentClientExtensions`、`AgentTelemetryExtensions` |
-| `VeloxDev.AI.MCP` | `McpScope`、`McpServerConfiguration`、`McpServerRunMode`、`McpServerStatus`、`McpSelfServiceLevel`、MCP 状态视图模型、`McpAgentToolkit`、`McpAgentContextProvider` |
+| `VeloxDev.AI.Safety` | `AgentPermissionMode`、`AgentPermissionPolicy`、`AgentPermissionRule`、`PermissionDecision`、`AgentActionCategory`、`ToolInvocation` |
+| `VeloxDev.AI.MCP` | `McpScope`、`McpServerConfiguration`、`McpServerRunMode`、`McpServerStatus`、MCP 状态视图模型、`McpAgentToolkit`、`McpAgentContextProvider` |
 | `VeloxDev.AI.Skills` | `SkillScope`、`SkillAgentToolkit`、`SkillAgentContextProvider`、`ISkillSource` 及两个实现、描述符/状态模型 |
 | `VeloxDev.AI.SubAgents` | `SubAgentScope`、`SubAgentAgentToolkit`、`SubAgentAgentContextProvider`、`SubAgentState`/`SubAgentSummary`/`SubAgentStatusViewModel`、树视图模型 |
 | `VeloxDev.AI.Pipelines` | `AgentPipeline`、`AgentEvent` 层级、`ToolPipeline`、`TextPipeline`、`AgentTranscript` 及条目、`AgentPipelineAgent` |
@@ -24,7 +25,7 @@
 - [workflow](00_workflow/index.md) —— `WorkflowAgentScope` 流式表面、`WorkflowStateTracker`、`WorkflowAgentContextProvider`、`AgentContextCollector`。
 - [functions](01_functions/index.md) —— `WorkflowAgentToolkit`、`WorkflowToolCategory`，以及按类别的完整工具清单：[查询与状态](01_functions/00_查询与状态工具/index.md)、[变更](01_functions/01_变更工具/index.md)、[执行](01_functions/02_执行工具/index.md)、[命令/图/分析/交互](01_functions/03_命令图分析与交互工具/index.md)、[辅助类](01_functions/04_辅助类/index.md)。
 - [mcp](02_mcp/index.md) —— `VeloxDev.AI.MCP`：`McpScope`、配置/运行模式/自助枚举、状态视图模型、`McpAgentToolkit`、`McpAgentContextProvider`。
-- [ai](03_ai/index.md) —— `VeloxDev.AI` 通用工具：特性、`AgentLanguages`、反射读取/发现/调用器、事件参数与通知接口、`AgentObjectToolkit`、`AgentEmbeddedResources`、`AgentTelemetryExtensions`。
+- [ai](03_ai/index.md) —— `VeloxDev.AI` 通用工具：特性、`AgentLanguages`、反射读取/发现/调用器、事件参数与通知接口、`AgentObjectToolkit`、`AgentEmbeddedResources`、`AgentTelemetryExtensions`；以及 `VeloxDev.AI.Safety` 权限模型。
 - [agentex](04_agentex/index.md) —— `AgentEx.AsAgentScope` 与 `AgentClientExtensions.AsAIAgent`。
 - [subagents](05_子代理/index.md) —— `VeloxDev.AI.SubAgents`：子系统、工具包 + 提供器、状态/行、树。
 - [skills](06_skills/index.md) —— `VeloxDev.AI.Skills`：`SkillScope`、`SkillAgentToolkit`、来源与描述符/状态模型。

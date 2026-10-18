@@ -6,11 +6,9 @@
 public sealed class TickChannelEventArgs(string channelName) : EventArgs
 ```
 
-源码：`Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` 第 1159-1162 行。
+源码：`Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` 第 1162-1166 行。
 
 `TickManager` 四个通道事件的载荷。它与 `TickManager` 同处一个文件、是顶层类型，并且**不**派生自 `TimeLineEventArgs` —— 它派生自 `EventArgs`，因为它不携带任何可取消状态，只有一个名字。
-
-这就是原名 `MonoBehaviourChannelEventArgs` 的那个类型；改名只改了名字。
 
 #### 构造函数
 
@@ -36,7 +34,7 @@ public sealed class TickChannelEventArgs(string channelName) : EventArgs
 
 **示例：**
 ```text
-// 源码：GetOrCreateChannel 中的转发（TickManager.cs 第 1024-1027 行）
+// 源码：GetOrCreateChannel 中的转发（TickManager.cs 第 1023-1031 行）
 ch.Started += (s, e) => OnChannelStarted?.Invoke(s, new TickChannelEventArgs(n));
 ch.Paused  += (s, e) => OnChannelPaused?.Invoke(s, new TickChannelEventArgs(n));
 ch.Resumed += (s, e) => OnChannelResumed?.Invoke(s, new TickChannelEventArgs(n));

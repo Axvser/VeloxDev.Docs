@@ -6,10 +6,10 @@
 
 | 容器 | 弱引用模型 | 页面 |
 |---|---|---|
-| `WeakDelegate<TDelegate>` | 处理器存为 `WeakReference<Delegate>`；缓存组合委托让调用路径无锁 | [WeakDelegate](00_WeakDelegate/index.md) |
+| `WeakDelegate<TDelegate>` | 处理器存为 `WeakReference<Delegate>`；缓存的组合委托让调用路径无锁，并**强持有**并入其中的每个处理器 | [WeakDelegate](00_WeakDelegate/index.md) |
 | `WeakQueue<T>` | 条目由 `Queue<WeakReference<T>>` 持有 —— FIFO | [WeakQueue](01_WeakQueue/index.md) |
 | `WeakStack<T>` | 条目由 `Stack<WeakReference<T>>` 持有 —— LIFO | [WeakStack](02_WeakStack/index.md) |
-| `WeakCache<TTargetKey,TCacheKey>` | 值绑定到弱键（经 `ConditionalWeakTable`）—— 条目随键一起消亡 | [WeakCache](03_WeakCache/index.md) |
+| `WeakCache<TTargetKey, TCacheKey>` | 值绑定到弱键（经 `ConditionalWeakTable`）—— 条目随键一起消亡 | [WeakCache](03_WeakCache/index.md) |
 
 ## 命名空间与约束
 

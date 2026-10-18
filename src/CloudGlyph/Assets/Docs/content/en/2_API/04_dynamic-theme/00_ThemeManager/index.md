@@ -8,7 +8,7 @@ Static entry point for theme state and switching. All members are static. Live i
 
 Source: `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`.
 
-##### Properties
+#### Properties
 
 | Name | Type | Description |
 |---|---|---|
@@ -65,7 +65,7 @@ ThemeManager.SetCurrent<Light>();
 **Returns:** `void`
 
 **Notes:**
-- Adds the target to the active cache and to the `WeakReference` list. Calling `Register` on an already-registered target is a no-op (guarded by the `ConditionalWeakTable` lookup).
+- Adds the target to the manager's own `ConditionalWeakTable` and to the `WeakReference` list. Calling `Register` on an already-registered target is a no-op (guarded by the table lookup).
 - Normally invoked automatically by the generated `InitializeTheme()`; see [02 ThemeConfigAttribute](../02_ThemeConfigAttribute/index.md).
 
 #### ThemeManager.Unregister
@@ -114,7 +114,7 @@ ThemeManager.Transition<Light>(TransitionEffects.Theme);
 
 **Returns:** `void` (asynchronous — the method is `async void`)
 
-**Exceptions:** none declared — an invalid `themeType` (`themeType == Current`, or not assignable to `ITheme`) is ignored with `Debug.WriteLine("[ThemeManager] Invalid theme type, jumping to current theme.")`. An exception raised inside the switch is caught by `Transition` itself and written as `Debug.WriteLine("[ThemeManager] Error during theme transition: ...")`; an `async void` caller cannot receive it.
+**Exceptions:** none declared — an invalid `themeType` (`themeType == Current`, or not assignable to `ITheme`) is ignored with `Debug.WriteLine("[ThemeManager] Invalid theme type, jumping to current theme.")`. An exception raised inside `RunSwitch` is caught by `Transition` itself and written as `Debug.WriteLine("[ThemeManager] Error during theme transition: ...")`; an `async void` caller cannot receive it. Exceptions thrown by the `ExecuteThemeChanging` / `ExecuteThemeChanged` hooks are not caught (they run outside that `try`).
 
 **Notes:**
 - Cancels any switch in flight (`CancelActiveSwitch`), prunes dead `WeakReference`s, then calls `ExecuteThemeChanging(oldValue, newValue)` on every registered object.
@@ -173,7 +173,7 @@ Declared in `Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`.
 **Notes:**
 - Default is `StartModel.Cache` (verified by `ThemeBasicsTests.StartModel_DefaultIsCache`).
 - The demos set `ThemeManager.StartModel = StartModel.Cache;` explicitly before any switch.
-- It is marked `[Flags]` — `StartModel.Reflect | StartModel.Cache` is a valid value (verified by `ThemeBasicsTests.StartModel_FlagsEnum`).
+- It is marked `[Flags]` — `StartModel.Reflect | StartModel.Cache` is a valid enum value (verified by `ThemeBasicsTests.StartModel_FlagsEnum`). It is not a usable *mode*, though: `PrepareSamplers` switches on the exact `Reflect` / `Cache` values, so the combined value matches neither arm and every property is skipped (no start value). Use one value at a time.
 
 ---
 

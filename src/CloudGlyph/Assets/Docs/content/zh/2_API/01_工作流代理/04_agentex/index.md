@@ -4,7 +4,7 @@
 
 ## AgentEx
 
-`public static class AgentEx` —— 命名空间 `VeloxDev.AI.Workflow`；源 `Src/Core/VeloxDev.Core.Extension/Agent/Workflow/`。
+`public static class AgentEx` —— 命名空间 `VeloxDev.AI.Workflow`；源 `Src/Core/VeloxDev.Core.Extension/AgentEx.cs`。
 
 | 成员 | 签名 | 说明 |
 |---|---|---|
@@ -28,7 +28,7 @@ using VeloxDev.AI.Workflow;
 // 1. 树 -> 作用域
 var scope = tree.AsAgentScope()
     .WithPromptLanguage(AgentLanguages.English)
-    .WithAutoDiscovery(assemblyName: "Lib")
+    .WithAutoDiscovery()
     .WithAllowNodeExecution(true)
     .WithMaxToolCalls(200)
     .WithTranscript(transcript);

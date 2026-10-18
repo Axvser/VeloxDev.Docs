@@ -11,7 +11,7 @@ public sealed class WeakDelegate<TDelegate>
 
 内部实现上，每个注册的处理器存为 `List` 里的 `WeakReference<Delegate>`，容器还会把存活处理器经 `Delegate.Combine` 组合成的 *组合委托* 缓存在 `volatile` 字段中；正是这个缓存让常见的「逐个调用所有人」路径无需加锁、无需反射。新增或移除处理器时默认会重建缓存，而重建会先丢弃目标已被回收的处理器。
 
-**关于弱语义的说明。** 缓存的组合委托是对当前已组合处理器的*强引用*。因此以默认 `CanUpdateCache: true` 添加的处理器会一直被容器保活，直到某次重建缓存不再包含它（通常是之后的 `RemoveHandler`）。若想弱语义真正生效，可在添加时传 `CanUpdateCache: false`，让新处理器不进强缓存，从而在其不再被其它对象引用时可以被回收 —— 快速入门探针正是这种用法。
+**关于弱语义的说明。** 缓存的组合委托是对当前已组合处理器的*强引用*。因此以默认 `CanUpdateCache: true` 添加的处理器会一直被容器保活，直到某次重建缓存不再包含它（通常是之后的 `RemoveHandler`）。若想弱语义真正生效，可在添加时传 `CanUpdateCache: false`，让新处理器不进强缓存，从而在其不再被其它对象引用时可以被回收 —— 快速入门探针正是这种用法。这种豁免只持续到下次重建：届时仍存活的处理器会被并入新的强缓存；此前已被回收的处理器则被丢弃。
 
 ## 方法
 
@@ -45,8 +45,8 @@ public sealed class WeakDelegate<TDelegate>
 **返回：** `void`
 
 **说明：**
-- 移除每个仍能解析到该委托实例的存储项（对弱持有的目标做引用相等比较）。
-- 以默认标志移除后，缓存中的组合委托不再引用该处理器，它因此变得可回收。
+- 移除每个弱持目标与 `handler` 在 `Delegate` 的 `==` 运算符下相等的存储项（委托相等：相同目标与方法，不是对象标识）。因为从尾部扫描，添加过两次的处理器会两条都移除。
+- 使用默认标志时，每移除一个匹配项都会在同一把锁内重建缓存；此后组合委托不再引用该处理器，它因此变得可回收。
 
 ### `WeakDelegate<TDelegate>.GetInvocationList`
 
@@ -86,8 +86,9 @@ Assert.AreEqual(42, result);
 ```
 
 **说明：**
-- 用于委托签名未知时的通用路径：调用 `GetInvocationList()?.DynamicInvoke(objects)`。由于走反射，处理器抛出的异常会以 `TargetInvocationException` 形式浮出（`Delegate.DynamicInvoke` 的语义）。
+- 用于委托签名未知时的通用路径：调用 `GetInvocationList()?.DynamicInvoke(objects)`。没有存活处理器时，null 条件运算符使调用成为无操作。由于走反射，处理器抛出的异常会以 `TargetInvocationException` 形式浮出（`Delegate.DynamicInvoke` 的语义）。
 - 编译期已知签名时，优先取 `GetInvocationList()` 做类型化调用 —— 可避免每次调用都走反射。
+- 方法本身不取锁；它通过 `GetInvocationList()` 读取 volatile 缓存，仅在缓存未命中时加锁。
 
 ### `WeakDelegate<TDelegate>.Clone`
 

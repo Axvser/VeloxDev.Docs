@@ -6,24 +6,24 @@ The supported targets below come from each adapter's **declared** `.csproj` (`Sr
 
 | Adapter package | `TargetFramework(s)` in `.csproj` | Framework dependency |
 |---|---|---|
-| `VeloxDev.WPF` | `netframework4.6.1`; `net5.0-windows`; `netcoreapp3.0` | `<UseWPF>true</UseWPF>` |
-| `VeloxDev.WinForms` | `netframework4.6.1`; `net5.0-windows`; `netcoreapp3.0` | `<UseWindowsForms>true</UseWindowsForms>` |
-| `VeloxDev.Avalonia` | `netstandard2.0`; `net6.0` | Avalonia `11.1.0` |
-| `VeloxDev.WinUI` | `net8.0-windows10.0.19041.0`; `net10.0-windows10.0.19041.0` | Windows App SDK (`UseWinUI`), min `10.0.17763.0` |
-| `VeloxDev.MAUI` | `net10.0`; `net10.0-windows10.0.19041.0` | .NET MAUI workload (`UseMaui`), `Microsoft.Maui.Controls` |
-| `VeloxDev.Razor` | `net6.0` | `Microsoft.AspNetCore.App` (Razor SDK) |
-| `VeloxDev.Jalium` | `net10.0` | `Jalium.UI.Controls` |
+| `VeloxDev.WPF` | `netframework4.6.1`; `net5.0-windows`; `netcoreapp3.0`; `net8.0-windows` | `<UseWPF>true</UseWPF>` |
+| `VeloxDev.WinForms` | `netframework4.6.1`; `net5.0-windows`; `netcoreapp3.0`; `net8.0-windows` | `<UseWindowsForms>true</UseWindowsForms>` |
+| `VeloxDev.Avalonia` | `netstandard2.0`; `net6.0`; `net8.0` | Avalonia `11.1.0` (`Avalonia.Themes.Fluent`, `Avalonia.Fonts.Inter`) |
+| `VeloxDev.WinUI` | `net8.0-windows10.0.19041.0`; `net10.0-windows10.0.19041.0` | Windows App SDK (`UseWinUI`) `1.6.241114003`, `TargetPlatformMinVersion` `10.0.17763.0` |
+| `VeloxDev.MAUI` | `net10.0`; `net10.0-windows10.0.19041.0` | .NET MAUI workload (`UseMaui`), `Microsoft.Maui.Controls` `10.0.20` |
+| `VeloxDev.Razor` | `net6.0`; `net8.0` | `Microsoft.AspNetCore.App` (Razor SDK) |
+| `VeloxDev.Jalium` | `net10.0` | `Jalium.UI.Controls` `26.10.8` (minimum) |
 
 Notes:
 
-- `VeloxDev.MAUI` uses a platform-neutral `net10.0` assembly plus a `net10.0-windows10.0.19041.0` Windows TFM (the `#if WINDOWS` types, e.g. the WinUI-backed link/overlay path, only exist in the Windows asset). The Windows `SupportedOSPlatformVersion` is `10.0.17763.0`.
+- `VeloxDev.MAUI` uses a platform-neutral `net10.0` assembly plus a `net10.0-windows10.0.19041.0` Windows TFM (the `#if WINDOWS` types, e.g. the WinUI-backed link/overlay path, only exist in the Windows asset). The Windows `SupportedOSPlatformVersion` is `10.0.17763.0`; the Windows TFM additionally references `Microsoft.WindowsAppSDK` `1.7.250909003`.
 - `VeloxDev.WinUI` additionally declares a default `RuntimeIdentifier` of `win-x64` (also `win-arm64` / `win-x86`) and references `Microsoft.WindowsAppSDK`.
-- `VeloxDev.Jalium` is platform-neutral (`net10.0`) — the adapter only uses the cross-platform Jalium core, so it serves Windows, Linux and Android consumers alike.
+- `VeloxDev.Jalium` is platform-neutral (`net10.0`) — the adapter only uses the cross-platform Jalium core, so it serves Windows, Linux and Android consumers alike. Its package floor is `Jalium.UI.Controls` **26.10.8**: 26.10.7 lacks `Dispatcher.MainDispatcher`, and 26.10.0–26.10.6 lack `DispatcherPriority`. The in-repo Jalium demos target `net10.0-windows` and add the separate `Jalium.UI.Desktop` **26.10.9** host/windowing package on top; 26.10.9 is a demo choice, not the adapter's minimum, and no 26.11.0 is referenced by either.
 
 ## SDK / runtime
 
-- A .NET SDK able to build the **GUI workload** you pick: Windows-desktop TFMs need a Windows SDK (`net5.0-windows` / `netcoreapp3.0` / `net9.0-windows` …), WinUI needs the Windows App SDK workload, MAUI needs the `maui` workload, and Razor needs the Razor SDK (`Microsoft.NET.Sdk.Razor`). Avalonia and Jalium build anywhere the target SDK exists.
-- This Quick Start's WPF scaffold targets `net9.0-windows` — a *tested* configuration (the in-repo demos build `net9.0-windows` / `net10.0`), not a requirement.
+- A .NET SDK able to build the **GUI workload** you pick: Windows-desktop TFMs need a Windows SDK (`net5.0-windows` / `netcoreapp3.0` / `net8.0-windows` …), WinUI needs the Windows App SDK workload, MAUI needs the `maui` workload, and Razor needs the Razor SDK (`Microsoft.NET.Sdk.Razor`). Avalonia (`netstandard2.0` + `net8.0`) and Jalium (`net10.0`) build anywhere the target SDK exists.
+- This Quick Start's WPF scaffold targets `net9.0-windows` — a *tested* configuration (the full in-repo WPF demo builds `net9.0-windows`, the `Trimmed` demo `net10.0-windows`), not a requirement. The adapter's highest declared TFM is `net8.0-windows`, which a `net9.0-windows` project resolves through NuGet's TFM compatibility rules.
 - **Package manager:** NuGet + the `dotnet` CLI (`dotnet new install`, `dotnet add package`, `dotnet build`).
 
 ## Required services
@@ -32,4 +32,4 @@ None. To *see* a workflow you need an app host — a WPF / WinForms / WinUI / Av
 
 ## Evidence note
 
-WPF, Avalonia, WinUI, WinForms, MAUI, Blazor/Razor and Jalium all have workflow demos under `Examples/Workflow/<Platform>` (each with a `Trimmed` sibling) plus Transition/Theme demos under `Examples/Transition/*` and `Examples/Theme/*`. The WPF demo was **built** on 2026-10-01 (`dotnet build Examples/Workflow/WPF/Demo/Demo.csproj`, 0 warnings / 0 errors) and the seven `dotnet new wpf-v-*` templates were **generated**; because no GUI can be launched in this authoring environment, the interactive behaviour below is verified by source and by that build, not observed on screen — see the run declarations on the [Verification](../04_verification/index.md) and [Complete Code](../05_complete-code/index.md) pages.
+WPF, Avalonia, WinUI, WinForms, MAUI, Blazor/Razor and Jalium all have workflow demos under `Examples/Workflow/<Platform>` (each with a `Trimmed` sibling) plus Transition/Theme demos under `Examples/Transition/*` and `Examples/Theme/*`. A WPF demo build was recorded on 2026-10-01 (`dotnet build Examples/Workflow/WPF/Demo/Demo.csproj`, 0 warnings / 0 errors), and the seven `dotnet new wpf-v-*` templates were generated that day. **This revision (2026-10-18) was not built or run**: the adapter table, the Jalium package floor, and the connection-preview paths were re-verified statically against `Src/Adapters/*`, `Src/Templates/*`, `Src/Core/VeloxDev.Core`, and the in-repo demo projects. No GUI was launched — see the run declarations on the [Verification](../04_verification/index.md) and [Complete Code](../05_complete-code/index.md) pages.

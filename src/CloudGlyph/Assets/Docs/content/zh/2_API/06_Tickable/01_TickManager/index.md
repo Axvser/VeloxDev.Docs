@@ -6,9 +6,9 @@
 public static class TickManager
 ```
 
-源码：`Src/Core/VeloxDev.Core/TimeLine/TickManager.cs`（1163 行）。
+源码：`Src/Core/VeloxDev.Core/TimeLine/TickManager.cs`（1167 行）。
 
-`TickManager` 是本特性运行期的唯一公开入口。所有成员都是 `static`；除 `ChannelNames` 外，每个成员都带一个末位的 `string channel = DEFAULT_CHANNEL` 参数。通道由 `GetOrCreateChannel` 惰性创建，存在一个进程范围的 `ConcurrentDictionary<string, LoopChannel>`（`_channels`，第 1017 行）中 —— 因此该管理器是进程级全局状态，通道的生命周期长于任何注册在其上的行为。
+`TickManager` 是本特性运行期的唯一公开入口。所有成员都是 `static`；除 `ChannelNames` 外，每个成员都带一个末位的 `string channel = DEFAULT_CHANNEL` 参数。通道由 `GetOrCreateChannel` 惰性创建，存在一个进程范围的 `ConcurrentDictionary<string, LoopChannel>`（`_channels`，第 1019 行）中 —— 因此该管理器是进程级全局状态，通道的生命周期长于任何注册在其上的行为。
 
 ## 哪些是公开的，哪些不是
 
@@ -17,7 +17,7 @@ public static class TickManager
 | 下面记录的 34 个静态成员 | 嵌套类型 `LoopChannel`、`BehaviorWrapper`、`ConfigChangeRequest`、`ObjectPool<T>` |
 | `TickChannelEventArgs`（同文件中的独立顶层类型） | `GetOrCreateChannel`、`RebuildCachedWrappers`、`ProcessAddedBehaviors`、`ExecuteBehaviors*Sync`、`CreateFrameEventArgs`、`Sleep`、`ForceCleanup` 等 |
 
-`LoopChannel` 是 `private sealed`（第 99 行）。两个泵、通道自己的时间源与通道自己的事件都住在里面，`TickManager` 之外没有任何东西能命名它。唯一公开通往通道时钟的门是 `TickManager.Bus`。
+`LoopChannel` 是 `private sealed`（第 101 行）。两个泵、通道自己的时间源与通道自己的事件都住在里面，`TickManager` 之外没有任何东西能命名它。唯一公开通往通道时钟的门是 `TickManager.Bus`。
 
 ## 成员索引
 
@@ -48,10 +48,10 @@ public static class TickManager
 | `MAX_SLEEP_CHUNK_MS` | `50` | 长睡眠按此分片，使停止能在此时间内被察觉 |
 | `MIN_SLEEP_MS` | `1` | 时钟推进为零时的退避 |
 
-源码：`TickManager.cs` 第 10-33 行。
+源码：`TickManager.cs` 第 11-35 行。
 
 ## 位于本页边界上的其他类型
 
 - **`TickChannelEventArgs`** —— 四个静态事件的载荷；单独记录（[TickChannelEventArgs](../04_TickChannelEventArgs/index.md)）。
 - **`ITickable`** —— `RegisterBehaviour` 接受的类型；单独记录（[ITickable](../05_ITickable/index.md)）。
-- **`ITimeSourceControl`**（`VeloxDev.Timing`）—— `Bus` 的返回类型。它属于共享基础设施，随过渡动画特性一并记录；本特性用户需要的成员是 `IsAdvancing`、`IsPaused`、`Rate`、`Position`、`Epoch`、`Pause()`、`Resume()`、`SetRate(double)` 与 `WaitWhileStalledAsync(CancellationToken)`。
+- **`ITimeSourceControl`**（`VeloxDev.Timing`）—— `Bus` 的返回类型。它继承 `ITimeSource`：`ITimeSource` 公开 `TicksPerSecond`、`Ticks`、`Position`、`Rate`、`IsPaused`、`IsAdvancing`、`Epoch` 与 `WaitWhileStalledAsync(CancellationToken)`；`ITimeSourceControl` 另加 `Pause()`、`Resume()`、`SetRate(double)`、`Seek(TimeSpan)` 与 `Wake()`。它属于共享基础设施，随过渡动画特性一并记录。

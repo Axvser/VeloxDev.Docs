@@ -28,6 +28,8 @@
 | `Todo` | `TodoProvider? { get; private set; }` | 框架 todo 提供器（`WithTodoTracking`）。 |
 | `AgentMode` | `AgentModeProvider? { get; private set; }` | 框架模式提供器（`WithAgentModes`）。 |
 | `CheckpointStore` | `IExecutionCheckpointStore? { get; private set; }` | 宿主检查点存储（`WithCheckpointStore`）。 |
+| `PermissionPolicy` | `AgentPermissionPolicy { get; }` | 当前生效的权限策略（模式 + 规则 + judge）。永不 null。 |
+| `PermissionMode` | `AgentPermissionMode { get; }` | 当前生效的模式；即 `PermissionPolicy.Mode` 的简写。 |
 
 ## WorkflowAgentScope —— 流式表面
 
@@ -48,8 +50,9 @@
 | 成员 | 签名 |
 |---|---|
 | `WithEnums` / `WithInterfaces` / `WithComponents` / `WithData` | `(Type[] …, AgentLanguages? language = null)` |
-| `WithAutoDiscovery` | `WithAutoDiscovery(Assembly assembly, AgentLanguages? language = null)` |
-| `WithAutoDiscovery` | `WithAutoDiscovery(string assemblyName, AgentLanguages? language = null)` |
+| `WithAutoDiscovery` | `WithAutoDiscovery(AgentLanguages? language = null)` |
+
+`WithAutoDiscovery` **不**扫描程序集：它读取编译 agent 上下文树的 `Customer/` 目录（`Enums`、`Interfaces`、`Data`、`Components/{kind}`），因此只注册源码生成器收录的内容。
 
 ### 自定义工具
 
@@ -74,15 +77,18 @@
 | `WithAllowedGenericCommands` | `WithAllowedGenericCommands(params string[] commandNames)` | `ExecuteCommandOnNode` / `ExecuteCommandById` 的白名单。 |
 | `WithAutoMarkDirty` | `WithAutoMarkDirty(bool enabled = false)` | 变更后自动标脏。 |
 
-### 交互与审批
+### 交互与权限
 
-| 成员 | 签名 |
-|---|---|
-| `WithInteractionSafety` | `WithInteractionSafety(int level)` |
-| `WithInteractionSafetyPrompt` | `WithInteractionSafetyPrompt(int level, string promptBody)` |
-| `WithSelectionHandler` | `WithSelectionHandler(Func<AgentSelectionEventArgs, Task> handler)` |
-| `WithConfirmationHandler` | `WithConfirmationHandler(Func<AgentConfirmationEventArgs, Task> handler)` |
-| `WithToolApproval` | `WithToolApproval(bool enabled = true)` |
+| 成员 | 签名 | 说明 |
+|---|---|---|
+| `WithSelectionHandler` | `WithSelectionHandler(Func<AgentSelectionEventArgs, Task> handler)` | 注册 `RequestSelection`；传 `null` 注销。 |
+| `WithConfirmationHandler` | `WithConfirmationHandler(Func<AgentConfirmationEventArgs, Task> handler)` | 支撑 `RequestConfirmation`、每个 `Ask` 权限决定与 `ResetToolCallLimit`；同时启用 `EnterPlanMode` / `ExitPlanMode`。 |
+| `WithPermissionMode` | `WithPermissionMode(AgentPermissionMode mode)` | 粗粒度策略；逐调用读取，因此会话中途切换会治理下一次调用。 |
+| `SetPermissionMode` | `bool SetPermissionMode(AgentPermissionMode mode)` | 运行时切换；返回模式是否移动。 |
+| `WithModePrompt` | `WithModePrompt(AgentPermissionMode mode, string? promptBody)` | 替换某模式的出厂提示文本（`null` 恢复）。 |
+| `WithPermissionRule` | `WithPermissionRule(PermissionDecision decision, params string[] patterns)` | 模式之下的细粒度层；模式按工具名、`category:*` 或 `source:*` 选择。 |
+| `WithoutPermissionRules` | `WithoutPermissionRules()` | 移除全部规则；模式不变。 |
+| `WithPermissionJudge` | `WithPermissionJudge(Func<ToolInvocation, PermissionDecision>? judge)` | 为 `Auto` 中无规则裁决的调用做决定；judge 抛异常即拒绝。 |
 
 ### 宿主与管线
 
@@ -113,8 +119,10 @@
 |---|---|---|
 | `ProvideProgressiveContextPrompt` | `string ProvideProgressiveContextPrompt()` / `(AgentLanguages)` | 精简提示。 |
 | `ProvideAllContexts` | `string ProvideAllContexts()` / `(AgentLanguages)` | 完整提示。 |
-| `ProvideFrameworkContext` / `ProvideCustomerContext` | `string …(AgentLanguages = English)` | 上下文块。 |
-| `ProvideFrameworkDataContext` / `ProvideCustomerDataContext` | `string …(AgentLanguages = English)` | 数据块。 |
+| `ProvideFrameworkContext` | `string ProvideFrameworkContext(AgentLanguages language = English)` | 框架枚举/接口/组件。 |
+| `ProvideCustomerContext` | `string ProvideCustomerContext()` | 已注册客户类型，各自使用注册时的语言。 |
+| `ProvideFrameworkDataContext` | `string ProvideFrameworkDataContext(AgentLanguages language = English)` | 框架 `Data` 块。 |
+| `ProvideCustomerDataContext` | `string ProvideCustomerDataContext()` | 已注册客户数据块，各自使用注册时的语言。 |
 | `CreateToolkit` | `WorkflowAgentToolkit CreateToolkit()` | 每个作用域缓存一个实例。 |
 | `ProvideTools` | `IList<AITool> ProvideTools()` / `(WorkflowToolCategory)` | 工具集。 |
 | `CreateContextProvider` | `AIContextProvider CreateContextProvider()` | 单个 `WorkflowAgentContextProvider`。 |
@@ -139,7 +147,7 @@
 
 ## WorkflowAgentContextProvider
 
-`public sealed class WorkflowAgentContextProvider : AIContextProvider`。**每轮工具与指令的唯一来源。** 以其缓存的渲染按作用域 `ContextKey`（`Version` 加预算用量档）键控；未变化的一轮不加锁、不分配，返回同一个 `AIContext` 实例。其 `StateKeys` 按作用域（同一作用域两个提供器共享键，两个作用域绝不共享）。
+`public sealed class WorkflowAgentContextProvider : AIContextProvider`。**每轮工具与指令的唯一来源。** 以作用域的 `ContextKey`（`Version`、树的当前选中集 revision 与预算用量档）键控缓存渲染；未变化的一轮不加锁、不分配，返回同一个 `AIContext` 实例。其 `StateKeys` 按作用域（同一作用域两个提供器共享键，两个作用域绝不共享）。
 
 ```csharp
 public WorkflowAgentContextProvider(WorkflowAgentScope scope)

@@ -81,4 +81,4 @@ Use the run tool's `logs` field for the compiler run-session log (which carries 
 
 ## Run declaration
 
-- ✅ Actually built and ran — the deterministic agent test suite was executed on 2026-10-01 (`已通过! 失败: 0，通过: 387`). It covers `WorkflowLifecycleFidelityTests` (`CompileNodeResult_SingleNodeTree_ProducesTerminalCompilePlan`, `GetNodeResult_SingleNodeTree_RunsToCompletionWithTerminalRole`, `GetNodeResult_WithoutAllowNodeExecution_IsRejectedByPolicy`) and `CompiledRunControlTests`, all of which drive the compiler path against the demo graph with a stubbed interpreter. Running a conversation against a model was not part of that run.
+- ⚠️ **Not run for this revision** — statically verified against the current source on 2026-10-18. A previously recorded deterministic suite run (2026-10-01, 387 tests) covered `WorkflowLifecycleFidelityTests` and `CompiledRunControlTests`, but it predates the permission-mode redesign and is not used as current evidence. Running a conversation against a model was not part of that run.

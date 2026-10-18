@@ -10,7 +10,7 @@ $$
 \text{Enqueue / Push: } O(1), \qquad \text{TryDequeue / TryPop / TryPeek: } O(1 + d) \text{ amortized}
 $$
 
-where $d$ = dead references at the front / top. `TryDequeue`/`TryPop`/`TryPeek` pop and drop dead wrappers until they reach a live item (or empty), so each dead wrapper is dropped exactly once over its lifetime — the accumulated cost of skipping dead entries is amortized O(1) per entry added. `Count`, `GetEnumerator` and `TrimExcess` first compact the whole structure (`Prune()`, `WeakQueue.cs` lines 124-135; `WeakStack.cs` lines 124-136, which also reverses so LIFO order survives):
+where $d$ = dead references at the front / top. `TryDequeue`/`TryPop`/`TryPeek` pop and drop dead wrappers until they reach a live item (or empty), so each dead wrapper is dropped exactly once over its lifetime — the accumulated cost of skipping dead entries is amortized O(1) per entry added. `Count`, `GetEnumerator` and `TrimExcess` first compact the whole structure (`Prune()`, `WeakQueue.cs` lines 137-148; `WeakStack.cs` lines 137-149, which also reverses so LIFO order survives):
 
 $$
 O(n), \quad n = \text{stored reference wrappers}
@@ -24,14 +24,14 @@ $$
 | `Count` / `GetEnumerator` / `TrimExcess` | $O(n)$ worst-case (prune first) |
 | `Clear` | $O(n)$ — the BCL `Queue`/`Stack` nulls out every stored slot to release the wrappers |
 
-**Memory.** The container holds $O(n)$ `WeakReference<T>` wrappers and never roots the payloads, so a payload becomes collectible as soon as no other strong reference exists. Between sweeps the container may hold empty wrappers for already-collected payloads (garbage slots), but because every `Count`/enumeration/`TrimExcess` compacts and every pop skips them, the wasted space is transient and bounded by the live working set.
+**Memory.** The container holds $O(n)$ `WeakReference<T>` wrappers and never roots the payloads, so a payload becomes collectible as soon as no other strong reference exists. Between sweeps the container may hold empty wrappers for already-collected payloads (garbage slots); their number is bounded by the entries added since the last `Prune()`, and every `Count`/enumeration/`TrimExcess` compacts them, while pops skip them. If the collection is only ever written to, dead wrappers accumulate until one of those reads runs.
 
 ## WeakCache
 
 `AddOrUpdate` / `TryGetCache` / `Remove` are `ConditionalWeakTable` operations plus a list scan, so lookup and insert are amortized O(1). Cleanup is periodic, triggered when the insert counter exceeds an **adaptive** threshold (`_perceptionThreshold`, default `4`):
 
 ```csharp
-// Src/Core/VeloxDev.Core/WeakTypes/WeakCache.cs (lines 75-79)
+// Src/Core/VeloxDev.Core/WeakTypes/WeakCache.cs (lines 100-104)
 private static int GetNextCleanupThreshold(int currentCount)
 {
     int nextCapacity = currentCount == 0 ? 4 : currentCount * 2;
@@ -68,7 +68,7 @@ Rebuilding the multicast cache costs a pass over the handler list: `RebuildCache
 |---|---|
 | `AddHandler` (`CanUpdateCache: true`) | $O(1)$ append + $O(h)$ rebuild |
 | `AddHandler` (`CanUpdateCache: false`) | $O(1)$ |
-| `RemoveHandler` | $O(h)$ scan/remove (+ $O(h)$ rebuild if requested) |
+| `RemoveHandler` | $O(h)$ scan; with the default `CanUpdateCache: true`, an $O(h)$ rebuild per matched entry (so $O(k \cdot h)$ for $k$ duplicate matches) |
 | `GetInvocationList` (cache hit) | $O(1)$, lock-free |
 | `GetInvocationList` (cache miss) | $O(h)$ rebuild under the lock |
 | `Invoke(object?[] objects)` | $O(1)$ read + DynamicInvoke dispatch cost |

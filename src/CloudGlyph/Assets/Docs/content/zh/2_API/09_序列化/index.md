@@ -4,7 +4,7 @@
 
 源码：`Src/Core/VeloxDev.Core/Serialization/*.cs`（引擎、标注、`ViewModelSerializer`）、`Src/Core/VeloxDev.Core.Extension/CompiledGraphEx.cs`、`CheckpointEx.cs`。
 
-**一句话说清设计**：闭世界、零反射。只有当源生成器为某个类型编出了读写器，它才会被写出去（`Src/Core/VeloxDev.Core/Serialization/VeloxJsonSerializer.cs:21`）。生成器没见过的类型会**带着说明报错**，而不是写成一个空壳 —— 这正是这套引擎对裁剪与 AOT 友好的前提。
+**一句话说清设计**：闭世界、零反射。只有当源生成器为某个类型编出了读写器，它才会被写出去（`Src/Core/VeloxDev.Core/Serialization/VeloxJsonSerializer.cs:11-19`）。生成器没见过的类型会**带着说明报错**，而不是写成一个空壳 —— 这正是这套引擎对裁剪与 AOT 友好的前提。
 
 ```mermaid
 flowchart TD
@@ -40,15 +40,25 @@ internal sealed partial class ContractModel
 public sealed class ExecutionCheckpoint
 ```
 
-**成员收录规则** —— public 且带 public setter 的属性，按声明顺序；`[VeloxProperty]` 提升出来的字段排其后；继承成员最后（`Base/VeloxJsonModel.cs:912-1025`）。这个顺序是格式的**逐字节契约**。
+**成员收录规则** —— public 且带 public setter 的属性，按声明顺序；`[VeloxProperty]` 提升出来的字段排其后；继承成员最后（`Base/VeloxJsonModel.cs:912-1026`）。这个顺序是格式的**逐字节契约**。
 
-生成器只在消费方程序集**引用了 `VeloxDev.MVVM`** 时才运行（`Base/VeloxJsonModel.cs:333`）；MSBuild 属性 `VeloxJsonSerialization=false` 可以整个关掉它（`Src/Generators/VeloxDev.Core.Generator/VeloxJson.cs:34`）。
+生成器只在编译单元能看见 `VeloxDev.MVVM.VeloxPropertyAttribute` 时才运行 —— 该类型随 `VeloxDev.Core` 发布，所以引用了它即可（`Base/VeloxJsonModel.cs:333-334`）；MSBuild 属性 `VeloxJsonSerialization=false` 可以整个关掉它（`Src/Generators/VeloxDev.Core.Generator/VeloxJson.cs:34`）。
+
+### 生成的元数据
+
+每个有贡献的程序集得到一个生成文件：`<SanitizedAssemblyName>_VeloxJson.g.cs`（`Src/Generators/VeloxDev.Core.Generator/VeloxJson.cs:69-73`）。里面包含：
+
+- 每个类型一对 `internal sealed` 读写器，分别实现 `IVeloxJsonWriter` / `IVeloxJsonReader`；
+- 一个 `[ModuleInitializer]`，为每一对注册写者、读者与 `$type` 名字，并传入 `declaresType`（`Writers/VeloxJsonCodeWriter.cs:503-507`）；
+- 文件头注释，列出该程序集能写出的全部类型、它们的写出名、收录原因，并用 `*` 标出只能靠继承、字典键或类型参数约束走到的类型（`Writers/VeloxJsonCodeWriter.cs:58-72`）。
+
+生成器按目标框架各跑一次，所以这些元数据会按 TFM 重复。
 
 ---
 
 ## `ViewModelSerializer` —— 入口
 
-**签名：** `public static class ViewModelSerializer`（`Serialization/ViewModelSerializer.cs:55`）。所有方法都带约束 `where T : INotifyPropertyChanged`。
+**签名：** `public static class ViewModelSerializer`（`Serialization/ViewModelSerializer.cs:55`）。所有泛型方法都带约束 `where T : INotifyPropertyChanged`；`DeserializeToType` 是唯一没有类型参数的成员。
 
 | 成员 | 签名 | 说明 |
 |---|---|---|
@@ -161,9 +171,9 @@ Newtonsoft 时代那三个开关（`WithTypeNameHandling`、`WithNullValueHandli
 
 ## 这个格式**不是**什么
 
-它**不能**和 `System.Text.Json` 或 Newtonsoft 互通。三处结构性差异：类型判别符的值就是注册表键（泛型名带类型实参，嵌套层用 `+` 连接）、集合形状由声明类型决定、成员集来自生成器而非反射。外来的类型标签解析不出来，读侧会**静默退回声明类型** —— 对具体类来说等于丢掉多态，对接口或抽象类型则抛 `MissingReader`。
+它**不能**和 `System.Text.Json` 或 Newtonsoft 互通。三处结构性差异：类型判别符的值就是注册表键（泛型名带类型实参，嵌套层用 `+` 连接）、集合形状由声明类型决定、成员集来自生成器而非反射。外来的类型标签解析不出来，读侧会**静默退回声明类型** —— 对具体类来说等于丢掉多态，对接口或抽象类型则抛出由 `MissingReader` 构造的 `InvalidOperationException`。
 
 还有两条被测量过的行为值得知道：
 
-- **数字穿过 `object` 成员时不保类型。** JSON 只有一种整数：进去的 `int` 回来是 `long`，`float` 回来是 `double`。引擎自己的字段是精确的；而一个在载荷上对 `int` 做模式匹配的节点，恢复之后匹配不上。
-- **无类型成员是降级而非失败。** 声明为 `object` 的成员读回来是一个 JSON 字典，不是原来的类型。
+- **数字穿过 `object` 成员时不保类型。** JSON 只有一种整数：进去的 `int` 回来是 `long`。非整数没有无类型读取器可映射回去 —— `ReadUnknown` 对整数文本返回 `long`，其余返回裸 token 文本（`VeloxJsonSerializer.cs:348-372`）。引擎自己的字段是精确的；而一个在载荷上对 `int` 做模式匹配的节点，恢复之后匹配不上。
+- **无类型成员是降级而非失败。** 声明为 `object`、且文档没有可解析类型名的成员，读回来是一个 `Dictionary<string, object?>`，不是原来的类型（`VeloxJsonSerializer.cs:453-501`）。

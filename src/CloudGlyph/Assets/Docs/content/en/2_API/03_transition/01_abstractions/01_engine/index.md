@@ -71,7 +71,6 @@ public abstract class TransitionSchedulerCore : ITransitionSchedulerCore
     public static ConditionalWeakTable<object, ConcurrentDictionary<ITransitionSchedulerCore, byte>> NoMutualSchedulers { get; internal set; }
 
     public static bool TryGetMutualScheduler(object source, out ITransitionSchedulerCore? scheduler);
-    public static bool RemoveMutualScheduler(object source);
     public static bool TryGetNoMutualScheduler(object source, out ITransitionSchedulerCore[] schedulers);
     public static bool RemoveNoMutualScheduler(object source);
 

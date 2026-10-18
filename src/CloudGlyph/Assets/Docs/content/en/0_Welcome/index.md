@@ -197,6 +197,9 @@
     <div class="feat-card cg-feat" style="animation-delay: 0.4s;">
       <a class="feat-link" href="../1_QuickStart/08_platform-adapters/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🧩</span> Adapters<br><span style="opacity: 0.6;">7 GUIs — WPF · Avalonia · WinUI · MAUI · WinForms · Razor · Jalium</span></a>
     </div>
+    <div class="feat-card cg-feat" style="animation-delay: 0.45s;">
+      <a class="feat-link" href="../1_QuickStart/09_serialization/index.md"><span class="feat-icon" style="font-size: 1.3em; margin-right: 6px;">🗃️</span> Serialization<br><span style="opacity: 0.6;">Archive attributes · JSON round-trip</span></a>
+    </div>
   </div>
 
 </div>

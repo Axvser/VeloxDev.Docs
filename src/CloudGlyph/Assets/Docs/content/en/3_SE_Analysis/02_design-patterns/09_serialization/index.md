@@ -73,9 +73,9 @@ Four routes put a type in, and the generator decides from the source alone (`Bas
 | Observable field | a `[VeloxProperty]` field — the MVVM generator promotes it |
 | Marker | `[Archivable]`, optionally naming extra roots |
 
-Reachability then closes over **member declaration types** — a property's type, a field's type, a method's return type, a generic argument — one hop at a time (`:377-399`). Since 2026-10-04 that closure widens along three more axes: derived classes, dictionary keys and values, and the constraints of an open generic used as a root (`:34-48`).
+Reachability then closes over **member declaration types** — a property's or field's declared type, a collection's element type, a dictionary's key type — one hop at a time (`:621-630`), with the closure loop at `:425-470`. It also widens along three more axes: derived classes, dictionary keys and values, and the constraints of an open generic used as a root (`:361-405`).
 
-The consequence worth stating plainly: an abstract class or an interface **never** gets an entry — `ReaderFor` returns `null` for them, forever. Polymorphism works because the *concrete* type is written into the document as the discriminator, and the reader resolves that name back through the registry.
+The consequence worth stating plainly: the generator never emits an entry for an abstract class or an interface, so `ReaderFor` returns `null` for them. Polymorphism works because the *concrete* type is written into the document as the discriminator, and the reader resolves that name back through the registry.
 
 ## Two entry points, one engine
 

@@ -33,32 +33,37 @@ Implemented in `Src/Core/VeloxDev.Core.Extension/Agent/Workflow/Functions/`. **E
 | `Analytics` | `1 << 6` | `GetNodeStatistics` (**1 tool**). |
 | `State` | `1 << 7` | Snapshots & dirty marking (**3 tools**). |
 | `Composite` | `1 << 8` | **Reserved — no tools.** Every operation is a single component-command step. |
-| `Interaction` | `1 << 9` | `RequestSelection` / `RequestConfirmation` — registered only when a handler is configured and safety level > 0 (**up to 2 tools**). |
+| `Interaction` | `1 << 9` | `RequestSelection` / `RequestConfirmation` — registered when the matching handler is configured (**up to 2 tools**). `EnterPlanMode` / `ExitPlanMode` are added outside the category mask when a confirmation handler is configured. |
 | `All` | all of the above | Every category. |
 
-**Tool count.** The ten categories above total **68 built-in tools** when both interaction handlers are configured (20 + 23 + 12 + 2 + 5 + 0 + 1 + 3 + 0 + 2 = 68; `Layout` and `Composite` contribute none, and the 66 without `Interaction` are unconditional — the `Execution` and `Command` gates are checked inside each tool body, not by withholding the tool). On top of that, three things are always offered regardless of `categories`:
+**Tool count.** The ten categories total **66 unconditional tools** (20 + 23 + 12 + 2 + 5 + 0 + 1 + 3 + 0 = 66; `Layout` and `Composite` contribute none, and the `Execution` and `Command` gates are checked inside each tool body, not by withholding the tool). On top of that:
 
-- `ResetToolCallLimit` — the budget escape hatch (see the Tool Budgets page);
+- the two `Interaction` tools, each only when its handler exists;
+- `EnterPlanMode` / `ExitPlanMode`, both only when a confirmation handler exists;
+- `ResetToolCallLimit`, always offered regardless of `categories`;
 - the tools registered with `WithTools` / `WithQueryTools`;
 - every tool contributed by an attached subsystem (MCP / skills / sub-agents).
+
+With both handlers registered, `ProvideTools()` returns **71**: 66 + 2 interaction + 2 plan tools + 1 reset.
 
 **`Layout` and `Composite` are reserved by design:** multi-node layout is done node-by-node via `MoveNode` / `SetNodePosition`, and every operation is a single component-command step, so the framework's undo/redo stack stays the source of truth and is never bypassed or double-submitted.
 
 ## Tracking & accounting
 
-Every built-in tool is created through a local `T(AITool, name)` helper that wraps it in `TrackedAIFunction`. `TrackedAIFunction` (namespace `VeloxDev.AI`, `internal sealed`) marshals the call onto the scope's `SynchronizationContext`, runs it past the `ToolPipeline` (refusal + confirmation), and reports `AgentToolCallStarted` / `AgentToolCallCompleted` into the scope's `AgentPipeline`.
+Every built-in tool is created through a local `T(Delegate, name, AgentActionCategory)` helper that wraps it in `TrackedAIFunction`. `TrackedAIFunction` (namespace `VeloxDev.AI`, `internal sealed`) marshals the call onto the scope's `SynchronizationContext`, runs it past the `ToolPipeline` (permission refusal + confirmation), and reports `AgentToolCallStarted` / `AgentToolCallCompleted` into the scope's `AgentPipeline`. The category declared on that line is what the permission policy evaluates.
 
-The pre-flight gate `CheckBudget` runs inside the marshalled block, before the body:
+The pre-flight gate `CheckInvocation` runs inside the marshalled block, before the body:
 
 1. a tool switched off via `IsToolEnabled` → `'{toolName}' is disabled by host policy. …`;
 2. `ResetToolCallLimit` always passes;
-3. for a child scope, the root's ceiling (`The session's tool-call budget (N) is spent.`);
-4. this scope's own `MaxToolCalls`;
-5. `MaxWriteToolCalls` (non-query) / `MaxReadToolCalls` (query).
+3. a `PermissionDecision.Deny` from `PermissionPolicy.Evaluate(invocation)` → the mode/rule refusal;
+4. for a child scope, the root's ceiling (`The session's tool-call budget (N) is spent.`);
+5. this scope's own `MaxToolCalls`;
+6. `MaxWriteToolCalls` (non-query) / `MaxReadToolCalls` (query).
 
 A refusal never reaches the body and never counts. A `Succeeded` call is counted by `AccountingStage` → `AccountAsync`, which also raises the callback and marks dirty when `AutoMarkDirty` is on and the tool is not a query.
 
-`QueryToolNames` is the read-only classification: the 20 Query tools, `TakeSnapshot` / `GetChangesSinceSnapshot`, `GetNodeStatistics`, the five Graph tools, `RequestSelection` / `RequestConfirmation`, `ResetToolCallLimit`, `CompileWorkflow` / `CompileNodeResult` / `GetCompileStatus` / `GetExecutionLog`, plus every name in `SkillAgentToolkit.ToolNames` and `SubAgentAgentToolkit.ToolNames`.
+`QueryToolNames` is the read-only classification: the 20 Query tools, `TakeSnapshot` / `GetChangesSinceSnapshot`, `GetNodeStatistics`, the five Graph tools, `RequestSelection` / `RequestConfirmation`, `ResetToolCallLimit`, `CompileWorkflow` / `CompileNodeResult` / `GetCompileStatus` / `GetExecutionLog`, plus every name in `SkillAgentToolkit.ToolNames` and `SubAgentAgentToolkit.ToolNames`. `EnterPlanMode` / `ExitPlanMode` are deliberately absent from that list, so a plan-mode switch spends the write budget.
 
 ## Tool inventory
 
@@ -67,5 +72,5 @@ A refusal never reaches the body and never counts. A `Succeeded` call is counted
 | [00 · Query & State tools](00_query-state-tools/index.md) | Query + State | 20 + 3 |
 | [01 · Mutation tools](01_mutation-tools/index.md) | Mutation | 23 |
 | [02 · Execution tools](02_execution-tools/index.md) | Execution | 12 (incl. the run-handle family) |
-| [03 · Command, Graph, Analytics & Interaction tools](03_command-graph-analytics-interaction/index.md) | Command + Graph + Analytics + Interaction | 2 + 5 + 1 + 2 |
+| [03 · Command, Graph, Analytics & Interaction tools](03_command-graph-analytics-interaction/index.md) | Command + Graph + Analytics + Interaction | 2 + 5 + 1 + up to 4 |
 | [04 · Helper classes](04_helpers/index.md) | — | `CommandInvoker`, `ComponentPatcher`, `TypeIntrospector` |

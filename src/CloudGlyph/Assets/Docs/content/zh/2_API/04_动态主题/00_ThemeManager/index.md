@@ -8,7 +8,7 @@
 
 源码：`Src/Core/VeloxDev.Core/DynamicTheme/ThemeManager.cs`。
 
-##### 属性
+#### 属性
 
 | 名称 | 类型 | 描述 |
 |---|---|---|
@@ -65,7 +65,7 @@ ThemeManager.SetCurrent<Light>();
 **返回：** `void`
 
 **说明：**
-- 将目标加入活跃缓存与 `WeakReference` 列表。对已注册的目标再次调用 `Register` 是无操作（由 `ConditionalWeakTable` 查找保证）。
+- 把目标加入管理器自己的 `ConditionalWeakTable` 与 `WeakReference` 列表。对已注册的目标再次调用 `Register` 是无操作（由表查找保证）。
 - 通常由生成的 `InitializeTheme()` 自动调用；见 [02 ThemeConfigAttribute](../02_ThemeConfigAttribute/index.md)。
 
 #### ThemeManager.Unregister
@@ -114,7 +114,7 @@ ThemeManager.Transition<Light>(TransitionEffects.Theme);
 
 **返回：** `void`（异步——方法本身是 `async void`）
 
-**异常：** 未声明 —— 无效的 `themeType`（`themeType == Current`，或不可赋值为 `ITheme`）会被忽略，并输出 `Debug.WriteLine("[ThemeManager] Invalid theme type, jumping to current theme.")`。切换内部抛出的异常由 `Transition` 自己捕获并输出 `Debug.WriteLine("[ThemeManager] Error during theme transition: ...")`；`async void` 的调用方接不到它。
+**异常：** 未声明 —— 无效的 `themeType`（`themeType == Current`，或不可赋值为 `ITheme`）会被忽略，并输出 `Debug.WriteLine("[ThemeManager] Invalid theme type, jumping to current theme.")`。`RunSwitch` 内部抛出的异常由 `Transition` 自己捕获并输出 `Debug.WriteLine("[ThemeManager] Error during theme transition: ...")`；`async void` 的调用方接不到它。`ExecuteThemeChanging` / `ExecuteThemeChanged` 钩子抛出的异常**不会**被捕获（它们在那个 `try` 之外运行）。
 
 **说明：**
 - 先取消在飞的切换（`CancelActiveSwitch`），清理失效的 `WeakReference`，然后对每个已注册对象调用 `ExecuteThemeChanging(oldValue, newValue)`。
@@ -173,7 +173,7 @@ ThemeManager.Jump<Dark>();
 **说明：**
 - 默认是 `StartModel.Cache`（由 `ThemeBasicsTests.StartModel_DefaultIsCache` 验证）。
 - 两个示例都在任何切换之前显式设置 `ThemeManager.StartModel = StartModel.Cache;`。
-- 它标记为 `[Flags]` —— `StartModel.Reflect | StartModel.Cache` 是合法的组合值（由 `ThemeBasicsTests.StartModel_FlagsEnum` 验证）。
+- 它标记为 `[Flags]` —— `StartModel.Reflect | StartModel.Cache` 是合法的枚举值（由 `ThemeBasicsTests.StartModel_FlagsEnum` 验证）。但它不是可用的*模式*：`PrepareSamplers` 按 `Reflect` / `Cache` 的精确值分支，组合值两个分支都不匹配，于是每个属性都被跳过（没有起始值）。请一次只用一个值。
 
 ---
 

@@ -80,7 +80,7 @@ deactivate Ch
 @enduml
 ```
 
-> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 274-327 (Start), 430-438 (RegisterBehaviour), 753-801 (the drain), 1017-1030 (GetOrCreateChannel), 1066-1067 (the static forward); `Src/Generators/VeloxDev.Core.Generator/Writers/TickWriter.cs` lines 76-90.
+> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 276-330 (Start), 432-435 (RegisterBehaviour), 755-803 (the drain), 1019-1032 (GetOrCreateChannel), 1068-1069 (the static forward); `Src/Generators/VeloxDev.Core.Generator/Writers/TickWriter.cs` lines 81-94.
 
 ## The ordering claim, stated precisely
 
@@ -89,7 +89,7 @@ The invariant is: **`Awake` and `Start` run before the first frame of that chann
 The mechanism is not "register before start". It is that `ProcessMainThreadOperations` — which includes `ProcessAddedBehaviors` — is called at the top of the update loop body, *before* `_updateSampler.Sample()`:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 526-537)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 530-541)
 var frameStartTime = GetTimestamp();
 ProcessMainThreadOperations();
 
@@ -119,11 +119,11 @@ The table that catches people out, with the mechanism behind each row:
 
 | Action | Lifecycle re-runs? | Why |
 |---|---|---|
-| `StopAsync` + `Start` | No | `StopAsync` clears the queues (`ClearQueues`, line 954) and `Start` only restarts the pumps. The registration is gone, but nothing re-enqueues it. |
+| `StopAsync` + `Start` | No | `StopAsync` clears the *queues* (`ClearQueues`, line 956) and resets the statistics; the behaviour dictionary survives, so the surviving registrations tick again after `Start` without re-running `Awake` / `Start`. Only a registration still queued at the stop is lost. |
 | `RestartAsync` | No | Same — it is `StopAsync` + waits + `Start`. |
 | `CloseTickable()` + `InitializeTickable()` | **Yes** | A fresh wrapper is drawn from `_wrapperPool` and `InvokeAwake` / `InvokeStart` run on it. |
 
-Note the asymmetry: stopping a channel *drops* the registration without telling the behaviour (there is no "closed" hook on `ITickable`), and re-registering an instance that is still registered replaces the wrapper and re-runs both hooks. `MainWindow.xaml.cs` lines 111-135 exposes both buttons so the pair is visible rather than asserted.
+Note the asymmetry: stopping a channel does not tell the behaviour (there is no "closed" hook on `ITickable`) and does not remove applied registrations; re-registering an instance that is still registered replaces the wrapper and re-runs both hooks. `MainWindow.xaml.cs` lines 105-119 exposes both pairs of buttons so the distinction is visible rather than asserted.
 
 ## Failure and edge paths
 
@@ -132,4 +132,4 @@ Note the asymmetry: stopping a channel *drops* the registration without telling 
 - **`Start` on a running channel.** Returns at line 276: no new threads, no second `OnChannelStarted`.
 - **Registering on a channel that was never started.** The entry sits in `_addQueue` until someone calls `Start`. It is not lost, and it is not started.
 - **A throwing `Awake` / `Start`.** `SafeExecute` catches it and writes to `Debug.WriteLine`; `InvokeStart` still runs, and the drain still sets `_wrappersNeedSort`.
-- **Registering during `StopAsync`.** The queue is cleared in the `finally` block, so a registration that arrives mid-stop is dropped. Re-register after the stop completes.
+- **Registering during `StopAsync`.** The queues are cleared in the `finally` block, so a registration still queued when the stop completes is dropped. Re-register after the stop completes. A registration applied before the stop stays registered.

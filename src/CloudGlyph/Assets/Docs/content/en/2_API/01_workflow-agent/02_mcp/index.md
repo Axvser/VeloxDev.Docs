@@ -1,6 +1,6 @@
 # Workflow Agent — Namespace: `VeloxDev.AI.MCP`
 
-Local/remote MCP hosting: `McpScope` installs server packages (npm/pip), launches processes over stdio, or reaches remote servers over Streamable HTTP (SSE fallback), returning each server's tools as `AITool`; `McpAgentToolkit` turns server management into Agent-callable tools and `McpAgentContextProvider` contributes them (and the inventory) per turn. All types live in `VeloxDev.AI.MCP` (implemented in `Src/Core/VeloxDev.Core.Extension/Agent/MCP/`). Security model: configuration is fixed once at load time; the Agent may load/unload/inspect, and author a new server only if the host opens the self-service ladder.
+Local/remote MCP hosting: `McpScope` installs server packages (npm/pip), launches processes over stdio, or reaches remote servers over Streamable HTTP (SSE fallback), returning each server's tools as `AITool`; `McpAgentToolkit` turns server management into Agent-callable tools and `McpAgentContextProvider` contributes them (and the inventory) per turn. All types live in `VeloxDev.AI.MCP` (implemented in `Src/Core/VeloxDev.Core.Extension/Agent/MCP/`). Security model: configuration is fixed once at load time; the Agent may load/unload/inspect, and it may author a new server only if the **permission mode** lets the `Curate` action through (see `VeloxDev.AI.Safety`).
 
 **Evidence:** **Test** (`Src/Core/VeloxDev.Core.Extension.Test/Agent/MCP/*`) + **Demo** (`AgentHelper` `Mcp`/`McpServers`, `WithMcps`).
 
@@ -12,21 +12,21 @@ Local/remote MCP hosting: `McpScope` installs server packages (npm/pip), launche
 |---|---|---|
 | `ServerError` | `event Action<McpServerConfiguration, Exception>?` | Raised when a server fails to load; not rethrown, that server contributes zero tools. |
 | `McpRootRelative` | `string { get; private set; }` | Current MCP root (relative). |
-| `SelfServiceLevel` | `McpSelfServiceLevel { get; private set; }` | Default `Closed`. |
 | `Status` | `McpStatusViewModel { get; }` | Bindable per-server status + aggregates. |
 | `Version` | `long { get; }` | Render cache key; advances when servers/levels come and go. |
 | `LoadedTools` | `IReadOnlyList<AITool> { get; }` | All connected servers' tools, aggregated. |
 | `DisabledServerNames` | `IReadOnlyList<string> { get; }` | Servers switched off by the host. |
 | `RegisteredServers` | `IReadOnlyList<McpServerConfiguration> { get; }` | Configurations pre-registered with `WithServers`. |
 | `WithMcpRoot` | `McpScope WithMcpRoot(string relativePath)` | Sets the install root. |
-| `WithSelfService` | `McpScope WithSelfService(McpSelfServiceLevel level)` | Opens the self-service ladder. |
-| `WithConfirmationHandler` | `McpScope WithConfirmationHandler(Func<string, string, Task<bool>> handler)` | User-approval callback for self-service adds. |
+| `WithConfirmationHandler` | `McpScope WithConfirmationHandler(Func<string, string, Task<bool>> handler)` | User-approval callback for server adds. |
 | `WithConnectionTimeout` | `McpScope WithConnectionTimeout(TimeSpan? timeout)` | Global HTTP transport + init timeout. |
 | `WithServers` | `McpScope WithServers(params McpServerConfiguration[] servers)` | Pre-registers loadable configurations. |
 | `WithSynchronizationContext` | `McpScope WithSynchronizationContext(SynchronizationContext? context)` | Marshals status updates. |
 | `WithOAuthAuthorizationRedirect` | `McpScope WithOAuthAuthorizationRedirect(Func<Uri, Uri, CancellationToken, Task<string?>> handler)` | OAuth authorization-redirect handler for remote servers. |
 
-**Other public methods.** `CanAddServer(McpServerRunMode)`, `RequiresConfirmationToAdd()`, `SetServerEnabled(string, bool)`, `IsServerEnabled(string)`, `SetToolEnabled(string serverName, string toolName, bool)`, `IsToolEnabled(string serverName, string toolName)`, `BuildInventoryBlock()`, `CreateContextProvider(ToolPipeline? tools = null, AgentPipeline? pipeline = null)`, `UnloadServer(string)`, `UnloadServerAsync(string)`, `DisposeAsync()`, `LoadAsync(IEnumerable<McpServerConfiguration> servers, CancellationToken ct = default)`, `AddAsync(McpServerConfiguration config, CancellationToken ct = default)`, `GetServerTools(string name)`.
+**Other public methods.** `SetServerEnabled(string, bool)`, `IsServerEnabled(string)`, `SetToolEnabled(string serverName, string toolName, bool)`, `IsToolEnabled(string serverName, string toolName)`, `BuildInventoryBlock()`, `CreateContextProvider(ToolPipeline? tools = null, AgentPipeline? pipeline = null)`, `UnloadServer(string)`, `UnloadServerAsync(string)`, `DisposeAsync()`, `LoadAsync(IEnumerable<McpServerConfiguration> servers, CancellationToken ct = default)`, `AddAsync(McpServerConfiguration config, CancellationToken ct = default)`, `GetServerTools(string name)`.
+
+**Removed in the permission-mode redesign.** `McpSelfServiceLevel` and `McpScope.WithSelfService` no longer exist, nor do `CanAddServer` / `RequiresConfirmationToAdd`. Whether the model may add a server is now decided per call by the session's permission mode and rules: every management tool that changes the server set is `AgentActionCategory.Curate`, so `Auto` still asks, and a host can write `Deny("mcp-add:local")`, `Deny("mcp-add:http")` or `Ask("source:mcp:*")` rules.
 
 **`LoadAsync` behavior.** `Npm`/`Pip` install first (idempotent, process-wide install cache + `SemaphoreSlim`), then connect over stdio; `Npx`/`Uvx`/`Dotnet`/`Exe` connect directly; `Http` connects over Streamable HTTP with SSE fallback. A per-server failure is caught — the status becomes `Error`, `ServerError` fires, and that server contributes zero tools; caller cancellation propagates.
 
@@ -45,7 +45,7 @@ Local/remote MCP hosting: `McpScope` installs server packages (npm/pip), launche
 | `Version` | `string?` | Version tag for `Npm`/`Pip`; `null` = `"latest"`. |
 | `Arguments` | `string[]` | Extra args passed to the server process. |
 | `Endpoint` | `string?` | Remote URL for `Http` mode. |
-| `Options` | `object?` | Anonymous-object blob; unknown keys are rejected. |
+| `Options` | `IReadOnlyDictionary<string, object?>?` | Map; unknowns are rejected. |
 
 **`Options` keys.** Http: `headers`, `oauth` (`clientId`, `clientSecret`, `redirectUri`, `scopes` — Authorization Code + PKCE), `connectionTimeout`, `transportMode` (`AutoDetect`/`StreamableHttp`/`Sse`), `ownsSession`. Stdio: `env`, `workingDirectory`.
 
@@ -54,8 +54,6 @@ Local/remote MCP hosting: `McpScope` installs server packages (npm/pip), launche
 `enum McpServerRunMode` — `Npm`, `Npx`, `Uvx`, `Dotnet`, `Pip`, `Exe`, `Http` (command models as in the Quick Start page).
 
 `enum McpServerStatus` — `NotStarted`, `Installing`, `Connecting`, `Connected`, `Error`.
-
-`enum McpSelfServiceLevel` — `Closed = 0`, `RemoteConfirmed = 1`, `AllConfirmed = 2`, `Unrestricted = 3`. `RemoteConfirmed` opens only `Http`; `AllConfirmed` opens local modes too but still asks; `Unrestricted` stops asking. `CanAddServer(mode)` / `RequiresConfirmationToAdd()` read this.
 
 ## Status view-models
 
@@ -71,18 +69,21 @@ Local/remote MCP hosting: `McpScope` installs server packages (npm/pip), launche
 
 | Member | Signature | Notes |
 |---|---|---|
-| `ToolNames` | `public static readonly string[] ToolNames` | `["ListMcpServers", "LoadMcpServers", "UnloadMcpServer", "DescribeMcpServer"]`. |
-| `ListName` / `DescribeName` / `AddToolName` | `public const string` | `"ListMcpServers"` / `"DescribeMcpServer"` / `"AddMcpServer"`. |
-| `CreateTools` | `IList<AITool> CreateTools()` / `CreateTools(ToolPipeline tools, AgentPipeline? pipeline = null)` | The 4–5 tools, wrapped when a pipeline is given. |
+| `ToolNames` | `public static readonly string[] ToolNames` | `["ListMcpServers", "LoadMcpServers", "UnloadMcpServer", "DescribeMcpServer", "AddMcpServer", "SetMcpServerArguments"]`. |
+| `ListName` / `DescribeName` / `AddToolName` / `SetArgumentsName` | `public const string` | `"ListMcpServers"` / `"DescribeMcpServer"` / `"AddMcpServer"` / `"SetMcpServerArguments"`. |
+| `CreateTools` | `IList<AITool> CreateTools()` / `CreateTools(ToolPipeline tools, AgentPipeline? pipeline = null)` | The tools, wrapped when a pipeline is given. |
 | `BuildPromptContext` | `string BuildPromptContext()` | The prompt text. |
 
-| Tool | Registered when | Purpose |
-|---|---|---|
-| `ListMcpServers` | always | Lists configured servers and status + aggregates. Pure query. |
-| `LoadMcpServers` | `!IsGrantedView` | Loads (installs if needed, connects) host pre-registered servers; optional JSON array of names. |
-| `UnloadMcpServer` | `!IsGrantedView` | Unloads a connected server mid-session. |
-| `DescribeMcpServer` | `!IsGrantedView` | Exports a connected server's tool capabilities as prompts WITHOUT invoking them. |
-| `AddMcpServer` | `SelfServiceLevel != Closed` **and** `!IsGrantedView` | Adds and connects a server the host did not pre-register. |
+| Tool | Registered when | Category | Purpose |
+|---|---|---|---|
+| `ListMcpServers` | always | `Read` | Lists configured servers and status + aggregates. |
+| `LoadMcpServers` | `!IsGrantedView` | `Curate` | Loads (installs if needed, connects) host pre-registered servers; optional JSON array of names. |
+| `UnloadMcpServer` | `!IsGrantedView` | `Curate` | Unloads a connected server mid-session. |
+| `DescribeMcpServer` | always | `Read` | Exports a connected server's tool capabilities as prompts WITHOUT invoking them. |
+| `AddMcpServer` | `!IsGrantedView` | `Curate` | Adds and connects a server the host did not pre-register. The permission judge is also asked under the synthesized key `mcp-add:local` / `mcp-add:http`. |
+| `SetMcpServerArguments` | `!IsGrantedView` | `Curate` | Replaces a local server's launch arguments and restarts it, leaving its identity alone. |
+
+A **granted view** (the MCP surface handed to a spawned child) registers only `ListMcpServers` and `DescribeMcpServer`.
 
 ## McpAgentContextProvider
 

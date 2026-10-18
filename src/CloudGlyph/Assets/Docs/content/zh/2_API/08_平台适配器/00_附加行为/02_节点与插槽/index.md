@@ -59,6 +59,43 @@
 
 公共 JS 回调方法：`OnSlotConnectionStart(double worldX, double worldY)`、`OnSlotConnectionMove(double worldX, double worldY)`、`OnSlotConnectionEnd(string? targetSlotId)`。
 
+### 拖拽期间的连接预览
+
+连接手势通过两个 Core 成员（命名空间 `VeloxDev.WorkflowSystem`）暴露实时候选接收口，而不是适配器类型：
+
+| 成员 | 签名 | 作用 |
+|---|---|---|
+| `WorkflowTreeEx.StandardSetPreviewReceiver` | `static void StandardSetPreviewReceiver(this IWorkflowTreeViewModel component, IWorkflowSlotViewModel? slot)` | 报告指针下的槽。忽略发送口；候选未变时不重复校验；否则写入 `SlotState.PreviewReceiver` 与 `ConnectionPreviewState`。 |
+| `WorkflowTreeEx.StandardRefreshConnectionPreview` | `static void StandardRefreshConnectionPreview(this IWorkflowTreeViewModel component)` | 强制重新校验当前候选（用于宿主的异步结论）。 |
+| `WorkflowTreeEx.StandardCheckConnection` | `static ConnectionCheck StandardCheckConnection(this IWorkflowTreeViewModel component, IWorkflowSlotViewModel sender, IWorkflowSlotViewModel receiver)` | 纯预检：方向、同一节点、以及 Helper 的 `ValidateConnection`。 |
+| `SlotHitTestEx.HitTest` | `static IWorkflowSlotViewModel? HitTest(IWorkflowTreeViewModel tree, double x, double y, double radius = 12d)` | 半径内最近的已测量槽锚点；跳过 `NaN` 锚点。 |
+
+在 `tree.VirtualLink.IsVisible` 时，各适配器从自己的指针移动路径调用它们：
+
+| 适配器 | 指针移动调用点 |
+|---|---|
+| WPF | `WorkflowSurfaceBehavior.OnPreviewMouseMove`（先于悬停路由返回） |
+| Avalonia | `WorkflowSurfaceBehavior.OnPointerMoved` |
+| WinUI | `WorkflowSurfaceBehavior.OnPointerMoved` |
+| Jalium | `WorkflowSurfaceBehavior.OnMouseMove` |
+| MAUI | `WorkflowSlotConnectionBehavior.UpdatePointer` |
+| WinForms | `WorkflowSlotConnectionBehavior.UpdatePointer` |
+| Razor | `WorkflowSlotConnectionBehavior.OnSlotConnectionMove`（`[JSInvokable]`） |
+
+```csharp
+// 来源：Src/Adapters/VeloxDev.WPF/Attached/Workflow/WorkflowSurfaceBehavior.cs
+viewModel.SetPointerCommand.Execute(pointer);
+
+if (viewModel.VirtualLink.IsVisible)
+{
+    viewModel.StandardSetPreviewReceiver(
+        SlotHitTestEx.HitTest(viewModel, pointer.Horizontal, pointer.Vertical));
+    return;
+}
+```
+
+**证据：** Core 测试 `Src/Core/VeloxDev.Core.Test/WorkflowSystem/WorkflowConnectionPreviewTests.cs` 覆盖了 `StandardSetPreviewReceiver`（候选变化、命中发送口自身、清空）与 `SlotHitTestEx.HitTest`（最近槽、空树）。
+
 ## 类：`WorkflowSlotLayoutBehavior`
 
 让槽锚点与节点布局保持同步。它监视节点的 `Anchor` / `Size` / 槽属性，并用 `TranslatePoint` 找到槽中心后重新计算每个槽的 `Anchor`（计入 `Layout.ActualOffset`）。
@@ -79,8 +116,6 @@
 | MAUI | `sealed class`；`BindableProperty.CreateAttached` |
 | WinForms | `Control` 状态表之上的 `sealed class` |
 | Jalium | `sealed class : DependencyObject` |
-
-**Avalonia 触屏说明：** 在 Android/iOS 上 Avalonia 用 `Tunnel` 路由注册指针处理器，避免 `ScrollViewer` 手势识别器抢走捕获（见 internal `PlatformDetection.IsTouchPlatform`）。*Avalonia 触屏竞争行为已按源码验证；桌面端拖拽语义与 WPF 一致。*
 
 ### Razor 组件：`WorkflowSlotLayoutBehavior`
 

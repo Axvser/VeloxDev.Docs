@@ -1,4 +1,4 @@
-# 06 · Verify and Complete Code
+# Verify and Complete Code
 
 ## 1. Reproduce the program
 
@@ -8,7 +8,7 @@ Create a console project, add the two packages from `01_install`, and replace `P
 dotnet run -c Debug
 ```
 
-**Expected result:** eleven lines of output, each of which is claimed by one of the rows below (two rows read the same `running` line). Nothing is interactive and nothing needs a window.
+**Expected result:** eleven lines of output. Each is claimed by one of the rows below; three rows read the same `running` line.
 
 ## 2. What each line proves
 
@@ -17,7 +17,7 @@ dotnet run -c Debug
 | `[event] OnChannelStarted -> demo` | Lifecycle events are channel-scoped | `TickChannelEventArgs.ChannelName` |
 | `[Awake]` before `[Start]` before `running` | `Awake` / `Start` run on the drain, before the first frame body | They print before any `Update` counter moved |
 | `running … ActiveBehaviorCount=1` | The registration reached the channel | `TickManager.ActiveBehaviorCount("demo")` |
-| `running … Update=n LateUpdate=n Fixed≈1.7n` | The fixed pump runs at its own cadence, decoupled from the frame rate | The step interval is 16 ms, so the fixed pump runs at ~62.5 Hz independent of the target. Over this 400 ms window the update pump only achieved ~37 Hz (the loop is still ramping up), so the ratio came out at ~1.7 rather than the ~1.04 of a settled 60 fps channel. Run it for longer and the second number converges toward the first |
+| `running … Update=n LateUpdate=n Fixed≈1.7n` | The fixed pump runs at its own cadence, decoupled from the frame rate | The step interval is 16 ms, so the fixed pump runs at ~62.5 Hz independent of the target. Over this 400 ms window the update pump only achieves ~37 Hz while it ramps up, so the ratio is ~1.7 rather than the ~1.04 of a settled 60 fps channel. Run longer and it converges |
 | `paused … IsUpdateThreadAlive=True` | A parked pump is alive, not dead | The liveness query qualifies the clock, not the activity |
 | `paused … framesDelta=1` | One frame already in flight lands | Measure *after* the pause returns, as this does |
 | `resumed … framesDelta=6` | Resuming restarts delivery | Strictly greater than the paused reading |
@@ -144,7 +144,6 @@ public static class Program
 
         var alive = TickManager.IsUpdateThreadAlive("demo");
         ball.CloseTickable();                      // generated: UnregisterBehaviour
-        TickManager.UnregisterBehaviour(ball);
         await TickManager.StopAsync("demo");
         Console.WriteLine($"stopped   IsRunning={TickManager.IsRunning("demo")} " +
                           $"SystemStatus={TickManager.SystemStatus("demo")} " +
@@ -155,9 +154,7 @@ public static class Program
 
 ## 4. Also verify against the shipped demo and tests
 
-The repository carries a GUI demo and a test suite that exercise the same surface. Run them against your own checkout with the commands below.
-
-**The WPF demo** — `Examples/Tickable/WPF/Demo/`, a window that registers itself as the single behaviour on the `default` channel and prints what the pumps delivered (`MainWindow.Hooks.cs`, `SimState.cs`, `MainWindow.xaml.cs`):
+**The WPF demo** — `Examples/Tickable/WPF/Demo/`, a window that registers itself as the single behaviour on the `default` channel and displays what the pumps delivered (`MainWindow.Hooks.cs`, `SimState.cs`, `MainWindow.xaml.cs`):
 
 ```text
 cd Examples/Tickable/WPF/Demo
@@ -171,13 +168,17 @@ cd Src/Core/VeloxDev.Core.Test
 dotnet test --filter "FullyQualifiedName~TimeLine"
 ```
 
-`FullyQualifiedName~TimeLine` is a substring match on the fully-qualified name, so it selects more than the four files under `Src/Core/VeloxDev.Core.Test/TimeLine/` (**31** `[TestMethod]`s: TickManagerTests 11, TickableBusTests 12, TimeLineEventArgsTests 6, TickableAttributeTests 2). It also picks up 15 tests from the timing and TransitionSystem suites whose *method* name contains `Timeline` - `Timeline_*`, `Seek_*`, `SetRate_*`, `Loop_TakesTheDeclaredDuration`, `SharedTimeline_PausesBothAnimationsAtOnce`, `Switch_EveryTargetIsAnchoredToTheSameTimeline`. 31 + 15 = 46.
+`FullyQualifiedName~TimeLine` is a substring match, so it selects the 28 `[TestMethod]`s under `Src/Core/VeloxDev.Core.Test/TimeLine/` (TickableBusTests 12, TickManagerTests 11, TimeLineEventArgsTests 3, TickableAttributeTests 2) plus 15 timing / TransitionSystem tests whose name contains `Timeline` or matches the same substring. 28 + 15 = 43.
 
-**Expected result:** `Failed: 0, Passed: 46, Skipped: 0, Total: 46`.
+**Expected result:** `Failed: 0, Passed: 43, Skipped: 0, Total: 43`.
 
 ## 5. Run Declaration
 
-- ✅ **Actually built and ran on 2026-10-01.** The program in section 3 was compiled and executed with `dotnet run -c Debug` (net10.0, .NET SDK 10, Windows 11), against `VeloxDev.Core` and the `VeloxDev.Core.Generator` analyzer built from this repository at HEAD. Recorded output:
+- ⚠️ **The console program in section 3 was not executed during this edit.** It was statically verified against the source at the time of writing: every type, member and signature it uses exists in `Src/Core/VeloxDev.Core/TimeLine/`, `Src/Core/VeloxDev.Core/Interfaces/Tickable/` and `Writers/TickWriter.cs`. The transcript below was recorded on 2026-10-01 and is retained as an illustrative expected shape, not as output of this edit. Counters vary by a frame or two between runs.
+- ✅ **The test suite was executed on 2026-10-18.** `dotnet test Src/Core/VeloxDev.Core.Test/VeloxDev.Core.Test.csproj --filter "FullyQualifiedName~TimeLine"` → `已通过! - 失败: 0，通过: 43，已跳过: 0，总计: 43，持续时间: 8 s - VeloxDev.Core.Test.dll (net10.0)` (`Passed! - Failed: 0, Passed: 43, Skipped: 0, Total: 43`, 8 s).
+- ✅ `Examples/Tickable/WPF/Demo/Demo.csproj` was built on 2026-10-01: `已成功生成。 0 个警告 0 个错误` (`Build succeeded. 0 warning(s) 0 error(s)`). The demo was **not** launched — it is a GUI window with no console output, so `dotnet build` is the level of evidence it can give.
+
+The 2026-10-01 transcript for section 3:
 
 ```text
 [event]   OnChannelStarted -> demo
@@ -192,7 +193,3 @@ fps       TargetFPS=30 measured=31
 bus       IsAdvancing=True Rate=2 Position=3240ms
 stopped   IsRunning=False SystemStatus=Stopped threadAliveBefore=True threadAliveAfter=False
 ```
-
-- ✅ `Examples/Tickable/WPF/Demo/Demo.csproj` builds: `已成功生成。 0 个警告 0 个错误` (`Build succeeded. 0 warning(s) 0 error(s)`). The demo was **not** launched — it is a GUI window with no console output, so `dotnet build` is the level of evidence it can give.
-- ✅ **The test suite was executed on 2026-10-01.** `dotnet test Src/Core/VeloxDev.Core.Test/VeloxDev.Core.Test.csproj --filter "FullyQualifiedName~TimeLine"` → `已通过! - 失败: 0，通过: 46，已跳过: 0，总计: 46，持续时间: 8 s - VeloxDev.Core.Test.dll (net10.0)` (`Passed! - Failed: 0, Passed: 46, Skipped: 0, Total: 46`, 8 s). The filter is a substring match, so the 46 are the 31 `TimeLine/` tests plus 15 timing / TransitionSystem tests whose method names contain `Timeline`.
-- ⚠️ Every expected result in sections 1 and 2 is backed by the transcript above. Frame and step counters differ by one or two between runs; the recorded values are one run's, not a contract.

@@ -1,6 +1,6 @@
-# MVVM — `VeloxCommand` 的执行
+# MVVM — `VeloxCommand` 执行
 
-负责派发工作、以及询问“能否运行”的五个成员。
+负责派发工作与查询"能否运行"的成员。
 
 ###### `VeloxCommand.CanExecute`
 
@@ -8,15 +8,15 @@
 `bool CanExecute(object? parameter)`
 
 | 参数 | 类型 | 说明 |
-|---|---|---|
+| --- | --- | --- |
 | `parameter` | `object?` | 转发给 `canExecute` 谓词。 |
 
-**Returns:** `bool` —— `(_canExecute?.Invoke(parameter) ?? true) && !_isForceLocked`。未注册谓词时，只要命令未被强制锁定就返回 `true`。
+**返回：** `bool` —— 谓词结果与强制锁标志的组合。没有谓词时，命令在未锁定时可执行。
 
 **Example:**
 
 ```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandTests.cs, lines 69-77
+// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandTests.cs
 var command = new VeloxCommand(() => { }, canExecute: p => p is string s && s == "yes");
 
 Assert.IsTrue(command.CanExecute("yes"));
@@ -24,45 +24,67 @@ Assert.IsFalse(command.CanExecute("no"));
 Assert.IsFalse(command.CanExecute(null));
 ```
 
-**Notes:** 这是 XAML 绑定的 `ICommand` 成员。它从不反映队列 —— 那请看 `IVeloxCommandStatus`。
+**说明：** 这是 XAML 绑定的 `ICommand` 成员。它从不反映队列 —— 队列问题见 `IVeloxCommandStatus`。只有形参类型能容纳 `null` 时，`null` 实参才可执行；否则回答 `false` 而不是抛异常。
 
 ###### `VeloxCommand.Execute`
 
 **Signature:**
 `void Execute(object? parameter)`
 
-**Returns:** `void` —— 即发即忘；实现为 `_ = ExecuteAsync(parameter)`。
+**返回：** `void` —— fire-and-forget；实现为 `_ = ExecuteAsync(parameter)`。
 
-**Notes:** `ICommand` 的入口。底层调用的返回任务被丢弃，因此没有人观察方法体失败 —— 请订阅 `Failed` 或使用 `ExecuteAndWaitAsync`。
+**说明：** `ICommand` 入口。方法体失败无人观察；订阅 `Failed` 或使用 `ExecuteAndWaitAsync`。
 
-###### `VeloxCommand.ExecuteAsync`
+###### `VeloxCommand.ExecuteAsync(object?)`
 
 **Signature:**
 `Task ExecuteAsync(object? parameter)`
 
-| 参数 | 类型 | 说明 |
-|---|---|---|
-| `parameter` | `object?` | 传给命令方法体的实参。 |
+**返回：** `Task` —— 在调用被**受理**时完成：低于并发容量则立即启动，否则入队。它**不**等待方法体结束。
 
-**Returns:** `Task` —— 执行被**受理**时完成：低于并发容量时立即开始，否则入队。方法体结束时它**不**完成。
-
-**Exceptions:** 方法本身不抛异常；方法体失败经 `Failed` 事件呈现，若用了 `ExecuteAndWaitAsync` 则经 `CommandCompletion` 呈现。
+**异常：** 方法本身不抛。方法体失败通过 `Failed` 事件或 `ExecuteAndWaitAsync` 的 `CommandCompletion` 呈现。
 
 **Example:**
 
 ```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandCompletionTests.cs, lines 30-42
+// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandCompletionTests.cs
 var gate = new CommandGate();
 var command = new VeloxCommand(gate.RunAsync, semaphore: 1);
 
-_ = command.ExecuteAsync(null);                       // takes the only slot
+_ = command.ExecuteAsync(null);
 await gate.WaitForStartedAsync();
 
 var waiting = command.ExecuteAndWaitAsync(null);
 await CommandTestKit.WaitUntilAsync(() => command.IsBusy() && command.PendingCount() == 1);
 ```
 
-**Notes:** 时序为 `Created` →（立即 `Started`，或先 `Enqueued` 再 `Dequeued` → `Started`）→ 终点阶段 → `Exited`。
+**说明：** 序列是 `Created` →（立即 `Started`，或先 `Enqueued` 后 `Dequeued` → `Started`）→ 终止阶段 → `Exited`。
+
+###### `VeloxCommand.ExecuteAsync(object?, CancellationToken)`
+
+**Signature:**
+`Task<object?> ExecuteAsync(object? parameter, CancellationToken cancellationToken)`
+
+**返回：** 方法体的值（装箱）；方法体无返回值时是 `null`。
+
+**异常：**
+
+| 异常 | 条件 |
+| --- | --- |
+| `Exception` | 方法体抛出；原始实例被重新抛出 |
+| `OperationCanceledException` | 执行被取消 |
+| `InvalidOperationException` | 命令被锁定，调用被拒绝 |
+
+**说明：** token 只放弃等待。该重载刻意不给 `cancellationToken` 默认值：否则单实参调用会与 `ExecuteAsync(object?)` 产生歧义。
+
+###### `VeloxCommand.Execute(object?, out object?)`
+
+**Signature:**
+`void Execute(object? parameter, out object? result)`
+
+**返回：** `void`；`result` 接收方法体的值。
+
+**异常：** 与可等待版本相同的三种结局；任一情况下都会抛出并把 `result` 置为 `null`。它会同时阻塞在队列与方法体上，且不得在同一条命令的方法体内调用。
 
 ###### `VeloxCommand.ExecuteAndWaitAsync`
 
@@ -70,60 +92,43 @@ await CommandTestKit.WaitUntilAsync(() => command.IsBusy() && command.PendingCou
 `Task<CommandCompletion> ExecuteAndWaitAsync(object? parameter, CancellationToken cancellationToken = default)`
 
 | 参数 | 类型 | 说明 |
-|---|---|---|
+| --- | --- | --- |
 | `parameter` | `object?` | 传给方法体的实参。 |
 | `cancellationToken` | `CancellationToken` | 只放弃等待；不取消执行。可选。 |
 
-**Returns:** `Task<CommandCompletion>` —— **这一次**执行结束时完成，包括那些根本没运行的调用。
+**返回：** `Task<CommandCompletion>` —— **这一次**执行结束时完成，包括从未运行的调用。
 
-**Exceptions:**
+**异常：**
 
 | 异常 | 条件 |
-|---|---|
+| --- | --- |
 | `OperationCanceledException` | `cancellationToken` 先触发。 |
 
 **Example:**
 
 ```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandCompletionTests.cs, lines 72-82
+// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandCompletionTests.cs
 var command = new VeloxCommand(() => Task.CompletedTask);
 await command.LockAsync();
 
 var completion = await command.ExecuteAndWaitAsync(null).WaitAsync(CommandTestKit.Timeout);
 
-Assert.AreEqual(CommandOutcome.Refused, completion.Outcome,
-    "a refused call never raises Exited, so this is the only way to observe it");
+Assert.AreEqual(CommandOutcome.Refused, completion.Outcome);
 ```
 
-```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandCompletionTests.cs, lines 44-56
-var boom = new InvalidOperationException("boom");
-var command = new VeloxCommand((_, _) => Task.FromException(boom));
-
-// deliberately no Failed subscriber: the result must not depend on someone having subscribed
-var completion = await command.ExecuteAndWaitAsync(null);
-
-Assert.AreEqual(CommandOutcome.Failed, completion.Outcome);
-Assert.AreSame(boom, completion.Exception);
-```
-
-**Notes:**
-
-- 该成员是 `VeloxCommand` 同时实现 `IVeloxCommandCompletion` 的两个原因之一；在 `IVeloxCommand` 引用上经 `VeloxCommandExtensions` 可做同一件事。
-- 结果由执行自身的结局算出，而不是从事件里读回来，因此不依赖是否存在 `Failed` 订阅者。
-- 命令保持锁定期间仍在排队的调用尚未结束，返回的任务会等到槽位释放或队列被清空。
+**说明：** 结局由执行自身计算，而不是从事件回读。仍在排队的调用尚未结束，因此任务会等到槽位释放或队列清空。
 
 ###### `VeloxCommand.Notify`
 
 **Signature:**
 `void Notify()`
 
-**Returns:** `void` —— 触发 `CanExecuteChanged`。
+**返回：** `void` —— 触发 `CanExecuteChanged`。
 
 **Example:**
 
 ```csharp
-// Source: Demo — Examples/MVVM/Avalonia/Demo/ViewModels/MainWindowViewModel.cs, lines 218-222
+// Source: Demo — Examples/MVVM/Avalonia/Demo/ViewModels/MainWindowViewModel.cs
 private void RefreshCollectionCommands()
 {
     RemoveSelectedItemCommand.Notify();
@@ -131,4 +136,4 @@ private void RefreshCollectionCommands()
 }
 ```
 
-**Notes:** 抛异常的 `CanExecuteChanged` 订阅者会被吞掉并通过 `HandlerException` 上报。
+**说明：** 抛异常的 `CanExecuteChanged` 订阅者会被吞掉并通过 `HandlerException` 上报。

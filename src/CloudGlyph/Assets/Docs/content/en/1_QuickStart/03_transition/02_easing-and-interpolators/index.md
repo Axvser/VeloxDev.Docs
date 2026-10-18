@@ -111,7 +111,7 @@ public sealed class SmoothStepDoubleSampler : ISampler
 ```csharp
 // Process-wide opt-in: every double-typed property now interpolates with smoothstep.
 InterpolatorCore.RegisterInterpolator(typeof(double), new SmoothStepDoubleSampler());
-// InterpolatorCore.UnregisterInterpolator(typeof(double), out _);  // restore the default
+// InterpolatorCore.UnregisterInterpolator(typeof(double), out _);  // remove the override; double then has no sampler
 ```
 
 Registration is last-writer-wins on the key you write, but **lookup is not an exact-type match**. `InterpolatorCore.TryGetInterpolator` (source: `Src/Core/VeloxDev.Core/TransitionSystem/Sampling/Interpolator.cs`) resolves a property's type in three steps: the **exact type** first, then its **base classes nearest-first**, then its **interfaces ordered by full name (ordinal)**. The fallback is there because a framework property is very often declared as a subclass of what the adapter registered — WPF registers `Brush`, while a property may be declared `LinearGradientBrush` — so an exact match alone would leave that property unanimated (and, for a reference-typed leaf, make it fail `TransitionPathUnsampleableException` instead). Two consequences for a registration of your own:

@@ -18,7 +18,8 @@ VeloxDev 提供**七个适配器**，每个都是独立的 NuGet 包，并配套
 
 每个适配器按框架提供：
 
-- **工作流附加行为** — 位于 `VeloxDev.WorkflowSystem.AttachedBehaviors` 命名空间：`WorkflowSurfaceBehavior`（平移/缩放/滚动宿主）、`WorkflowCanvasTransformBehavior`（共享的画布变换）、`WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`，以及对象池化的视图容器（绑定 `Helper.VisibleItems` 的 `ViewPool`，由 `ViewManager` 复用）。具体文件集随框架而定——例如 MAUI 通过 `WorkflowLinkOverlay` 走连线层、没有独立的画布变换行为；Razor 把若干实现写成 `.razor` 组件。
+- **工作流附加行为** — 位于 `VeloxDev.WorkflowSystem.AttachedBehaviors` 命名空间：`WorkflowSurfaceBehavior`（平移/缩放/滚动宿主）、`WorkflowCanvasTransformBehavior`（共享的画布变换）、`WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`，以及对象池化的视图容器（绑定 `Helper.VisibleItems` 的 `ViewPool`，由 `ViewManager` 复用）。七个适配器现在都提供 `WorkflowSurfaceBehavior`；MAUI 通过 `WorkflowLinkOverlay` 走连线层、没有独立的画布变换行为，Jalium 则把画布变换暴露为 `WorkflowSurfaceBehavior.CanvasTransform` 附加属性而不是独立类。Razor 把若干实现写成 `.razor` 组件。
+- **指针移动时的连接预览** — 只要 `VirtualLink.IsVisible`，每个适配器都会调用 `tree.StandardSetPreviewReceiver(SlotHitTestEx.HitTest(tree, x, y))` 把候选接收口报告给 Core。`SlotHitTestEx` 按槽已测得的 `Anchor`（默认半径 12）解析，而不是沿可视树查找——拖拽期间橡皮筋覆盖整个表面。候选口驱动 `SlotState.PreviewReceiver` 与 `ConnectionPreviewState`（`Started` / `ValidTarget` / `InvalidTarget`）。
 - **网格与小地图契约** — Core 共享接口 `IWorkflowGridDecorator` 与 `IWorkflowMinimapOverlay`（命名空间 `VeloxDev.WorkflowSystem`），表面行为每次渲染都会把滚动/内容偏移写入；`WorkflowMinimapOverlay` 提供默认小地图逻辑与拖拽导航。
 - **过渡与主题接线** — `VeloxDev.TransitionSystem` 下的各框架封闭类型（`Interpolator`、`State`、`Transition`、`TransitionEffects`、`TransitionInterpreter`、`TransitionScheduler`、`UIThreadInspector`），以及在框架需要适配器专属值类型时、`VeloxDev.DynamicTheme` 下的平台转换器（`ColorConverter`、`BrushConverter`、`CornerRadiusConverter` 等；Jalium 的 `PlatformAdapters` 目前没有定义转换器集）。
 

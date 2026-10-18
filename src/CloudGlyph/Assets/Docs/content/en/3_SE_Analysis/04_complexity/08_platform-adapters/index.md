@@ -52,6 +52,19 @@ The zoom cost therefore scales with the model ($O(N)$ notifications) but the per
 
 The minimap intentionally thumbnails the *whole* graph ($O(N)$), not just the visible region — that is what makes it a navigational overview.
 
+## Connection preview hit test
+
+While a connection drag is active, every pointer move calls `SlotHitTestEx.HitTest(tree, x, y, 12)` and then `StandardSetPreviewReceiver`. The hit test is geometric (slot anchors), so its cost does not depend on how many views are materialized.
+
+| Operation | Cost | Notes |
+|---|---|---|
+| `SlotHitTestEx.HitTest` | $O(N \cdot S)$ | Visits every node's slots once, skips `NaN` anchors, and keeps the nearest anchor inside the radius. $S$ = slots per node. |
+| Repeat the same candidate | $O(1)$ after the scan | `StandardSetPreviewReceiver` compares the candidate by reference and returns without re-running validation. |
+| New candidate | $O(1)$ + the helper's `ValidateConnection` | Runs direction / same-node checks and the optional `PreviewValidating` handler, then writes the slot's `PreviewReceiver` bit and `ConnectionPreviewState`. |
+| `StandardRefreshConnectionPreview` | $O(1)$ + validation | Forces the check for the current candidate (used when an asynchronous verdict lands). |
+
+The per-move scan is the only model-proportional cost in the connection gesture; it is bounded by the slot count, not by $N$ views, and it runs only while `VirtualLink.IsVisible`.
+
 ## Summary
 
 The adapter keeps interactive cost proportional to what is on screen: virtualization limits rendered views to $V$, the view pool bounds allocation to a small batch per frame, and panning is $O(1)$ per input event. The two model-wide costs are zoom ($O(N)$ collapse notifications + an $O(N)$ cover check per gesture) and the minimap ($O(N)$ redraw), both constant-factor per node and only triggered by the operations that actually change every node or the whole-graph overview.

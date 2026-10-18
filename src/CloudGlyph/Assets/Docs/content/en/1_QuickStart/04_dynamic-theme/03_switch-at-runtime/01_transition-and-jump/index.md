@@ -7,7 +7,7 @@ public static void Transition<T>(ITransitionEffectCore effect) where T : ITheme
 public static async void Transition(Type themeType, ITransitionEffectCore effect)
 ```
 
-`Transition<T>` forwards to the `Type` overload, which is `async void`: it returns to the caller once every registered target has been prepared, written and scheduled — its first await is the join over the per-target runs — and it advances `ThemeManager.Current` only when the runs actually land. Because it is `async void`, a fault inside the run is reported through `Debug.WriteLine` rather than thrown at the caller; nothing awaits this call.
+`Transition<T>` forwards to the `Type` overload, which is `async void`: it returns to the caller once every registered target has been prepared, written and scheduled — the first actual suspension is the `Task.WhenAll` inside `RunSwitch` — and it advances `ThemeManager.Current` only when the runs actually land. Because it is `async void`, a fault inside the run is reported through `Debug.WriteLine` rather than thrown at the caller; nothing awaits this call.
 
 A switch is rejected before anything happens when the target theme is the theme already current, or when the type does not implement `ITheme`. Both guards are shared with `Jump`.
 
@@ -78,7 +78,7 @@ partial void OnThemeChanged(Type? oldValue, Type? newValue)
 
 Source: `Examples/Theme/WPF Trimmed/Demo/MainWindow.xaml.cs` — the Avalonia twin shows a window notification instead.
 
-`ExecuteThemeChanged` fires only for a switch that lands. A switch superseded by a newer one — `Transition` cancels the running switch when the next one starts — never advances `Current` and never announces its end, so `OnThemeChanging` can be seen more often than `OnThemeChanged`. The scale demo prints both hooks into one line of its UI precisely so the difference is visible, and labels an interrupted switch `被中断` (interrupted).
+`ExecuteThemeChanged` fires only for a switch that lands. A switch superseded by a newer one — `Transition` cancels the running switch when the next one starts — never advances `Current` and never announces its end, so `OnThemeChanging` can be seen more often than `OnThemeChanged`. The scale demo writes whichever hook fired into one line of its UI (`Hooks.Text`) precisely so the difference is visible, and labels an interrupted switch `被中断` (interrupted) in its status line.
 
 `SetCurrent<T>()` sets `ThemeManager.Current` and nothing else: no callbacks, no values written. Use it to seed the starting theme before any element registers itself — the scale demos do it in `App`, right after installing the interpolator, so that the values each element applies as it initialises are the ones for that theme.
 

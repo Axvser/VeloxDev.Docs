@@ -4,14 +4,14 @@ Per frame, a channel would otherwise allocate one `FrameEventArgs`, one `ConfigC
 
 | Pool | Element type | Capacity | Source |
 |---|---|---|---|
-| `_frameEventArgsPool` | `FrameEventArgs` | `DEFAULT_OBJECT_POOL_SIZE` = 50 | `TickManager.cs` 152 |
-| `_configRequestPool` | `ConfigChangeRequest` | 50 | `TickManager.cs` 153 |
-| `_wrapperPool` | `BehaviorWrapper` | 50 | `TickManager.cs` 154 |
+| `_frameEventArgsPool` | `FrameEventArgs` | `DEFAULT_OBJECT_POOL_SIZE` = 50 | `TickManager.cs` 154 |
+| `_configRequestPool` | `ConfigChangeRequest` | 50 | `TickManager.cs` 155 |
+| `_wrapperPool` | `BehaviorWrapper` | 50 | `TickManager.cs` 156 |
 
 ## The pool
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 69-93)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 71-95)
 private sealed class ObjectPool<T>(int maxSize) where T : class, new()
 {
     private readonly ConcurrentStack<T> _pool = new();
@@ -50,7 +50,7 @@ Three details of that implementation are deliberate:
 `FrameEventArgs` is drawn once per frame and returned at the end of the same frame body:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 824-833)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 826-835)
 private FrameEventArgs CreateFrameEventArgs(TimeSpan delta, TimeSpan total)
 {
     var frameArgs = _frameEventArgsPool.Get();
@@ -68,7 +68,7 @@ The `Handled = false` line is the reset that makes reuse safe, and it is the rea
 The fixed pump draws and returns one argument **per step**, not per wake-up — a stall that owes six steps draws six times inside one loop iteration and returns each immediately:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 483-493)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 485-495)
 for (var i = 0; i < count; i++)
 {
     var fixedFrameArgs = CreateFrameEventArgs(
@@ -84,9 +84,9 @@ for (var i = 0; i < count; i++)
 
 That comment records a removed round trip: the arguments used to be handed to a cross-thread queue that the update loop drained purely to return them to the pool. Nothing ever read the arguments from it.
 
-`ConfigChangeRequest` is the only pooled object that crosses threads — drawn on the caller's thread by `SetTargetFPS`, filled, enqueued, and later reset and returned by the update pump (`ProcessConfigChanges`, lines 768-783, and `ClearQueues`, lines 954-965).
+`ConfigChangeRequest` is the only pooled object that crosses threads — drawn on the caller's thread by `SetTargetFPS`, filled, enqueued, and later reset and returned by the update pump (`ProcessConfigChanges`, lines 770-785, and `ClearQueues`, lines 956-967).
 
-`BehaviorWrapper` is pooled per registration: drawn and `Reset` in `ProcessAddedBehaviors` (lines 792-793), `Clear`ed and returned in `ProcessRemovedBehaviors` (lines 810-811).
+`BehaviorWrapper` is pooled per registration: drawn and `Reset` in `ProcessAddedBehaviors` (lines 794-795), `Clear`ed and returned in `ProcessRemovedBehaviors` (lines 812-813).
 
 ## Why only three things are pooled
 
@@ -102,7 +102,7 @@ The two knobs that used to need a pooled request object no longer do, and the co
 The loops never iterate the behaviour dictionary. They iterate a plain array that is rebuilt only when something changed:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 741-751)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 743-753)
 private BehaviorWrapper[] GetCachedWrappers()
 {
     var currentTime = GetTimestamp();
@@ -116,7 +116,7 @@ private BehaviorWrapper[] GetCachedWrappers()
 }
 ```
 
-The rebuild (lines 872-901) is where the interesting decisions are:
+The rebuild (lines 874-903) is where the interesting decisions are:
 
 - It sizes the array from `_behaviors.Values.Count`, fills it with active wrappers, **insertion-sorts it on `ExecutionOrder`**, then `Array.Resize`es it down. The source comment names the reason for insertion sort: behaviour counts are small and LINQ would allocate.
 - `_cachedWrappers` is `volatile`, so a pump thread that calls `GetCachedWrappers` sees a whole array or the previous whole array — never a half-built one. There is no lock on the dispatch path at all.
@@ -125,7 +125,7 @@ The rebuild (lines 872-901) is where the interesting decisions are:
 The dispatch loops are consequently a bare indexed `for` over a stable array, with the `Handled` and cancellation checks inlined per iteration:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 689-702)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 691-704)
 private void ExecuteBehaviorsUpdateSync(FrameEventArgs frameArgs, CancellationToken token)
 {
     var wrappers = GetCachedWrappers();
@@ -144,4 +144,4 @@ private void ExecuteBehaviorsUpdateSync(FrameEventArgs frameArgs, CancellationTo
 
 The `try/catch` inside the loop is the exception-isolation policy: one misbehaving behaviour cannot stop the loop or the behaviours behind it.
 
-> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 69-93, 152-154, 483-493, 689-702, 741-751, 768-816, 824-833, 872-901, 954-965.
+> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 71-95, 154-156, 485-495, 691-704, 743-753, 770-818, 826-835, 874-903, 956-967.

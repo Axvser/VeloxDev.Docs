@@ -2,15 +2,13 @@
 
 ## Supported targets
 
-`VeloxDev.Core.Extension` (the project that holds `Agent/`) declares a single target framework:
+`VeloxDev.Core.Extension` (the project that holds `Agent/`) declares two target frameworks:
 
 ```
-<TargetFramework>netstandard2.0</TargetFramework>
+<TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
 ```
 
-Source: `Src/Core/VeloxDev.Core.Extension/VeloxDev.Core.Extension.csproj`.
-
-The library therefore drops into anything that consumes `netstandard2.0`. Its AI dependencies, however, are modern-only, so a host should target a current .NET. The shipped demo (`Examples/Workflow/*`, which share the agent pane through `Examples/Workflow/Common/Lib`) and the tests build with:
+Source: `Src/Core/VeloxDev.Core.Extension/VeloxDev.Core.Extension.csproj`. The `net8.0` target carries the trimming/AOT contract (`IsAotCompatible=true`); the `netstandard2.0` target is the widest-reach build. Its AI dependencies, however, are modern-only, so a host should target a current .NET. The shipped demo (`Examples/Workflow/*`, which share the agent pane through `Examples/Workflow/Common/Lib`) and the tests build with:
 
 ```
 <TargetFramework>net10.0</TargetFramework>
@@ -22,7 +20,7 @@ That `net10.0` build is only the *tested* configuration, not the minimum — it 
 
 ## SDK / runtime and packages
 
-- **.NET SDK 10.0** (the toolchain the demo and tests were built with; `dotnet --version` on the reference machine reports `10.0.401`).
+- **.NET SDK 8.0+** — the `net8.0` target is the one that carries the AI stack's modern APIs; the `netstandard2.0` target is for older consumers. The repository's demo and tests were built with SDK `10.0.x` (the reference machine reports `10.0.401`), which is a *tested* configuration, not the minimum.
 - The packages `VeloxDev.Core.Extension` pulls transitively (Source: `VeloxDev.Core.Extension.csproj`):
 
 | Package | Version | Why it is here |
@@ -49,7 +47,7 @@ Every tool's compact JSON output is built by the archive engine's own JSON tree 
 
 Building the scope (`tree.AsAgentScope()` … `ProvideProgressiveContextPrompt()`), enumerating the tool set (`ProvideTools()` / `CreateAllTools()`), and attaching subsystems (MCP / Skills / Sub-agents) are all offline. **Only actually running a conversation** — calling `agent.RunAsync(...)` — reaches the model. The Run Declaration on the verification page states honestly which of the two was done.
 
-**Expected result:** you have a `.NET 10` host project, an `IChatClient`, a live workflow tree, and (optionally) Node or Python on `PATH` for local MCP servers.
+**Expected result:** you have a .NET 8+ host project, an `IChatClient`, a live workflow tree, and (optionally) Node or Python on `PATH` for local MCP servers.
 
 ## Run declaration
 

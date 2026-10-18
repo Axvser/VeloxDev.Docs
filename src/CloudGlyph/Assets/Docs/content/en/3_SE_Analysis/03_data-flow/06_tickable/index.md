@@ -38,8 +38,8 @@ activate Ch
 Ch -> Bus: Resume()
 Ch -> Ch: _updateSampler.Reset() / _fixedSampler.Reset()
 Ch -> Ch: RebuildCachedWrappers()
-Ch -> UT: new Thread(UpdateLoop).Start()
 Ch -> FT: new Thread(FixedUpdateLoop).Start()
+Ch -> UT: new Thread(UpdateLoop).Start()
 Ch --> TM: Started
 deactivate Ch
 TM -> TM: OnChannelStarted?.Invoke(new TickChannelEventArgs("demo"))
@@ -119,7 +119,7 @@ deactivate TM
 @enduml
 ```
 
-> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 274-327 (Start), 329-374 (StopAsync), 384-402 (Pause/Resume), 430-438 (registration), 509-554 (UpdateLoop), 446-507 (FixedUpdateLoop), 753-801 (drain), 1017-1030 (GetOrCreateChannel), 1048-1064 (static forwards).
+> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 276-330 (Start), 331-377 (StopAsync), 386-404 (Pause/Resume), 432-440 (registration), 511-556 (UpdateLoop), 448-509 (FixedUpdateLoop), 755-803 (drain), 1019-1032 (GetOrCreateChannel), 1050-1072 (static forwards).
 
 ## Flows by phase
 

@@ -156,7 +156,7 @@ public sealed class TransitionPathConflictException : Exception
 
 ### 异常：`TransitionPathUnsampleableException`
 
-由 **`Transition<T>.Execute(...)` 同步抛出**，当一条声明路径永远无法动画：其叶为引用类型，既无自定义插值器也无注册采样器，没有任何可用来插值的东西。值类型豁免 —— 它仍可逐成员装配。
+由 **`Transition<T>.Execute(...)` 同步抛出**，当一条声明路径永远无法动画：其叶为引用类型，既无自定义插值器也无注册采样器，没有任何可用来插值的东西。值类型豁免此检查 —— 实现 `ISampleable` 的结构体会逐成员装配，未实现的会被 `Warn` 后跳过。
 
 ```csharp
 public sealed class TransitionPathUnsampleableException : Exception

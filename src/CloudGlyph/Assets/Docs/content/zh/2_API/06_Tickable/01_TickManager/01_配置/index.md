@@ -1,6 +1,6 @@
 # `TickManager` — 配置
 
-源码：`Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` 第 1000-1103 行（静态表面）与第 201-270 行（`LoopChannel` 实现）。
+源码：`Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` 第 1008-1105 行（静态表面）与第 205-272 行（`LoopChannel` 实现）。
 
 这里的每个成员都接受 `string channel = TickManager.DEFAULT_CHANNEL`。
 
@@ -13,7 +13,7 @@
 
 **说明：**
 - 编译期常量，因此可用作参数默认值、特性实参和 `switch` 标签。
-- `Examples/Tickable/WPF/Demo/SimState.cs` 第 21 行给出了值得照抄的写法：`public const string Name = TickManager.DEFAULT_CHANNEL;`，随后 `[Tickable(DemoChannel.Name)]` —— 通道只起一次名字，并在屏幕上被读回来。
+- `Examples/Tickable/WPF/Demo/SimState.cs` 第 13 行给出了值得照抄的写法：`public const string Name = TickManager.DEFAULT_CHANNEL;`，随后 `[Tickable(DemoChannel.Name)]` —— 通道只起一次名字，并在屏幕上被读回来。
 
 #### 属性：`TickManager.UseAsyncLoop`
 
@@ -23,7 +23,7 @@
 **返回：** `bool` —— 通道是否用 `async`/`await` + `Task.Delay` 而非原生 `Thread` 驱动帧。
 
 **说明：**
-- 初始化值取决于构建目标（第 1006-1011 行）：
+- 初始化值取决于构建目标（第 1008-1013 行）：
 
 ```csharp
 public static bool UseAsyncLoop { get; set; } =
@@ -60,16 +60,16 @@ public static bool UseAsyncLoop { get; set; } =
 
 **返回：** `void`。
 
-**异常：** 无 —— 超范围的值被**静默忽略**，既不钳制也不上报（第 205-206 行）。
+**异常：** 无 —— 超范围的值被**静默忽略**，既不钳制也不上报（第 207-208 行）。
 
 **示例：**
 ```text
-// 源码：Examples/Tickable/WPF/Demo/MainWindow.xaml.cs（第 75 行）
+// 源码：Examples/Tickable/WPF/Demo/MainWindow.xaml.cs（第 66 行）
 TickManager.SetTargetFPS(60, DemoChannel.Name);
 ```
 
 **说明：**
-- 以 `ConfigChangeRequest` 形式入队（从 `_configRequestPool` 取），由 update 泵在 `ProcessConfigChanges`（第 768-783 行）中施加，那里把目标帧率字段与缓存的帧时长一起写。
+- 以 `ConfigChangeRequest` 形式入队（从 `_configRequestPool` 取），由 update 泵在 `ProcessConfigChanges`（第 770-785 行）中施加，那里把目标帧率字段与缓存的帧时长一起写。
 - 默认 60。该节奏约束的是*采样节拍*，不是虚拟时钟 —— 时间速率减半不会让帧率减半。
 
 #### `TickManager.SetFixedUpdateInterval`
@@ -82,16 +82,16 @@ TickManager.SetTargetFPS(60, DemoChannel.Name);
 | `intervalMs` | `int` | 固定步之间的毫秒数。接受范围 `1..1000` |
 | `channel` | `string` | 目标通道 |
 
-**返回：** `void`。**异常：** 无 —— 超范围即忽略（第 223 行）。
+**返回：** `void`。**异常：** 无 —— 超范围即忽略（第 225 行）。
 
 **示例：**
 ```text
-// 源码：Examples/Tickable/WPF/Demo/MainWindow.xaml.cs（第 83 行）
+// 源码：Examples/Tickable/WPF/Demo/MainWindow.xaml.cs（第 74 行）
 TickManager.SetFixedUpdateInterval(16, DemoChannel.Name);
 ```
 
 **说明：**
-- 刻意**不**走配置队列：那条队列由 *update* 循环排空，而采样器属于 *fixed* 循环。该值写入一个 volatile 字段（`_pendingFixedIntervalMs`），由 fixed 泵在自己的线程上写进 `_fixedSampler.Step`（第 457-463 行）—— 从 update 线程写会与 `Advance` 争用它所重置的累加器。
+- 刻意**不**走配置队列：那条队列由 *update* 循环排空，而采样器属于 *fixed* 循环。该值写入一个 volatile 字段（`_pendingFixedIntervalMs`），由 fixed 泵在自己的线程上写进 `_fixedSampler.Step`（第 459-465 行）—— 从 update 线程写会与 `Advance` 争用它所重置的累加器。
 - 默认 16 ms。步长为零不是合法值，所以零才可以被用来表示「没有待处理」。
 
 #### `TickManager.SetTimeScale`
@@ -113,7 +113,7 @@ TickManager.SetFixedUpdateInterval(16, DemoChannel.Name);
 
 **示例：**
 ```text
-// 源码：Examples/Tickable/WPF/Demo/MainWindow.xaml.cs（第 91 行）
+// 源码：Examples/Tickable/WPF/Demo/MainWindow.xaml.cs（第 80 行）
 TickManager.SetTimeScale(1f, DemoChannel.Name);
 
 // 源码：Src/Core/VeloxDev.Core.Test/TimeLine/TickableBusTests.cs（第 252 行）
@@ -121,7 +121,7 @@ Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => TickManager.SetTimeScale
 ```
 
 **说明：**
-- 直接作用于总线（第 238 行）而不走配置队列：总线自己串行化它的写入者，而那条队列只在速率还是通道自有字段时才存在。
+- 直接作用于总线（第 242 行）而不走配置队列：总线自己串行化它的写入者，而那条队列只在速率还是通道自有字段时才存在。
 - 因为它是*时钟的*速率，`FrameEventArgs.DeltaTime` 与 `FrameEventArgs.TotalTime` 都随它变化，锚定在 `TickManager.Bus(channel)` 上的动画也一样 —— 而帧的*节拍*不变（`TickableBusTests.TheChannelsRateScalesTheAnimationButNotTheFrameCadence`）。
 - 速率为 `0` 会冻结时钟但不构成暂停：不派发任何帧，`IsPaused` 保持 `false`，`SystemStatus` 仍报 `"Running"`，`Resume()` 也抬不动它。只有非零速率才行。
 
@@ -138,7 +138,7 @@ Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => TickManager.SetTimeScale
 **返回：** `void`。
 
 **说明：**
-- 这里的「主线程」指的是通道的 **Update** 线程，不是 UI 线程。`ProcessMainThreadOperations`（第 753-766 行）每帧在排空配置/新增/移除队列之前最多取 64 个动作。
+- 这里的「主线程」指的是通道的 **Update** 线程，不是 UI 线程。`ProcessMainThreadOperations`（第 755-768 行）每帧在排空配置/新增/移除队列之前最多取 64 个动作。
 - 动作被 `try/catch` 包住，失败只写 `Debug.WriteLine`。
 - 在 UI 宿主里你仍要自己封送到 dispatcher；而且在钩子里做这件事正是那种没有症状的失败 —— 引擎会吞掉钩子抛出的一切。
 

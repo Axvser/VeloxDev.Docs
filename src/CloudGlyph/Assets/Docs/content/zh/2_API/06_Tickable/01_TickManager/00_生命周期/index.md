@@ -1,6 +1,6 @@
 # `TickManager` — 生命周期与注册
 
-源码：`Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` 第 1046-1071 行（静态包装）与第 274-441 行（`LoopChannel` 实现）。
+源码：`Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` 第 1050-1072 行（静态包装）与第 276-444 行（`LoopChannel` 实现）。
 
 这里的每个成员都接受 `string channel = TickManager.DEFAULT_CHANNEL`，并转发到该通道 `LoopChannel` 上的同名成员。全部经由 `GetOrCreateChannel` **在首次使用时创建通道**。`StopAsync` 对从未启动的通道返回已完成的任务。
 
@@ -15,17 +15,17 @@
 
 **返回：** `void`。
 
-**异常：** 无。对已在运行的通道再次启动是 no-op —— `LoopChannel.Start` 第一句就是 `if (_isRunning) return;`（第 276 行）。
+**异常：** 无。对已在运行的通道再次启动是 no-op —— `LoopChannel.Start` 第一句就是 `if (_isRunning) return;`（第 278 行）。
 
 **示例：**
 ```text
-// 源码：Examples/Tickable/WPF/Demo/MainWindow.xaml.cs（第 60 行）
+// 源码：Examples/Tickable/WPF/Demo/MainWindow.xaml.cs（第 51 行）
 TickManager.Start(DemoChannel.Name);
 ```
 
 **说明：**
 - 启动 update 与 fixed-update 两条线程（`VeloxDev.Update[<通道名>]`、`VeloxDev.FixedUpdate[<通道名>]`，`ThreadPriority.AboveNormal`，`IsBackground = true`）；当 `EffectiveUseAsyncLoop` 为真时改为启动两个异步循环。
-- 把两个采样器重新锚定到「现在」（第 288-289 行），并调用 `_bus.Resume()`（第 293 行），因此上一个生命周期遗留的暂停不会带过来。
+- 把两个采样器重新锚定到「现在」（第 290-291 行），并调用 `_bus.Resume()`（第 295 行），因此上一个生命周期遗留的暂停不会带过来。
 - 重建按执行顺序排序的行为缓存数组，然后触发 `Started` → `OnChannelStarted`。
 
 #### `TickManager.StopAsync`
@@ -39,15 +39,15 @@ TickManager.Start(DemoChannel.Name);
 
 **示例：**
 ```text
-// 源码：Examples/Tickable/WPF/Demo/MainWindow.xaml.cs（第 69 行）
+// 源码：Examples/Tickable/WPF/Demo/MainWindow.xaml.cs（第 60 行）
 _ = TickManager.StopAsync(DemoChannel.Name);
 ```
 
 **说明：**
 - 若通道未运行则立即返回，且在这种情况下**不**触发 `OnChannelStopped`。
 - 取消两个泵，然后最多等 `RESTART_SHUTDOWN_TIMEOUT_MS`（1 秒）。线程路径用 `Thread.Join`，异步路径用 `Task.WhenAny(Task.WhenAll(...), Task.Delay(1000))`。
-- 下行途中清掉暂停（`_bus.Resume()`，第 339 行）—— 暂停中被停止的通道回来后是可运行的。它**不**会解除速率为 `0` 造成的冻结。
-- 重置 `TotalTime`、`TotalFrames`、`CurrentFPS` 与配置缓存时间戳，并排空全部四个队列。
+- 下行途中清掉暂停（`_bus.Resume()`，第 341 行）—— 暂停中被停止的通道回来后是可运行的。它**不**会解除速率为 `0` 造成的冻结。
+- 重置 `TotalTime`、`TotalFrames`、`CurrentFPS` 与配置缓存时间戳，并排空全部四个队列。它**不**清空 `_behaviors`：已经应用过的注册在停止后仍然存在，并在下次 `Start` 后继续被驱动（不重跑 `Awake` / `Start`）。只有停止时仍在队列里的注册会被丢弃。
 - 对 `Pause()` park 住的通道是安全的：park 会观察取消令牌，所以取消能穿透进去。
 
 #### `TickManager.Pause`
@@ -58,7 +58,7 @@ _ = TickManager.StopAsync(DemoChannel.Name);
 **返回：** `void`。**异常：** 无。
 
 **说明：**
-- 通道未运行或已暂停时为 no-op（第 386 行）。
+- 通道未运行或已暂停时为 no-op（第 388 行）。
 - 在通道的时间源上置 `IsPaused`，并触发 `Paused` → `OnChannelPaused`。
 - 两个泵 park 在 `WaitWhileStalledAsync` 上而不是轮询，所以暂停中的通道完全不产生唤醒。
 - 由于暂停状态属于共享的时间源，锚定在 `TickManager.Bus(channel)` 上的动画会在同一瞬间冻住。
@@ -71,9 +71,9 @@ _ = TickManager.StopAsync(DemoChannel.Name);
 **返回：** `void`。**异常：** 无。
 
 **说明：**
-- 通道未运行或未暂停时为 no-op（第 399 行）。
+- 通道未运行或未暂停时为 no-op（第 401 行）。
 - 触发 `Resumed` → `OnChannelResumed`。
-- 在速率为 `0` 之后，它只解除暂停而不让时钟前进 —— 通道继续 park，直到速率被设为非零（`LoopChannel.Resume` 的备注，第 391-396 行）。
+- 在速率为 `0` 之后，它只解除暂停而不让时钟前进 —— 通道继续 park，直到速率被设为非零（`LoopChannel.Resume` 的备注，第 393-398 行）。
 
 #### `TickManager.TogglePause`
 
@@ -83,7 +83,7 @@ _ = TickManager.StopAsync(DemoChannel.Name);
 **返回：** `void`。
 
 **说明：**
-- 实现是 `if (_bus.IsPaused) Resume(); else Pause();`（第 440 行），两个分支都继承上面的保护：对已停止的通道是 no-op。
+- 实现是 `if (_bus.IsPaused) Resume(); else Pause();`（第 444 行），两个分支都继承上面的保护：对已停止的通道是 no-op。
 - 触发 `OnChannelPaused` 或 `OnChannelResumed`，不会两者都触发。
 
 #### `TickManager.RestartAsync`
@@ -110,7 +110,7 @@ _ = TickManager.StopAsync(DemoChannel.Name);
 
 **返回：** `void`。
 
-**异常：** 无。`null` 被 `if (behavior != null) _addQueue.Enqueue(behavior);`（第 432 行）滤掉。
+**异常：** 无。`null` 被 `if (behavior != null) _addQueue.Enqueue(behavior);`（第 434 行）滤掉。
 
 **示例：**
 ```text
@@ -119,7 +119,7 @@ TickManager.RegisterBehaviour(this, "demo");
 ```
 
 **说明：**
-- 该调用只是入队。Update 泵在采样下一帧之前于 `ProcessAddedBehaviors`（第 785-801 行）排空队列，所以 `InvokeAwake()` 与 `InvokeStart()` 在 update 线程上、**在第一帧帧体之前**运行 —— 无论注册发生在 `Start` 之前还是之后。
+- 该调用只是入队。Update 泵在采样下一帧之前于 `ProcessAddedBehaviors`（第 787-803 行）排空队列，所以 `InvokeAwake()` 与 `InvokeStart()` 在 update 线程上、**在第一帧帧体之前**运行 —— 无论注册发生在 `Start` 之前还是之后。
 - 行为以 `RuntimeHelpers.GetHashCode(behavior)` 为键，所以同一实例注册两次是替换而不是新增一个 wrapper —— 但仍会在替换品上再跑一遍 `InvokeAwake` / `InvokeStart`。
 - 执行顺序即注册顺序：每个 wrapper 用 `Interlocked.Increment(ref _instanceCounter)` 作为 `ExecutionOrder`，缓存数组按它对它做插入排序。
 - 注册不会立刻启动行为：若通道未运行，`Awake` / `Start` 要等到 `Start` 之后的第一帧。
@@ -143,6 +143,6 @@ TickManager.UnregisterBehaviour(this, "demo");
 ```
 
 **说明：**
-- 入队；排空过程（`ProcessRemovedBehaviors`，第 803-816 行）移除 wrapper、清空它并归还 `_wrapperPool`。
+- 入队；排空过程（`ProcessRemovedBehaviors`，第 805-818 行）移除 wrapper、清空它并归还 `_wrapperPool`。
 - 移除是**静默的**：`UnregisterBehaviour` 只移除 wrapper，不对行为调用任何钩子 —— 循环从不调用「关闭」回调。（`ITickable` 上*确实*有 `CloseTickable()`，但它正是*执行*注销的那个方法，所以注销不会反过来调用它。）需要清理的资源由调用方自行处理。
 - 移除后该实例仍然实现 `ITickable`，可以再次注册 —— 而再次注册会在新的 wrapper 上再跑一遍 `Awake` 与 `Start`。

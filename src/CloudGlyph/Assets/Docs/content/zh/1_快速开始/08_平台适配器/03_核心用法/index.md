@@ -100,6 +100,38 @@ private void OnPointerReleased(object sender, MouseButtonEventArgs e)
 
 **预期结果：** 按下输出槽并在输入槽上松开（或反过来）会创建一条连线；`SlotState` 在 `Sender` / `Receiver` 标志间切换，`SlotView` 相应换色。
 
+## 4.1 指针移动期间的连接预览
+
+橡皮筋覆盖整个表面，因此指针下的可视元素通常就是表面本身。为此，每个适配器都在虚拟连线可见时，于每次指针移动中按几何位置报告候选接收口：
+
+```csharp
+// 来源：Src/Core/VeloxDev.Core/WorkflowSystem/StandardEx/WorkflowTreeEx.cs（StandardSetPreviewReceiver）
+//       Src/Core/VeloxDev.Core/WorkflowSystem/GUI/Interaction/SlotHitTestEx.cs（HitTest）
+if (tree.VirtualLink.IsVisible)
+{
+    tree.StandardSetPreviewReceiver(
+        SlotHitTestEx.HitTest(tree, worldX, worldY));
+}
+```
+
+- `SlotHitTestEx.HitTest(tree, x, y, radius = 12)` 扫描树中的槽，跳过 `Anchor` 仍为 `NaN` 的槽，返回半径内最近的已测量槽（没有则返回 `null`）。
+- `StandardSetPreviewReceiver` 会忽略发送口自身；候选未变化时不重复校验；否则执行 `StandardCheckConnection` 以及可选的 `PreviewValidating` 否决。结果写入槽的 `PreviewReceiver` 位与 `ConnectionPreviewState`（`Started` → `ValidTarget` / `InvalidTarget`）。
+- 异步校验结论返回后，用 `StandardRefreshConnectionPreview(tree)` 强制重新检查当前候选。
+
+各适配器的调用位置：
+
+| 适配器 | 调用点 |
+|---|---|
+| WPF | `WorkflowSurfaceBehavior.OnPreviewMouseMove`，在 `VirtualLink.IsVisible` 时（先于悬停路由返回） |
+| Avalonia | `WorkflowSurfaceBehavior.OnPointerMoved` |
+| WinUI | `WorkflowSurfaceBehavior.OnPointerMoved` |
+| Jalium | `WorkflowSurfaceBehavior.OnMouseMove` |
+| MAUI | `WorkflowSlotConnectionBehavior.UpdatePointer` |
+| WinForms | `WorkflowSlotConnectionBehavior.UpdatePointer` |
+| Razor | `WorkflowSlotConnectionBehavior.OnSlotConnectionMove`（`[JSInvokable]`） |
+
+**预期结果：** 拖拽橡皮筋经过兼容槽时，槽的预览状态（以及虚拟连线的阶段）变为有效；经过不兼容槽时变为无效；离开所有槽后回到 `Started`。松开时仍执行真正的连接。
+
 ## 5. 网格装饰层与小地图覆盖层
 
 每次布局/滚动时，表面行为会写入两个 Core 契约：装饰层实现 `IWorkflowGridDecorator`，小地图实现 `IWorkflowMinimapOverlay`（它继承装饰层契约，另加 `ViewportWidth`、`ViewportHeight`、`WorkflowTree`、`IsMinimapVisible`）。`WorkflowSurfaceBehavior.UpdateGridDecorator` 还会把 `decorator.RulerBand` 转发给 `SetVirtualizeInset`，避免标尺带下方的节点被过早剔除。
@@ -145,6 +177,6 @@ behaviors:WorkflowSurfaceBehavior.LinkMenuKey="LinkContextMenu"
 </ContextMenu>
 ```
 
-行为解析该资源、订阅 Core 的 `LinkInteraction` 中枢、在按下位置弹出菜单、把菜单自身的上下文设成它下面那条连线，并把开/合报回中枢（中枢在菜单打开期间挂起悬停）。因此条目直接绑定那条连线 —— 上面的 `{Binding DeleteCommand}` 就是新增的一个动作，只在模板里增删即可。WinForms 与 Jalium 改为在 `WorkflowTreeView.OnBuildLinkMenu(menu, link)` 里构建同一份菜单（基类会加「Delete」），Razor 则由树视图传入 `<LinkMenu Context="link"> … </LinkMenu>` 片段。
+行为解析该资源、订阅树的输入路由（`WorkflowInput.For(tree)`）的 `PointerPressed` 事件、在按下位置弹出菜单、把菜单自身的上下文设成它下面那条连线，并在菜单打开期间设置 `WorkflowInput.IsSuspended = true`，使把指针带到连线上的那次移动不会清掉菜单正要操作的悬停目标。它还订阅 Helper 的 `LinkRemoved` 事件，在连线离开树时关闭菜单。因此条目直接绑定那条连线 —— 上面的 `{Binding DeleteCommand}` 就是新增的一个动作，只在模板里增删即可。**WinForms** 改为在 `WorkflowTreeView.OnBuildLinkMenu(menu, link)` 里构建同一份菜单（基类会加一项「Delete」，生成的模板则覆写为空菜单）；**Jalium 现在与其它 XAML 适配器一样使用 `LinkMenuKey` + `ContextMenu` 资源**。Razor 则由表面接收 `<LinkMenu Context="link"> … </LinkMenu>` 片段。
 
-**预期结果：** 右键一条连线会弹出菜单，「Delete」删除该连线。菜单打开期间指针虽在菜单上，连线仍保持选中；若菜单打开时那条连线离开树，中枢会抛出 `ContextMenuDismissRequested`，由宿主收起菜单。
+**预期结果：** 右键一条连线会弹出菜单，「Delete」删除该连线。菜单打开期间指针虽在菜单上，连线仍保持选中，因为表面设置了 `WorkflowInput.IsSuspended`；若菜单打开时那条连线离开树，Helper 的 `LinkRemoved` 事件会让表面关闭菜单。

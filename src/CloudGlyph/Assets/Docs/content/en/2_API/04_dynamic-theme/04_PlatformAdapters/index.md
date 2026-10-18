@@ -72,17 +72,17 @@ All converters implement `IThemeValueConverter.Convert(Type targetType, string p
 
 | Converter | Purpose | Accepted parameters (WPF / Avalonia) |
 |---|---|---|
-| `DoubleConverter` | `double` value | `double` / `int` / `float`, or an invariant-parseable `string`. |
+| `DoubleConverter` | `double` value | WPF: `double` / `int` / `float`, or an invariant-parseable `string`. Avalonia adds `long` / `decimal` / `bool`. |
 | `PointConverter` | platform `Point` | `"x,y"` string (WPF splits, Avalonia calls `Point.Parse`), or `[x, y]` numbers. |
 | `ThicknessConverter` | platform `Thickness` | uniform / `"h,v"` / `"l,t,r,b"` strings, or 1 / 2 / 4 numeric parameters. |
 | `CornerRadiusConverter` | platform `CornerRadius` | uniform / `"tl,tr,br,bl"` strings, or 1 / 4 numeric parameters. |
 | `ColorConverter` | platform `Color` | color-name/HEX string, ARGB `int`, or A/R/G/B components. |
 | `BrushConverter` | platform brush | an existing brush (`Brush` in WPF, `IBrush` in Avalonia), a resource key, a color string, or a delegated `ColorConverter` result wrapped in a solid brush. |
-| `ObjectConverter` | any `targetType` | a single resource-key string; falls back to the platform type converter (`TypeDescriptor` / `TypeUtilities`). |
+| `ObjectConverter` | any `targetType` | a single resource-key string; then a resource lookup, an explicit target-type table (strings, numbers, `TimeSpan`, platform geometry/color/font types, enums) and, for brushes, the platform brush parser. Types outside the table return `null`. |
 
 **Notes:**
 - WPF targets `System.Windows` / `System.Windows.Media` types and resolves string colors through `System.Windows.Media.BrushConverter`; resource lookups go through a shared internal `ThemeResourceLookup` helper that walks `Application.Current.Resources` and its merged dictionaries.
-- Avalonia targets Avalonia types (`IBrush`, `Point`, ...), parses strings through the platform types' native parsers (`Point.Parse`, `Color.TryParse`, ...), prefers `Avalonia.Utilities.TypeUtilities.TryConvert`, and looks resources up via `Application.Current.TryFindResource`.
+- Avalonia targets Avalonia types (`IBrush`, `Point`, ...), parses strings through the platform types' native parsers (`Point.Parse`, `Color.TryParse`, ...), and looks resources up via `Application.Current.TryFindResource`. `ObjectConverter` deliberately uses an explicit type table instead of `Avalonia.Utilities.TypeUtilities.TryConvert`, whose reflection-based converter discovery is marked `RequiresUnreferencedCode`; keeping it out is what keeps theme conversion usable under trimming and AOT.
 - The WPF demo annotates properties with `[ThemeConfig<BrushConverter, Light, Dark>(...)]`; the Avalonia demo uses `ObjectConverter` with `[ThemeConfig<ObjectConverter, Dark, Light>(...)]`.
 - Converters are the `TConverter` strategy referenced by `ThemeConfigAttribute<TConverter, ...>` and are instantiated by the theme generator when a theme registers.
 

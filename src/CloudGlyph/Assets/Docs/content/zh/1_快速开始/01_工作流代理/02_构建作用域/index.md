@@ -1,6 +1,6 @@
 # 02 · 构建作用域
 
-作用域是把一棵 workflow 树绑定到一套 agent 配置的对象。每个 `With*` 调用都返回同一个作用域，因此整套配置就是一条链。
+作用域是把一棵 workflow 树绑定到一份 agent 配置的对象。每个 `With*` 调用都返回同一作用域，因此整份配置就是一条链。
 
 ```csharp
 using VeloxDev.AI;
@@ -8,8 +8,8 @@ using VeloxDev.AI.Workflow;
 
 WorkflowAgentScope scope = tree.AsAgentScope()
     .WithPromptLanguage(AgentLanguages.English)     // 提示 / [AgentContext] 文档的语言
-    .WithOutputLanguage(AgentLanguages.Chinese)     // 模型必须使用的回答语言
-    .WithAutoDiscovery()                            // 注册编译期上下文树里的客户类型
+    .WithOutputLanguage(AgentLanguages.Chinese)     // 模型必须用哪种语言回答
+    .WithAutoDiscovery()                            // 注册编译上下文树携带的类型
     .WithMaxToolCalls(200)
     .WithAllowNodeExecution(true)
     .WithSynchronizationContext(SynchronizationContext.Current)
@@ -18,7 +18,7 @@ WorkflowAgentScope scope = tree.AsAgentScope()
 
 来源：`Examples/Workflow/Common/Lib/ViewModels/Workflow/Helper/AgentHelper.cs`（`ProvideAgent`）。
 
-**预期结果：** `scope` 构造成功、不抛异常。构建作用域从不触网、不调用模型 —— 它只记录配置。
+**预期结果：** `scope` 构造成功、不抛异常。构造作用域从不触网、不接触模型 —— 它只记录配置。
 
 ## 1. 入口
 
@@ -30,32 +30,32 @@ WorkflowAgentScope scope = tree.AsAgentScope()
 
 | 成员 | 签名 | 作用 |
 |---|---|---|
-| `WithPromptLanguage` | `WithPromptLanguage(AgentLanguages language)` | 当每次调用的 `language` 为 `null` 时，提示与 `[AgentContext]` 文档的全局默认语言。应先调用；它也会传播到已挂载的 `SkillScope`。 |
-| `WithOutputLanguage` | `WithOutputLanguage(AgentLanguages language)` | LLM 必须回答所用的语言（与提示语言无关）。 |
-| `WithAutoDiscovery` | `WithAutoDiscovery(AgentLanguages? language = null)` | 注册编译期上下文树 `Customer/` 根下的全部类型条目 —— 组件（按四个组件接口分组）、枚举、接口与数据。**运行期不做任何扫描**；见 §3。 |
+| `WithPromptLanguage` | `WithPromptLanguage(AgentLanguages language)` | 当逐次调用的 `language` 为 `null` 时，提示与 `[AgentContext]` 文档的全局默认语言。先调用它；它也会传播到已挂载的 `SkillScope`。 |
+| `WithOutputLanguage` | `WithOutputLanguage(AgentLanguages language)` | LLM 必须用哪种语言回复（独立于提示语言）。 |
+| `WithAutoDiscovery` | `WithAutoDiscovery(AgentLanguages? language = null)` | 注册编译上下文树 `Customer/` 根下的每个类型条目 —— 组件（按四个组件接口分组）、枚举、接口与数据。**运行时不做任何扫描**；见 §3。 |
 | `WithEnums` / `WithInterfaces` / `WithComponents` / `WithData` | `(Type[] …, AgentLanguages? language = null)` | 显式注册类型，而不是扫描。 |
 | `WithMaxToolCalls` | `WithMaxToolCalls(int maxCalls)` | 累计工具调用上限。 |
 | `WithMaxReadToolCalls` | `WithMaxReadToolCalls(int maxCalls)` | 只读（查询）调用的独立上限。 |
 | `WithMaxWriteToolCalls` | `WithMaxWriteToolCalls(int maxCalls)` | 变更（非查询）调用的独立上限。 |
 
-`AgentLanguages` 是一个 `byte` 枚举，含 33 个成员（`English = 0`、`ChineseSimplified = 1`（别名 `Chinese`）…… `Persian = 32`），另有 `AgentLanguagesExtensions`（`ToLanguageCode`、`TryParseLanguageCode`、`ParseLanguageCode`、`GetDisplayName`）。
+`AgentLanguages` 是一个 `byte` 枚举，共 33 个成员（`English = 0`、`ChineseSimplified = 1` 及其别名 `Chinese`、…、`Persian = 32`），另有 `AgentLanguagesExtensions`（`ToLanguageCode`、`TryParseLanguageCode`、`ParseLanguageCode`、`GetDisplayName`）。
 
-## 3. 类型发现的细节
+## 3. 类型发现细节
 
-上下文树是**编译期**走出来编译单元生成的，所以 `WithAutoDiscovery` 是一组目录列举，而不是运行期扫描：
+上下文树由源码生成器**在编译期**遍历编译构建，因此 `WithAutoDiscovery` 只是若干目录列举，而不是运行时扫描：
 
-| `Customer/` 下的目录 | 装什么 |
+| `Customer/` 下的目录 | 内容 |
 |---|---|
-| `Enums` | 生成器放行的枚举类型 |
-| `Interfaces` | 被用作成员类型的接口 |
-| `Data` | 数据类型 —— 带 `[AgentContext]` 的类与结构体，**以及（2026-10-05 起）被某个已收录类型的成员声明类型直接暴露出来的普通类** |
-| `Components/{kind}` | 四类组件，按 `IWorkflowTreeViewModel` / `IWorkflowNodeViewModel` / `IWorkflowSlotViewModel` / `IWorkflowLinkViewModel` 分组 |
+| `Enums` | 生成器收录的枚举类型 |
+| `Interfaces` | 被成员类型使用的接口 |
+| `Data` | 数据类型 —— 带 `[AgentContext]` 的类与结构体，以及被已列类型成员以声明类型暴露的普通类 |
+| `Components/{kind}` | 四个组件种类，按 `IWorkflowTreeViewModel` / `IWorkflowNodeViewModel` / `IWorkflowSlotViewModel` / `IWorkflowLinkViewModel` 分组 |
 
-**注册什么取决于生成器放行了什么。** 没有任何标注触及、没有组件接口到达、也没有成员引用的类型，既不在树里，也不在这里注册 —— 对它根本没有上下文可渲染。框架类型住在 `Framework/` 下，而只读 `Customer/`。
+**注册的就是生成器收录的。** 没有任何标注、没有组件接口可达、也没有成员引用的类型不在树中，也不会在这里注册 —— 对它没有可渲染的上下文。框架类型位于 `Framework/`，这里只读 `Customer/`。
 
-源码：`WorkflowAgentScope.cs:969-986`；数据那条放宽的可达判据在 `AIContextModel.cs:311-322` 与 `:377-399`。
+来源：`WorkflowAgentScope.cs`（`WithAutoDiscovery`）；数据扩宽的收录规则在 `AIContextModel.cs`。
 
-**预期结果：** `WithAutoDiscovery()` 之后，作用域持有编译期树里的客户注册；询问一个生成器从未放行的类型，得不到任何上下文块。
+**预期结果：** 调用 `WithAutoDiscovery()` 后，作用域持有编译树的客户类型注册；请求一个生成器从未收录的类型不会得到上下文块。
 
 ## 4. 提示提供器
 
@@ -63,19 +63,19 @@ WorkflowAgentScope scope = tree.AsAgentScope()
 |---|---|---|
 | `ProvideProgressiveContextPrompt` | `string ProvideProgressiveContextPrompt()` / `(AgentLanguages)` | 精简系统提示。 |
 | `ProvideAllContexts` | `string ProvideAllContexts()` / `(AgentLanguages)` | 完整自包含提示。 |
-| `ProvideFrameworkContext` | `string ProvideFrameworkContext(AgentLanguages = English)` | 内置枚举/接口/组件的上下文块。 |
-| `ProvideCustomerContext` | `string ProvideCustomerContext(AgentLanguages = English)` | 已注册客户类型的上下文块。 |
-| `ProvideFrameworkDataContext` | `string ProvideFrameworkDataContext(AgentLanguages = English)` | `Anchor`、`Offset`、`Size`、`IAccessContext`、`ITaskContext`、`TaskContext`、`ICompileContext`、`IRuntimeContext` 的数据块。 |
-| `ProvideCustomerDataContext` | `string ProvideCustomerDataContext(AgentLanguages = English)` | 已注册客户数据类型的数据块。 |
+| `ProvideFrameworkContext` | `string ProvideFrameworkContext(AgentLanguages language = English)` | 内置枚举/接口/组件的上下文块。 |
+| `ProvideCustomerContext` | `string ProvideCustomerContext()` | 已注册客户类型的上下文块，各自使用注册时的语言。 |
+| `ProvideFrameworkDataContext` | `string ProvideFrameworkDataContext(AgentLanguages language = English)` | `Framework/Data` 下内置数据类型（如 `Anchor`、`Offset`、`Size`）的数据块。 |
+| `ProvideCustomerDataContext` | `string ProvideCustomerDataContext()` | 已注册客户数据类型的数据块，各自使用注册时的语言。 |
 
-`ProvideProgressiveContextPrompt` 让初始提示保持精简：行为约束、失败处理协议、内置参考、带一行摘要的已注册类型清单、自定义工具、交互安全策略、技能与输出语言指令。完整的属性/命令表**不**预载 —— 模型被告知在操作某类型前先用完整类型名调用 `GetComponentContext`。
+`ProvideProgressiveContextPrompt` 让初始提示保持精简：行为约束、失败处理协议、内置参考、带一行摘要的注册类型清单、自定义工具、权限策略、技能与输出语言指令。完整的属性/命令表**不会**预加载 —— 模型被告知在操作某类型前先用完整类型名调用 `GetComponentContext`。
 
 ```csharp
-var skeleton = scope.ProvideProgressiveContextPrompt();   // 静态骨架 —— 冻进 ChatOptions.Instructions
+var skeleton = scope.ProvideProgressiveContextPrompt();   // 静态骨架 —— 冻结进 ChatOptions.Instructions
 var providers = scope.CreateContextProviders();           // 每轮：能力包络 + 技能 + MCP + 子代理 + 框架
 ```
 
-**预期结果：** `skeleton` 是非空 markdown 字符串，含「Interaction Safety Policy」小节；`providers` 至少包含一个 `WorkflowAgentContextProvider`。
+**预期结果：** `skeleton` 是非空 markdown 字符串，包含权限策略小节；`providers` 至少包含一个 `WorkflowAgentContextProvider`。
 
 ## 5. 工具产出
 
@@ -83,12 +83,12 @@ var providers = scope.CreateContextProviders();           // 每轮：能力包�
 |---|---|---|
 | `CreateToolkit` | `WorkflowAgentToolkit CreateToolkit()` | 本作用域的工具包（每个作用域缓存一个实例）。 |
 | `ProvideTools` | `IList<AITool> ProvideTools()` | 全部工具，遵守逐工具开关。 |
-| `ProvideTools` | `IList<AITool> ProvideTools(WorkflowToolCategory categories)` | 按类别位标志限制。 |
+| `ProvideTools` | `IList<AITool> ProvideTools(WorkflowToolCategory categories)` | 限制到给定类别标志。 |
 
-经 `WithTools` / `WithQueryTools` 注册的自定义工具始终包含，与类别标志无关。工具被关闭时的行为见「工具预算与宿主策略」页。
+经 `WithTools` / `WithQueryTools` 注册的自定义工具始终包含，不受类别标志影响。工具被关闭后的行为见「工具预算与宿主策略」页。
 
-**预期结果：** 对于启用了节点执行并注册了两个交互处理器的作用域，`scope.ProvideTools().Count` 为 `69` —— 即 68 个内置工具加上始终追加的 `ResetToolCallLimit`（精确的按类别拆分见第 06 页）。`Execution` 与 `Command` 的闸门在每个工具体内检查，因此不会从计数中移除工具；没有交互处理器时会少去 `Interaction` 的那些工具。
+**预期结果：** 对启用了节点执行、且两个交互处理器都已注册的作用域，`scope.ProvideTools().Count` 为 `71` —— 66 个无条件分类工具，加 `RequestSelection` / `RequestConfirmation` / `EnterPlanMode` / `ExitPlanMode`，加 `ResetToolCallLimit`（逐类别明细见第 06 页）。`Execution` 与 `Command` 闸门在每个工具体内检查，因此不会从计数中移除工具；没有处理器时数量只少掉这些条件工具。
 
 ## 运行声明
 
-- ⚠️ 未实际运行 —— 仅静态核验。签名与两趟发现行为读自 `WorkflowAgentScope.cs` 与 `AgentHelper.cs`；未从本页构造任何作用域。
+- ⚠️ 未实际运行 —— 仅静态核验（2026-10-18）。签名与上下文树发现行为读自 `WorkflowAgentScope.cs` 与 `AgentHelper.cs`；未从本页构造任何作用域。

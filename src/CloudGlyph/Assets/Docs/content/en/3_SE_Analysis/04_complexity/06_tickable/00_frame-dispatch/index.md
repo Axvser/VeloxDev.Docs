@@ -15,7 +15,7 @@ $$
 Each sweep body is: an array index, a pattern-match on the wrapper, and one delegate call. The `Handled` check is hoisted to the top of the body, so a behaviour that aborts the phase turns the rest of **both** loops into a single branch:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 692-701)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 694-703)
 for (int i = 0; i < wrappers.Length; i++)
 {
     if (frameArgs.Handled || token.IsCancellationRequested) break;
@@ -46,14 +46,14 @@ $$
 \frac{\text{steps}}{\text{frame}} \approx \frac{1000}{F \cdot h}
 $$
 
-For the defaults, $F = 60$ and $h = 16$: $\frac{1000}{60 \cdot 16} \approx 1.04$ steps per frame. Change the target to 2 fps and the ratio goes to about 31; press `SetFixedUpdateInterval(200)` and at 60 fps it drops to 2.5. The demo measures the ratio rather than computing it — `Δfixed / Δframes` over a one-second window (`MainWindow.xaml.cs` lines 201-228) — which is why the value it displays tracks the *measured* frame rate rather than the configured one and reads high while the update pump is still ramping up. Note also that the ratio is unaffected by the time scale: the rate moves the virtual clock, and the fixed pump follows the virtual clock.
+For the defaults, $F = 60$ and $h = 16$: $\frac{1000}{60 \cdot 16} \approx 1.04$ steps per frame. Change the target to 2 fps and the ratio goes to about 31; press `SetFixedUpdateInterval(200)` and at 60 fps it drops to 2.5. The WPF demo measures the ratio rather than computing it — `Δfixed / Δframes` over a one-second window (`MainWindow.xaml.cs` lines 170-197) — which is why the value it displays tracks the *measured* frame rate rather than the configured one and reads high while the update pump is still ramping up. Note also that the ratio is unaffected by the time scale: the rate moves the virtual clock, and the fixed pump follows the virtual clock.
 
 ## Amortised cache validation
 
 `GetCachedWrappers` runs on every sweep and is $O(1)$ when the cache is good:
 
 ```csharp
-// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 741-751)
+// Src/Core/VeloxDev.Core/TimeLine/TickManager.cs (lines 743-753)
 private BehaviorWrapper[] GetCachedWrappers()
 {
     var currentTime = GetTimestamp();
@@ -67,7 +67,7 @@ private BehaviorWrapper[] GetCachedWrappers()
 }
 ```
 
-- **Cache hit:** one `Stopwatch.GetTimestamp()`, one `Interlocked.Read`, one comparison, one `volatile` read of the array. Constant, and called three times per frame (once per sweep) plus once per fixed step.
+- **Cache hit:** one `Stopwatch.GetTimestamp()`, one `Interlocked.Read`, one comparison, one `volatile` read of the array. Constant, and called twice per update frame (once per update sweep) plus once per fixed step.
 - **Cache miss:** `RebuildCachedWrappers`, which is where the $O(N^2)$ lives.
 
 $T_{\text{rebuild}}$ has three parts — allocate and fill ($O(N)$), insertion-sort ($O(N^2)$ worst case, $O(N)$ on an already-ordered array, which is the common case because `ExecutionOrder` is a monotonically increasing counter and registration order *is* execution order), and a possible `Array.Resize` copy ($O(N)$):
@@ -90,6 +90,6 @@ The steady-state space per channel is fixed, not per frame:
 | The four queues | $O(k)$ where $k$ is unapplied changes; normally 0 |
 | Samplers, bus, CTS | $O(1)$ each |
 
-**Per-frame allocation in the steady state is zero.** One `FrameEventArgs` is drawn and returned; one wrapper per registration and one config request per FPS change are pooled; the dispatch array is only replaced on a change, not per frame. That is the property the pool exists for, and it is measurable: the demo's `HookEntry` is deliberately a struct "built without touching a string" because "at the default frame rate a channel runs about 120 hooks a second, and a log that allocated per call would be a GC cost the demo imposed on the very loop it is measuring" (`SimState.cs` lines 146-158).
+**Per-frame allocation in the steady state is zero.** One `FrameEventArgs` is drawn and returned; one wrapper per registration and one config request per FPS change are pooled; the dispatch array is only replaced on a change, not per frame. That is the property the pool exists for, and it is measurable: the demo's `HookEntry` is deliberately a struct "built without touching a string" because "at the default frame rate a channel runs about 120 hooks a second, and a log that allocated per call would be a GC cost the demo imposed on the very loop it is measuring" (`SimState.cs` lines 119-128).
 
-> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 689-751, 872-901; `Examples/Tickable/WPF/Demo/MainWindow.xaml.cs` lines 201-228; `Examples/Tickable/WPF/Demo/SimState.cs` lines 146-158.
+> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 691-753, 874-903; `Examples/Tickable/WPF/Demo/MainWindow.xaml.cs` lines 170-197; `Examples/Tickable/WPF/Demo/SimState.cs` lines 119-128.

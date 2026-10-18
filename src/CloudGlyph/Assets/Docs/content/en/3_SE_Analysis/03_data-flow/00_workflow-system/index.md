@@ -6,7 +6,7 @@ PlantUML sequence diagrams trace the core data flows of the workflow-system feat
 
 | Page | Flow |
 |---|---|
-| [Connect Flow](00_connect/index.md) | Build one connection: `SendConnection` → `ReceiveConnection` → `CreateLink` |
+| [Connect Flow](00_connect/index.md) | Build one connection, with the drag preview: `SendConnection` → `SetPreviewReceiver` → `ReceiveConnection` → `CreateLink` |
 | [Compile and Run (Root)](01_compile-and-run/index.md) | Compile a graph (`CompileRole.Root`) and drive it with `RuntimeEngine.RunAsync` |
 | [Reverse / Terminal Cone Flow](02_terminal-cone/index.md) | Reverse-compile a result (`CompileRole.Terminal`) and track `Target` / `TargetReached` |
 | [Redirect Re-run](03_redirect/index.md) | An in-node `Error()` → `IRedirectable` → whole-graph re-run |

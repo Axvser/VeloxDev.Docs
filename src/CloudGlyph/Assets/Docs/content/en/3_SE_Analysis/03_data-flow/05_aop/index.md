@@ -1,10 +1,10 @@
 # Data Flow — AOP
 
-The AOP runtime flow has three stages: **proxy acquisition**, **hook registration**, and **intercepted invocation**. The examples below use the WPF demo (`Examples/AOP/WPF/Demo`), where a `Demo.TeamViewModel` is the target and `TeamViewModel_Demo_Aop` is its generated proxy interface.
+Three flows: **proxy acquisition**, **hook installation**, and **intercepted invocation**. The example uses `Demo.TeamViewModel` from `Examples/AOP/WPF/Demo`, whose generated proxy is `TeamViewModel_Demo_AopProxy`.
 
-## 1. Proxy acquisition & hook registration
+## 1. Proxy acquisition — `Aop()`
 
-The generated `Aop()` extension (`AopWriter.cs`, `Src/Generators/VeloxDev.Core.Generator/Writers/AopWriter.cs`) is the single entry point. Its factory runs only on the first call per target; later calls are cache hits in the per-pair `ConditionalWeakTable`:
+The generated extension is the only entry point. `AopCache` runs the factory once per target; later calls return the cached proxy.
 
 ```plantuml
 @startuml
@@ -13,139 +13,169 @@ The generated `Aop()` extension (`AopWriter.cs`, `Src/Generators/VeloxDev.Core.G
 actor "Caller (UI)" as C
 participant "Aop() extension" as E
 participant "AopCache" as AC
-participant "ProxyEx" as PX
-participant "DispatchProxy" as DP
-participant "ProxyInstance" as PI
+participant "Proxy ctor" as P
 participant "Aop" as AO
 
 C -> E: team.Aop()
 activate E
-
-E -> AC: AopCache.Resolve<TeamViewModel, TeamViewModel_Demo_Aop>(team, factory)
+E -> AC: Resolve<TeamViewModel, TeamViewModel_Demo_Aop>(team, factory)
 activate AC
+AC -> AC: Entry<TClass,TInterface>.Instances.GetValue(team, factory)
 
-alt proxy already cached for this target
-    AC --> E: cached proxy (per-pair CWT hit)
+alt cached
+    AC --> E: cached TeamViewModel_Demo_AopProxy
 else first call
-    AC -> AC: Entry<TeamViewModel, TeamViewModel_Demo_Aop>.Instances.GetValue(team, factory)
-    AC -> PX: factory -> ProxyEx.CreateProxy<TeamViewModel_Demo_Aop>(team)
-    activate PX
-    PX -> DP: DispatchProxy.Create<TeamViewModel_Demo_Aop, ProxyInstance>()
-    activate DP
-    DP --> PX: proxy (ProxyInstance subclass; ctor registers ProxyInstances[localid])
-    deactivate DP
-    PX -> PI: _target = team; _targetType = interface type
-    PX -> PI: ProxyIDs.Add(proxy, proxy._localid)
-    PX --> AC: proxy
-    deactivate PX
-    AC -> AO: Aop.Map(proxy, team)  (reverse lookup table)
-    AC --> E: proxy (now cached in the per-pair CWT)
+    AC -> P: factory -> new TeamViewModel_Demo_AopProxy(team)
+    activate P
+    P --> AC: proxy (_target = team)
+    deactivate P
+    AC -> AO: Aop.Map(proxy, team)
+    activate AO
+    AO --> AC: (weak entry)
+    deactivate AO
+    AC --> E: proxy (now cached)
 end
 
 deactivate AC
-E --> C: TeamViewModel_Demo_Aop proxy
+E --> C: TeamViewModel_Demo_Aop
 deactivate E
 
 @enduml
 ```
 
-`SetProxy` then classifies the member with `ProxyMembers` and resolves the live `ProxyInstance` through `ProxyIDs` → `ProxyInstances` (both static dictionaries declared in `ProxyInstance.cs`; `ProxyEx.cs` only reads them). When the key already exists the whole `(start, coverage, end)` triple is overwritten:
+The proxy is constructed with `new`, not through a factory API. The generated extension is:
 
-| Member kind (`ProxyMembers`) | Dictionary written | Accessor key |
-|---|---|---|
-| `Getter` | `ProxyInstance.GetterActions` | `"get_" + memberName` |
-| `Setter` | `ProxyInstance.SetterActions` | `"set_" + memberName` |
-| `Method` | `ProxyInstance.MethodActions` | `memberName` (verbatim) |
+```csharp
+var p = new global::VeloxDev.AopInterfaces.AopFixture_VeloxDev_Core_Test_AspectOriented_AopProxy(x);
+global::VeloxDev.AspectOriented.Aop.Map(p, x);
+return p;
+```
 
-For example, `p.SetProxy(ProxyMembers.Setter, nameof(TeamViewModel.Name), null, null, endHook)` stores the triple under `"set_Name"` in `SetterActions` (`ProxyEx.cs` `SetPropertySetter`, lines 63-82). The dictionaries, `ProxyInstance` registrations and hooks all belong to a **single proxy instance**, so `SetProxy` must be called on the object returned by `Aop()`, not on the raw target.
+(emitted by `AopWriter.WriteExtension`; shown for `AopFixture`, same shape for every target.)
 
-## 2. Intercepted invocation
-
-Every member call on the proxy funnels into `ProxyInstance.Invoke` (`ProxyInstance.cs`, lines 23-53). The member name picks a dictionary: `get_*` → `GetterActions`, `set_*` → `SetterActions`, anything else → `MethodActions`. The hook order is always `start` → (`coverage`, or a reflection fallback into the real target) → `end`:
+## 2. Hook installation — `SetProxy`
 
 ```plantuml
 @startuml
 !theme plain
 
-actor "Caller (UI)" as C
-participant "TeamViewModel_Demo_Aop proxy" as P
-participant "ProxyInstance" as PI
-participant "ProxyHandler hooks" as H
+actor "Caller" as C
+participant "ProxyEx" as PX
+participant "Proxy (IAopHookTarget)" as P
+participant "AspectHooks" as H
+
+C -> PX: SetProxy<T>(target, kind, name, start, coverage, end)
+activate PX
+alt target is not IAopHookTarget
+    PX --> C: throw InvalidOperationException
+else proxy
+    PX -> PX: key = "get_" + name / "set_" + name / name
+    PX -> H: new AspectHooks(start, coverage, end)
+    activate H
+    H --> PX: hooks
+    deactivate H
+    PX -> P: SetHooks(key, hooks)
+    activate P
+    alt key matches a member
+        P -> P: _hooks_key = hooks
+        P --> PX: (stored)
+    else unknown key
+        P --> PX: throw ArgumentOutOfRangeException
+    end
+    deactivate P
+    PX --> C: void
+end
+deactivate PX
+
+@enduml
+```
+
+`SetHooks` is an explicit interface implementation on the generated proxy; its `switch` has one case per interceptable accessor. Re-installing replaces the field — the previous `AspectHooks` is dropped, not composed.
+
+## 3. Intercepted invocation
+
+Every generated member has the same two-branch shape: **no hooks** calls the target directly; **hooks present** runs the chain.
+
+```plantuml
+@startuml
+!theme plain
+
+actor "Caller" as C
+participant "TeamViewModel_Demo_AopProxy" as P
+participant "AspectHooks" as H
 participant "TeamViewModel (target)" as T
 
-C -> P: p.Reset() / p.Name read / p.Name = value
+C -> P: p.Add(2, 3) / p.Name / p.Name = value
 activate P
-P -> PI: DispatchProxy routes Invoke(name, args)
-activate PI
+P -> P: h = _hooks_<key>
 
-PI -> PI: GetterActions/SetterActions/MethodActions lookup by member name
+alt h is null (no hooks)
+    P -> T: direct call (no array, no boxing, no reflection)
+    T --> P: result
+else hooks installed
+    alt getter
+        P -> H: Start?.Invoke(null, null)
+    else setter
+        P -> H: Start?.Invoke(new object?[]{ value }, null)
+    else method with arguments
+        P -> H: Start?.Invoke(new object?[]{ args... }, null)
+    else parameterless method
+        P -> H: Start?.Invoke(null, null)
+    end
+    H --> P: r0
 
-alt start handler registered
-    PI -> H: start.Invoke(args, null)
-    H --> PI: R0
+    alt Coverage is null
+        P -> T: the member's own body
+        T --> P: r1
+    else Coverage installed
+        P -> H: Coverage.Invoke(args, r0)
+        H --> P: r1
+    end
+
+    P -> H: End?.Invoke(args, r1)
+    H --> P: (discarded)
 end
 
-alt coverage handler registered
-    PI -> H: coverage.Invoke(args, R0)   (replaces the original body)
-    H --> PI: R1
-else coverage == null
-    PI -> T: reflection: _targetType.GetMethod(name).Invoke(_target, args)
-    T --> PI: R1 (the real body runs)
-end
-
-alt end handler registered
-    PI -> H: end.Invoke(args, R1)
-    H --> PI: -
-end
-
-PI --> P: return R1
-deactivate PI
-P --> C: result
+P --> C: r1 (or the direct result)
 deactivate P
 
 @enduml
 ```
 
-Applied to the demo hooks (`MainWindow.xaml.cs`, lines 45-95):
+Applied to the demo regs in `MainWindow.xaml.cs`:
 
-- `p.Name` read: only a `start` hook is registered, so the read logs the access and the value itself comes from the reflection fallback.
-- `p.Name = "..."`: only an `end` hook is registered; the reflection fallback performs the write, then the `end` hook observes `args[0]` (the new value).
-- `p.Reset()`: only a `coverage` hook is registered, so the built-in reset body **never runs** — the hook return value `R1 = null` replaces it.
+| Call | Registered stage | What happens |
+|---|---|---|
+| `p.Name` | getter `start` | logs the read; the body still runs and returns the value |
+| `p.Name = "..."` | setter `end` | the body writes; `end` reads `args[0]` |
+| `p.Reset()` | method `coverage` | the body never runs; `coverage`'s `null` result is returned |
+| `p.Members.Add(...)` | `AOP_OnMemberAdded` `end` | the collection event re-enters `this.Aop()`; the method body runs, then `end` reports the new item |
 
-### Event-driven extension (collection change → self `Aop()`)
+### Event-driven re-entry
 
-The demo also shows aspect behavior reached through an event, not a direct proxy call. `TeamViewModel`'s constructor subscribes its own private handlers to the real `Members` collection (`TeamViewModel.cs`, lines 10-14):
+`TeamViewModel` subscribes to its own collection in the constructor and forwards through the proxy (`Examples/AOP/WPF/Demo/TeamViewModel.cs`):
 
 ```csharp
-// Examples/AOP/WPF/Demo/TeamViewModel.cs (lines 35-38)
 private void OnMemberAdded(object? sender, NotifyCollectionChangedEventArgs e)
 {
     this.Aop().AOP_OnMemberAdded(sender, e);
 }
 ```
 
-Adding a member through the proxy (`p.Members.Add(...)`) reflects to the target's real collection, whose `CollectionChanged` fires `OnMemberAdded`. That handler routes back through the **same cached proxy** — `this.Aop()` — and calls the `[AspectOriented]` `AOP_OnMemberAdded`, whose `end` hook reports each added member. The intercepted method still runs its own body through the reflection fallback, so the aspect layers on top of the original logic.
+`this.Aop()` is the same cached proxy, so the notification path is intercepted exactly like a direct call. The method body still runs (no `coverage`), and the demo's `end` hook inspects `parameters[1]` — the `NotifyCollectionChangedEventArgs`.
 
-## 3. Error & boundary paths
-
-`ProxyInstance.Invoke` contains **no try/catch** — none of the hook stages are protected:
-
-- A throwing `start` / `coverage` / `end` handler propagates its exception straight to the caller; the remaining stages and any reflection call are skipped.
-- When `coverage == null` and the reflection `MethodInfo.Invoke` throws (the real method throws, or arguments mismatch), reflection wraps it as `TargetInvocationException` and it propagates out; an `end` hook is skipped.
-- When `coverage == null` and `_targetType.GetMethod(name)` returns `null` (member not resolvable on the proxy interface), the `?.` short-circuits: `Invoke` returns `null` and the real body is **not** executed.
-- A member with no registered hooks is not special-cased — the `actions == null` path still takes the reflection fallback, so unhooked members transparently reach the real target.
-- `SetProxy` on an object that is not a registered proxy (for example, the raw target rather than the `Aop()` result) silently does nothing: the `ProxyIDs` lookup in `ProxyEx.cs` fails and the helper returns the source unchanged.
-
-## Flow summary
+## 4. Error and boundary paths
 
 | Path | Trigger | Result |
 |---|---|---|
-| Proxy acquisition | first `instance.Aop()` | `DispatchProxy` created, `_target`/`_targetType` set, registered in `ProxyIDs`, mapped via `Aop.Map`, cached in the per-pair CWT |
-| Hook registration | `proxy.SetProxy(kind, name, s, c, e)` | `(s, c, e)` written under `get_*`/`set_*`/verbatim key in `GetterActions`/`SetterActions`/`MethodActions` |
-| Normal call | `proxy.Member(...)` | `start` → `coverage` (or reflection fallback) → `end` → return `R1` |
-| Hook throws | any non-null hook | Exception propagates to the caller; remaining stages and reflection skipped |
-| Reflection throws | `coverage == null`, member found | `TargetInvocationException` propagates; `end` skipped |
-| Reflection misses | `coverage == null`, member not found | `GetMethod(...)?` returns `null`; call returns `null`, real body not run |
-| Event extension | target collection `CollectionChanged` | private handler calls `this.Aop().AOP_OnMemberAdded(...)` through the cached proxy |
+| Not a proxy | `SetProxy` on a hand-written `IAspectOriented` | `InvalidOperationException` before any state changes |
+| Unknown member | `SetProxy(..., "NoSuchMember", ...)` | `ArgumentOutOfRangeException` from `SetHooks` |
+| Hook throws | any non-null stage | Propagates unchanged; later stages are skipped |
+| Coverage returns `null` for a value type | e.g. `int` member | `NullReferenceException` at the generated unbox |
+| Coverage returns the wrong type | any member | `InvalidCastException` at the generated cast |
+| Target member throws | body or direct call | Propagates unchanged — no `TargetInvocationException` wrapper |
+| No hooks | any member | Direct call; no exception surface of its own |
 
-> Source references: `Src/Core/VeloxDev.Core/AspectOriented/{ProxyInstance,ProxyEx,AopCache,Aop}.cs`, `Src/Generators/VeloxDev.Core.Generator/Writers/AopWriter.cs`, `Examples/AOP/WPF/Demo/{TeamViewModel.cs,MainWindow.xaml.cs}`.
+The absence of a reflection wrapper is a behavioral improvement over the previous `MethodInfo.Invoke` design: callers catch the same exception type the target threw.
+
+> Source: `Src/Core/VeloxDev.Core/AspectOriented/{Aop,AopCache,ProxyEx,AspectHooks}.cs`, `Src/Generators/VeloxDev.Core.Generator/{AopSurface,AopProxy}.cs`, `Writers/AopWriter.cs`, `Src/Core/VeloxDev.Core.Test/AspectOriented/AopProxyTests.cs`, `Examples/AOP/WPF/Demo/{TeamViewModel.cs,MainWindow.xaml.cs}`.

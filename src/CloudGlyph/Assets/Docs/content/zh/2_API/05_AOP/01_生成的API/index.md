@@ -1,79 +1,107 @@
-# AOP — 生成器产物（源生成器）
+# AOP — 生成器产物
 
-对每个至少有一个成员带 `[AspectOriented]` 的 `partial` 类在编译期生成（识别逻辑在 `Base/AnalizeHelper.IsAopClass` 与 `Writers/AopWriter.ReadAopConfig`）。共三种产物，来自 `Src/Generators/VeloxDev.Core.Generator` 的生成器：
+`Src/Generators/VeloxDev.Core.Generator` 中的两个增量生成器产出调用方触达的全部内容：
 
-| 产物 | 生成者 | 文件名提示 |
+| 生成器 | 源码 | 发射 |
 |---|---|---|
-| AOP 代理接口 | `AopInterface` | `{Class}_{Ns}_Aop.g.cs` |
-| partial 类胶水 | `AopProxy` → `AopWriter.Write` | `{Class}_{Ns}_AOP.g.cs` |
-| `Aop(this T)` 扩展 | `AopProxy` → `AopWriter.WriteExtension` | `{Class}_{Ns}_AopExt.g.cs` |
+| `VeloxDev.Generators.AopSurface` | `AopSurface.cs` | 镜像接口与代理类（两个文件） |
+| `VeloxDev.Generators.AopProxy` | `AopProxy.cs` → `Writers/AopWriter.cs` | `Aop()` 扩展 |
 
-`Ns` 是类所在命名空间把 `.` 替换为 `_` 之后的结果（对文件级命名空间的 `Demo.TeamViewModel`，`Ns = Demo`）。
+用户类不会被注入任何东西。`AopWriter.GenerateBaseTypes` 与 `GenerateBaseInterfaces` 返回空数组，`GenerateBody` 返回空字符串 —— 旧的 partial 类胶水已不存在。
 
-## 生成类型：`VeloxDev.AopInterfaces.{Class}_{Ns}_Aop`
+## 发现
 
-命名规则出自 `AopInterface.cs`：
+`Analizer.Filters.Targets` 使用 `ForAttributeWithMetadataName("VeloxDev.AspectOriented.AspectOrientedAttribute", ...)`，`IsCandidateClass` 只接受 **partial** 类声明。随后 `AnalizeHelper.IsAopClass` 跨所有 partial 声明按特性简单名复查成员。由此可知：
+
+- 类必须是 `partial`；
+- 写 `[AspectOriented]`，不要写限定名或别名形式；
+- 跨多个 partial 文件的类型只生成一次，成员从所有部分收集。
+
+## 命名
+
+`Base/AopNames.cs` 是唯一的命名算法：
 
 ```csharp
-string interfaceName = $"{classDeclaration.Identifier.Text}_{classSymbol.ContainingNamespace.ToDisplayString().Replace('.', '_')}_Aop";
+internal const string InterfaceNamespace = "VeloxDev.AopInterfaces";
+
+internal static string InterfaceFor(INamedTypeSymbol symbol)
+    => $"{symbol.Name}_{Segment(symbol)}_Aop";
+
+internal static string ProxyFor(INamedTypeSymbol symbol)
+    => InterfaceFor(symbol) + "Proxy";
+
+internal static string Segment(INamedTypeSymbol symbol)
+    => symbol.ContainingNamespace is null || symbol.ContainingNamespace.IsGlobalNamespace
+        ? "Global"
+        : symbol.ContainingNamespace.ToDisplayString().Replace('.', '_');
 ```
 
-`public`，继承 `global::VeloxDev.AspectOriented.IAspectOriented`。示例：`Demo.TeamViewModel` → `TeamViewModel_Demo_Aop`；`Demo.ViewModels.TeamViewModel` → `TeamViewModel_Demo_ViewModels_Aop`。
+示例：`Demo.TeamViewModel` → `TeamViewModel_Demo_Aop`；`Demo.ViewModels.TeamViewModel` → `TeamViewModel_Demo_ViewModels_Aop`；全局命名空间的类 → `{Class}_Global_Aop`。
 
-**生成的成员**（为类的每个合格成员生成一个公有成员，按成员类别依次排列）：
+## 生成的接口
 
-- **字段**：同时带有 `[AspectOriented]` 与简单名含 `Observable` 或 `Property` 的特性（例如 `[VeloxProperty]`、`[Observable]`）时，成为一个 get/set 属性。名称去掉前导 `_` 并把下一字符大写（`Base/AnalizeHelper.GetPropertyNameByFieldName`）：`_name` → `Name`。
-- **公有属性**：带 `[AspectOriented]` 时成为一个属性 —— 当不存在 getter 或 getter 为公有时保留 getter；仅当存在公有 setter 时保留 setter。
-- **公有方法**：带 `[AspectOriented]` 时成为一个方法；参数与返回类型改写为语义模型解析出的全限定显示形式（`void` 保持 `void`）。
-
-`AopInterface` 对 WPF demo 类 `Demo.TeamViewModel` 生成的接口的可读渲染（实际生成器写的是语义模型解析出的全限定类型名）：
+文件名提示 `{Interface}.g.cs`，命名空间 `VeloxDev.AopInterfaces`。以 `AopFixture`（命名空间 `VeloxDev.Core.Test.AspectOriented`）为例，发射的声明是：
 
 ```csharp
-public interface TeamViewModel_Demo_Aop : global::VeloxDev.AspectOriented.IAspectOriented
+public interface AopFixture_VeloxDev_Core_Test_AspectOriented_Aop : global::VeloxDev.AspectOriented.IAspectOriented, global::VeloxDev.AspectOriented.IAopHookTarget
 {
-    string Name { get; set; }
-    ObservableCollection<MemberViewModel> Members { get; set; }
-    void Reset();
-    void AOP_OnMemberAdded(object? sender, NotifyCollectionChangedEventArgs e);
-    void AOP_OnMemberRemoved(object? sender, NotifyCollectionChangedEventArgs e);
+    public string Title { get; set; }
+
+    public int Add(int a, int b);
+    public void Ping();
+    public string Echo(string value);
 }
 ```
 
-`Name` / `Members` 来自 `TeamViewModel.cs` 的两个 `[VeloxProperty][AspectOriented]` 字段；`Reset`、`AOP_OnMemberAdded`、`AOP_OnMemberRemoved` 来自 `[AspectOriented]` 公有方法。该类型被传给 `DispatchProxy.Create<T, ProxyInstance>()`，这正是运行时能拦截 `get_*` / `set_*` / 方法名的原因（`AspectOrientedAttribute` 见 [特性与标记](../00_面向切面/00_特性与标记/index.md)）。
+成员规则出自 `AopSurface.GenerateSource`：
 
-## 生成的 partial 类（文件 `{Class}_{Ns}_AOP.g.cs`）
+| 源成员 | 条件 | 接口成员 |
+|---|---|---|
+| 字段 | `[AspectOriented]` 外加文本含 `Observable` 或 `Property` 的特性 | `get`/`set` 属性；名称为去掉前导 `_` 并把下一字符大写（`_name` → `Name`） |
+| 属性 | `public` 且带 `[AspectOriented]`；存在公有 getter 或未声明 getter 时镜像 getter；仅当存在公有 setter 时镜像 setter | 同名属性 |
+| 方法 | `public` 且带 `[AspectOriented]` | 同名方法，参数与返回类型为全限定名 |
 
-`AopProxy`（命名空间 `VeloxDev.Generators`）收集每个通过过滤的类，当 `AopWriter.CanWrite()` 为真（存在 `[AspectOriented]` 成员）时，经继承的 `WriterBase.Write()` 产出一个源文件：重发所属命名空间，并把类重新声明为 `partial`，其基类型列表 = 符号原有的基类型 + 生成的 AOP 接口（`AopWriter.GenerateBaseInterfaces`），方法体为空。
+属性的 getter 与 setter 是独立成员，拥有独立的钩子组。
 
-真实契约出自 `Writers/AopWriter.cs`：
+## 生成的代理
+
+文件名提示 `{Interface}Proxy.g.cs`，命名空间 `VeloxDev.AopInterfaces`：
 
 ```csharp
-public override string[] GenerateBaseInterfaces() =>
-[
-    $"{NAMESPACE_VELOX_AOP}.{Syntax?.Identifier.Text}_{NamespaceFileSegment()}_Aop"
-];
+internal sealed class AopFixture_VeloxDev_Core_Test_AspectOriented_AopProxy : AopFixture_VeloxDev_Core_Test_AspectOriented_Aop
+{
+    private global::VeloxDev.AspectOriented.AspectHooks? _hooks_Add;
+    private global::VeloxDev.AspectOriented.AspectHooks? _hooks_Ping;
+    private global::VeloxDev.AspectOriented.AspectHooks? _hooks_Echo;
+    private global::VeloxDev.AspectOriented.AspectHooks? _hooks_get_Title;
+    private global::VeloxDev.AspectOriented.AspectHooks? _hooks_set_Title;
+
+    private readonly global::VeloxDev.Core.Test.AspectOriented.AopFixture _target;
+
+    internal AopFixture_VeloxDev_Core_Test_AspectOriented_AopProxy(global::VeloxDev.Core.Test.AspectOriented.AopFixture target) => _target = target;
+    // 成员与 SetHooks ...
+}
 ```
 
-其中 `NAMESPACE_VELOX_AOP = "global::VeloxDev.AopInterfaces"` 与 `NamespaceFileSegment()` 都定义在 `Writers/WriterBase.cs`。`NamespaceFileSegment()` 返回把 `.` 替换为 `_` 后的所属命名空间；当类位于全局命名空间时，返回占位符 `"Global"` —— 因为此时 `ToDisplayString()` 给出的是非法的 `<global namespace>`。效果：编译器因此看到该类实现了它的生成接口，从而由用户自己 `partial` 部分提供的成员满足接口契约 —— 模型源码无需自行声明该接口。
+它是 `internal sealed`；调用方只看到 `Aop()` 返回的接口类型。其行为与异常面见 [生成的代理](../00_面向切面/03_生成的代理/index.md)。
 
-## 生成的扩展：`{Class}_{Ns}_AopExtensions` 中的 `Aop(this T)`
+## 生成的扩展
 
-`AopWriter.WriteExtension()` 在命名空间 `VeloxDev.AspectOriented` 下发射文件 `{Class}_{Ns}_AopExt.g.cs`。对 WPF demo 的 `Demo.TeamViewModel` 的具体输出：
+文件名提示 `{Class}_{NamespaceSegment}_AopExt.g.cs`，命名空间 `VeloxDev.AspectOriented`，类名 `{Class}_{NamespaceSegment}_AopExtensions`。`AopFixture` 的实际发射输出：
 
 ```csharp
 namespace VeloxDev.AspectOriented;
 
-public static class TeamViewModel_Demo_AopExtensions
+public static class AopFixture_VeloxDev_Core_Test_AspectOriented_AopExtensions
 {
-    public static global::VeloxDev.AopInterfaces.TeamViewModel_Demo_Aop Aop(
-        this global::Demo.TeamViewModel instance)
+    public static global::VeloxDev.AopInterfaces.AopFixture_VeloxDev_Core_Test_AspectOriented_Aop Aop(this global::VeloxDev.Core.Test.AspectOriented.AopFixture instance)
         => global::VeloxDev.AspectOriented.AopCache.Resolve<
-            global::Demo.TeamViewModel,
-            global::VeloxDev.AopInterfaces.TeamViewModel_Demo_Aop>(
+            global::VeloxDev.Core.Test.AspectOriented.AopFixture,
+            global::VeloxDev.AopInterfaces.AopFixture_VeloxDev_Core_Test_AspectOriented_Aop>(
             instance,
             static x =>
             {
-                var p = global::VeloxDev.AspectOriented.ProxyEx.CreateProxy<global::VeloxDev.AopInterfaces.TeamViewModel_Demo_Aop>(x);
+                var p = new global::VeloxDev.AopInterfaces.AopFixture_VeloxDev_Core_Test_AspectOriented_AopProxy(x);
                 global::VeloxDev.AspectOriented.Aop.Map(p, x);
                 return p;
             });
@@ -82,19 +110,20 @@ public static class TeamViewModel_Demo_AopExtensions
 
 | 参数 | 类型 | 说明 |
 |---|---|---|
-| `instance` | `T`（模型类） | 要包装的目标实例 |
+| `instance` | 模型类 | 目标实例 |
 
-**返回：** `{Class}_{Ns}_Aop` — 缓存的代理（每个实例一个，经 `AopCache.Resolve`），类型为生成的接口。
+**返回：** 生成的接口 —— 经 `AopCache.Resolve` 每个实例一个缓存代理。
 
-**备注：**
+**生成文件路径：** 默认 Roslyn 只把这些源交给编译器。设置 `EmitCompilerGeneratedFiles=true` 后可在 `obj/<Configuration>/<TFM>/generated/VeloxDev.Core.Generator/VeloxDev.Generators.{AopSurface,AopProxy}/` 下查看。上面的片段来自 `Src/Core/VeloxDev.Core.Test` 的发射文件（`obj/Debug/net10.0/generated/...`）。
 
-- 通过 `AopCache.Resolve<TClass, TInterface>` 解析（见 [Aop 与 AopCache](../00_面向切面/04_代理生命周期/index.md)）；其执行的工厂调用 `ProxyEx.CreateProxy<I>(x)` 与 `Aop.Map(p, x)`。
-- Demo 用法，`Examples/AOP/WPF/Demo/MainWindow.xaml.cs`：
+## 限制（源码核验）
 
-```csharp
-var team = _teamData.Aop();     // 缓存的代理
-_ = _teamData.Aop().Name;       // getter 被拦截（start 钩子触发）
-_teamData.Aop().Reset();        // 方法被拦截（coverage 替换成员体）
-```
+| 形态 | 结果 | 原因 |
+|---|---|---|
+| 非 partial 类 | 不生成任何内容，无诊断 | `IsCandidateClass` 要求 `partial` |
+| 重载方法 | 生成代码无法编译 | 每个裸名只有一个钩子字段与一个 `switch` 分支 |
+| 泛型方法 | 生成接口丢失类型参数列表 | `MethodDeclaration(...)` 创建时未调用 `WithTypeParameterList` |
+| `ref` / `out` / `in` 参数 | 生成的调用丢失修饰符 | 代理以裸标识符调用 `_target.M(arg1, ...)` |
+| 非公有方法或非公有访问器 | 不镜像 | `AopSurface` 中的 `public` 过滤 |
 
-相关页面：[AOP 运行时概览](../00_面向切面/index.md)。
+被拦截成员应保持为实例成员、名称唯一、参数均为按值传递。

@@ -13,11 +13,11 @@
 | MAUI | `ContentView` | `sealed class` | `BindableProperty.CreateAttached` |
 | WinForms | `Control` | `sealed class` | 私有 `ConditionalWeakTable<Control, SurfaceState>` |
 | Razor | 无（组件） | `partial class WorkflowSurfaceBehavior : ComponentBase, IAsyncDisposable` | 参数 |
-| Jalium | 无（纯代码） | 没有独立的表面行为 —— 复合控件 `WorkflowTreeView` 自己负责平移、缩放与视口推送 | — |
+| Jalium | `FrameworkElement` | `public static class` | `DependencyProperty.RegisterAttached` |
 
-### 附加属性表面（WPF / Avalonia / WinUI / MAUI）
+### 附加属性表面（WPF / Avalonia / WinUI / MAUI / Jalium）
 
-每个 XAML 风格适配器都暴露相同的附加属性与常见的 `Get*` / `Set*` 静态访问器（属性系统：WPF/WinUI 为 `DependencyProperty`，Avalonia 为 `AvaloniaProperty`，MAUI 为 `BindableProperty`）：
+每个 XAML 风格适配器都暴露相同的附加属性与常见的 `Get*` / `Set*` 静态访问器（属性系统：WPF/WinUI/Jalium 为 `DependencyProperty`，Avalonia 为 `AvaloniaProperty`，MAUI 为 `BindableProperty`）：
 
 | 属性 | 类型 | 默认 | 说明 |
 |---|---|---|---|
@@ -39,8 +39,9 @@
 | WPF / Avalonia / WinUI | `public static void Refresh(UserControl host)` |
 | MAUI | `public static void Refresh(ContentView host)` |
 | WinForms | `public static void Refresh(Control host)` |
+| Jalium | `public static void Refresh(FrameworkElement host)` |
 
-**Jalium 没有 `Refresh`：** 它的表面是复合控件 `WorkflowTreeView`，用实例成员（`AttachScrollViewer`、`SetTree`、`NotifyZoomCommitted`、`NavigateToWorld`）取代整套静态表面行为。
+**Jalium 还提供** `NavigateToWorld(FrameworkElement host, double worldX, double worldY)`、`NotifyZoomCommitted(FrameworkElement host)` / `NotifyZoomCommitted(FrameworkElement host, double horizontalOffset, double verticalOffset)` 与 `TreeOf(DependencyObject element)`。表面是 `static class`：它和其余适配器一样解析模板的 `PART_*` 部件并推送视口。
 
 **WinForms 的表面另有** `SetWorkflowTree(Control element, IWorkflowTreeViewModel? value)`（对应 XAML 适配器免费获得的 `DataContext` 赋值）。
 
@@ -66,15 +67,15 @@ WinForms 没有附加属性；`WorkflowSurfaceBehavior` 为每个 `Control` 通�
 | `GridSpacing` | `double` | `40` | 次要网格间距。 |
 | `MajorLineEvery` | `int` | `5` | 主网格线节奏。 |
 | `RulerThickness` | `double` | `28` | 标尺带尺寸。 |
-| `LinkMenu` | `RenderFragment<IWorkflowLinkViewModel>?` | `null` | 连线右键菜单的条目；表面渲染外框并包办全部接线（右键、定位、开合、向中枢上报）。每个条目收到它作用于的那条连线。 |
+| `LinkMenu` | `RenderFragment<IWorkflowLinkViewModel>?` | `null` | 连线右键菜单的条目；表面渲染外框并包办全部接线（右键、定位、开合、`WorkflowInput.IsSuspended`）。每个条目收到它作用于的那条连线。 |
 
 公共方法 `OnWheelZoom(int wheelDelta, double scrollX, double scrollY, double viewportW, double viewportH, double reachW, double reachH)` 与 `OnSurfaceScroll(...)` 是 JS 回调；`DisposeAsync` 解除挂接。组件渲染画布并把节点/连接几何经由 Razor 互操作通道交给浏览器。
 
 ### 连线右键菜单
 
-把连线的右键变成菜单的正是表面行为。它订阅 Core 的 `VeloxDev.WorkflowSystem.LinkInteraction` 中枢（每棵树一个实例，经 `LinkInteraction.For` 取得），解析 `LinkMenuKey` 命名的资源，把菜单自身的上下文设成指针下那条连线，在按下处弹出，并把 `ContextMenuOpened` / `ContextMenuClosed` 报回中枢。菜单打开期间中枢挂起悬停（`IsSuspended`）；若菜单打开时它针对的连线离开树，中枢抛出 `ContextMenuDismissRequested`，因此菜单绝不比它作用的连线活得更久。菜单条目归宿主：每条绑定它收到的连线（WPF/Avalonia/WinUI/MAUI 用 `Command="{Binding DeleteCommand}"`，Razor 用 `@onclick`）。
+把连线的右键变成菜单的正是表面行为。它订阅树的输入路由 —— `WorkflowInput.For(tree)`，每棵树一个实例，经 `IInputEvents.Input` 暴露 —— 的 `PointerPressed` 事件。当右键的 `Target` 是 `IWorkflowLinkViewModel` 时，它解析 `LinkMenuKey` 命名的资源，把菜单自身的 `DataContext` 设成那条连线，把世界坐标换算成屏幕坐标并弹出菜单。菜单打开期间它设置 `WorkflowInput.IsSuspended = true`，使指针跟踪不会清掉菜单正要操作的悬停目标；它还订阅 Helper 的 `LinkRemoved`，在连线离开树时关闭菜单。`WorkflowInput` 暴露当前 `PointerTarget`、`HoveredLink`、`ConnectionSender`、`PreviewReceiver`、`PreviewState` 与 `PreviewCheck`，以及 `PreviewChanged` / `PreviewValidating` 事件。菜单条目归宿主：每条绑定它收到的连线（WPF/Avalonia/WinUI/MAUI 用 `Command="{Binding DeleteCommand}"`，Razor 用 `@onclick`）。
 
-WinForms 与 Jalium 没有这项表面附加属性；它们的 `WorkflowTreeView` 改由可重写的 `OnBuildLinkMenu(menu, link)` 钩子构建菜单，基类实现只加一个 **Delete** 条目。
+WinForms 没有这项表面附加属性；它的 `WorkflowTreeView` 改由可重写的 `OnBuildLinkMenu(menu, link)` 钩子构建菜单，基类实现只加一个 **Delete** 条目（生成的模板覆写为空菜单）。Jalium 与其余 XAML 适配器一样使用 `LinkMenuKey`：`WorkflowSurfaceBehavior` 解析键控的 `ContextMenu`，并在连线右键时显示它。
 
 ## 类：`WorkflowCanvasTransformBehavior`
 
@@ -87,4 +88,4 @@ WinForms 与 Jalium 没有这项表面附加属性；它们的 `WorkflowTreeView
 | WinForms | `public static class` | 保存一个 `Offset`（无渲染变换）；`GetTransform(Control)`、`SetTransform(Control, Offset?)`、internal `Apply(Control, Offset)` |
 | Razor | `public static class` | `GetOffset(IWorkflowTreeViewModel tree)` → `CanvasLayout.ActualOffset`；`ToCss(Offset)` → `translate(px, px)`；`GetTransformStyle(tree)` → CSS 变换字符串 |
 | MAUI | 不提供 | MAUI 改由 `WorkflowLinkOverlay` 渲染连接 |
-| Jalium | 不提供 | 画布平移由复合控件 `WorkflowTreeView` / `ViewManager` 在内部施加 |
+| Jalium | 不提供独立类 | `WorkflowSurfaceBehavior.CanvasTransform` 是 `Transform?` 类型的附加 `DependencyProperty`；池化的 Node/Link 模板把 `RenderTransform` 绑定到它 |

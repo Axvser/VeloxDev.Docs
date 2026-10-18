@@ -44,7 +44,7 @@ public partial class MainWindow
 
 Source: `Src/Generators/VeloxDev.Core.Generator/Theme.cs`.
 
-The generator reacts to `[ThemeConfig<...>]` on a **partial class** (currently the 2-to-6-theme arities, i.e. metadata arities 3–7) and emits an additional partial declaration for that class:
+The generator reacts to `[ThemeConfig<...>]` on a **partial class**. It scans the 2-to-6-theme arities (metadata arities 3–7); the 7-theme arity (metadata arity 8) is defined by the attribute family but has no provider of its own, so it is only picked up when the same class also carries one of the scanned arities. For a discovered class it emits an additional partial declaration:
 
 - Adds `: IThemeObject` when the base type does not already implement it.
 - Emits `ExecuteThemeChanging(Type? oldValue, Type? newValue)` / `ExecuteThemeChanged(...)` that call the base implementation (when one exists) and then the **partial hooks** `partial void OnThemeChanging(Type? oldValue, Type? newValue)` / `partial void OnThemeChanged(...)` — declared without a body so the user can implement them in their own part of the class. The WPF demo implements `OnThemeChanged` to show a `MessageBox`; the Avalonia demo shows a `WindowNotificationManager` notification.
@@ -53,7 +53,7 @@ The generator reacts to `[ThemeConfig<...>]` on a **partial class** (currently t
 
 **Notes:**
 - A class that merely implements `IThemeObject` without `[ThemeConfig]` is not processed.
-- The converter is instantiated inline via `Activator.CreateInstance` at registration time — the generator does not use `ThemeCache.RegisterConverter`.
+- The converter is instantiated inline via `Activator.CreateInstance` at registration time. There is no shared converter registry in `ThemeCache`; each registration creates its own converter instance.
 
 ---
 
@@ -102,4 +102,4 @@ Source: `Src/Core/VeloxDev.Core/Interfaces/DynamicTheme/IThemeValueConverter.cs`
 
 **Notes:**
 - Platform adapters ship implementations — `BrushConverter`, `ColorConverter`, `DoubleConverter`, `PointConverter`, `CornerRadiusConverter`, `ThicknessConverter`, `ObjectConverter` (all in namespace `VeloxDev.DynamicTheme`, in the adapter assemblies) — see [04 PlatformAdapters](../04_PlatformAdapters/index.md).
-- `ThemeCache` also exposes a converter registry (`RegisterConverter` / `GetConverter`) for scenarios that want to share a single converter instance across types.
+- Converters are stateless by contract and are created per registration by the generator; sharing a converter instance across types is not part of this API surface.

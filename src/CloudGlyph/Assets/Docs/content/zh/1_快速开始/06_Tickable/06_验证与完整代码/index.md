@@ -1,37 +1,37 @@
-# 06 · 验证与完整代码
+# 验证与完整代码
 
-## 1. 复现这个程序
+## 1. 复现程序
 
-创建一个控制台工程，按 `01_安装依赖` 添加两个包，然后把 `Program.cs` 换成第 3 节的清单。接着：
+创建一个控制台项目，添加 `01_安装` 中的两个包，并用第 3 节的清单替换 `Program.cs`。然后：
 
 ```text
 dotnet run -c Debug
 ```
 
-**预期结果：** 十一行输出，下面每一行主张都对应其中一行（有两行读的是同一行 `running`）。全程无需交互，也不需要窗口。
+**预期结果：** 输出十一行。每行都由下表的一行认领；其中三行读的是同一行 `running`。
 
 ## 2. 每一行证明了什么
 
-| 行 | 主张 | 行内的证据 |
+| 输出行 | 结论 | 行内证据 |
 |---|---|---|
-| `[event] OnChannelStarted -> demo` | 生命周期事件是按通道区分的 | `TickChannelEventArgs.ChannelName` |
-| `[Awake]` 早于 `[Start]` 早于 `running` | `Awake` / `Start` 在排空时运行，先于第一帧帧体 | 它们在任何 `Update` 计数变动之前打印 |
-| `running … ActiveBehaviorCount=1` | 注册确实到达了通道 | `TickManager.ActiveBehaviorCount("demo")` |
-| `running … Update=n LateUpdate=n Fixed≈1.7n` | 定步长泵按自己的节奏运行，与帧率脱钩 | 步长 16 ms 意味着固定泵以约 62.5 Hz 独立于目标帧率运行。在这 400 ms 窗口内 update 泵只跑到约 37 Hz（循环还在起步），所以比值是 1.7 而不是稳定 60 fps 时的约 1.04。跑久一点，第二个数会向第一个数收敛 |
-| `paused … IsUpdateThreadAlive=True` | park 住的泵是活着的，不是死的 | 存活查询看的是时钟而不是活动 |
-| `paused … framesDelta=1` | 一帧已在途的帧仍会落下 | 本程序在 `Pause` 返回之后才开始读数 |
+| `[event] OnChannelStarted -> demo` | 生命周期事件是通道范围的 | `TickChannelEventArgs.ChannelName` |
+| `[Awake]` 在 `[Start]` 之前，`[Start]` 在 `running` 之前 | `Awake` / `Start` 在排空时、第一帧帧体之前运行 | 它们在任何 `Update` 计数增长之前打印 |
+| `running … ActiveBehaviorCount=1` | 注册到达了通道 | `TickManager.ActiveBehaviorCount("demo")` |
+| `running … Update=n LateUpdate=n Fixed≈1.7n` | fixed 泵按自己的节奏运行，与帧率解耦 | 步长为 16 ms，所以 fixed 泵约 62.5 Hz，与目标帧率无关。在这个 400 ms 窗口里 update 泵仍在爬升，只达到约 37 Hz，所以比值约 1.7，而不是稳定 60 fps 通道的约 1.04。运行更久会收敛 |
+| `paused … IsUpdateThreadAlive=True` | park 住的泵是活的，不是死的 | 存活查询限定的是时钟，不是活动 |
+| `paused … framesDelta=1` | 已有一帧在途并落地 | 在暂停返回**之后**测量，本例正是如此 |
 | `resumed … framesDelta=6` | 恢复重新开始交付 | 严格大于暂停时的读数 |
-| `rate TimeScale=2` | `SetTimeScale` 直达时钟 | 通过 `TickManager.TimeScale` 读回 |
-| `handled Update +n LateUpdate +0` | `Handled` 跳过整个剩余的 `LateUpdate` 阶段 | `Update` 照跑，`LateUpdate` 未跑 |
-| `fps TargetFPS=30 measured=31` | 目标帧率生效 | 实测值来自墙钟，不来自设置本身 |
-| `bus IsAdvancing=True Rate=2 …` | 通道暴露了它的时钟 | `TickManager.Bus("demo")` 就是那个 `ITimeSourceControl` |
-| `stopped … threadAliveAfter=False` | 两个泵都停了，统计也重置了 | `IsRunning` 为 false，`SystemStatus` 为 `"Stopped"` |
+| `rate TimeScale=2` | `SetTimeScale` 写穿到时钟 | 通过 `TickManager.TimeScale` 读回 |
+| `handled Update +n LateUpdate +0` | `Handled` 跳过剩余的整个 `LateUpdate` 阶段 | `Update` 仍运行，`LateUpdate` 没有 |
+| `fps TargetFPS=30 measured=31` | 目标生效 | 实测值来自墙钟，不是配置值 |
+| `bus IsAdvancing=True Rate=2 …` | 通道暴露了它的时钟 | `TickManager.Bus("demo")` 是 `ITimeSourceControl` |
+| `stopped … threadAliveAfter=False` | 两条泵都已停止，统计已重置 | `IsRunning` 为 false，`SystemStatus` 为 `"Stopped"` |
 
-计数器在两次运行之间会有一两帧的浮动 —— 它们是对真实循环的测量，不是常量。
+计数器会在多次运行间波动一两帧 —— 它们是对真实循环的测量，不是常量。
 
 ## 3. 完整代码
 
-`Program.cs` —— 单文件、无省略号，每个标识符都在此定义或由分析器生成。
+`Program.cs` —— 单文件，无省略号，每个标识符都在此定义或由分析器生成。
 
 ```csharp
 using VeloxDev.TimeLine;
@@ -104,7 +104,7 @@ public static class Program
 
         TickManager.OnChannelStarted += (_, e) => Console.WriteLine($"[event]   OnChannelStarted -> {e.ChannelName}");
 
-        ball.InitializeTickable();                 // 生成的方法：SetTargetFPS(60) + RegisterBehaviour
+        ball.InitializeTickable();                 // 生成：SetTargetFPS(60) + RegisterBehaviour
         TickManager.Start("demo");
 
         await Task.Delay(400);
@@ -136,15 +136,14 @@ public static class Program
         ball.FreezeLateUpdate = false;
 
         TickManager.SetTargetFPS(30, "demo");
-        await Task.Delay(1100);   // CurrentFPS 每墙钟秒才重新发布一次
+        await Task.Delay(1100);   // CurrentFPS 每墙钟秒重新发布一次
         Console.WriteLine($"fps       TargetFPS={TickManager.TargetFPS("demo")} measured={TickManager.CurrentFPS("demo")}");
 
         var bus = TickManager.Bus("demo");
         Console.WriteLine($"bus       IsAdvancing={bus?.IsAdvancing} Rate={bus?.Rate} Position={bus?.Position.TotalMilliseconds:F0}ms");
 
         var alive = TickManager.IsUpdateThreadAlive("demo");
-        ball.CloseTickable();                      // 生成的方法：UnregisterBehaviour
-        TickManager.UnregisterBehaviour(ball);
+        ball.CloseTickable();                      // 生成：UnregisterBehaviour
         await TickManager.StopAsync("demo");
         Console.WriteLine($"stopped   IsRunning={TickManager.IsRunning("demo")} " +
                           $"SystemStatus={TickManager.SystemStatus("demo")} " +
@@ -153,11 +152,9 @@ public static class Program
 }
 ```
 
-## 4. 再对照随仓库附带的演示与测试
+## 4. 同时对照仓库中的示例与测试
 
-仓库里有一个 GUI 演示与一套测试，覆盖同一个表面。用下面的命令在你自己的检出上运行它们。
-
-**WPF 演示** —— `Examples/Tickable/WPF/Demo/`，一个把自己注册为 `default` 通道上唯一行为的窗口，并打印两个泵交付了什么（`MainWindow.Hooks.cs`、`SimState.cs`、`MainWindow.xaml.cs`）：
+**WPF 示例** —— `Examples/Tickable/WPF/Demo/`，一个把自己注册为 `default` 通道唯一行为的窗口，并显示两条泵交付了什么（`MainWindow.Hooks.cs`、`SimState.cs`、`MainWindow.xaml.cs`）：
 
 ```text
 cd Examples/Tickable/WPF/Demo
@@ -171,13 +168,17 @@ cd Src/Core/VeloxDev.Core.Test
 dotnet test --filter "FullyQualifiedName~TimeLine"
 ```
 
-`FullyQualifiedName~TimeLine` 是对完全限定名的子串匹配，因此它选中的不止 `Src/Core/VeloxDev.Core.Test/TimeLine/` 下的四个文件（共 **31** 个 `[TestMethod]`：TickManagerTests 11、TickableBusTests 12、TimeLineEventArgsTests 6、TickableAttributeTests 2）。它还会命中 timing 与 TransitionSystem 套件中**方法名**含 `Timeline` 的 15 个测试 —— `Timeline_*`、`Seek_*`、`SetRate_*`、`Loop_TakesTheDeclaredDuration`、`SharedTimeline_PausesBothAnimationsAtOnce`、`Switch_EveryTargetIsAnchoredToTheSameTimeline`。31 + 15 = 46。
+`FullyQualifiedName~TimeLine` 是子串匹配，因此会选中 `Src/Core/VeloxDev.Core.Test/TimeLine/` 下的 28 个 `[TestMethod]`（TickableBusTests 12、TickManagerTests 11、TimeLineEventArgsTests 3、TickableAttributeTests 2），再加上 15 个名字含 `Timeline` 或匹配同一子串的 timing / TransitionSystem 测试。28 + 15 = 43。
 
-**预期结果：** `失败: 0，通过: 46，已跳过: 0，总计: 46`。
+**预期结果：** `Failed: 0, Passed: 43, Skipped: 0, Total: 43`。
 
 ## 5. 运行声明
 
-- ✅ **2026-10-01 实际构建并运行。** 第 3 节的程序以 `dotnet run -c Debug`（net10.0、.NET SDK 10、Windows 11）编译并执行，依赖的是本仓库 HEAD 构建出的 `VeloxDev.Core` 与 `VeloxDev.Core.Generator` 分析器。记录输出：
+- ⚠️ **本次修订未执行第 3 节的控制台程序。** 它是对写作时源码的静态核对：其中用到的每个类型、成员与签名都存在于 `Src/Core/VeloxDev.Core/TimeLine/`、`Src/Core/VeloxDev.Core/Interfaces/Tickable/` 与 `Writers/TickWriter.cs`。下面那段记录来自 2026-10-01，仅作为期望形状保留，不是本次修订的输出。计数器会因运行不同而波动一两帧。
+- ✅ **测试套件于 2026-10-18 执行。** `dotnet test Src/Core/VeloxDev.Core.Test/VeloxDev.Core.Test.csproj --filter "FullyQualifiedName~TimeLine"` → `已通过! - 失败: 0，通过: 43，已跳过: 0，总计: 43，持续时间: 8 s - VeloxDev.Core.Test.dll (net10.0)`（`Passed! - Failed: 0, Passed: 43, Skipped: 0, Total: 43`，8 秒）。
+- ✅ `Examples/Tickable/WPF/Demo/Demo.csproj` 于 2026-10-01 构建成功：`已成功生成。 0 个警告 0 个错误`。示例**未**启动 —— 它是没有控制台输出的 GUI 窗口，`dotnet build` 是它能提供的证据上限。
+
+2026-10-01 第 3 节的记录：
 
 ```text
 [event]   OnChannelStarted -> demo
@@ -192,7 +193,3 @@ fps       TargetFPS=30 measured=31
 bus       IsAdvancing=True Rate=2 Position=3240ms
 stopped   IsRunning=False SystemStatus=Stopped threadAliveBefore=True threadAliveAfter=False
 ```
-
-- ✅ `Examples/Tickable/WPF/Demo/Demo.csproj` 构建成功：`已成功生成。 0 个警告 0 个错误`。演示**未**被启动 —— 它是一个没有控制台输出的 GUI 窗口，`dotnet build` 就是它能提供的证据上限。
-- ✅ **测试套件已于 2026-10-01 执行。** `dotnet test Src/Core/VeloxDev.Core.Test/VeloxDev.Core.Test.csproj --filter "FullyQualifiedName~TimeLine"` → `已通过! - 失败: 0，通过: 46，已跳过: 0，总计: 46，持续时间: 8 s - VeloxDev.Core.Test.dll (net10.0)`。该过滤器是子串匹配，所以这 46 个 = `TimeLine/` 下的 31 个 + timing / TransitionSystem 中方法名含 `Timeline` 的 15 个。
-- ⚠️ 第 1、2 节的每条预期结果都由上面这段记录支撑。帧数与步数在两次运行之间会差一两下；记录的是其中一次的数值，不是契约。

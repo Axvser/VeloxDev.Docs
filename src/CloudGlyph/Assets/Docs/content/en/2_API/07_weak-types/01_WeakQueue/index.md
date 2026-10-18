@@ -19,7 +19,7 @@ The type implements `IEnumerable<T>`, so LINQ works directly; enumeration yields
 **Returns:** `int` — the number of items whose target is still alive.
 
 **Notes:**
-- The getter prunes collected references first (under lock), so it is not O(1) while dead references are present.
+- The getter runs `Prune()` over the whole backing queue under lock, so it is $O(n)$ in the number of stored wrappers (dead or live), not $O(1)$.
 - Fast path: when the internal queue holds no references at all it returns `0` without locking.
 
 ### `WeakQueue<T>.IsEmpty`
@@ -129,6 +129,7 @@ The type implements `IEnumerable<T>`, so LINQ works directly; enumeration yields
 **Notes:**
 - The explicit `IEnumerable.GetEnumerator()` forwards to this method, so both interfaces yield the same sequence.
 - Under lock, prunes collected references and yields only the items still alive — verified by `WeakQueueTests.Enumerable_ReturnsAllLiveItems`.
+- The iterator holds the internal lock across `yield return`, so enumeration blocks other members until the iterator is disposed. Materialize with `ToList()` if the consumer is slow or re-enters the queue.
 
 ## Source
 

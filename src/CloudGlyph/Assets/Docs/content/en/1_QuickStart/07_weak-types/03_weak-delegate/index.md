@@ -6,7 +6,7 @@ The generic argument must derive from `System.Delegate` (for example `WeakDelega
 
 ## 1. Subscribe and invoke
 
-`AddHandler` appends a handler as a weak reference; `Invoke(object?[] objects)` fires the current combined delegate through `DynamicInvoke`:
+`AddHandler` appends the handler to the weak list; `Invoke(object?[] objects)` fires the current combined delegate through `DynamicInvoke`:
 
 ```csharp
 using System;

@@ -1,6 +1,6 @@
 # 平台适配器 — 完整代码
 
-下面的七个子页面**逐字重现**「配置」页 `dotnet new wpf-v-*` 命令所生成的文件（`-n` 名称与 `Demo.Views.Workflow` 命名空间已代入，模板默认颜色已填好）。合起来就是 WPF 工程的工作流**视图层**。
+下面的七个子页面**逐字重现**「配置」页 `dotnet new wpf-v-*` 命令所生成的文件（`-n` 名称与 `Demo.Views.Workflow` 命名空间已代入，模板默认颜色已填好）。有一处刻意添加：`WorkflowView.xaml` 页在连线 `ContextMenu` 里展示了一个 `Delete` `MenuItem`；模板交出的该 `ContextMenu` 本身是**空的**，这一项只是文档标出的自定义位置。合起来就是 WPF 工程的工作流**视图层**。
 
 ## 工程文件
 
@@ -48,5 +48,7 @@
 ```
 
   随后把七个子页面上的代码块与生成文件逐字节比对：**11 个中有 9 个逐字一致**；不一致的两个（`WorkflowView.xaml` 漏了 `CornerRadius="3"`，`NodeView.xaml` 一处注释被写坏）已修正为与生成结果一致。
-- ✅ 承载该视图层的演示也在同日构建通过：`dotnet build Examples/Workflow/WPF/Demo/Demo.csproj` 成功，0 警告 / 0 错误（见[验证](../04_验证/index.md)页运行声明）。
+
+- ⚠️ **本次修订（2026-10-18）没有重新生成模板。** 子页面是依据 `Src/Templates/VeloxDev.WPF.Templates/working/content/*` 静态复核的：示例文件与 `Viewbox`/`PART_*` 接线仍然一致；`Delete` 菜单项是文档标明的添加项（模板交出的菜单为空）。
+- ✅ 历史记录（2026-10-01，本次未重跑）：承载该视图层的演示构建通过，`dotnet build Examples/Workflow/WPF/Demo/Demo.csproj` 成功，0 警告 / 0 错误（见[验证](../04_验证/index.md)页运行声明）。
 - ⚠️ 该脚手架未*单独*编译（它被生成到临时目录而非 WPF 工程里），组装后的应用也未启动——因此应视为「经生成 + 经等价仓库内演示构建」的验证，而非这套确切脚手架的端到端实跑。

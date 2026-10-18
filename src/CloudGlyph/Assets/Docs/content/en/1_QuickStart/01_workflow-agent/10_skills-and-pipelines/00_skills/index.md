@@ -65,4 +65,4 @@ A failed `load_skill` for an unknown name is an **actionable error** whose messa
 
 ## Run declaration
 
-- ✅ Actually built and ran — the deterministic agent test suite (2026-10-01, `已通过! 失败: 0，通过: 387`) includes `Skills/**` (`SkillScopeTests`, `SkillAgentToolkitTests`, `SkillAgentContextProviderTests`), covering discovery in both languages, the enabled/withdrawn blocks, the four tools, resource traversal refusal, and the render cache.
+- ⚠️ **Not run for this revision** — statically verified against the current source on 2026-10-18. The `Skills/**` tests exist and passed in a 2026-10-01 run (387 tests), but that run predates the permission-mode redesign and is not used as current evidence.

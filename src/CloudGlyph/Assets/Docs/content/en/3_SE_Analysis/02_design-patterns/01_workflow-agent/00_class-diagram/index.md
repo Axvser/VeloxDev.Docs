@@ -20,7 +20,7 @@ classDiagram
         +WithMaxToolCalls(int)
         +WithMaxReadToolCalls(int)
         +WithMaxWriteToolCalls(int)
-        +WithAutoDiscovery(Assembly, AgentLanguages)
+        +WithAutoDiscovery(AgentLanguages)
         +WithEnums() WithInterfaces() WithComponents() WithData()
         +WithTools(string?, params AITool[])
         +WithQueryTools(string?, params AITool[])
@@ -29,11 +29,14 @@ classDiagram
         +WithAllowNodeExecution(bool)
         +WithAllowedGenericCommands(params string[])
         +WithAutoMarkDirty(bool)
-        +WithInteractionSafety(int)
-        +WithInteractionSafetyPrompt(int, string)
+        +WithPermissionMode(AgentPermissionMode)
+        +SetPermissionMode(AgentPermissionMode) bool
+        +WithModePrompt(AgentPermissionMode, string?)
+        +WithPermissionRule(PermissionDecision, params string[])
+        +WithoutPermissionRules()
+        +WithPermissionJudge(Func~ToolInvocation, PermissionDecision~)
         +WithSelectionHandler(Func~AgentSelectionEventArgs, Task~)
         +WithConfirmationHandler(Func~AgentConfirmationEventArgs, Task~)
-        +WithToolApproval(bool)
         +WithSynchronizationContext(SynchronizationContext)
         +WithToolCallCallback(Func~AgentToolCallEventArgs, Task~)
         +WithLogWriter(ILogWriter) WithCheckpointStore(IExecutionCheckpointStore)
@@ -116,7 +119,6 @@ classDiagram
     }
     class McpScope {
         +long Version
-        +McpSelfServiceLevel SelfServiceLevel
         +CreateGrantedView(source, servers, tools) McpScope
     }
     class SubAgentScope {

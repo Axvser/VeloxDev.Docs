@@ -102,7 +102,7 @@ deactivate TM
 @enduml
 ```
 
-> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 329-374 (StopAsync), 384-402 (Pause/Resume), 404-428 (RestartAsync), 440 (TogglePause), 954-993 (ClearQueues, ForceCleanup, WaitForConditionAsync), 1051-1064 (static forwards).
+> Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 331-377 (StopAsync), 386-404 (Pause/Resume), 406-432 (RestartAsync), 444 (TogglePause), 956-995 (ClearQueues, ForceCleanup, WaitForConditionAsync), 1053-1066 (static forwards).
 
 ## Why a parked pump can still be stopped
 
@@ -120,15 +120,15 @@ Translated: a parked loop waits on something. If that wait did not observe the c
 | Bus paused flag | `true` | `false` | `false` (cleared) | cleared then unchanged |
 | Bus rate | unchanged | unchanged | **not** cleared | **not** cleared |
 | `TotalFrames` / `TotalTime` / `CurrentFPS` | unchanged | unchanged | reset to 0 | reset, then re-accumulate |
-| Behaviour registrations | unchanged | unchanged | **dropped** (queues cleared) | **dropped** |
+| Behaviour registrations | unchanged | unchanged | **applied ones survive**; queued ones are dropped | **applied ones survive**; queued ones are dropped |
 | `Awake` / `Start` re-run | no | no | no | **no** |
 | Samplers | unchanged | unchanged | unchanged | **re-anchored** |
 | Event raised | `OnChannelPaused` | `OnChannelResumed` | `OnChannelStopped` | `OnChannelStopped` + `OnChannelStarted` |
 
 Three entries in that table are the ones that cause trouble when missed:
 
-- **A rate of `0` is not the bus's paused flag, and neither `Resume` nor `StopAsync` clears it.** `SetTimeScale(0)` freezes the clock; `StopAsync`'s `_bus.Resume()` only lifts the *pause*. A channel stopped at rate 0 restarts and immediately parks again. The demo prints `IsAdvancing` beside `SystemStatus` so the two states are distinguishable on screen (`MainWindow.xaml.cs` lines 307-324).
-- **`StopAsync` drops the registrations** but does not notify the behaviours — the stop path calls no `CloseTickable` hook on `ITickable`. (The `CloseTickable()` member does exist; it is what *performs* unregistration, but `StopAsync` never invokes it.) A host that stops a channel and expects its behaviours to be re-registered on the next `Start` will find them gone.
+- **A rate of `0` is not the bus's paused flag, and neither `Resume` nor `StopAsync` clears it.** `SetTimeScale(0)` freezes the clock; `StopAsync`'s `_bus.Resume()` only lifts the *pause*. A channel stopped at rate 0 restarts and immediately parks again. The demo prints `IsAdvancing` beside `SystemStatus` so the two states are distinguishable on screen (`MainWindow.xaml.cs` lines 276-285).
+- **`StopAsync` drains the registration queues but does not clear applied registrations.** `ClearQueues` drops a behaviour still waiting in `_addQueue` or `_removeQueue`; the `_behaviors` dictionary is untouched, so a behaviour that had already been drained ticks again after the next `Start` — without `Awake` / `Start` re-running. A host that expects a stop to detach its behaviours must call `CloseTickable()` *and let the remove drain before stopping* (or register again after the restart).
 - **`RestartAsync` does not re-run `Awake` / `Start`** either. The only path that does is `CloseTickable()` + `InitializeTickable()`.
 
 ## The guard placement makes events honest
@@ -143,13 +143,13 @@ Every handler is emitted *after* the guard, never before. So an event means "the
 | `StopAsync` | not running | `OnChannelStopped` |
 | `Start` | already running | `OnChannelStarted` |
 
-`TogglePause` cannot raise both, because it is literally `if (_bus.IsPaused) Resume(); else Pause();` (line 440) and those two methods are the only raisers.
+`TogglePause` cannot raise both, because it is literally `if (_bus.IsPaused) Resume(); else Pause();` (line 444) and those two methods are the only raisers.
 
 ## Failure and edge paths
 
 - **Stop while paused.** Covered above and by the test; it completes normally.
 - **Stop while the fixed pump is mid-batch.** The token is checked at the top of each behaviour in the dispatch loop (`token.IsCancellationRequested` in the break condition), so a long batch aborts within one behaviour.
-- **Stop with the queue non-empty.** `ClearQueues` drains all four in the `finally` block, so registrations that never got applied are discarded rather than left to leak into the next lifecycle.
+- **Stop with the queue non-empty.** `ClearQueues` drains all four in the `finally` block, so registrations and unregistrations that never got applied are discarded rather than left to leak into the next lifecycle.
 - **Restart after a shutdown that did not confirm.** `ForceCleanup` is the fallback: cancel and dispose the token source, null the thread and task fields, clear the queues. It is the only path where a pump might still be running when the next `Start` creates new ones, which is why it writes a warning to `Debug.WriteLine`.
-- **`RestartAsync` drain wait is best-effort.** Its `WaitForConditionAsync` result is ignored; if the queues are still non-empty after 500 ms, `Start` proceeds anyway (`TickManager.cs` lines 420-425).
+- **`RestartAsync` drain wait is best-effort.** Its `WaitForConditionAsync` result is ignored; if the queues are still non-empty after 500 ms, `Start` proceeds anyway (`TickManager.cs` lines 422-427).
 - **`StopAsync` never faults.** The pump join is inside `try { … } catch (Exception) { }` with cleanup in `finally`, so the returned task completes successfully even if a pump misbehaved.

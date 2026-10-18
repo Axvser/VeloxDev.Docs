@@ -2,20 +2,20 @@
 
 ## 1. Supported targets
 
-**Engine core** (from `VeloxDev.Core.csproj` `<TargetFrameworks>`): `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0`. The engine core — including `VeloxDev.Timing`, `VeloxDev.Threading` and `VeloxDev.Lifetime` — is consumable from .NET Framework 4.6.1+, .NET Core 3.0+ and .NET 5+.
+**Engine core** (from `Src/Core/VeloxDev.Core/VeloxDev.Core.csproj` `<TargetFrameworks>`): `netstandard2.0` / `netframework4.6.1` / `net5.0` / `netcoreapp3.0` / `net8.0`. The engine core — including `VeloxDev.Timing`, `VeloxDev.Threading` and `VeloxDev.Lifetime` — is consumable from .NET Framework 4.6.1+, .NET Core 3.0+, .NET 5+ and .NET 8+.
 
 **Per-framework adapter targets** (from each adapter's csproj) — add the adapter that matches your GUI framework when you animate UI-bound properties:
 
 | Adapter | `<TargetFrameworks>` |
 |---|---|
-| `VeloxDev.WPF` / `VeloxDev.WinForms` | `netframework4.6.1` / `net5.0-windows` / `netcoreapp3.0` |
-| `VeloxDev.Avalonia` | `netstandard2.0` / `net6.0` |
+| `VeloxDev.WPF` / `VeloxDev.WinForms` | `netframework4.6.1` / `net5.0-windows` / `netcoreapp3.0` / `net8.0-windows` |
+| `VeloxDev.Avalonia` | `netstandard2.0` / `net6.0` / `net8.0` |
 | `VeloxDev.WinUI` | `net8.0-windows10.0.19041.0` / `net10.0-windows10.0.19041.0` |
-| `VeloxDev.MAUI` | `net10.0` plus the platform TFMs the MAUI workload adds (on Windows: `net10.0-windows10.0.19041.0`) |
-| `VeloxDev.Razor` | `net6.0` |
+| `VeloxDev.MAUI` | `net10.0` / `net10.0-windows10.0.19041.0` (the MAUI workload supplies the other platform TFMs) |
+| `VeloxDev.Razor` | `net6.0` / `net8.0` |
 | `VeloxDev.Jalium` | `net10.0` |
 
-**SDK / runtime:** a .NET SDK that can build the target you pick. The engine core needs no special workload; the WPF / WinForms / WinUI / MAUI / Razor targets need the corresponding GUI workload (`<UseWPF>true</UseWPF>`, the Windows App SDK, the MAUI workload, the Razor SDK). The in-repo demos build against `net9.0` / `net10.0` — *tested* configurations, not requirements.
+**SDK / runtime:** a .NET SDK that can build the target you pick — .NET 8 SDK or newer for the `net8.0` targets, .NET 10 SDK for the `net10.0` targets. The engine core needs no special workload; the WPF / WinForms / WinUI / MAUI / Razor targets need the corresponding GUI workload (`<UseWPF>true</UseWPF>`, the Windows App SDK, the MAUI workload, the Razor SDK). The in-repo demos build against `net9.0` / `net10.0` — *tested* configurations, not requirements.
 
 **Package manager:** NuGet via the `dotnet` CLI or Visual Studio (`dotnet add package ...`).
 
@@ -35,7 +35,7 @@ The demos this Quick Start mirrors are under `Examples/Transition/`:
 | `Blazor/Demo` | `net10.0` (server + WASM client) | a plain `BoxModel` view-model re-rendered via `INotifyPropertyChanged` |
 | `Jalium/Demo` | `net10.0-windows` | a Jalium desktop `Rectangle` |
 
-The engine-level contract is additionally pinned by `Src/Core/VeloxDev.Core.Test/TransitionSystem/*` (26 files) and `Src/Core/VeloxDev.Core.Test/Timing/*` (6 files).
+The engine-level contract is additionally pinned by `Src/Core/VeloxDev.Core.Test/TransitionSystem/*` (26 files) and `Src/Core/VeloxDev.Core.Test/Timing/*` (6 files) — 287 MSTest cases in total.
 
 ## 3. The `AUTO TEST` conformance harness
 

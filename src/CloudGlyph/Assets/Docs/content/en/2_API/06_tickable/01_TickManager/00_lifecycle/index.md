@@ -1,6 +1,6 @@
 # `TickManager` — Lifecycle & Registration
 
-Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 1046-1071 (the static wrappers) and 274-441 (`LoopChannel` implementations).
+Source: `Src/Core/VeloxDev.Core/TimeLine/TickManager.cs` lines 1050-1072 (the static wrappers) and 276-444 (`LoopChannel` implementations).
 
 Every member here takes `string channel = TickManager.DEFAULT_CHANNEL` and forwards to the same-named member on the channel's `LoopChannel`. All of them **create the channel on first use** through `GetOrCreateChannel` — except `Pause`, `Resume`, `TogglePause` and the status queries, which are harmless on a channel created empty. `StopAsync` on a channel that was never started returns a completed task.
 
@@ -15,17 +15,17 @@ Every member here takes `string channel = TickManager.DEFAULT_CHANNEL` and forwa
 
 **Returns:** `void`.
 
-**Exceptions:** none. Starting an already-running channel is a no-op — `LoopChannel.Start` opens with `if (_isRunning) return;` (line 276).
+**Exceptions:** none. Starting an already-running channel is a no-op — `LoopChannel.Start` opens with `if (_isRunning) return;` (line 278).
 
 **Example:**
 ```text
-// Source: Examples/Tickable/WPF/Demo/MainWindow.xaml.cs (line 60)
+// Source: Examples/Tickable/WPF/Demo/MainWindow.xaml.cs (line 51)
 TickManager.Start(DemoChannel.Name);
 ```
 
 **Notes:**
 - Spawns the update and fixed-update threads (`VeloxDev.Update[<channel>]`, `VeloxDev.FixedUpdate[<channel>]`, `ThreadPriority.AboveNormal`, `IsBackground = true`), or the two async loops when `EffectiveUseAsyncLoop` is true.
-- Re-anchors both samplers to "now" (lines 288-289) and calls `_bus.Resume()` (line 293), so a pause left over from a previous lifecycle does not survive.
+- Re-anchors both samplers to "now" (lines 290-291) and calls `_bus.Resume()` (line 295), so a pause left over from a previous lifecycle does not survive.
 - Rebuilds the cached, execution-order-sorted behaviour array, then raises `Started` → `OnChannelStarted`.
 
 #### `TickManager.StopAsync`
@@ -39,15 +39,15 @@ TickManager.Start(DemoChannel.Name);
 
 **Example:**
 ```text
-// Source: Examples/Tickable/WPF/Demo/MainWindow.xaml.cs (line 69)
+// Source: Examples/Tickable/WPF/Demo/MainWindow.xaml.cs (line 60)
 _ = TickManager.StopAsync(DemoChannel.Name);
 ```
 
 **Notes:**
 - Returns immediately (`Task.CompletedTask`-like) if the channel is not running, and in that case does **not** raise `OnChannelStopped`.
 - Cancels the pumps, then waits up to `RESTART_SHUTDOWN_TIMEOUT_MS` (1 s) for them. Waits are `Thread.Join` for the thread path, `Task.WhenAny(Task.WhenAll(...), Task.Delay(1000))` for the async path.
-- Clears a pause on the way down (`_bus.Resume()`, line 339) — a paused channel that is stopped comes back runnable. It does **not** lift a rate of `0`.
-- Resets `TotalTime`, `TotalFrames`, `CurrentFPS` and the config cache timestamp, and drains all four queues.
+- Clears a pause on the way down (`_bus.Resume()`, line 341) — a paused channel that is stopped comes back runnable. It does **not** lift a rate of `0`.
+- Resets `TotalTime`, `TotalFrames`, `CurrentFPS` and the config cache timestamp, and drains all four queues. It does **not** clear `_behaviors`: a registration that had already been applied survives the stop and ticks again after the next `Start` (without re-running `Awake` / `Start`). Only a registration still queued when the stop drains it is discarded.
 - Safe against a channel parked by `Pause()`: the park observes the cancellation token, so the cancel propagates into it.
 
 #### `TickManager.Pause`
@@ -60,7 +60,7 @@ _ = TickManager.StopAsync(DemoChannel.Name);
 **Exceptions:** none.
 
 **Notes:**
-- No-op when the channel is not running or already paused (line 386).
+- No-op when the channel is not running or already paused (line 388).
 - Sets `IsPaused` on the channel's time source and raises `Paused` → `OnChannelPaused`.
 - The pumps park on `WaitWhileStalledAsync` rather than polling, so a paused channel makes no wake-ups at all.
 - Because the paused state belongs to the shared time source, an animation anchored to `TickManager.Bus(channel)` freezes in the same instant.
@@ -75,9 +75,9 @@ _ = TickManager.StopAsync(DemoChannel.Name);
 **Exceptions:** none.
 
 **Notes:**
-- No-op when the channel is not running or not paused (line 399).
+- No-op when the channel is not running or not paused (line 401).
 - Raises `Resumed` → `OnChannelResumed`.
-- After a rate of `0` this lifts the pause without making the clock advance — the channel stays parked until a non-zero rate is set (`LoopChannel.Resume` remarks, lines 391-396).
+- After a rate of `0` this lifts the pause without making the clock advance — the channel stays parked until a non-zero rate is set (`LoopChannel.Resume` remarks, lines 393-398).
 
 #### `TickManager.TogglePause`
 
@@ -87,7 +87,7 @@ _ = TickManager.StopAsync(DemoChannel.Name);
 **Returns:** `void`.
 
 **Notes:**
-- Implemented as `if (_bus.IsPaused) Resume(); else Pause();` (line 440), so both branches inherit the guards above: on a stopped channel it is a no-op.
+- Implemented as `if (_bus.IsPaused) Resume(); else Pause();` (line 444), so both branches inherit the guards above: on a stopped channel it is a no-op.
 - Raises `OnChannelPaused` or `OnChannelResumed`, never both.
 
 #### `TickManager.RestartAsync`
@@ -114,16 +114,16 @@ _ = TickManager.StopAsync(DemoChannel.Name);
 
 **Returns:** `void`.
 
-**Exceptions:** none. `null` is filtered by `if (behavior != null) _addQueue.Enqueue(behavior);` (line 432).
+**Exceptions:** none. `null` is filtered by `if (behavior != null) _addQueue.Enqueue(behavior);` (line 434).
 
 **Example:**
 ```text
-// Source: the generated InitializeTickable() (TickWriter.cs line 83)
+// Source: the generated InitializeTickable() (TickWriter.cs line 88)
 TickManager.RegisterBehaviour(this, "demo");
 ```
 
 **Notes:**
-- The call only enqueues. The update pump drains the queue in `ProcessAddedBehaviors` (lines 785-801) before sampling the next frame, so `InvokeAwake()` then `InvokeStart()` run on the update thread, **before the first frame body**, whether registration happened before or after `Start`.
+- The call only enqueues. The update pump drains the queue in `ProcessAddedBehaviors` (lines 787-803) before sampling the next frame, so `InvokeAwake()` then `InvokeStart()` run on the update thread, **before the first frame body**, whether registration happened before or after `Start`.
 - Behaviours are keyed by `RuntimeHelpers.GetHashCode(behavior)`, so registering the same instance twice replaces the wrapper rather than adding a second one — but it still runs `InvokeAwake` / `InvokeStart` again on the replacement.
 - Execution order is registration order: each wrapper takes `Interlocked.Increment(ref _instanceCounter)` as its `ExecutionOrder`, and the cached array is insertion-sorted on it.
 - A registering behaviour is **not** started immediately: if the channel is not running, `Awake` / `Start` wait for the first frame after `Start`.
@@ -144,11 +144,11 @@ TickManager.RegisterBehaviour(this, "demo");
 
 **Example:**
 ```text
-// Source: the generated CloseTickable() (TickWriter.cs line 88)
+// Source: the generated CloseTickable() (TickWriter.cs line 95)
 TickManager.UnregisterBehaviour(this, "demo");
 ```
 
 **Notes:**
-- Enqueues; the drain (`ProcessRemovedBehaviors`, lines 803-816) removes the wrapper, clears it and returns it to `_wrapperPool`.
+- Enqueues; the drain (`ProcessRemovedBehaviors`, lines 805-818) removes the wrapper, clears it and returns it to `_wrapperPool`.
 - Removal is **silent**: `UnregisterBehaviour` removes the wrapper and invokes no hook on the behaviour — the loop never calls a "close" callback. (`CloseTickable()` *does* exist on `ITickable`, but it is the method that *performs* the unregistration, so unregistering does not call it back.) Any cleanup the behaviour needs is the caller's to perform.
 - After removal the instance still implements `ITickable` and can be registered again — and doing so runs `Awake` and `Start` once more on a fresh wrapper.

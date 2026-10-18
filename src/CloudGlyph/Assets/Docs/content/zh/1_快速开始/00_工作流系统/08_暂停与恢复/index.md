@@ -1,10 +1,10 @@
-# Workflow System — 暂停并恢复一次运行
+# 工作流系统 — 暂停并恢复运行
 
-一次编译运行就是一长串被 await 的节点驱动。`ManualExecutionGate` 是它的暂停点：引擎在每个节点驱动前 await 它，所以宿主能把运行握在节点边界上，然后再放开。在 `01_安装` 建好的 `WorkflowQuickStart` 项目里创建这个类。
+一次编译运行是一长串 await 的节点驱动。`ManualExecutionGate` 是暂停点：引擎在驱动每个节点前 await 它，因此宿主可以在节点边界停住运行，再放行。在 `WorkflowQuickStart` 工程中按「安装与创建项目」创建相关代码。
 
-## 1. 把门挂到会话上
+## 1. 把闸门挂到会话上
 
-门在会话上，不在引擎上：
+闸门属于会话，而不是引擎：
 
 ```csharp
 using VeloxDev.Core.WorkflowSystem.CompilerEx;
@@ -13,21 +13,21 @@ var gate = new ManualExecutionGate();
 var context = new RuntimeContext { ExecutionGate = gate };
 ```
 
-**预期结果：** 编译通过，且 `gate.IsPaused` 为 `false`。
+**预期结果：** 代码可编译，`gate.IsPaused` 为 `false`。
 
-## 2. 握住运行
+## 2. 停住运行
 
-运行开始前先 `Pause()` —— 引擎到达的第一个节点边界就会阻塞：
+在开始运行**之前**调用 `Pause()` —— 引擎到达的第一个节点边界会阻塞：
 
 ```csharp
 gate.Pause();
 var run = new RuntimeEngine().RunAsync(rootGraph, context, CancellationToken.None);
-await Task.Delay(80);          // 让引擎走到第一个边界
+await Task.Delay(80);          // let the engine reach the first boundary
 ```
 
-**预期结果：** `context.Status == "Paused"`、`gate.IsPaused == true`、`context.IsRunning == true`，而 `context.Data` 仍是 `null` —— 一个节点都没被驱动。注意第三条：**暂停不是停止**，运行仍在飞。
+**预期结果：** `context.Status == "Paused"`、`gate.IsPaused == true`、`context.IsRunning == true`，且 `context.Data` 仍为 `null` —— 还没有节点被驱动。注意第三项：**暂停不是停止**，运行仍在进行中。
 
-## 3. 放开它
+## 3. 放行
 
 ```csharp
 gate.Resume();
@@ -36,25 +36,25 @@ await run;
 Console.WriteLine($"{context.Status} {context.Data}");
 ```
 
-**预期结果：** 运行正常跑完 —— `Completed tick->bias->print`。门一放开 `Status` 就回到 `"Running"`，随后变成 `"Completed"`。
+**预期结果：** 运行正常完成 —— `Completed tick->bias->print`。闸门释放的瞬间 `Status` 回到 `"Running"`，随后变为 `"Completed"`。
 
-## 4. 从别处暂停一次运行中的运行
+## 4. 从另一个线程暂停
 
-宿主的 UI 线程在运行停在调度器上时按暂停；`Pause` 与 `Resume` 从任何线程调用都安全，包括运行所在的那个：
+宿主在其 UI 线程暂停，而运行停在调度器上；`Pause` 与 `Resume` 可从任何线程安全调用，包括驱动运行的那个线程：
 
 ```csharp
-// demo 会话把它暴露成一个可绑定属性：
+// Exposed by the demo session as a bindable property:
 public ManualExecutionGate Gate { get; } = new();
 
-Gate.Pause();     // 握在下一个节点边界
-Gate.Resume();    // 放开
+Gate.Pause();     // holds at the next node boundary
+Gate.Resume();    // lets it go
 ```
 
-**预期结果：** 暂停在下一个节点边界生效，绝不发生在节点内部 —— 已经在被驱动的节点一定跑完。
+**预期结果：** 暂停在下一个节点边界生效，绝不会在节点中途 —— 已被驱动的节点总是跑完。
 
-## 5. 停掉一个被暂停的运行
+## 5. 停止一个暂停中的运行
 
-在被握住时取消运行的令牌会让它结束，而不是挂住：
+在运行被停住时取消它的令牌，会结束它而不是挂起：
 
 ```csharp
 var cts = new CancellationTokenSource();
@@ -62,17 +62,17 @@ var held = new RuntimeEngine().RunAsync(rootGraph, context, cts.Token);
 gate.Pause();
 await Task.Delay(50);
 cts.Cancel();
-await held;                                   // 会返回，不会挂住
+await held;                                   // returns; it does not hang
 
 Console.WriteLine($"{context.Status} {context.Outcome}");
 ```
 
-**预期结果：** `Stopped Cancelled`。这就是 `IExecutionGate.WaitAsync` 在取消时必须**抛出**而不是返回的原因：一个「门没开却回来了」的调用方会继续驱动。
+**预期结果：** `Stopped Cancelled`。这就是 `IExecutionGate.WaitAsync` 在取消时必须**抛异常**而不是返回的原因：若调用方在闸门未打开时正常返回，它就会继续驱动。
 
-## 6. 真实仓库里它在哪
+## 6. 真实仓库中的位置
 
-demo 把同一个门接到宿主 UI 上：`Examples/Workflow/Common/Lib/ViewModels/Workflow/WorkflowDemoSession.cs` 持有 `public ManualExecutionGate Gate { get; } = new();` 并在 `ConfigureRun` 里赋值（赋值前先调 `Gate.Resume()`，这样一次运行绝不带着上一次留下的暂停开始）。每个完整版平台 demo 都把它接到暂停/恢复按钮上 —— 如 `Examples/Workflow/WPF/Demo/Views/Workflow/WorkflowView.xaml.cs`、`Examples/Workflow/Avalonia/Demo/Views/Workflow/WorkflowView.axaml.cs`、`Examples/Workflow/Blazor/Demo/Demo/Components/Pages/Workflow.razor.cs` —— 并读 `Gate.IsPaused` 来显示「已暂停 / 空闲」。
+demo 把同一个闸门接到宿主 UI：`Examples/Workflow/Common/Lib/ViewModels/Workflow/WorkflowDemoSession.cs` 拥有 `public ManualExecutionGate Gate { get; } = new();`，并在 `ConfigureRun` 中赋值（在 `Gate.Resume()` 之后，确保一次运行不会一开始就卡在上一轮的暂停上）。每个完整平台 demo 都把暂停/恢复按钮绑定到它 —— 例如 `Examples/Workflow/WPF/Demo/Views/Workflow/WorkflowView.xaml.cs`、`Examples/Workflow/Avalonia/Demo/Views/Workflow/WorkflowView.axaml.cs`、`Examples/Workflow/Blazor/Demo/Demo/Components/Pages/Workflow.razor.cs` —— 并读取 `Gate.IsPaused` 显示暂停/空闲状态。
 
 测试：`Src/Core/VeloxDev.Core.Test/WorkflowSystem/CompilerEx/ExecutionGateTests.cs` —— `AClosedGate_HoldsTheRunAtTheNextNodeBoundary_AndResumeLetsItGo`、`AClosedGate_AlsoHoldsTheBranchesOfAFanOut`、`CancellingAPausedRun_EndsIt_InsteadOfWaitingForever`。
 
-下一步见 `09_观察与报告`。
+前往「观察与报告」。

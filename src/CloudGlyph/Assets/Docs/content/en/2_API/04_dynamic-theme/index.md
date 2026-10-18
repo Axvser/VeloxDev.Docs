@@ -9,27 +9,27 @@ The dynamic-theme feature switches an app between theme types (`Dark` / `Light` 
 | Area | Namespace / location | Contents |
 |---|---|---|
 | Core contracts | `VeloxDev.DynamicTheme` (in `VeloxDev.Core`) | `ThemeManager`, `ThemeCache` (+ nested `InstanceCache`), `ThemeConfigAttribute<TConverter, TTheme...>`, enum `StartModel`, `Dark`, `Light`, `ITheme`, `IThemeObject`, `IThemeValueConverter` |
-| Source generator | `VeloxDev.Generators.Theme` | Emits the partial `IThemeObject` implementation for a class carrying `[ThemeConfig<...>]` |
+| Source generator | `VeloxDev.Generators` (class `Theme`) | Emits the partial `IThemeObject` implementation for a class carrying `[ThemeConfig<...>]` |
 | Backing engine | `VeloxDev.TransitionSystem` / `.Abstractions` / `VeloxDev.Timing` | `InterpolatorCore`, `TransitionSchedulerCore`, `TimeSourceCore` (the default `ITimeSourceControl`), `TransitionCore`, `ISampler`, `ISampleable`, `ITransitionProperty` / `TransitionProperty`, `ITransitionEffectCore`, `IEaseCalculator`, `Eases` |
 | Platform adapters | `VeloxDev.WPF` / `VeloxDev.Avalonia` (and `MAUI` / `WinUI` / `WinForms` / `Razor`) | Adapter `Interpolator`, `TransitionEffect` / `TransitionEffects`, theme value converters (`DoubleConverter`, `PointConverter`, `ThicknessConverter`, `CornerRadiusConverter`, `ColorConverter`, `BrushConverter`, `ObjectConverter`) |
 
 ## Key Types at a Glance
 
 - **`ThemeManager`** — static entry point. `Current`, `StartModel`, `SetPlatformInterpolator<T>`, `SetCurrent<T>`, `Register` / `Unregister`, `Transition<T>` / `Transition(Type, ITransitionEffectCore)` (`async void`, run on the transition system), `Jump<T>` / `Jump(Type)` (synchronous, applies end values with no animation).
-- **`ThemeCache`** — central store of theme property values: static defaults per type plus runtime overrides per instance (`InstanceCache`), with a shared converter registry.
-- **`ThemeConfigAttribute<TConverter, TTheme1..TThemeN>`** — six arities (2 to 7 theme types) mapping one property to one value per theme.
+- **`ThemeCache`** — central store of theme property values: static defaults per type plus runtime overrides per instance (`InstanceCache`), the latter held in a weak-keyed table.
+- **`ThemeConfigAttribute<TConverter, TTheme1..TThemeN>`** — six arities (2 to 7 theme types) mapping one property to one value per theme. The generator scans the 2-to-6-theme arities (metadata arities 3–7); a 7-theme row is picked up only when the same class also carries one of those.
 - **`StartModel`** — `[Flags]` enum (`Reflect = 1`, `Cache = 2`) selecting the animation start-value source.
 - **`ITheme` / `IThemeObject` / `IThemeValueConverter`** — theme marker, the generated theme-object contract, and the value-conversion strategy.
-- **Backing engine** — the static sampler registry `InterpolatorCore.NativeInterpolators` (`ConcurrentDictionary<Type, ISampler>`), the platform seam `InterpolatorCore.CreateScheduler` / `TransitionSchedulerCore` / the shared `ITimeSourceControl`, the sampling contracts `ISampler`/`ISampleable`, the property contract `TransitionProperty`, and the effect/ease contracts `ITransitionEffectCore` / `IEaseCalculator` / `Eases`.
+- **Backing engine** — the process-wide sampler registry behind `InterpolatorCore.TryGetInterpolator` / `RegisterInterpolator` / `UnregisterInterpolator`, the platform seam `InterpolatorCore.CreateScheduler` / `TransitionSchedulerCore` / the shared `ITimeSourceControl`, the sampling contracts `ISampler`/`ISampleable`, the property contract `TransitionProperty`, and the effect/ease contracts `ITransitionEffectCore` / `IEaseCalculator` / `Eases`.
 - **Platform adapters** — the adapter `Interpolator`, the effect presets `TransitionEffects` (`Empty` / `Theme` / `Hover`), and the theme value converters.
 
 ## Pages
 
-- [00 ThemeManager](00_ThemeManager/index.md) — `ThemeManager` (all static members), enum `StartModel`, marker classes `Dark` / `Light`.
-- [01 ThemeCache](01_ThemeCache/index.md) — `ThemeCache` (all static members) and nested class `InstanceCache`.
-- [02 ThemeConfigAttribute](02_ThemeConfigAttribute/index.md) — `ThemeConfigAttribute<TConverter, TTheme...>` (six arities) and the contracts `ITheme`, `IThemeObject`, `IThemeValueConverter`.
-- [03 TransitionSystem](03_TransitionSystem/index.md) — the engine surface the theme feature drives: sampler resolution, the property and effect contracts.
-- [04 PlatformAdapters](04_PlatformAdapters/index.md) — the adapter-provided `Interpolator`, `TransitionEffect` / `TransitionEffects`, and the theme value converters.
+- [ThemeManager](00_ThemeManager/index.md) — `ThemeManager` (all static members), enum `StartModel`, marker classes `Dark` / `Light`.
+- [ThemeCache](01_ThemeCache/index.md) — `ThemeCache` (all static members) and nested class `InstanceCache`.
+- [ThemeConfigAttribute](02_ThemeConfigAttribute/index.md) — `ThemeConfigAttribute<TConverter, TTheme...>` (six arities) and the contracts `ITheme`, `IThemeObject`, `IThemeValueConverter`.
+- [TransitionSystem](03_TransitionSystem/index.md) — the engine surface the theme feature drives: sampler resolution, the property and effect contracts.
+- [PlatformAdapters](04_PlatformAdapters/index.md) — the adapter-provided `Interpolator`, `TransitionEffect` / `TransitionEffects`, and the theme value converters.
 
 ## Related Features
 

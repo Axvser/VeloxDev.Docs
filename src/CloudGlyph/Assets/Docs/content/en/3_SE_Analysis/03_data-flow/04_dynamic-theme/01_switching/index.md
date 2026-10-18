@@ -42,7 +42,8 @@ else passes
     note right of TM
       groups = PrepareSamplers(actives, typeof(Light))
       one TargetEntries per target, one TransitionEntry per property.
-      No endpoint is normalized here and no sampler is resolved here.
+      No endpoint is normalized here and no sampler is kept here;
+      the only registry touch is the hasSampler probe.
     end note
     loop each active, each themed property
         TM -> TO: GetStaticThemeCache() / GetActiveThemeCache()
@@ -88,7 +89,7 @@ else passes
         loop each run
             TM -> SC: Execute(interpolator, state, effect, run.Cts)
             activate SC
-            SC -> IK: Prepare(target, state, effect, inspector)
+            SC -> IK: Prepare(target, state, effect, host)
             activate IK
             IK -> SMP: NormalizeStart / NormalizeEnd
             activate SMP

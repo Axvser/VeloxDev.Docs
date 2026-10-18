@@ -1,10 +1,10 @@
-# Workflow System — 并行扇出、它的并发上限与编译大纲
+# 工作流系统 — 并行扇出、并发上限与编译大纲
 
-当一个节点喂给多个下游目标时，编译器把这些分支包进一个 `ParallelSegment`，引擎让它们**并发**运行。`MaxParallelBranches` 限制同时有多少条在飞。`CompiledOutline` 把任何编译图压成一条可绑定的列表。
+当一个节点喂给多个下游目标时，编译器把分支包进 `ParallelSegment`，引擎**并发**运行它们。`MaxParallelBranches` 限制同时在飞的分支数。`CompiledOutline` 把任意编译图压平成一份可绑定列表。
 
 ## 1. 给图加一个扇出
 
-输出槽位可以接受多条连线的普通节点就会扇出。创建 `FanOutNodes.cs`：
+输出槽接受多条连接的普通节点即可扇出。创建 `FanOutNodes.cs`：
 
 ```csharp
 using VeloxDev.Core.WorkflowSystem.CompilerEx;
@@ -32,7 +32,7 @@ public class SourceHelper : NodeHelper<SourceNode>
         => Task.FromResult<object?>("SRC");
 }
 
-// 两条分支各自记下开始与结束时刻，好在外部量出重叠。
+// The two branches record when they start and end, so overlapping can be measured.
 public static class BranchClock
 {
     public static readonly List<(int Index, int Tick)> Starts = [];
@@ -88,9 +88,9 @@ public class RightHelper : NodeHelper<RightNode>
 }
 ```
 
-**预期结果：** 编译通过。
+**预期结果：** 工程可编译。
 
-## 2. 搭出并编译这个扇出
+## 2. 构建并编译扇出
 
 ```csharp
 using VeloxDev.Core.WorkflowSystem.CompilerEx;
@@ -119,7 +119,7 @@ var graph = (await new CompilerViewModel().CompileAsync(
 Console.WriteLine(string.Join(", ", graph.Entries.Select(e => e.GetType().Name)));
 ```
 
-**预期结果：** `ChainSegment, ParallelSegment` —— 源编译成一条单节点链，它的两个目标变成一个扇出组。`MultipleTargets` 通道是源的输出槽位能接受两条连线的原因；每个输入端的 `OneSource` 就够接一条入边了。
+**预期结果：** `ChainSegment, ParallelSegment` —— 源节点编译成单节点链，它的两个目标组成扇出组。`MultipleTargets` 通道让源输出槽接受两条连接；每个输入的 `OneSource` 足以容纳一条入边。
 
 ## 3. 分支默认并发
 
@@ -135,11 +135,11 @@ var e1 = BranchClock.Ends.First(e => e.Index == 1).Tick;
 Console.WriteLine($"overlap={s0 < e1 && s1 < e0}");
 ```
 
-**预期结果：** `overlap=True` —— 两条分支同时在飞。每条分支都从**扇出源的载荷**出发，绝不会读到兄弟的产物。
+**预期结果：** `overlap=True` —— 两个分支同时在对飞。每个分支都从**扇出源节点的负载**开始，绝不会读到兄弟分支的输出。
 
-**说明：** 这是调用方 `SynchronizationContext` 上的交错异步工作，不是线程并行：每条分支都在调用方上下文上起步，它内部每次 `await` 都会让给兄弟，所以 I/O 密集的分支会重叠，而烧 CPU 的分支仍然轮流占用那个线程。这是刻意的 —— 把节点体挪到线程池会破坏「组件与 UI 绑定」这条契约。
+**说明：** 这是在调用方 `SynchronizationContext` 上交错的异步工作，不是线程并行：每个分支在调用方上下文启动，内部每个 `await` 都让给兄弟分支，所以 I/O 型分支会重叠，而烧 CPU 的分支仍轮流占用线程。这是刻意的 —— 把节点体挪到线程池会破坏「组件是 UI 绑定」的契约。
 
-## 4. 给这个组加上限
+## 4. 给组加上限
 
 ```csharp
 BranchClock.Starts.Clear(); BranchClock.Ends.Clear();
@@ -153,16 +153,16 @@ var u1 = BranchClock.Ends.First(e => e.Index == 1).Tick;
 Console.WriteLine($"overlap={t0 < u1 && t1 < u0}");
 ```
 
-**预期结果：** `overlap=False` —— 上限为 1 时，一条分支跑完下一条才开始。
+**预期结果：** `overlap=False` —— 上限为 1 时，一个分支跑完另一个才开始。
 
-**说明：** 上限是**按组**的，不是按轮的，而且它是从具体的 `RuntimeContext` 上读的（`ExecutionGateTests` 与 `ParallelExecutionTests` 都钉住了这一点）。`null`（默认）表示不限。分支很重时 —— 每一条都起进程、占大缓冲 —— 设上它，让机器分波处理。**没有 demo 设置它**；契约由 `ParallelExecutionTests.MaxParallelBranches_SerialisesTheGroupWhenSetToOne` 钉住。
+**说明：** 上限是**每组**的，不是每次运行的，并且从具体的 `RuntimeContext` 读取（`ExecutionGateTests` 与 `ParallelExecutionTests` 都钉住这一点）。`null`（默认）表示无上限。当分支很重 —— 每个都启动进程或持有大缓冲区 —— 可设置它，让机器一波波处理。**没有 demo 设置它**；契约由 `ParallelExecutionTests.MaxParallelBranches_SerialisesTheGroupWhenSetToOne` 钉住。
 
-还有两条扇出规矩值得记住：**任意分支内命中终结分支即整轮结束**；多条分支同时请求重定向时**分支顺序第一条**胜出，其余记日志忽略（按顺序而不是按墙上时钟，运行因此可复现）。
+另外两条扇出规则：**任一分支内命中终端分支会结束整个运行**；多个分支请求重定向时，**分支顺序最靠前者胜出**，其余记录日志并忽略（按顺序而非墙钟，保证运行可复现）。
 
-## 5. 把图压成一条大纲
+## 5. 把图压平成大纲
 
 ```csharp
-foreach (var row in CompiledOutline.Of(rootGraph))          // rootGraph：那条线性链
+foreach (var row in CompiledOutline.Of(rootGraph))          // rootGraph: the linear chain
     Console.WriteLine($"{new string(' ', row.Depth * 2)}{row.Kind} | {row.Label}");
 ```
 
@@ -172,14 +172,14 @@ foreach (var row in CompiledOutline.Of(rootGraph))          // rootGraph：那�
 Execute | TickerNode → BiasNode → PrinterNode
 ```
 
-每行带 `Depth`（按它缩进）、`Kind`（`Execute` / `Branch` / `Parallel`，外加分支选项的 `Option` / `Terminal`）、`Label` 与它点名的 `Nodes`。对上面那张扇出图，你会得到深度 0 的一行 `Parallel`，下面每条分支一行 `Execute`。
+每行携带 `Depth`（按它缩进）、`Kind`（`Execute` / `Branch` / `Parallel`，分支选项另有 `Option` / `Terminal`）、`Label` 与它命名的 `Nodes`。对上面的扇出图，你会得到一个深度 0 的 `Parallel` 行，每个分支下各有一行 `Execute`。
 
-**说明：** 编译图本身就是 ViewModel，所以嵌套列表可以直接绑它；`CompiledOutline` 是为另一种形态准备的 —— 一个扁平、可虚拟化的列表，一次把整棵结构摆出来。
+**说明：** 编译图本身已经是 view model，嵌套列表可以直接绑定；`CompiledOutline` 服务于另一种形状 —— 一份扁平、可虚拟化的列表，一次显示整个结构。
 
-## 6. 真实仓库里它在哪
+## 6. 真实仓库中的位置
 
-`Examples/Workflow/Common/Lib/ViewModels/Workflow/TreeViewModel.cs` 为树视图构建这份大纲，Avalonia 宿主按 `Depth` 缩进（`Examples/Workflow/Avalonia/Demo/Views/Workflow/DepthIndentConverter.cs`）。demo 的 `WorkflowDemoSession` 编译出的图里有好几处扇出（`[Stats, Dist, Anomaly]` 那一组就汇入一个汇合点）。
+`Examples/Workflow/Common/Lib/ViewModels/Workflow/TreeViewModel.cs` 为它的树视图构建大纲，Avalonia 宿主按 `Depth` 缩进（`Examples/Workflow/Avalonia/Demo/Views/Workflow/DepthIndentConverter.cs`）。demo 的 `WorkflowDemoSession` 编译了带多个扇出的图（`[Stats, Dist, Anomaly]` 组喂给一个 join）。
 
 测试：`Src/Core/VeloxDev.Core.Test/WorkflowSystem/CompilerEx/ParallelExecutionTests.cs` 与 `CompiledOutlineTests.cs`。
 
-下一步见 `13_验证与运行声明`。
+前往「验证与运行声明」。

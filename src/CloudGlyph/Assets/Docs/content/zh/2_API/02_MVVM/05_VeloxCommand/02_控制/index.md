@@ -1,49 +1,49 @@
 # MVVM — `VeloxCommand` 生命周期控制
 
-加锁 / 中断 / 清空 / 继续这一族，每个都有同步（即发即忘）版与可等待的 `Async` 孪生版。它们都同时声明在 `IVeloxCommand` 上，因此生成的命令属性也暴露这些方法。
+锁定 / 中断 / 清空 / 继续这一族，每个都有同步（fire-and-forget）与可等待的 `Async` 版本。它们也都声明在 `IVeloxCommand` 上，因此生成的命令属性同样暴露它们。
 
 ###### `VeloxCommand.Lock` / `VeloxCommand.LockAsync`
 
 **Signature:**
-`void Lock()` —— `Task LockAsync()`
+`void Lock()` — `Task LockAsync()`
 
-**Returns:** `Task`（异步版）—— 强制锁设置完成、且 `Notify()` 已执行后完成。
+**返回：** `Task`（异步形态）—— 强制锁设置完成且 `CanExecuteChanged` 已触发后完成。
 
 **Example:**
 
 ```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandControlTests.cs, lines 24-31
+// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandControlTests.cs
 await command.LockAsync();
-Assert.IsFalse(command.CanExecute(null), "a locked command reports itself as not executable");
+Assert.IsFalse(command.CanExecute(null));
 
 await command.ExecuteAsync(null);
 
-Assert.HasCount(1, recorder.Of(CommandEventType.Canceled), "a call arriving at a locked command is refused");
-Assert.HasCount(0, recorder.Of(CommandEventType.Started), "refused means never started");
+Assert.HasCount(1, recorder.Of(CommandEventType.Canceled));
+Assert.HasCount(0, recorder.Of(CommandEventType.Started));
 ```
 
-**Notes:** 进入锁定会拒绝新调用（`Created` → `Canceled`），但不中断正在运行的调用。`Interrupt` 与 `Clear` 会借用锁再归还，因此本就锁定的命令事后保持锁定。
+**说明：** 进入锁会拒绝新调用（`Created` → `Canceled`），但不中断正在运行的调用。`Interrupt` 与 `Clear` 会借用锁再归还，因此原本已锁定的命令之后仍锁定。
 
 ###### `VeloxCommand.Unlock` / `VeloxCommand.UnlockAsync`
 
 **Signature:**
-`void Unlock()` —— `Task UnlockAsync()`
+`void Unlock()` — `Task UnlockAsync()`
 
-**Returns:** `Task`（异步版）—— 锁被清除、并在容量允许范围内排空队列后完成。
+**返回：** `Task`（异步形态）—— 解除锁并尽可能排空队列后完成。
 
-**Notes:** 拼写是 `Unlock` —— 接口早期版本用的是 `UnLock`。`IVeloxCommand` 与 `VeloxCommand` 上现在都只有当前拼写。
+**说明：** 拼写是 `Unlock`，不是 `UnLock`。`IVeloxCommand` 与所有命令类型上都只有这一种拼写。
 
 ###### `VeloxCommand.Interrupt` / `VeloxCommand.InterruptAsync`
 
 **Signature:**
-`void Interrupt()` —— `Task InterruptAsync()`
+`void Interrupt()` — `Task InterruptAsync()`
 
-**Returns:** `Task`（异步版）—— 活动执行被取消后完成。
+**返回：** `Task`（异步形态）—— 活动执行被取消后完成。
 
 **Example:**
 
 ```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandCompletionTests.cs, lines 58-70
+// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandCompletionTests.cs
 var running = command.ExecuteAndWaitAsync(null);
 await gate.WaitForStartedAsync();
 
@@ -52,20 +52,20 @@ await command.InterruptAsync();
 Assert.AreEqual(CommandOutcome.Canceled, (await running.WaitAsync(CommandTestKit.Timeout)).Outcome);
 ```
 
-**Notes:** 取消每个活动项的 `CancellationTokenSource`，并为每次执行触发一次 `Canceled`。排队项留在队列里 —— 要丢弃它们请用 `Clear`。已经跑完并释放过源的方法体会被跳过（`ObjectDisposedException` 被捕获），取消回调抛出的异常也会被吞掉，因此命令绝不会被永久锁死。
+**说明：** 取消每个活动项的取消源，并每次执行只触发一条 `Canceled`。排队项留在队列中 —— 用 `Clear` 丢弃它们。已经结束并释放源的项会被跳过（捕获 `ObjectDisposedException`），抛异常的取消回调会被吞掉，使命令不会永久锁定。
 
 ###### `VeloxCommand.Clear` / `VeloxCommand.ClearAsync`
 
 **Signature:**
-`void Clear()` —— `Task ClearAsync()`
+`void Clear()` — `Task ClearAsync()`
 
-**Returns:** `Task`（异步版）—— 队列清空、活动执行被取消后完成。
+**返回：** `Task`（异步形态）—— 队列清空且活动执行被取消后完成。
 
 **Example:**
 
 ```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandCompletionTests.cs, lines 84-100
-_ = command.ExecuteAsync(null);                       // takes the slot
+// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandCompletionTests.cs
+_ = command.ExecuteAsync(null);
 await gate.WaitForStartedAsync();
 
 var queued = command.ExecuteAndWaitAsync(null);
@@ -73,50 +73,44 @@ await CommandTestKit.WaitUntilAsync(() => command.PendingCount() == 1);
 
 await command.ClearAsync();
 
-Assert.AreEqual(CommandOutcome.Canceled, (await queued.WaitAsync(CommandTestKit.Timeout)).Outcome,
-    "a queued call dropped by Clear never raises Exited either");
+Assert.AreEqual(CommandOutcome.Canceled, (await queued.WaitAsync(CommandTestKit.Timeout)).Outcome);
 ```
 
-**Notes:** 排队项按队列顺序上报 —— 先逐个 `Dequeued`，再 `Canceled`。被丢弃的排队项从不运行、从不触发 `Started` / `Exited`，而它的每次执行 `CancellationTokenSource` 由 `ClearAsync` 自己释放（没有别人会做）。
+**说明：** 排队项按队列顺序报告 —— 先逐个 `Dequeued`，再 `Canceled`。被丢弃的排队项永远不会运行、不会触发 `Started` / `Exited`，其取消源由 `ClearAsync` 自己释放。
 
 ###### `VeloxCommand.Continue` / `VeloxCommand.ContinueAsync`
 
 **Signature:**
-`void Continue()` —— `Task ContinueAsync()`
+`void Continue()` — `Task ContinueAsync()`
 
-**Returns:** `Task`（异步版）。
+**返回：** `Task`（异步形态）。
 
-**Notes:** 命令未处于强制锁定时启动排队中的工作；否则为空操作。一次什么都没留下的 `Clear` 之后再 `Continue`，不会启动任何东西。
+**说明：** 命令未强制锁定时启动排队工作；否则为空操作。
 
 ###### `VeloxCommand.ChangeSemaphore` / `VeloxCommand.ChangeSemaphoreAsync`
 
 **Signature:**
-`void ChangeSemaphore(int s)` —— `Task ChangeSemaphoreAsync(int semaphore)`
+`void ChangeSemaphore(int s)` — `Task ChangeSemaphoreAsync(int semaphore)`
 
 | 参数 | 类型 | 说明 |
-|---|---|---|
+| --- | --- | --- |
 | `s` / `semaphore` | `int` | 新的最大并发执行数。 |
 
-**Returns:** `Task`（异步版）。
+**返回：** `Task`（异步形态）。
 
-**Exceptions:**
+**异常：**
 
 | 异常 | 条件 |
-|---|---|
-| `ArgumentOutOfRangeException` | 取值小于 1。同步重载在派发**之前**校验，因为只在 async 方法内部抛出的异常会变成未被观察的异常而被静默丢弃。 |
+| --- | --- |
+| `ArgumentOutOfRangeException` | 值小于 1。同步重载在派发前先校验，因为只在 async 方法内抛出的异常会变成未观察异常。 |
 
 **Example:**
 
 ```csharp
-// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandConcurrencyTests.cs, lines 119-122
+// Source: Test — Src/Core/VeloxDev.Core.Test/MVVM/VeloxCommandConcurrencyTests.cs
 await command.ChangeSemaphoreAsync(3);
-
 await gate.WaitForStartedAsync(3);
-Assert.AreEqual(3, gate.StartedCount, "raising the cap is what releases the queue - nothing else will");
+Assert.AreEqual(3, gate.StartedCount);
 ```
 
-**Notes:** 调高容量会立即排空队列；调低容量绝不会取消任何已在运行的任务。
-
-## 源码引用
-
-`Src/Core/VeloxDev.Core/MVVM/VeloxCommand.cs` —— `LockAsync` 601、`UnlockAsync` 625、`InterruptAsync` 642、`ClearAsync` 686、`ContinueAsync` 750、`ChangeSemaphoreAsync` 774、`TryStartPendingAsync` 794。
+**说明：** 提高容量会立即排空队列；降低容量不会取消已在运行的项。

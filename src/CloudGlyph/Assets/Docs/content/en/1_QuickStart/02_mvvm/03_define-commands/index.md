@@ -1,148 +1,90 @@
 # MVVM — Define Commands
 
-`[VeloxCommand]` on a method generates a lazily created `IVeloxCommand` property wrapping that method. The command implements `System.Windows.Input.ICommand`, so it binds in XAML exactly like a framework command.
+`[VeloxCommand]` on a method generates a lazily created command property (or, for a generic method, a cached accessor) wrapping that method.
 
 ## 1. Attribute parameters
 
-`[VeloxCommand(string name = "Auto", bool canValidate = false, int semaphore = 1)]` — full signature in `Src/Core/VeloxDev.Core/MVVM/VeloxCommandAttribute.cs`:
+`[VeloxCommand(string name = "Auto", bool canValidate = false, int semaphore = 1)]` — declared in `Src/Core/VeloxDev.Core/MVVM/VeloxCommandAttribute.cs`.
 
 | Parameter | Meaning |
-|---|---|
-| `name` | Command-property name. `"Auto"` (default) derives it from the method name with **every** `Async` substring removed: `Plus` → `PlusCommand`, `IncrementAsync` → `IncrementCommand`, `SumToAsync` → `SumToCommand`. A custom string is used verbatim (`name: "Add"` → `AddCommand`). |
-| `canValidate` | When `true`, the property is built with `canExecute: CanExecute{Name}Command`, and the generator declares `private partial bool CanExecute{Name}Command(object? parameter)` for you to implement. When `false`, the emitted predicate is `_ => true`. |
-| `semaphore` | Maximum concurrent executions. The writer stores `Math.Max(1, semaphore)`, so the generated command never has a capacity below 1. |
+| --- | --- |
+| `name` | Command name. `"Auto"` (default) derives it from the method name by removing **every** `Async` substring: `Plus` → `PlusCommand`, `IncrementAsync` → `IncrementCommand`, `SumToAsync` → `SumToCommand`. Any other value is used verbatim, and `Command` is still appended. |
+| `canValidate` | When `true`, the generated command uses a `private partial bool CanExecute{Name}Command(...)` predicate you must implement. When `false`, the emitted predicate is always true. |
+| `semaphore` | Maximum concurrent executions. The writer stores `Math.Max(1, semaphore)`, so a generated command never has a capacity below 1. |
 
 ## 2. Accepted method signatures
 
-The writer decides two things separately: the **return type** decides how the value becomes a `Task`, and the **parameter list** decides which constructor or factory is used. Leading parameters may be zero or one, optionally followed by a trailing `CancellationToken`.
+The return type must be `Task`, `Task<T>`, `ValueTask`, `ValueTask<T>` or `void`. Leading parameters are optional, at most **15**, and may be followed by one trailing `CancellationToken`.
 
-| Method shape | Resolved construction |
-|---|---|
-| `Task M()` | `VeloxCommand(Func<Task>)` |
-| `Task M(object? parameter)` | `VeloxCommand.CreateTaskOnlyWithParameter(Func<object?, Task>)` |
-| `Task M(CancellationToken ct)` | `VeloxCommand.CreateTaskOnlyWithCancellationToken(Func<CancellationToken, Task>)` |
-| `Task M(object? parameter, CancellationToken ct)` | primary constructor (`Func<object?, CancellationToken, Task>`) |
-| `Task<T> M(...)` | same as the matching `Task M(...)` row — the `T` is discarded |
-| `void M()` / `void M(object? parameter)` | `VeloxCommand(Action)` / `VeloxCommand(Action<object?>)` |
-| `ValueTask M()` | `() => M().AsTask()` thunk → `VeloxCommand(Func<Task>)` |
-| `ValueTask M(CancellationToken ct)` | `ct => M(ct).AsTask()` thunk → `CreateTaskOnlyWithCancellationToken` |
-| `ValueTask<T> M(...)` | same as the matching `ValueTask M(...)` row |
-| `Task M(T value)` / `ValueTask M(T value)` / `void M(T value)` | thunk casts the parameter: `parameter => M((T)parameter!)` (plus `.AsTask()` for `ValueTask`) |
+| Shape | Generated command |
+| --- | --- |
+| no leading parameter, `Task` / `ValueTask` / `void` | untyped `IVeloxCommand`, constructed with a `Task`- or `Action`-taking constructor |
+| one `object?` parameter | untyped `IVeloxCommand`; the argument stays boxed |
+| one parameter of another type `T` | `IVeloxCommand<T, TResult>`; the property and the pipeline carry `T` unboxed |
+| two to fifteen leading parameters | `IVeloxCommand<T1, …, Tn, TResult>` from the arity family in `CommandArities.cs` |
+| return type `Task<T>` / `ValueTask<T>` | `TResult` is `T`, and the value is handed back by `IVeloxCommandResult` / the typed `ExecuteAsync` overload |
+| return type `Task` / `ValueTask` / `void` | `TResult` is `object?` and is always `null` |
+| generic method `M<T>(T value) where T : …` | a cached accessor `IVeloxCommand<T, TResult> GetMCommand<T>()` — one command per closed `T`, each with its own queue and lock |
 
-**Rejected shapes** raise the generator diagnostic **`VELOXCMD001`** (`Src/Generators/VeloxDev.Core.Generator/Diagnostics.cs`), an *error*, and the method is skipped — the rest of the class still generates:
+Only a `CancellationToken` parameter makes the body cancellable. Every other shape builds a command whose body never receives a token: an interrupted execution reports `Canceled`, but the body runs on to completion.
 
-| Rejected shape | Why |
-|---|---|
-| `void M(CancellationToken ct)` | nothing a synchronous body can observe; return `Task` to be cancellable |
-| a generic method `M<T>(...)` | the generated method group cannot infer its type arguments from one `object?` argument (a generic *class* is fine) |
-| more than one parameter before the trailing token | a command carries a single argument; take a record or tuple instead |
-| a return type that is not `Task`, `Task<T>`, `ValueTask`, `ValueTask<T>` or `void` | no way to turn it into a command |
+**Rejected shapes** report the error `VELOX_MVVM_CMD001` on the method's own line and are skipped; the rest of the class still generates:
 
-**Expected result:** every accepted shape compiles and produces a non-null command property; a rejected one fails the build with `VELOXCMD001` naming the method and the reason, and no `{Name}Command` property is emitted for it.
+| Rejected shape | Reason |
+| --- | --- |
+| `void M(CancellationToken ct)` | a synchronous body cannot observe the token |
+| a generic method whose type parameters do not appear in its parameter types | the accessor has no type argument to carry |
+| more than 15 leading parameters | the generated `Func` would exceed its type-argument limit; pass a record or tuple instead |
+| a return type outside the accepted set | there is no way to turn it into a command |
 
-## 3. Minimal command and its generated code
+**Expected result:** every accepted shape compiles to a non-null command; a rejected one fails the build with `VELOX_MVVM_CMD001` naming the method and the reason, and no member is emitted for it.
 
-```csharp
-using VeloxDev.MVVM;
+## 3. Generated members
 
-namespace QuickStart.Mvvm;
-
-public partial class CounterViewModel
-{
-    [VeloxCommand]
-    private Task Increment(object? parameter, CancellationToken ct)
-    {
-        Count++;
-        return Task.CompletedTask;
-    }
-}
-```
-
-The real generated property (one file per class, `{ClassName}_{Namespace}_Commands.g.cs`) is:
+For a plain untyped command the generated file contains:
 
 ```csharp
-private global::VeloxDev.MVVM.IVeloxCommand? _buffer_IncrementCommand = null;
-public global::VeloxDev.MVVM.IVeloxCommand IncrementCommand
+private global::VeloxDev.MVVM.IVeloxCommand? _buffer_SaveCommand = null;
+public global::VeloxDev.MVVM.IVeloxCommand SaveCommand
 {
     get
     {
-        _buffer_IncrementCommand ??= new global::VeloxDev.MVVM.VeloxCommand(
-            command: Increment,
+        _buffer_SaveCommand ??= new global::VeloxDev.MVVM.VeloxCommand(
+            command: Save,
             canExecute: _ => true,
             semaphore: 1);
-        return _buffer_IncrementCommand;
+        return _buffer_SaveCommand;
     }
 }
 ```
 
-The property is created on first access and cached in `_buffer_IncrementCommand`.
+For `private Task Save(string name)` the property becomes `IVeloxCommand<string, object?>` and the getter uses `VeloxCommand<string, object?>.CreateTypedTaskOnlyWithParameter(...)`. For a method with several parameters it uses the matching arity constructor. The buffer field is created on first read and cached.
 
-A `ValueTask` body with a single typed parameter resolves to a conversion thunk instead of a method group — no `ValueTask` overload of `VeloxCommand` is needed at run time, so the same generated code works on every supported target framework:
+**Expected result:** `vm.SaveCommand` is non-null, has the documented type, and `CanExecute` reports `true` unless a predicate or the lock says otherwise.
 
-```csharp
-[VeloxCommand]
-private async ValueTask<int> SumToAsync(int limit)
-{
-    await Task.Yield();
-    var total = 0;
-    for (var i = 1; i <= limit; i++)
-    {
-        total += i;
-    }
-
-    return total;
-}
-```
-
-```csharp
-private global::VeloxDev.MVVM.IVeloxCommand? _buffer_SumToCommand = null;
-public global::VeloxDev.MVVM.IVeloxCommand SumToCommand
-{
-    get
-    {
-        _buffer_SumToCommand ??= global::VeloxDev.MVVM.VeloxCommand.CreateTaskOnlyWithParameter(
-            command: parameter => SumToAsync((int)parameter!).AsTask(),
-            canExecute: _ => true,
-            semaphore: 1);
-        return _buffer_SumToCommand;
-    }
-}
-```
-
-**Expected result:** `vm.IncrementCommand` is non-null and `CanExecute(null)` is `true`; `vm.SumToCommand.Execute(10)` reaches `SumToAsync` with `limit == 10`. The cast in the thunk is a run-time cast — passing the wrong type makes the execution fail with an `InvalidCastException` (`CommandOutcome.Failed`) rather than silently doing nothing.
-
-## 4. Executability validation (`canValidate: true`)
-
-With validation enabled the generator declares a `partial` predicate you must implement — omitting it is a compile error, not a command that is silently always executable:
+## 4. Executability validation
 
 ```csharp
 [VeloxCommand(canValidate: true)]
-private Task Decrement(object? parameter, CancellationToken ct)
+private Task Remove(NotePayload note)
 {
-    Count--;
     return Task.CompletedTask;
 }
 
-private partial bool CanExecuteDecrementCommand(object? parameter) => Count > 0;
+private partial bool CanExecuteRemoveCommand(NotePayload note)
+    => note is not null && note.Weight > 0;
 ```
 
-The predicate is re-queried whenever `CanExecuteChanged` is raised, so call `{Name}Command.Notify()` after any change that affects it. The WPF demo does exactly that from a property hook: `partial void OnIndexChanged(int oldValue, int newValue) { MinusCommand.Notify(); }`.
+The validator's parameter list follows the source method's leading parameters: a method with no leading parameter gets `object? parameter`; otherwise the types and names are copied, and a mismatch is `CS8826`. The predicate is re-queried whenever `CanExecuteChanged` is raised, so call `{Name}Command.Notify()` after a change that can affect it. The demos do this from a property hook: `partial void OnIndexChanged(int oldValue, int newValue) { MinusCommand.Notify(); }`.
 
-**Expected result:** while `Count == 0`, `DecrementCommand.CanExecute(null)` is `false` and a bound button is disabled; once `Count > 0` and `DecrementCommand.Notify()` runs, `CanExecute(null)` is `true` and the button enables.
+**Expected result:** a value that fails the predicate reports `CanExecute == false`; after `Notify()` it reports `true` and a bound button enables.
 
 ## 5. Commands are framework-agnostic
 
-The command runtime is a plain class — no UI type is referenced. Both demos bind `PlusCommand` / `MinusCommand` straight through the .NET `ICommand` contract, and a console host can call the same command.
+The command runtime references no UI type. Both demos bind `PlusCommand` / `MinusCommand` through `ICommand`, and a console host can call the same command.
 
-**Expected result:** the same view-model class binds unchanged in WPF and Avalonia; the complete-code program on the last page calls `ExecuteAndWaitAsync` on these commands with no UI present.
+**Expected result:** the same view-model binds unchanged in WPF and Avalonia; the console program on the last page calls these commands with no UI present.
 
 ## Run declaration
 
-- ✅ Actually built and run on 2026-10-01. The two generated snippets in section 3 are verbatim from `obj/Debug/net9.0/generated/VeloxDev.Core.Generator/VeloxDev.Generators.Command/CounterViewModel_QuickStart_Mvvm_Commands.g.cs`, produced by `dotnet build -c Debug -p:EmitCompilerGeneratedFiles=true` in a scratch console project that project-references `VeloxDev.Core` and `VeloxDev.Core.Generator`. Two commands from that build were also executed; recorded output:
-
-  ```text
-  Increment -> Completed (Succeeded=True)
-  SumTo(10) -> Completed
-  ```
-
-- The rejection matrix in section 2 was not re-run in this pass. It is transcribed from `CommandWriter.TryBuildCommandExpression` and `Diagnostics.UnsupportedCommandSignature`, and is exercised by `Src/Core/VeloxDev.Core.Test/MVVM/CommandSignatureDiagnosticsTests.cs` (which drives the generator directly and asserts the `VELOXCMD001` id and message fragments).
+- ⚠️ Not actually run in this documentation pass — statically verified against `Writers/CommandWriter.cs`, `Diagnostics.cs`, `MVVM/VeloxCommand.cs`, `MVVM/CommandArities.cs`, `Base/AIContextNaming.cs`, `Examples/MVVM/Common/Lib/CommandGalleryViewModel.cs` and `Src/Core/VeloxDev.Core.Test/MVVM/CommandSignatureTests.cs`.

@@ -185,3 +185,4 @@ internal static class Program
     - `dotnet run --project "Examples/Theme/WPF/Demo" -- bench` 与 Avalonia 版各跑一次 —— 均正常结束并打印 `%TEMP%\veloxdev-theme-scale.tsv`；第 2 节的数字就是从这两个文件读出的。
     - 上文单文件程序已对照当前 `VeloxDev.WPF` 适配器源码在 `net9.0-windows` 上编译核验（**0 错误 / 0 警告**）并冒烟启动：`Loaded` 主题初始化路径（`InitializeTheme`、`SetPlatformInterpolator`）运行无异常，窗口持续存活。
 - ⚠️ **未用鼠标实际点击。** 示例的按钮处理器没有手工驱动过；带动画与即时两条切换路径是通过示例自带的 `bench` 模式实测的 —— 它直接调用 `ThemeManager.Transition` 与 `ThemeManager.Jump`，并等待 `ThemeManager.Current` 推进。在运行中的窗口里观察一次点击，留给读者作端到端核验。
+- ⚠️ **2026-10-18 审计：仅静态核验。** 本次修订把本页的每个签名、路径与代码块都对照当前源码重新核过，但没有重新构建或运行示例与测试；上面的记录输出来自此前的运行。

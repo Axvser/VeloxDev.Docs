@@ -79,10 +79,11 @@ classDiagram
 Each type stores weak references so the container never keeps its payload alive. Generic constraints: `WeakQueue<T>` / `WeakStack<T>` require `where T : class`, `WeakCache<...>` requires both keys and values to be `class`, and `WeakDelegate<TDelegate>` requires `where TDelegate : Delegate`.
 
 ```csharp
-// Src/Core/VeloxDev.Core/WeakTypes/WeakQueue.cs (lines 34-42)
+// Src/Core/VeloxDev.Core/WeakTypes/WeakQueue.cs (lines 39-47)
 public void Enqueue(T item)
 {
     if (item == null) throw new ArgumentNullException(nameof(item));
+
     lock (_lock)
     {
         _references.Enqueue(new WeakReference<T>(item));
@@ -110,7 +111,7 @@ Dead references are pruned lazily when a member is touched, rather than by a ded
 | `WeakCache<TTargetKey,TCacheKey>` | The CWT entry disappears automatically when the target key is collected; the tracking entry is a `WeakReference` swept by `AddOrUpdate` when the insert counter exceeds `_perceptionThreshold`, and by `ForeachCache` / `Remove` |
 
 ```csharp
-// Src/Core/VeloxDev.Core/WeakTypes/WeakQueue.cs (lines 124-135)
+// Src/Core/VeloxDev.Core/WeakTypes/WeakQueue.cs (lines 137-148)
 private void Prune()
 {
     var activeReferences = _references
@@ -125,14 +126,14 @@ private void Prune()
 }
 ```
 
-Two details worth noting. First, `WeakStack.Prune` additionally calls `activeReferences.Reverse()` before re-pushing (`Src/Core/VeloxDev.Core/WeakTypes/WeakStack.cs`, lines 124-136), so LIFO order survives compaction. Second, reclamation is *two-phase*: the GC clears a `WeakReference` target as soon as nothing else holds the object strongly, but the empty wrapper entry stays in the backing container until a sweep reaches it — the queue/stack therefore holds garbage slots between sweeps, bounded and cleaned on access.
+Two details worth noting. First, `WeakStack.Prune` additionally reverses the surviving references before re-pushing (`Src/Core/VeloxDev.Core/WeakTypes/WeakStack.cs`, lines 137-149; `Reverse()` at line 142), so LIFO order survives compaction. Second, reclamation is *two-phase*: the GC clears a `WeakReference` target as soon as nothing else holds the object strongly, but the empty wrapper entry stays in the backing container until a sweep reaches it — the queue/stack therefore holds garbage slots between sweeps, bounded and cleaned on access.
 
 ## 3. Weak-Event usage and the one strong reference
 
 `WeakDelegate` backs the events of the transition engine: `TransitionEffectCore` declares each of the seven lifecycle events as a `WeakDelegate<EventHandler<TransitionEventArgs>>` field, and the two diagnostics as `WeakDelegate<EventHandler<TransitionEventArgs<WarnStage, string>>>` (`Warn`) and `WeakDelegate<EventHandler<TransitionEventArgs<ErrorStage, Exception>>>` (`Error`), routing the C# `event` accessors through them.
 
 ```csharp
-// Src/Core/VeloxDev.Core/TransitionSystem/Effects/TransitionEffect.cs (lines 60-64)
+// Src/Core/VeloxDev.Core/TransitionSystem/Effects/TransitionEffect.cs (lines 81-85)
 public virtual event EventHandler<TransitionEventArgs> Awaked
 {
     add => _awaked.AddHandler(value);
@@ -140,7 +141,7 @@ public virtual event EventHandler<TransitionEventArgs> Awaked
 }
 ```
 
-Invocation goes through the combined delegate, which `TransitionEffectCore` invokes in a **typed** (reflection-free) way (`Src/Core/VeloxDev.Core/TransitionSystem/Effects/TransitionEffect.cs`, lines 106-109):
+Invocation goes through the combined delegate, which `TransitionEffectCore` invokes in a **typed** (reflection-free) way (`Src/Core/VeloxDev.Core/TransitionSystem/Effects/TransitionEffect.cs`, lines 136-139):
 
 ```csharp
 public virtual void InvokeAwake(object sender, TransitionEventArgs e)

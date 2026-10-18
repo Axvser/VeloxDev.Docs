@@ -57,7 +57,7 @@ group the child scope is configured while nothing runs yet
     loop every name in everyName not granted (MCP names skipped)
         Roster -> Child: WithToolEnabled(name, false)
     end
-    Roster -> Child: parent.GrantInteractionTo(child) — level, overrides, both handlers
+    Roster -> Child: parent.GrantInteractionTo(child) — permission policy (mode, rules, judge), mode text, both handlers
     Roster -> Child: WithSkills(parentSkills.CreateNarrowed(grantedSkills))
     Roster -> Child: WithMcps(McpScope.CreateGrantedView(parentMcp, grantedServers, grantedTools))
     Roster -> Child: parent.GrantCustomToolsTo(child, grantedTools)
@@ -117,4 +117,4 @@ Notes:
 - **A refused spawn leaves no row.** The refusal is a JSON object and the model is expected to read `message`; nothing is half-created.
 - **The child's own roster is empty at first** and is populated only if the child dispatches something itself; nothing here makes a sibling's handle reachable.
 
-> Source: `SubAgentScope.cs` (`TrySpawn` 387-606, `RunAsync` 781-806, `Finish` 815-839, `WaitAsync` 891-906); `SubAgentAgentToolkit.cs` (the five tools, 85-229); `WorkflowAgentScope.cs` (`GrantInteractionTo` 283-296, `GrantCustomToolsTo` 251-264, `WithSubAgents` 1788-1804); `ToolCallLedger.cs`. Tests: `SubAgentDispatchTests`, `SubAgentBudgetTests`, `SubAgentHierarchyTests`, `SubAgentCapabilityGrantTests`.
+> Source: `SubAgentScope.cs` (`TrySpawn`, `RunAsync`, `Finish`, `WaitAsync`); `SubAgentAgentToolkit.cs` (the five tools); `WorkflowAgentScope.cs` (`GrantInteractionTo`, `GrantCustomToolsTo`, `WithSubAgents`); `ToolCallLedger.cs`. Tests: `SubAgentDispatchTests`, `SubAgentBudgetTests`, `SubAgentHierarchyTests`, `SubAgentCapabilityGrantTests`.
