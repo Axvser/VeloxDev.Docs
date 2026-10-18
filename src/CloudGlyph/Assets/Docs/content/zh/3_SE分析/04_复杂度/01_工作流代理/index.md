@@ -53,7 +53,7 @@ $$
 | `ConnectSlots` / `ConnectSlotsById` / `ConnectByProperty` | 摊还 $O(1)$ | 槽解析 + Send/Receive 命令 + `VerifyConnection` |
 | `PatchNodeProperties` / `PatchComponentById` | $O(P)$ | 反射补丁，逐属性拒绝规则 |
 | `RunCompiledWorkflow` / `GetNodeResult` | 编译 + 链/锥工作 | 见下 |
-| `ListCreatableTypes` | $O(A \cdot T)$ | 程序集扫描 |
+| `ListCreatableTypes` | $O(A \cdot T)$ | 编译后的上下文树查找 |
 | `ValidateWorkflow` | $O(V + E)$ | 带重复链接去重的节点/链接遍历 |
 | `RequestSelection` / `RequestConfirmation` | $O(1)$ + 处理器 | 用户等待占主导 |
 | `TakeSnapshot` / `GetChangesSinceSnapshot` | $O(V \cdot P + E)$ | 见上 |

@@ -53,7 +53,7 @@ $$
 | `ConnectSlots` / `ConnectSlotsById` / `ConnectByProperty` | $O(1)$ amortized | slot resolve + Send/Receive commands + `VerifyConnection` |
 | `PatchNodeProperties` / `PatchComponentById` | $O(P)$ | reflection patch, per-property rejection rules |
 | `RunCompiledWorkflow` / `GetNodeResult` | compile + chain/cone work | see below |
-| `ListCreatableTypes` | $O(A \cdot T)$ | assembly scan |
+| `ListCreatableTypes` | $O(A \cdot T)$ | compiled context-tree lookup |
 | `ValidateWorkflow` | $O(V + E)$ | node/link pass with duplicate-link dedup |
 | `RequestSelection` / `RequestConfirmation` | $O(1)$ + handler | user wait dominates |
 | `TakeSnapshot` / `GetChangesSinceSnapshot` | $O(V \cdot P + E)$ | see above |
