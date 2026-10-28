@@ -11,7 +11,7 @@ scope.WithMaxToolCalls(200)          // total cap on all tool calls
 ```
 
 - A call counts as **read** when its name is in the toolkit's read-only set — the Query tools plus `TakeSnapshot` / `GetChangesSinceSnapshot`, `GetNodeStatistics`, the five Graph tools, `RequestSelection` / `RequestConfirmation`, `ResetToolCallLimit`, the four compile/plan read tools (`CompileWorkflow`, `CompileNodeResult`, `GetCompileStatus`, `GetExecutionLog`), **plus every skill and sub-agent tool name** (folded in from `SkillAgentToolkit.ToolNames` and `SubAgentAgentToolkit.ToolNames`). `EnterPlanMode` / `ExitPlanMode` are not in that name list, so they count as **write** calls even though they do not touch the graph.
-- A pre-flight gate (`CheckBudget`) runs inside the marshalled block, before the body. When a limit is already reached it returns a refusal; the body never runs and the call is **not** counted.
+- A pre-flight gate (`CheckInvocation`) runs inside the marshalled block, before the body. When a limit is already reached it returns a refusal; the body never runs and the call is **not** counted.
 
 Refusal wording (from `LimitRefusal`):
 

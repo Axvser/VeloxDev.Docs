@@ -32,7 +32,7 @@ where $P' \le P$ is the scalar-prop count in the JSON. Only scalar and enum-type
 
 ## Toolkit dispatch
 
-Each tool is wrapped by `TrackedAIFunction`, whose overhead is $O(1)$ per call (interlocked counters + event raise + optional `MarkDirty`). The pre-flight gate `CheckBudget` is $O(1)$: an `IsToolEnabled` hash-set probe, an optional walk to the root ledger, and three integer comparisons. The tool bodies dominate:
+Each tool is wrapped by `TrackedAIFunction`, whose overhead is $O(1)$ per call (interlocked counters + event raise + optional `MarkDirty`). The pre-flight gate `CheckInvocation` is $O(1)$: an `IsToolEnabled` hash-set probe, an optional walk to the root ledger, and three integer comparisons. The tool bodies dominate:
 
 $$
 T_{\text{tool}} = O(\text{per-tool work}), \qquad T_{\text{tracked}} = T_{\text{tool}} + O(1)
@@ -130,7 +130,7 @@ $$
 | `WorkflowStateTracker.TakeSnapshot` | $O(V \cdot P + E)$ | $O(V \cdot P + E)$ | graph walk + scalar property emit |
 | `WorkflowStateTracker` diff | $O(V \cdot P' + E)$ | $O(V + E)$ | `RuntimeId` index + property compare |
 | Toolkit dispatch overhead | $O(1)$ | $O(1)$ | tracked wrapper counters + event |
-| `CheckBudget` gate | $O(1)$ (+ $O(d)$ to the root) | $O(1)$ | hash probe + integer compares |
+| `CheckInvocation` gate | $O(1)$ (+ $O(d)$ to the root) | $O(1)$ | hash probe + integer compares |
 | `ToolCallLedger.Spend` / `ResetChain` | $O(d)$ | $O(d)$ | walks the spawn chain |
 | Provider render | $O(1)$ hit / $O(\text{text} + n_{\text{tools}})$ miss | $O(1)$ hit | `ContextKey` cache |
 | `GetCompiledRunStatus` | $O(\min(40, L))$ | $O(40)$ | `SnapshotLogs()` + tail |
