@@ -34,8 +34,21 @@ flowchart TD
 | `HitRadius` | `double` | Hit-test radius for curves; defaults to `LinkHitTestEx.DefaultHitRadius` (`:213`) |
 | `IsSuspended` | `bool` | Set while a host menu is open; pointer tracking stops (`:220`) |
 | `Scroller` | `IWorkflowSurfaceScroller?` | Written by an adapter while attached; how a subscriber scrolls after taking a wheel over (`:238`) |
+| `Navigator` | `IWorkflowSurfaceNavigator?` | Written by an adapter while attached; how the surface centers a world point. `WorkflowNavigationEx`'s `node/slot/link.Locate()` calls it (`:249`) |
 
 **Route order.** The target is dispatched first, then each ancestor up to the tree. Every element on the way sees the same argument instance — so one action has one `WorkflowEventHandle`, and an ancestor can read what a handler closer to the target decided.
+
+**Locating an element.** `Navigator` is the absolute counterpart of `Scroller`: instead of a wheel delta it takes a world point and puts it at the viewport center. `WorkflowNavigationEx` turns a component into that point, so a host does not need the platform's scroll API:
+
+```csharp
+using VeloxDev.WorkflowSystem.StandardEx;
+
+node.Locate();   // the node's rectangle center
+slot.Locate();   // its parent node's rectangle center
+link.Locate();   // the midpoint of its two endpoint nodes' centers
+```
+
+All three read model data only — a slot's measured anchor and a link's published curve are deliberately ignored — so an off-screen, unmeasured or not-yet-drawn element still reaches the center. It pans only, preserving the zoom, and returns `false` without changing anything when no surface is attached. A target outside the current extent grows the canvas (the adapter decides; WinForms' pan engine simply accepts the signed target).
 
 ## `IInputEvents` / `InputRelay`
 

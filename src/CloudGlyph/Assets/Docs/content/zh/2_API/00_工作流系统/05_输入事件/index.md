@@ -34,8 +34,21 @@ flowchart TD
 | `HitRadius` | `double` | 曲线的命中半径；默认 `LinkHitTestEx.DefaultHitRadius`（`:213`） |
 | `IsSuspended` | `bool` | 宿主菜单打开时置位，指针跟踪停止（`:220`） |
 | `Scroller` | `IWorkflowSurfaceScroller?` | 适配器挂载期间写入；订阅者接管滚轮后经它滚动（`:238`） |
+| `Navigator` | `IWorkflowSurfaceNavigator?` | 适配器挂载期间写入；表面经它把世界坐标点移到视口中心。`WorkflowNavigationEx` 的 `node/slot/link.Locate()` 调它（`:249`） |
 
 **路由顺序。** 目标先派发，然后逐级祖先直到树。链上每个元素看到的是**同一个参数实例** —— 所以一次动作只有一个 `WorkflowEventHandle`，祖先也能读到更靠近目标的那一级做了什么决定。
+
+**定位一个元素。** `Navigator` 是 `Scroller` 的绝对值对应物：它不收滚轮增量，而收一个世界坐标点，把它放到视口中心。`WorkflowNavigationEx` 负责把组件换算成那个点，宿主不必知道平台的滚动 API：
+
+```csharp
+using VeloxDev.WorkflowSystem.StandardEx;
+
+node.Locate();   // 节点自身矩形中心
+slot.Locate();   // 所属节点的矩形中心
+link.Locate();   // 两端节点矩形中心的中点
+```
+
+三者都只读模型数据 —— 插槽的测量锚点与连线的已发布曲线被有意忽略 —— 所以屏幕外、未测量或尚未绘制的元素也能定位。它只平移、保留缩放；没有挂表面时返回 `false`、不做任何改动。目标在当前范围之外时，画布按差额延展（由适配器决定；WinForms 的平移引擎直接接受有符号目标）。
 
 ## `IInputEvents` / `InputRelay`
 
