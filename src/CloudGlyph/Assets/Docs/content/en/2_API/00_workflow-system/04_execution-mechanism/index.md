@@ -8,7 +8,7 @@ Two execution mechanisms drive the **same** single entry point. The **Compiler**
 
 ## 1. The one true entry: `ReceiveAsync`
 
-Every path — compiled drive, broadcast delivery, manual EXEC — funnels into one method declared by `IWorkflowNodeViewModelHelper` (`Interfaces/WorkflowSystem/IWorkflowNodeViewModel.cs`):
+Every path — compiled drive, broadcast delivery, manual EXEC — funnels into one method declared by `IWorkflowNodeViewModelHelper` (`Interfaces/WorkflowSystem/Components/IWorkflowNodeViewModel.cs`):
 
 ```csharp
 Task<object?> ReceiveAsync(ITaskContext context, CancellationToken ct);
@@ -234,4 +234,4 @@ They are **not mutually exclusive**: a workflow can be built and stepped manuall
 
 ---
 
-*Sources: `Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/CompilerViewModel.cs`, `CompilerViewModel.Reverse.cs`, `Runtime/RuntimeEngine.cs`, `Runtime/Model/RuntimeContext.cs`, `Runtime/Model/BranchRuntimeContext.cs`, `Runtime/Model/GroupData.cs`, `Runtime/Contracts/*.cs`; `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IContext.cs`, `IAccessContext.cs`, `ITaskContext.cs`, `IWorkflowNodeViewModel.cs`; `Src/Core/VeloxDev.Core/WorkflowSystem/Templates/ViewModels/NodeDefaultViewModel.cs`, `StandardEx/WorkflowNodeEx.cs`; `Examples/Workflow/Common/Lib/ViewModels/Workflow/WorkflowDemoSession.cs`, `ControllerViewModel.cs`, `EnumSelectorNodeViewModel.cs`, `Helper/EnumSelectorHelper.cs`, `Helper/PythonHelper.cs`, `Helper/TimerHelper.cs`, `NetworkFlowContext.cs`.*
+*Sources: `Src/Core/VeloxDev.Core/WorkflowSystem/CompilerEx/CompilerViewModel.cs`, `CompilerViewModel.Reverse.cs`, `Runtime/RuntimeEngine.cs`, `Runtime/Model/RuntimeContext.cs`, `Runtime/Model/BranchRuntimeContext.cs`, `Runtime/Model/GroupData.cs`, `Runtime/Contracts/*.cs`; `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Execution/IContext.cs`, `IAccessContext.cs`, `ITaskContext.cs`, `IWorkflowNodeViewModel.cs`; `Src/Core/VeloxDev.Core/WorkflowSystem/Templates/ViewModels/NodeDefaultViewModel.cs`, `StandardEx/WorkflowNodeEx.cs`; `Examples/Workflow/Common/Lib/ViewModels/Workflow/WorkflowDemoSession.cs`, `ControllerViewModel.cs`, `EnumSelectorNodeViewModel.cs`, `Helper/EnumSelectorHelper.cs`, `Helper/PythonHelper.cs`, `Helper/TimerHelper.cs`, `NetworkFlowContext.cs`.*

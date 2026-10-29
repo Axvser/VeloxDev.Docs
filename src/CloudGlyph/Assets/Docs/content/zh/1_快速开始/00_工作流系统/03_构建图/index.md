@@ -36,7 +36,7 @@ public static class GraphBuilder
 
 ## 2. 配置槽通道
 
-槽的 `SlotChannel`（`VeloxDev.WorkflowSystem` 中的 `[Flags]` 枚举）声明每个方向的连接容量：`OneSource` = 最多一条入向连接，`OneTarget` = 最多一条出向连接（`Src/Core/VeloxDev.Core/WorkflowSystem/Enums/Slot.cs`）。通过槽的 `SetChannelCommand` 设置，绝不要用新实例替换生成的槽（demo 警告：替换预置槽会触发它的 `DeleteCommand`，产生幽灵撤销记录）：
+槽的 `SlotChannel`（`VeloxDev.WorkflowSystem` 中的 `[Flags]` 枚举）声明每个方向的连接容量：`OneSource` = 最多一条入向连接，`OneTarget` = 最多一条出向连接（`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Enums/Slot.cs`）。通过槽的 `SetChannelCommand` 设置，绝不要用新实例替换生成的槽（demo 警告：替换预置槽会触发它的 `DeleteCommand`，产生幽灵撤销记录）：
 
 ```csharp
 private static void SetChannel(QuickSlot slot, SlotChannel channel)

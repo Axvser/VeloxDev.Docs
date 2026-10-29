@@ -36,7 +36,7 @@ public static class GraphBuilder
 
 ## 2. Configure the slot channels
 
-A slot's `SlotChannel` (a `[Flags]` enum in `VeloxDev.WorkflowSystem`) declares connection capacity per direction: `OneSource` = at most one incoming connection, `OneTarget` = at most one outgoing connection (`Src/Core/VeloxDev.Core/WorkflowSystem/Enums/Slot.cs`). Set it through the slot's `SetChannelCommand`, never by replacing the generated slot with a new instance (the demo warns that replacing a preset slot triggers its `DeleteCommand` and creates ghost undo entries):
+A slot's `SlotChannel` (a `[Flags]` enum in `VeloxDev.WorkflowSystem`) declares connection capacity per direction: `OneSource` = at most one incoming connection, `OneTarget` = at most one outgoing connection (`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Enums/Slot.cs`). Set it through the slot's `SetChannelCommand`, never by replacing the generated slot with a new instance (the demo warns that replacing a preset slot triggers its `DeleteCommand` and creates ghost undo entries):
 
 ```csharp
 private static void SetChannel(QuickSlot slot, SlotChannel channel)

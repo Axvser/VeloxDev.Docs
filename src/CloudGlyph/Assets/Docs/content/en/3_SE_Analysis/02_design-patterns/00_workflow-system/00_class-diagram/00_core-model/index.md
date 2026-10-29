@@ -172,4 +172,4 @@ classDiagram
     CompilerViewModel ..> ICompileTimeRouter : GetRouteTable
 ```
 
-Sources: `CompilerEx/Compile/CompilerViewModel.cs` (lines 26-57 entry, 59-249 forward decomposition), `CompilerEx/Compile/CompilerViewModel.Reverse.cs` (ancestor-cone compilation), `CompilerEx/Runtime/RuntimeEngine.cs` (lines 52-128 `RunAsync`, 205-214 the error / `IRedirectable` termination block; fan-out restore lives in `RunParallelAsync`, 329-383), `CompilerEx/Compile/Model/*.cs` + `Runtime/Model/*.cs`, `Interfaces/WorkflowSystem/IContext.cs`, `IAccessContext.cs`, `ITaskContext.cs`.
+Sources: `CompilerEx/Compile/CompilerViewModel.cs` (lines 26-57 entry, 59-249 forward decomposition), `CompilerEx/Compile/CompilerViewModel.Reverse.cs` (ancestor-cone compilation), `CompilerEx/Runtime/RuntimeEngine.cs` (lines 52-128 `RunAsync`, 205-214 the error / `IRedirectable` termination block; fan-out restore lives in `RunParallelAsync`, 329-383), `CompilerEx/Compile/Model/*.cs` + `Runtime/Model/*.cs`, `Interfaces/WorkflowSystem/Execution/IContext.cs`, `IAccessContext.cs`, `ITaskContext.cs`.

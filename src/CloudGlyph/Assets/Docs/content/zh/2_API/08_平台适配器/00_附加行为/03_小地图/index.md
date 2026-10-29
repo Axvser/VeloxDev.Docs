@@ -42,7 +42,7 @@ MAUI 用颜色类型的可绑定属性而非画刷（`MinimapBackgroundColor`、
 
 ## 接口：`IWorkflowGridDecorator`
 
-网格装饰层的数据交换契约；表面行为在每次渲染前把滚动偏移与画布内容偏移推给它。**定义于 Core**（`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowGridDecorator.cs`，命名空间 `VeloxDev.WorkflowSystem`），七个适配器共用一份定义。
+网格装饰层的数据交换契约；表面行为在每次渲染前把滚动偏移与画布内容偏移推给它。**定义于 Core**（`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Surface/IWorkflowGridDecorator.cs`，命名空间 `VeloxDev.WorkflowSystem`），七个适配器共用一份定义。
 
 ```csharp
 public interface IWorkflowGridDecorator
@@ -59,7 +59,7 @@ public interface IWorkflowGridDecorator
 
 ## 接口：`IWorkflowMinimapOverlay`
 
-派生自 `IWorkflowGridDecorator`（小地图同样需要滚动/内容偏移），再加视口尺寸与要渲染的树。**定义于 Core**（`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowMinimapOverlay.cs`，命名空间 `VeloxDev.WorkflowSystem`）。
+派生自 `IWorkflowGridDecorator`（小地图同样需要滚动/内容偏移），再加视口尺寸与要渲染的树。**定义于 Core**（`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Surface/IWorkflowMinimapOverlay.cs`，命名空间 `VeloxDev.WorkflowSystem`）。
 
 ```csharp
 public interface IWorkflowMinimapOverlay : IWorkflowGridDecorator

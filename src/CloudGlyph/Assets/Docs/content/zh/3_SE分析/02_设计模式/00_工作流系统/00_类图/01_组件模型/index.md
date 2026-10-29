@@ -96,4 +96,4 @@ classDiagram
     TreeHelper~T~ ..> WorkflowActionPair : Submit/Undo/Redo
 ```
 
-源码：`Interfaces/WorkflowSystem/IWorkflow*.cs`、`Templates/Helpers/TreeHelper.cs`、`Templates/Helpers/NodeHelper.cs`、`Templates/WorkflowBuilder.cs`。
+源码：`Interfaces/WorkflowSystem/{Common,Components}/IWorkflow*.cs`、`Templates/Helpers/TreeHelper.cs`、`Templates/Helpers/NodeHelper.cs`、`Templates/WorkflowBuilder.cs`。

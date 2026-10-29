@@ -32,7 +32,7 @@ public interface IWorkflowViewModel : INotifyPropertyChanging, INotifyPropertyCh
 | `OnPropertyChanged` | `void OnPropertyChanged(string propertyName)` | 变更通知 |
 | `CloseCommand` | `IVeloxCommand CloseCommand { get; }` | 终结所有进行中的任务（参数为 null） |
 
-*源码：`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowViewModel.cs`。*
+*源码：`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Common/IWorkflowViewModel.cs`。*
 
 #### `IWorkflowTreeViewModel : IWorkflowViewModel`
 
@@ -74,7 +74,7 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 | `Redo` / `Undo` / `ClearHistory` | `void Redo()` / `void Undo()` / `void ClearHistory()` | 栈操作 |
 | `MarkDirty` | `void MarkDirty()` | 标记树需要重新虚拟化 |
 
-*源码：`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowTreeViewModel.cs`。*
+*源码：`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Components/IWorkflowTreeViewModel.cs`。*
 
 #### `IWorkflowNodeViewModel : IWorkflowViewModel`
 
@@ -108,7 +108,7 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 | `AccessAsync` | `Task<bool> AccessAsync(IAccessContext context, CancellationToken ct)` | 数据流访问门（边 Sender→Receiver + 阶段 + 负载）；编译期 = 静态检测（Data 为 null），运行期 = 实时检测（Data = 负载）；默认 `true` |
 | `Delete` | `void Delete()` | → `StandardDelete`（原子、可撤销） |
 
-*源码：`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowNodeViewModel.cs`。*
+*源码：`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Components/IWorkflowNodeViewModel.cs`。*
 
 > `ReceiveAsync` 是 Compiler（引擎驱动）与非Compiler（节点驱动广播）两条路径共享的单一执行入口——每条路径以不同的 context 到达。入口、参数、时序见 `执行机制`。
 
@@ -128,7 +128,7 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 
 **`IWorkflowSlotViewModelHelper : IWorkflowHelper`** —— 事件 `TargetAdded/Removed`、`SourceAdded/Removed`；方法 `Install/Uninstall`、`SetChannel(SlotChannel)`、`UpdateState()`、`SendConnection()`、`ReceiveConnection()`、`Delete()`。
 
-*源码：`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowSlotViewModel.cs`。*
+*源码：`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Components/IWorkflowSlotViewModel.cs`。*
 
 #### `IWorkflowLinkViewModel : IWorkflowViewModel`
 
@@ -141,7 +141,7 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 
 **`IWorkflowLinkViewModelHelper : IWorkflowHelper`** —— `Install/Uninstall(IWorkflowLinkViewModel)`、`Delete()`。
 
-*源码：`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowLinkViewModel.cs`。*
+*源码：`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Components/IWorkflowLinkViewModel.cs`。*
 
 #### 其他接口
 
@@ -156,7 +156,7 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 | `ISpatialMap<T>` | `T : class, ISpatialBoundsProvider`；`Insert(T)`、`Remove(T)`、`Query(Viewport)`、`Clear()`、`Bounds` |
 | `ISpatialBoundsProvider` | `Viewport Bounds { get; }` + `INotifyPropertyChanged`；变更时引发 `PropertyChanged("Bounds")` |
 
-*源码：`Interfaces/WorkflowSystem/IWorkflowActionPair.cs`、`IWorkflowIdentifiable.cs`、`IContext.cs`、`ITaskContext.cs`、`ISlotProvider.cs`、`ISpatialMap.cs`、`ISpatialBoundsProvider.cs`。*
+*源码：`Interfaces/WorkflowSystem/Commands/IWorkflowActionPair.cs`、`IWorkflowIdentifiable.cs`、`IContext.cs`、`ITaskContext.cs`、`ISlotProvider.cs`、`ISpatialMap.cs`、`ISpatialBoundsProvider.cs`。*
 
 ### 值类型、几何类与枚举
 
@@ -173,7 +173,7 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 | `SlotChannel` | `[Flags] int`：`None=0`、`OneTarget=1`、`OneSource=2`、`OneBoth=3`、`MultipleTargets=4`、`MultipleSources=8`、`MultipleBoth=12` |
 | `SlotState` | `[Flags] int`：`StandBy=1`、`PreviewSender=2`、`PreviewReceiver=4`、`Sender=8`、`Receiver=16` |
 
-*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/` 下的 `GUI/GeometryModels/Anchor.cs`、`GUI/GeometryModels/Size.cs`、`GUI/GeometryModels/Offset.cs`、`GUI/GeometryModels/Viewport.cs`、`GUI/GeometryModels/CanvasLayout.cs`、`GUI/Virtualization/CellKey.cs`、`TaskContext.cs`、`WorkflowActionPair.cs`、`Enums/Slot.cs`。*
+*源码：`Src/Core/VeloxDev.Core/WorkflowSystem/` 下的 `GUI/GeometryModels/Anchor.cs`、`GUI/GeometryModels/Size.cs`、`GUI/GeometryModels/Offset.cs`、`GUI/GeometryModels/Viewport.cs`、`GUI/GeometryModels/CanvasLayout.cs`、`GUI/Virtualization/CellKey.cs`、`TaskContext.cs`、`WorkflowActionPair.cs`、`Interfaces/WorkflowSystem/Enums/Slot.cs`。*
 
 ### 默认 ViewModel 与 Helper
 
@@ -217,7 +217,7 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 
 `TrySelect` 是在 `conditionMap` 上的字典查找（期望 `O(1)`）。`CurrentValue` 的 getter 返回字符串形式；setter 接受字符串 / 枚举 / 数值并归一化。
 
-*源码：`SelectorEx/SlotEnumerator.cs`、`SelectorEx/ConditionalSlot.cs`、`SelectorEx/SlotDefinition.cs`、`Interfaces/WorkflowSystem/ISlotProvider.cs`、`Interfaces/WorkflowSystem/IConditionalSlotProvider.cs`、`Src/Core/VeloxDev.Core/AI/SlotSelectorsAttribute.cs`。*
+*源码：`SelectorEx/SlotEnumerator.cs`、`SelectorEx/ConditionalSlot.cs`、`SelectorEx/SlotDefinition.cs`、`Interfaces/WorkflowSystem/Providers/ISlotProvider.cs`、`Interfaces/WorkflowSystem/Providers/IConditionalSlotProvider.cs`、`Src/Core/VeloxDev.Core/AI/SlotSelectorsAttribute.cs`。*
 
 ### 空间系统
 
@@ -228,7 +228,7 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 | `WorkflowSpatialEx` | 扩展：`EnableMap(tree, cellSize, observable)`、`Virtualize(tree, viewport)`、`QueryNodes(tree, viewport)`、`ClearMap(tree)`。 |
 | `ISpatialMap<T>` / `ISpatialBoundsProvider` | 空间抽象（见上文「其他接口」）。 |
 
-*源码：`WorkflowSystem/GUI/Virtualization/SpatialGridHashMap.cs`、`WorkflowSystem/GUI/Virtualization/WorkflowSpatialManager.cs`、`WorkflowSystem/GUI/Virtualization/NodeBoundsProvider.cs`、`WorkflowSystem/GUI/Virtualization/NodePairBoundsProvider.cs`、`WorkflowSystem/GUI/Virtualization/WorkflowSpatialEx.cs`、`Interfaces/WorkflowSystem/ISpatialMap.cs`、`Interfaces/WorkflowSystem/ISpatialBoundsProvider.cs`。*
+*源码：`WorkflowSystem/GUI/Virtualization/SpatialGridHashMap.cs`、`WorkflowSystem/GUI/Virtualization/WorkflowSpatialManager.cs`、`WorkflowSystem/GUI/Virtualization/NodeBoundsProvider.cs`、`WorkflowSystem/GUI/Virtualization/NodePairBoundsProvider.cs`、`WorkflowSystem/GUI/Virtualization/WorkflowSpatialEx.cs`、`Interfaces/WorkflowSystem/Spatial/ISpatialMap.cs`、`Interfaces/WorkflowSystem/Spatial/ISpatialBoundsProvider.cs`。*
 
 ### 渲染就绪辅助（核心层，与 GUI 无关）
 
@@ -256,4 +256,4 @@ public interface IWorkflowTreeViewModelHelper : IWorkflowHelper
 
 `ConnectionCheck` 刻意不包含释放时的 `IWorkflowTreeEvents.Connecting` 否决：那是一次性的逐次决定，可能依赖预览不应消费的状态。预览只能**收紧**框架裁决，绝不能放松。
 
-*源码：`Interfaces/WorkflowSystem/ConnectionCheck.cs`、`Interfaces/WorkflowSystem/IConnectionPreviewLink.cs`、`GUI/Events/WorkflowInput.cs`、`GUI/Events/Tree/ConnectionPreviewEventArgs.cs`、`GUI/Events/Tree/ConnectionPreviewValidatingEventArgs.cs`、`GUI/Interaction/SlotHitTestEx.cs`。*
+*源码：`Interfaces/WorkflowSystem/Connections/ConnectionCheck.cs`、`Interfaces/WorkflowSystem/Connections/IConnectionPreviewLink.cs`、`GUI/Events/WorkflowInput.cs`、`GUI/Events/Tree/ConnectionPreviewEventArgs.cs`、`GUI/Events/Tree/ConnectionPreviewValidatingEventArgs.cs`、`GUI/Interaction/SlotHitTestEx.cs`。*

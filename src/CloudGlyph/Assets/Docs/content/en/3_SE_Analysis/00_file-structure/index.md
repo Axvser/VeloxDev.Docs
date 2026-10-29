@@ -8,7 +8,7 @@ VeloxDev/
 │   ├── Core/
 │   │   ├── VeloxDev.Core/                 ← Core engine (multi-target)
 │   │   │   ├── WorkflowSystem/            ← Workflow editor: Templates, StandardEx, CompilerEx, SelectorEx
-│   │   │   ├── TransitionSystem/          ← Animation engine, split by role: Events/ Effects/ Binding/ Sampling/ State/ Runtime/ Enums/ NativeSamplers/
+│   │   │   ├── TransitionSystem/          ← Animation engine, split by role: Events/ Effects/ Binding/ Sampling/ State/ Runtime/ NativeSamplers/ (enums live in Interfaces/TransitionSystem/Enums/)
 │   │   │   ├── DynamicTheme/              ← Theme switching (ThemeManager, ThemeCache)
 │   │   │   ├── MVVM/                      ← VeloxProperty/VeloxCommand runtime + IVeloxCommand
 │   │   │   ├── Serialization/             ← Archive engine (VeloxJson*), Archivable/Archive annotations

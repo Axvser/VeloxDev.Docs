@@ -2,7 +2,7 @@
 
 Namespace `VeloxDev.TransitionSystem`. `TransitionEventArgs` is the payload of the seven lifecycle events an effect raises; `TransitionEventArgs<TStage, TValue>` adds a typed stage and value for the two **diagnostic** events, and `WarnStage` / `ErrorStage` name the step that reported them. All of them derive from `VeloxDev.TimeLine.TimeLineEventArgs`, which carries the shared `Handled` / `DeltaTime` / `TotalTime` trio (documented with the tickable feature's [TimeLineEventArgs](../../../06_tickable/02_TimeLineEventArgs/index.md) and re-summarized on the [timeline](../../04_timeline/index.md) page).
 
-Sources: `Src/Core/VeloxDev.Core/TransitionSystem/Events/TransitionEventArgs.cs`, `TransitionEventArgs{TStage,TValue}.cs`, `Enums/WarnStage.cs`, `Enums/ErrorStage.cs`, `TransitionDiagnostics.cs`; base `Src/Core/VeloxDev.Core/TimeLine/TimeLineEventArgs.cs`.
+Sources: `Src/Core/VeloxDev.Core/TransitionSystem/Events/TransitionEventArgs.cs`, `TransitionEventArgs{TStage,TValue}.cs`, `Interfaces/TransitionSystem/Enums/WarnStage.cs`, `Interfaces/TransitionSystem/Enums/ErrorStage.cs`, `TransitionDiagnostics.cs`; base `Src/Core/VeloxDev.Core/TimeLine/TimeLineEventArgs.cs`.
 
 ### Class: `TransitionEventArgs : TimeLineEventArgs`
 

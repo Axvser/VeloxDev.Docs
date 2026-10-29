@@ -2,7 +2,7 @@
 
 命名空间 `VeloxDev.TransitionSystem`。`TransitionEventArgs` 是效果抛出的七个生命周期事件的载荷；`TransitionEventArgs<TStage, TValue>` 为两个**诊断**事件补上有类型的阶段与值，`WarnStage` / `ErrorStage` 则指出是哪个步骤上报的。它们都派生自 `VeloxDev.TimeLine.TimeLineEventArgs`，后者携带共享的 `Handled` / `DeltaTime` / `TotalTime` 三件套（记录在 tickable 特性的 [TimeLineEventArgs](../../../06_Tickable/02_TimeLineEventArgs/index.md)，并在 [timeline](../../04_timeline/index.md) 页面复述）。
 
-源码：`Src/Core/VeloxDev.Core/TransitionSystem/Events/TransitionEventArgs.cs`、`TransitionEventArgs{TStage,TValue}.cs`、`Enums/WarnStage.cs`、`Enums/ErrorStage.cs`、`TransitionDiagnostics.cs`；基类 `Src/Core/VeloxDev.Core/TimeLine/TimeLineEventArgs.cs`。
+源码：`Src/Core/VeloxDev.Core/TransitionSystem/Events/TransitionEventArgs.cs`、`TransitionEventArgs{TStage,TValue}.cs`、`Interfaces/TransitionSystem/Enums/WarnStage.cs`、`Interfaces/TransitionSystem/Enums/ErrorStage.cs`、`TransitionDiagnostics.cs`；基类 `Src/Core/VeloxDev.Core/TimeLine/TimeLineEventArgs.cs`。
 
 ### 类：`TransitionEventArgs : TimeLineEventArgs`
 

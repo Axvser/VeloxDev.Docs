@@ -42,7 +42,7 @@ MAUI uses color-typed bindable properties instead of brushes (`MinimapBackground
 
 ## Interface: `IWorkflowGridDecorator`
 
-Data-exchange contract for the grid decorator; the surface behavior pushes the scroll offsets and the canvas content offset into it before each render pass. **Defined in Core** (`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowGridDecorator.cs`, namespace `VeloxDev.WorkflowSystem`), shared by all seven adapters.
+Data-exchange contract for the grid decorator; the surface behavior pushes the scroll offsets and the canvas content offset into it before each render pass. **Defined in Core** (`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Surface/IWorkflowGridDecorator.cs`, namespace `VeloxDev.WorkflowSystem`), shared by all seven adapters.
 
 ```csharp
 public interface IWorkflowGridDecorator
@@ -59,7 +59,7 @@ public interface IWorkflowGridDecorator
 
 ## Interface: `IWorkflowMinimapOverlay`
 
-Derives from `IWorkflowGridDecorator` (the minimap also needs the scroll/content offsets) and adds the viewport size and the tree to render. **Defined in Core** (`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowMinimapOverlay.cs`, namespace `VeloxDev.WorkflowSystem`).
+Derives from `IWorkflowGridDecorator` (the minimap also needs the scroll/content offsets) and adds the viewport size and the tree to render. **Defined in Core** (`Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Surface/IWorkflowMinimapOverlay.cs`, namespace `VeloxDev.WorkflowSystem`).
 
 ```csharp
 public interface IWorkflowMinimapOverlay : IWorkflowGridDecorator

@@ -32,7 +32,7 @@ public interface IWorkflowViewModel : INotifyPropertyChanging, INotifyPropertyCh
 | `OnPropertyChanged` | `void OnPropertyChanged(string propertyName)` | Change notification |
 | `CloseCommand` | `IVeloxCommand CloseCommand { get; }` | Terminates all in-progress tasks (param null) |
 
-*Source: `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowViewModel.cs`.*
+*Source: `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Common/IWorkflowViewModel.cs`.*
 
 #### `IWorkflowTreeViewModel : IWorkflowViewModel`
 
@@ -74,7 +74,7 @@ Events: `NodeAdded` / `NodeRemoved` (`EventHandler<IWorkflowNodeViewModel>`), `L
 | `Redo` / `Undo` / `ClearHistory` | `void Redo()` / `void Undo()` / `void ClearHistory()` | Stack ops |
 | `MarkDirty` | `void MarkDirty()` | Flags the tree for re-virtualization |
 
-*Source: `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowTreeViewModel.cs`.*
+*Source: `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Components/IWorkflowTreeViewModel.cs`.*
 
 #### `IWorkflowNodeViewModel : IWorkflowViewModel`
 
@@ -108,7 +108,7 @@ Events: `SlotAdded` / `SlotRemoved` (`EventHandler<IWorkflowSlotViewModel>`).
 | `AccessAsync` | `Task<bool> AccessAsync(IAccessContext context, CancellationToken ct)` | Dataflow access gate for an edge (Sender→Receiver) + phase + payload; compile phase = static check (Data null), runtime phase = real-time check (Data = payload); default `true` |
 | `Delete` | `void Delete()` | → `StandardDelete` (atomic, undoable) |
 
-*Source: `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowNodeViewModel.cs`.*
+*Source: `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Components/IWorkflowNodeViewModel.cs`.*
 
 > `ReceiveAsync` is the single execution entry shared by the Compiler (engine-driven) and the non-Compiler (node-driven broadcast) paths — each path reaches it with a different context. Entry points, parameters, and timing: see `Execution Mechanism`.
 
@@ -128,7 +128,7 @@ Events: `SlotAdded` / `SlotRemoved` (`EventHandler<IWorkflowSlotViewModel>`).
 
 **`IWorkflowSlotViewModelHelper : IWorkflowHelper`** — events `TargetAdded/Removed`, `SourceAdded/Removed`; methods `Install/Uninstall`, `SetChannel(SlotChannel)`, `UpdateState()`, `SendConnection()`, `ReceiveConnection()`, `Delete()`.
 
-*Source: `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowSlotViewModel.cs`.*
+*Source: `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Components/IWorkflowSlotViewModel.cs`.*
 
 #### `IWorkflowLinkViewModel : IWorkflowViewModel`
 
@@ -141,7 +141,7 @@ Events: `SlotAdded` / `SlotRemoved` (`EventHandler<IWorkflowSlotViewModel>`).
 
 **`IWorkflowLinkViewModelHelper : IWorkflowHelper`** — `Install/Uninstall(IWorkflowLinkViewModel)`, `Delete()`.
 
-*Source: `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/IWorkflowLinkViewModel.cs`.*
+*Source: `Src/Core/VeloxDev.Core/Interfaces/WorkflowSystem/Components/IWorkflowLinkViewModel.cs`.*
 
 #### Other interfaces
 
@@ -156,7 +156,7 @@ Events: `SlotAdded` / `SlotRemoved` (`EventHandler<IWorkflowSlotViewModel>`).
 | `ISpatialMap<T>` | `T : class, ISpatialBoundsProvider`; `Insert(T)`, `Remove(T)`, `Query(Viewport)`, `Clear()`, `Bounds` |
 | `ISpatialBoundsProvider` | `Viewport Bounds { get; }` + `INotifyPropertyChanged`; raise `PropertyChanged("Bounds")` on change |
 
-*Sources: `Interfaces/WorkflowSystem/IWorkflowActionPair.cs`, `IWorkflowIdentifiable.cs`, `IContext.cs`, `ITaskContext.cs`, `ISlotProvider.cs`, `ISpatialMap.cs`, `ISpatialBoundsProvider.cs`.*
+*Sources: `Interfaces/WorkflowSystem/Commands/IWorkflowActionPair.cs`, `IWorkflowIdentifiable.cs`, `IContext.cs`, `ITaskContext.cs`, `ISlotProvider.cs`, `ISpatialMap.cs`, `ISpatialBoundsProvider.cs`.*
 
 ### Value Types, Geometry Classes and Enums
 
@@ -173,7 +173,7 @@ Events: `SlotAdded` / `SlotRemoved` (`EventHandler<IWorkflowSlotViewModel>`).
 | `SlotChannel` | `[Flags] int`: `None=0`, `OneTarget=1`, `OneSource=2`, `OneBoth=3`, `MultipleTargets=4`, `MultipleSources=8`, `MultipleBoth=12` |
 | `SlotState` | `[Flags] int`: `StandBy=1`, `PreviewSender=2`, `PreviewReceiver=4`, `Sender=8`, `Receiver=16` |
 
-*Sources: `GUI/GeometryModels/Anchor.cs`, `GUI/GeometryModels/Size.cs`, `GUI/GeometryModels/Offset.cs`, `GUI/GeometryModels/Viewport.cs`, `GUI/GeometryModels/CanvasLayout.cs`, `GUI/Virtualization/CellKey.cs`, `TaskContext.cs`, `WorkflowActionPair.cs`, `Enums/Slot.cs` in `Src/Core/VeloxDev.Core/WorkflowSystem/`.*
+*Sources: `GUI/GeometryModels/Anchor.cs`, `GUI/GeometryModels/Size.cs`, `GUI/GeometryModels/Offset.cs`, `GUI/GeometryModels/Viewport.cs`, `GUI/GeometryModels/CanvasLayout.cs`, `GUI/Virtualization/CellKey.cs`, `TaskContext.cs`, `WorkflowActionPair.cs`, `Interfaces/WorkflowSystem/Enums/Slot.cs` in `Src/Core/VeloxDev.Core/WorkflowSystem/`.*
 
 ### Default ViewModels and Helpers
 
@@ -217,7 +217,7 @@ Notes:
 
 `TrySelect` is a dictionary lookup over `conditionMap` (expected `O(1)`). `CurrentValue` getter returns the string form; setter accepts string / enum / numeric and normalizes.
 
-*Sources: `SelectorEx/SlotEnumerator.cs`, `SelectorEx/ConditionalSlot.cs`, `SelectorEx/SlotDefinition.cs`, `Interfaces/WorkflowSystem/ISlotProvider.cs`, `Interfaces/WorkflowSystem/IConditionalSlotProvider.cs`, `Src/Core/VeloxDev.Core/AI/SlotSelectorsAttribute.cs`.*
+*Sources: `SelectorEx/SlotEnumerator.cs`, `SelectorEx/ConditionalSlot.cs`, `SelectorEx/SlotDefinition.cs`, `Interfaces/WorkflowSystem/Providers/ISlotProvider.cs`, `Interfaces/WorkflowSystem/Providers/IConditionalSlotProvider.cs`, `Src/Core/VeloxDev.Core/AI/SlotSelectorsAttribute.cs`.*
 
 ### Spatial System
 
@@ -228,7 +228,7 @@ Notes:
 | `WorkflowSpatialEx` | Extensions: `EnableMap(tree, cellSize, observable)`, `Virtualize(tree, viewport)`, `QueryNodes(tree, viewport)`, `ClearMap(tree)`. |
 | `ISpatialMap<T>` / `ISpatialBoundsProvider` | Spatial abstractions (see "Other interfaces" above). |
 
-*Sources: `WorkflowSystem/GUI/Virtualization/SpatialGridHashMap.cs`, `WorkflowSystem/GUI/Virtualization/WorkflowSpatialManager.cs`, `WorkflowSystem/GUI/Virtualization/NodeBoundsProvider.cs`, `WorkflowSystem/GUI/Virtualization/NodePairBoundsProvider.cs`, `WorkflowSystem/GUI/Virtualization/WorkflowSpatialEx.cs`, `Interfaces/WorkflowSystem/ISpatialMap.cs`, `Interfaces/WorkflowSystem/ISpatialBoundsProvider.cs`.*
+*Sources: `WorkflowSystem/GUI/Virtualization/SpatialGridHashMap.cs`, `WorkflowSystem/GUI/Virtualization/WorkflowSpatialManager.cs`, `WorkflowSystem/GUI/Virtualization/NodeBoundsProvider.cs`, `WorkflowSystem/GUI/Virtualization/NodePairBoundsProvider.cs`, `WorkflowSystem/GUI/Virtualization/WorkflowSpatialEx.cs`, `Interfaces/WorkflowSystem/Spatial/ISpatialMap.cs`, `Interfaces/WorkflowSystem/Spatial/ISpatialBoundsProvider.cs`.*
 
 ### Render-readiness helpers (core, GUI-agnostic)
 
@@ -256,4 +256,4 @@ The connection drag is a first-class, UI-agnostic state on `WorkflowInput` (see 
 
 `ConnectionCheck` deliberately excludes the release-time `IWorkflowTreeEvents.Connecting` veto: that event is a per-attempt decision and may depend on state a preview must not consume. A preview can only **tighten** the framework's verdict, never relax it.
 
-*Sources: `Interfaces/WorkflowSystem/ConnectionCheck.cs`, `Interfaces/WorkflowSystem/IConnectionPreviewLink.cs`, `GUI/Events/WorkflowInput.cs`, `GUI/Events/Tree/ConnectionPreviewEventArgs.cs`, `GUI/Events/Tree/ConnectionPreviewValidatingEventArgs.cs`, `GUI/Interaction/SlotHitTestEx.cs`.*
+*Sources: `Interfaces/WorkflowSystem/Connections/ConnectionCheck.cs`, `Interfaces/WorkflowSystem/Connections/IConnectionPreviewLink.cs`, `GUI/Events/WorkflowInput.cs`, `GUI/Events/Tree/ConnectionPreviewEventArgs.cs`, `GUI/Events/Tree/ConnectionPreviewValidatingEventArgs.cs`, `GUI/Interaction/SlotHitTestEx.cs`.*
