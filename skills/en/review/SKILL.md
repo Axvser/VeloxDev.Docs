@@ -8,7 +8,7 @@ Review and correct each deliverable one by one
 
 ### Delegate by default
 
-Reviewing your own output invites self-approval: the fixes you already believe in, the samples you are already convinced are correct. Whenever the run environment can launch an **independent reviewer** — a separate sub-agent whose context did NOT take part in the writing phases (e.g. Claude: spawn the `wiki-reviewer` sub-agent installed with this SKILL, or any fresh-context sub-agent; other hosts: their equivalent) — you MUST delegate this phase to it. This is the default path, not an optimization. A writer judging its own Review checklist will tend to wave itself through; an independent reviewer does not share that bias.
+Reviewing your own output invites self-approval. Whenever the run environment can launch an **independent reviewer** — a separate sub-agent whose context did NOT take part in the writing phases (e.g. Claude: spawn the `wiki-reviewer` sub-agent installed with this SKILL, or any fresh-context sub-agent; other hosts: their equivalent) — you MUST delegate this phase to it. This is the default path, not an optimization; an independent reviewer does not share the writer's bias.
 
 Hand the reviewer a self-contained brief:
 

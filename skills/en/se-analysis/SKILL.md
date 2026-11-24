@@ -63,30 +63,7 @@ keep one illustrative chart on the parent that introduces the idea. Fit each cha
 axes to its own curves — an oscillating family needs a wider `y` domain than a
 monotonic one, and a shared domain that suits the rest will clip it.
 
-Rules that bite (all verified against the renderer):
-
-- The body is **JSON**, so numbers are JSON numbers — `2*PI` is invalid JSON, write
-  `6.283185307179586`.
-- Constants are **upper-case**: `PI`, `E`. Lower-case `pi` is undefined and the curve
-  vanishes with no error anywhere.
-- `"data"` is an array of objects; a plain curve is `{ "fn": "sin(x)" }`.
-- Piecewise curves use the ternary operator, which is allowed:
-  `"fn": "x < 0.5 ? 2*x^2 : 1 - (-2*x + 2)^2/2"`.
-- A non-`y = f(x)` graph type (`fnType` `parametric` / `polar` / `points` / `vector`,
-  or `graphType` `scatter`) additionally needs `"sampler": "builtIn"`; the parameter
-  is `t` for parametric and **`theta`** for polar.
-- **A power's exponent must be a literal integer.** The default interval sampler
-  accepts only an exponent of exactly one integer; anything else comes back as an
-  empty interval — the `<path>` is still emitted, but with no path data, so the curve
-  draws nothing and reports no error. `2^x`, `2^(10*x - 10)` and `x^0.5` all fail;
-  `x^2` and `(x-1)^3` are fine. When the exponent varies, write it as
-  `exp(u*ln(base))`: `2^(10*x - 10)` becomes `exp((10*x - 10)*0.6931471805599453)`
-  (`ln 2`).
-- **Set the domain to the interesting region.** `"xAxis": { "domain": [0, 1] }` and
-  `"yAxis": { "domain": [-0.2, 1.2] }` for an easing curve; a default axis scale
-  usually shows a flat line and one spike.
-- Give each series a `"color"` when it must be distinguishable, and add
-  `"title"` naming the function.
+The plot-expression rules in 【Rendered Content Members】 apply — JSON numbers, upper-case constants, the ternary form, `"sampler": "builtIn"` for non-`y = f(x)` types, an integer exponent, and a domain fitted to the curve. Give each series a `"color"` when it must be distinguishable, and a `"title"` naming the function.
 
 Example — an easing family, the case a formula table gets wrong:
 

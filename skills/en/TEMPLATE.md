@@ -76,7 +76,7 @@ Ultimately, the directory will present the following structure. These are five f
 
 ⚙ Complex features may nest further sub-capabilities (e.g. `00_user-registration/00_email-verification/`), obeying the same two-digit + kebab-case rule at every level.
 
-⚙ **The numeric prefix is a path device, never a title.** `0_Welcome`, `1_QuickStart`, `00_user-registration` are directory names. The moment text is *rendered to a reader* — a heading, a link label, a breadcrumb, a table cell naming a page — the prefix must be gone: write `QuickStart`, `User registration`. The renderer strips the prefix from navigation titles itself (`gen_tree.py`), so a hand-written `1_QuickStart` in prose is always a defect, never a match for the sidebar. Only two places keep the prefix: the link *destination* (`../1_QuickStart/index.md`) and discussion that is explicitly about the directory layout.
+⚙ **The numeric prefix is a path device, never a title.** `0_Welcome`, `1_QuickStart`, `00_user-registration` are directory names. The moment text is *rendered to a reader* — a heading, a link label, a breadcrumb, a table cell naming a page — the prefix must be gone: write `QuickStart`, `User registration`. The tree generator (`gen_tree.py`) strips the prefix from navigation titles, so a hand-written `1_QuickStart` in prose is always a defect, never a match for the sidebar. Only two places keep the prefix: the link *destination* (`../1_QuickStart/index.md`) and discussion that is explicitly about the directory layout (wrap it in `code`).
 
 ⚙ **A feature name is a feature name, not a class name.** Feature directories are named for the capability the reader looks for (`user-registration`, `data-export`), taken from the「Feature Inventory」. Type, class and namespace names belong in the page body, never in a directory name.
 
@@ -93,7 +93,7 @@ Either way, content must not be lost: deleting such a heading means promoting it
 
 ⚙ **Depth is free per dimension:** sub-pages under a feature are independent per dimension — QuickStart splits by setup/operations, API by namespace/type, SE by page-group — so nesting deeper in one dimension never forces the same split in another. Only the feature's own top-level name must stay consistent across `1_QuickStart` / `2_API` / `3_SE_Analysis`.
 
-⚙ **Atomic pages are opt-in, not the default:** a page that must genuinely stay a single document (a verbatim license/AUTHORS text, one self-contained spec) may opt out of the line budget by putting `<!-- cg:atomic -->` as the **first line** of its `index.md`; pages under the `4_Copyright` dimension are exempt automatically. Use this sparingly — it is the escape hatch, and the gate is enforced: `python validate-structure.py` reports every leaf over the hard cap and every parent overview that fails to link one of its children.
+⚙ **Atomic pages are opt-in, not the default:** a page that must genuinely stay a single document (a verbatim license/AUTHORS text, one self-contained spec) may opt out of the line budget by putting `<!-- cg:atomic -->` as the **first line** of its `index.md`; pages under the `4_Copyright` dimension are exempt automatically. Use it sparingly; the gate is enforced: `python validate-structure.py` reports every leaf over the hard cap and every parent overview that fails to link one of its children.
 
 **Illustrative example only — not a fixed requirement.** Fictional project "Acme Console" with three features (`user-registration`, `data-export`, `theme`). Every directory contains an `index.md`.
 
@@ -147,7 +147,7 @@ Wiki_Root/
 
 ## Localisation
 
-⚙ **Every page title is written in the wiki's own language.** When a language tree is produced, each directory segment and each page heading must be translated — `00_workflow-system` becomes `00_工作流系统`, not a copy of the English folder. This is not optional polish: the sidebar renders the directory name, so an untranslated segment shows up as stray English in an otherwise translated wiki.
+⚙ **Every page title is written in the wiki's own language.** When a language tree is produced, each directory segment and each page heading must be translated — `00_workflow-system` becomes `00_工作流系统`, not a copy of the English folder. The sidebar renders the directory name, so an untranslated segment shows up as stray English in an otherwise translated wiki.
 
 ⚙ **The one exception is a code identifier.** A segment that *is* a public type, attribute, namespace or API name in the source — `MVVM`, `AOP`, `MonoBehaviour`, `00_VeloxPropertyAttribute`, `00_transitionsystem` — stays verbatim in every language, because translating it would break the reader's ability to grep for it. The test is mechanical, not aesthetic: **does this exact token appear in the source code as a type/namespace/API name?** If yes, keep it. If it is a descriptive English phrase (`prerequisites`, `install`, `complete-code`, `attached-behaviors`, `patterns-overview`), it is a translation gap and MUST be translated.
 
@@ -173,14 +173,17 @@ Wiki_Root/
 
 ## Rendered Content Members
 
-⚙ Besides ordinary Markdown, the body may use these fenced blocks. Each is checked by a validator; a malformed block renders as a silent hole, so validate rather than assume.
+⚙ Besides ordinary Markdown, the body may use these fenced blocks. Mermaid, PlantUML and plot have validators; `video` and `chat` do not. Some plot failures (a rejected expression, a non-linear graph without the sampler) draw nothing at all rather than show an error, so validate rather than assume.
 
 | Fence | Use it for | Validator |
 |---|---|---|
 | `mermaid` | flow, sequence, class, state, ER, git graphs | `validate-mermaid.js` (real parser) / `validate-mermaid.py` |
 | `plantuml` | API call sequences, component and deployment diagrams | `validate-plantuml.py --engine java` / `validate-plantuml.py` |
 | `plot` | **mathematical curves** — see below | `validate-plot.py` |
-| `video` | Bilibili / YouTube / Vimeo embeds | — |
+| `video` | Bilibili / YouTube / Vimeo embeds, or a direct video file | — |
+| `chat` | collapsible agent / status panels | — |
+
+⚙ `chat` renders a collapsible panel for narration: `chat[label]` names it, an optional second bracket (`[open]`, `[collapsed]`, `[static]`, `[thinking]`, …) configures it, and the body is ordinary Markdown.
 
 ⚙ **Function plots (`plot`) — use a curve when the subject IS a function.** A page that describes a curve, a response, a decay or an easing family should draw it, not describe it in prose or enumerate it in a table. The body is a **JSON object** (the [function-plot](https://mauriciopoppe.github.io/function-plot/) options), so numbers are JSON numbers — `2*PI` is invalid, `6.283185307179586` is not:
 
