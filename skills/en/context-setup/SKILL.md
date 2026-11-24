@@ -6,7 +6,7 @@ Confirm all necessary context
 
 ## Flow
 
-1. Derive CloudGlyph_Child_Git from MainSKILL_Path
+1. Locate the wiki repo as the `Wiki/` submodule of the host repo and set CloudGlyph_Child_Git to that checkout's path; verify with `git submodule status`. Do not derive it from MainSKILL_Path
 
 2. Project_Root must be provided by the user
 

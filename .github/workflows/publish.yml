@@ -3,8 +3,13 @@ name: Deploy Avalonia Browser to GitHub Pages
 on:
   push:
     branches: ["master"]
+    # The site is the browser build of the viewer itself, so viewer code, package pins and this
+    # workflow all change what gets deployed. Restricting the filter to Assets/Docs left the live
+    # site stale after a template sync replaced the app code.
     paths:
-      - "src/CloudGlyph/Assets/Docs/**"
+      - "src/**"
+      - "Directory.Packages.props"
+      - ".github/workflows/publish.yml"
   workflow_dispatch:
 
 permissions:

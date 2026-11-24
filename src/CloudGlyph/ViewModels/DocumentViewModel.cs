@@ -43,7 +43,7 @@ public partial class DocumentViewModel : ObservableObject
     /// <summary>All available languages shown in the document-language selector on the left toolbar.</summary>
     public IReadOnlyList<LanguageOption> TopLanguages => _loadedLanguages.Count > 0
         ? _loadedLanguages
-        : [new(DefaultLanguage, "🌐 English")];
+        : [new(DefaultLanguage, "English")];
 
     [ObservableProperty]
     private ObservableCollection<PageNode> _nodes = [];
@@ -58,10 +58,14 @@ public partial class DocumentViewModel : ObservableObject
     private string _language = DefaultLanguage;
 
     [ObservableProperty]
-    private LanguageOption _selectedLanguage = new(DefaultLanguage, "🌐 English");
+    private LanguageOption _selectedLanguage = new(DefaultLanguage, "English");
 
     [ObservableProperty]
     private string _title = "Cloud Glyph";
+
+    /// <summary>Optional one-line tagline from <c>site.json</c>, shown under the title.</summary>
+    [ObservableProperty]
+    private string _subtitle = "Agent-driven Markdown Wiki · Desktop + Browser";
 
     [ObservableProperty]
     private bool _isLoading;
@@ -94,6 +98,20 @@ public partial class DocumentViewModel : ObservableObject
 
     /// <summary>True when the current query matched nothing, so the sidebar can say so.</summary>
     public bool HasNoResults => ShowResults && !IsIndexing && Results.Count == 0;
+
+    /// <summary>Flattened page count for the current language tree.</summary>
+    public int PageCount => Nodes.SelectMany(n => n.DescendantsAndSelf()).Count();
+
+    /// <summary>Status-bar line: the current language and how many pages it carries.</summary>
+    public string StatusText
+    {
+        get
+        {
+            var pages = PageCount;
+            var count = pages == 1 ? "1 page" : $"{pages} pages";
+            return $"{SelectedLanguage?.DisplayName ?? "English"} · {count}";
+        }
+    }
 
     public DocumentViewModel()
     {
@@ -140,6 +158,13 @@ public partial class DocumentViewModel : ObservableObject
                 if (!string.IsNullOrWhiteSpace(value))
                     Title = value.Trim();
             }
+
+            if (doc.RootElement.TryGetProperty("subtitle", out var subtitle) && subtitle.ValueKind == JsonValueKind.String)
+            {
+                var value = subtitle.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                    Subtitle = value.Trim();
+            }
         }
         catch
         {
@@ -150,11 +175,18 @@ public partial class DocumentViewModel : ObservableObject
     partial void OnSelectedLanguageChanged(LanguageOption value)
     {
         if (value is null) return;
+        OnPropertyChanged(nameof(StatusText));
         if (!string.Equals(Language, value.Code, StringComparison.OrdinalIgnoreCase))
         {
             Language = value.Code;
             _ = ReloadAsync();
         }
+    }
+
+    partial void OnNodesChanged(ObservableCollection<PageNode> value)
+    {
+        OnPropertyChanged(nameof(PageCount));
+        OnPropertyChanged(nameof(StatusText));
     }
 
     partial void OnSelectedNodeChanged(PageNode? value)
@@ -225,7 +257,7 @@ public partial class DocumentViewModel : ObservableObject
 
             var entries = JsonSerializer.Deserialize<List<LanguageEntry>>(json, JsonOptions);
             _loadedLanguages = entries?
-                .Select(e => new LanguageOption(e.Code, $"🌐 {e.DisplayName}"))
+                .Select(e => new LanguageOption(e.Code, e.DisplayName))
                 .ToList() ?? [];
 
             if (_loadedLanguages.Count > 0)
@@ -238,7 +270,7 @@ public partial class DocumentViewModel : ObservableObject
         catch
         {
             // Fallback: at least show the default language
-            _loadedLanguages = [new(DefaultLanguage, "🌐 English")];
+            _loadedLanguages = [new(DefaultLanguage, "English")];
         }
         finally
         {

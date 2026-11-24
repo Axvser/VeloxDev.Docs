@@ -6,7 +6,7 @@
 
 ## 流程
 
-1.基于MainSKILL_Path，推导CloudGlyph_Child_Git的值
+1.将 Wiki 仓库定位为宿主仓库的 `Wiki/` 子模块，CloudGlyph_Child_Git 取该检出目录的路径；用 `git submodule status` 核实。不要从 MainSKILL_Path 推导
 
 2.Project_Root必须由用户提供
 

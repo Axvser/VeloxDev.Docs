@@ -4,29 +4,114 @@
              RequestedThemeVariant="Default">
 
     <Application.Resources>
-        <!-- 等宽字体级联，用于代码块、目录节点、导航标签等 -->
-        <FontFamily x:Key="MonoFont">Cascadia Code, Cascadia Mono, Sarasa Mono SC, Microsoft YaHei UI, Segoe UI, avares://CloudGlyph/Assets/Fonts/NotoSans-Italic-VariableFont_wdth,wght.ttf#Noto Sans, monospace</FontFamily>
-        <!-- 正文字体级联，优先使用内置 Inter + 微软雅黑 + Noto Sans 覆盖多语言 -->
-        <FontFamily x:Key="UIFont">Inter, Microsoft YaHei UI, Segoe UI, avares://CloudGlyph/Assets/Fonts/msyh.ttf#Microsoft YaHei, avares://CloudGlyph/Assets/Fonts/NotoSans-Italic-VariableFont_wdth,wght.ttf#Noto Sans, sans-serif</FontFamily>
+        <ResourceDictionary>
+            <!-- 工作台配色。资源随 RequestedThemeVariant 切换，截图里的两套色板一一对应：
+                 Window 是整个窗口的底，Surface 是标题栏 / 侧栏 / 卡片，Raised 留给浮层。
+                 明暗切换由 MainView 监听系统主题后写 Application.RequestedThemeVariant 完成，
+                 因此这里用 ThemeDictionaries 而不是各自的 DynamicTheme 属性。 -->
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="Window" Color="#141414" />
+                    <SolidColorBrush x:Key="Surface" Color="#252526" />
+                    <SolidColorBrush x:Key="Raised" Color="#2D2D2D" />
+                    <SolidColorBrush x:Key="Input" Color="#2A2A2A" />
+                    <SolidColorBrush x:Key="Border" Color="#333333" />
+                    <SolidColorBrush x:Key="Hover" Color="#303030" />
+                    <SolidColorBrush x:Key="Text" Color="#E7E7E7" />
+                    <SolidColorBrush x:Key="Muted" Color="#A0A0A0" />
+                    <SolidColorBrush x:Key="Accent" Color="#0078D4" />
+                    <SolidColorBrush x:Key="Selection" Color="#094771" />
+                    <SolidColorBrush x:Key="SelectedText" Color="#FFFFFF" />
+                    <!-- Fluent 的目录树选中/悬停默认取系统强调色；覆盖成工作台自己的 Selection / Hover。 -->
+                    <SolidColorBrush x:Key="TreeViewItemBackgroundSelected" Color="#094771" />
+                    <SolidColorBrush x:Key="TreeViewItemBackgroundSelectedPointerOver" Color="#0B4F73" />
+                    <SolidColorBrush x:Key="TreeViewItemBackgroundSelectedPressed" Color="#0B4F73" />
+                    <SolidColorBrush x:Key="TreeViewItemBackgroundPointerOver" Color="#303030" />
+                    <SolidColorBrush x:Key="TreeViewItemForegroundSelected" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPointerOver" Color="#FFFFFF" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="Window" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="Surface" Color="#F3F3F3" />
+                    <SolidColorBrush x:Key="Raised" Color="#DDDDDD" />
+                    <SolidColorBrush x:Key="Input" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="Border" Color="#CECECE" />
+                    <SolidColorBrush x:Key="Hover" Color="#E8E8E8" />
+                    <SolidColorBrush x:Key="Text" Color="#333333" />
+                    <SolidColorBrush x:Key="Muted" Color="#6F6F6F" />
+                    <SolidColorBrush x:Key="Accent" Color="#0078D4" />
+                    <SolidColorBrush x:Key="Selection" Color="#ADD6FF" />
+                    <SolidColorBrush x:Key="SelectedText" Color="#1B1B1B" />
+                    <SolidColorBrush x:Key="TreeViewItemBackgroundSelected" Color="#ADD6FF" />
+                    <SolidColorBrush x:Key="TreeViewItemBackgroundSelectedPointerOver" Color="#9CC7F0" />
+                    <SolidColorBrush x:Key="TreeViewItemBackgroundSelectedPressed" Color="#9CC7F0" />
+                    <SolidColorBrush x:Key="TreeViewItemBackgroundPointerOver" Color="#E8E8E8" />
+                    <SolidColorBrush x:Key="TreeViewItemForegroundSelected" Color="#1B1B1B" />
+                    <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPointerOver" Color="#1B1B1B" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
+            <!-- 等宽字体级联，用于代码块、目录节点、导航标签等 -->
+            <FontFamily x:Key="MonoFont">Cascadia Code, Cascadia Mono, Sarasa Mono SC, Microsoft YaHei UI, Segoe UI, avares://CloudGlyph/Assets/Fonts/NotoSans-Italic-VariableFont_wdth,wght.ttf#Noto Sans, monospace</FontFamily>
+            <!-- 正文字体级联，优先使用内置 Inter + 微软雅黑 + Noto Sans 覆盖多语言 -->
+            <FontFamily x:Key="UIFont">Inter, Microsoft YaHei UI, Segoe UI, avares://CloudGlyph/Assets/Fonts/msyh.ttf#Microsoft YaHei, avares://CloudGlyph/Assets/Fonts/NotoSans-Italic-VariableFont_wdth,wght.ttf#Noto Sans, sans-serif</FontFamily>
+        </ResourceDictionary>
     </Application.Resources>
 
     <Application.Styles>
         <FluentTheme />
-        <!-- 全局正文字体，TextBlock / TextBox / Button 统一走 UIFont -->
+        <!-- 全局正文字体与字号，TextBlock / TextBox / Button 统一走 UIFont -->
         <Style Selector="TextBlock">
             <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+            <Setter Property="FontSize" Value="13" />
         </Style>
         <Style Selector="TextBox">
             <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="Background" Value="{DynamicResource Input}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
         </Style>
         <Style Selector="Button">
             <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+            <Setter Property="CornerRadius" Value="8" />
         </Style>
         <Style Selector="ComboBox">
             <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="Background" Value="{DynamicResource Input}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
         </Style>
         <Style Selector="ComboBoxItem">
             <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+        </Style>
+
+        <!-- 工作台排版：标题 19 SemiBold、副标题 14 SemiBold、正文 13、说明 11 Muted。
+             用 class 选择器（Classes="heading"），Avalonia 的样式不支持 WPF 那种 x:Key。 -->
+        <Style Selector="TextBlock.heading">
+            <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+            <Setter Property="FontSize" Value="19" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+        </Style>
+        <Style Selector="TextBlock.subheading">
+            <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+        </Style>
+        <Style Selector="TextBlock.body">
+            <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+        </Style>
+        <Style Selector="TextBlock.caption">
+            <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource Muted}" />
         </Style>
     </Application.Styles>
 </Application>

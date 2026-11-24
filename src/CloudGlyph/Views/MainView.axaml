@@ -8,41 +8,41 @@
 			 xmlns:md="clr-namespace:AvalonMarkdown.Views;assembly=AvalonMarkdown"
 			 mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
 			 x:Class="CloudGlyph.Views.MainView"
-			 x:DataType="vm:MainViewModel">
+			 x:DataType="vm:MainViewModel"
+			 Background="{DynamicResource Window}">
 
 	<Design.DataContext>
 		<vm:MainViewModel />
 	</Design.DataContext>
 
-	<Grid RowDefinitions="Auto,*">
+	<Grid RowDefinitions="Auto,*,Auto">
 
-		<!-- 顶部工具栏。三列 `*,Auto,*`：两侧星号列等宽，因此中间那列恰好落在窗口正中，
+		<!-- 标题栏。三列 `*,Auto,*`：两侧星号列等宽，因此中间那列恰好落在窗口正中，
 			 搜索框不随左右两侧内容宽度变化而偏移。 -->
 		<Border Grid.Row="0"
+				Height="68"
+				Background="{DynamicResource Surface}"
+				BorderBrush="{DynamicResource Border}"
 				BorderThickness="0,0,0,1"
-				BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-				Padding="8,6">
+				Padding="22,10">
 			<Grid ColumnDefinitions="*,Auto,*">
 
-				<!-- 左：文档语言 -->
-				<StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4"
-							HorizontalAlignment="Left">
-					<ComboBox ItemsSource="{Binding Document.TopLanguages}"
-							  SelectedItem="{Binding Document.SelectedLanguage}"
-							  ToolTip.Tip="Document language"
-							  MinWidth="110">
-						<ComboBox.ItemTemplate>
-							<DataTemplate x:DataType="vm:LanguageOption">
-								<TextBlock Text="{Binding DisplayName}" />
-							</DataTemplate>
-						</ComboBox.ItemTemplate>
-					</ComboBox>
+				<!-- 左：文档标题 + 副标题 -->
+				<StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
+					<TextBlock Text="{Binding Document.Title}"
+							   Classes="heading"
+							   TextTrimming="CharacterEllipsis" />
+					<TextBlock Text="{Binding Document.Subtitle}"
+							   Classes="caption"
+							   TextTrimming="CharacterEllipsis" />
 				</StackPanel>
 
 				<!-- 中：搜索框（Ctrl+K 聚焦，Esc 清空） -->
 				<TextBox Grid.Column="1"
 						 x:Name="SearchBox"
 						 Width="440"
+						 Height="32"
+						 VerticalAlignment="Center"
 						 PlaceholderText="Search pages…  (Ctrl+K)"
 						 Text="{Binding Document.Query, Mode=TwoWay}">
 					<TextBox.KeyBindings>
@@ -53,70 +53,115 @@
 								Background="Transparent"
 								BorderThickness="0"
 								Content="✕"
+								Foreground="{DynamicResource Muted}"
 								ToolTip.Tip="Clear search"
 								IsVisible="{Binding Document.ShowResults}"
 								Command="{Binding Document.ClearQueryCommand}" />
 					</TextBox.InnerRightContent>
 				</TextBox>
 
-				<!-- 右：预留工具栏 -->
-				<StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4"
-							HorizontalAlignment="Right">
+				<!-- 右：文档语言 -->
+				<StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10"
+							HorizontalAlignment="Right" VerticalAlignment="Center">
+					<ComboBox ItemsSource="{Binding Document.TopLanguages}"
+							  SelectedItem="{Binding Document.SelectedLanguage}"
+							  ToolTip.Tip="Document language"
+							  MinWidth="150">
+						<ComboBox.ItemTemplate>
+							<DataTemplate x:DataType="vm:LanguageOption">
+								<TextBlock Text="{Binding DisplayName}" />
+							</DataTemplate>
+						</ComboBox.ItemTemplate>
+					</ComboBox>
 				</StackPanel>
 			</Grid>
 		</Border>
 
-
-		<Grid Grid.Row="1" ColumnDefinitions="240,4,*">
+		<Grid Grid.Row="1" x:Name="WorkspaceGrid">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="280" MinWidth="200" MaxWidth="520" />
+				<ColumnDefinition Width="8" />
+				<ColumnDefinition Width="*" MinWidth="360" />
+			</Grid.ColumnDefinitions>
 
 			<!-- 左侧目录树。搜索不再挤掉它：结果浮在内容之上，导航树始终在位。 -->
-			<Grid Grid.Column="0" RowDefinitions="Auto,*">
-				<TextBlock Grid.Row="0"
-						   Text="Navigation"
-						   Margin="10,8,8,4"
-						   Opacity="0.6"
-						   FontSize="11" />
-				<TreeView Grid.Row="1"
-						  ItemsSource="{Binding Document.Nodes}"
-						  SelectedItem="{Binding Document.SelectedNode}"
-						  Margin="4,0">
-					<!-- 展开状态存在 PageNode 上，视图模型才能替跳转到的页面打开其祖先分支。
-						 这里用 ReflectionBinding 而非编译绑定：Style 没有可供绑定编译器推断的
-						 DataContext 类型。 -->
-					<TreeView.Styles>
-						<Style Selector="TreeViewItem">
-							<Setter Property="IsExpanded"
-									Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
-						</Style>
-					</TreeView.Styles>
-					<TreeView.ItemTemplate>
-						<TreeDataTemplate ItemsSource="{Binding Children}"
-										  x:DataType="models:PageNode">
-							<TextBlock Text="{Binding Title}"
-									   x:DataType="models:PageNode" />
-						</TreeDataTemplate>
-					</TreeView.ItemTemplate>
-				</TreeView>
-			</Grid>
+			<Border Grid.Column="0"
+					Background="{DynamicResource Surface}"
+					BorderBrush="{DynamicResource Border}"
+					BorderThickness="0,0,1,0">
+				<DockPanel LastChildFill="True">
+					<TextBlock DockPanel.Dock="Top"
+							   Text="Navigation"
+							   Margin="16,14,16,8"
+							   Foreground="{DynamicResource Accent}"
+							   FontSize="11"
+							   FontWeight="SemiBold" />
+					<TreeView ItemsSource="{Binding Document.Nodes}"
+							  SelectedItem="{Binding Document.SelectedNode}"
+							  Margin="8,0,8,8"
+							  Background="Transparent">
+						<TreeView.Styles>
+							<!-- 展开状态存在 PageNode 上，视图模型才能替跳转到的页面打开其祖先分支。
+								 这里用 ReflectionBinding 而非编译绑定：Style 没有可供绑定编译器推断的
+								 DataContext 类型。 -->
+							<Style Selector="TreeViewItem">
+								<Setter Property="Foreground" Value="{DynamicResource Text}" />
+								<Setter Property="IsExpanded"
+										Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
+							</Style>
+						</TreeView.Styles>
+						<TreeView.ItemTemplate>
+							<TreeDataTemplate ItemsSource="{Binding Children}"
+											  x:DataType="models:PageNode">
+								<TextBlock Text="{Binding Title}"
+										   x:DataType="models:PageNode" />
+							</TreeDataTemplate>
+						</TreeView.ItemTemplate>
+					</TreeView>
+				</DockPanel>
+			</Border>
 
-			<GridSplitter Grid.Column="1" ResizeDirection="Columns" Width="4" />
+			<!-- 自绘分隔条：按指针的绝对位置写左侧列宽，不在拖动中回读取整后的 ActualWidth
+				 （GridSplitter 在 150% 缩放下会因此来回跳 1px）。右侧仍是星号列，窗口缩放继续铺满。 -->
+			<Border Grid.Column="1"
+					x:Name="PaneSplitter"
+					Width="8"
+					Background="{DynamicResource Surface}"
+					Cursor="SizeWestEast"
+					PointerPressed="OnPaneSplitterPointerPressed"
+					PointerMoved="OnPaneSplitterPointerMoved"
+					PointerReleased="OnPaneSplitterPointerReleased"
+					PointerCaptureLost="OnPaneSplitterPointerCaptureLost" />
 
-			<!-- 右侧 Markdown 内容 -->
-			<Grid Grid.Column="2" Background="Transparent">
-				<TextBlock Text="Loading..."
-						   IsVisible="{Binding Document.IsLoading}"
-						   HorizontalAlignment="Center"
-						   VerticalAlignment="Center"
-						   Opacity="0.5"
-						   FontSize="18" />
-				<md:MarkdownView x:Name="MarkdownPreview"
-								 Text="{Binding Document.Content}"
-								 HorizontalAlignment="Stretch"
-								 VerticalAlignment="Stretch"
-								 Background="Transparent" />
-			</Grid>
+			<!-- 右侧 Markdown 内容：铺满剩余区域，不内缩、不描边。 -->
+			<Border Grid.Column="2"
+					Background="{DynamicResource Surface}">
+				<Grid Background="Transparent">
+					<TextBlock Text="Loading..."
+							   IsVisible="{Binding Document.IsLoading}"
+							   HorizontalAlignment="Center"
+							   VerticalAlignment="Center"
+							   Foreground="{DynamicResource Muted}"
+							   FontSize="13" />
+					<md:MarkdownView x:Name="MarkdownPreview"
+									 Text="{Binding Document.Content}"
+									 HorizontalAlignment="Stretch"
+									 VerticalAlignment="Stretch"
+									 Background="Transparent" />
+				</Grid>
+			</Border>
 
 		</Grid>
+
+		<!-- 状态栏 -->
+		<Border Grid.Row="2"
+				Background="{DynamicResource Surface}"
+				BorderBrush="{DynamicResource Border}"
+				BorderThickness="0,1,0,0"
+				Padding="22,5">
+			<TextBlock Text="{Binding Document.StatusText}"
+					   Classes="caption" />
+		</Border>
 
 		<!-- 搜索结果：从搜索框正下方浮出的面板。
 			 用 Popup 而不是普通 Border —— Markdown 预览是 NativeWebView（HWND 子窗口），
@@ -124,7 +169,10 @@
 
 			 宽度与搜索框严格相同（440），水平偏移为 0。这是刻意的：Popup 的贴靠边由
 			 PlacementMode 决定，宽度一旦不同，就只能对齐其中一条边、另一条必然参差。
-			 等宽 + 零偏移则无论贴哪条边，四条边都重合。 -->
+			 等宽 + 零偏移则无论贴哪条边，四条边都重合。
+
+			 面板底色直接取 Surface：应用整体走 Avalonia 的 ThemeVariant + ThemeDictionaries，
+			 这里用 DynamicResource 就会随系统明暗同步切换。 -->
 		<Popup x:Name="ResultsPopup"
 			   IsOpen="{Binding Document.IsSearchOpen, Mode=TwoWay}"
 			   PlacementTarget="{Binding #SearchBox}"
@@ -132,31 +180,26 @@
 			   HorizontalOffset="0"
 			   VerticalOffset="4"
 			   IsLightDismissEnabled="True">
-			<!-- 面板底色跟随本视图的 Background，而不是某个 Fluent 资源键：本应用的换肤由
-				 VeloxDev.DynamicTheme 通过 [ThemeConfig] 写控件属性完成，并不切换 Avalonia 的
-				 ThemeVariant，因此 ThemeDictionaries 类资源不会跟着变（实测
-				 SystemControlBackgroundAltHighBrush 在明暗两种主题下都是白色）。绑定到
-				 Background 则会跟着一起变，包括换肤动画的过程。 -->
 			<Border Width="440"
 					MaxHeight="440"
-					CornerRadius="6"
+					CornerRadius="8"
 					BorderThickness="1"
-					BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-					Background="{Binding $parent[UserControl].Background}"
+					BorderBrush="{DynamicResource Border}"
+					Background="{DynamicResource Surface}"
 					BoxShadow="0 10 28 0 #55000000">
 				<Grid RowDefinitions="Auto,Auto,*">
 
 					<TextBlock Grid.Row="0"
 							   Text="{Binding Document.ResultsHeader}"
 							   Margin="12,8,12,4"
-							   Opacity="0.6"
+							   Foreground="{DynamicResource Muted}"
 							   FontSize="11" />
 
 					<TextBlock Grid.Row="1"
 							   Text="Building index…"
 							   IsVisible="{Binding Document.IsIndexing}"
 							   Margin="12,0,12,6"
-							   Opacity="0.45"
+							   Foreground="{DynamicResource Muted}"
 							   FontSize="11" />
 
 					<ListBox Grid.Row="2"
@@ -168,11 +211,12 @@
 							<DataTemplate x:DataType="services:SearchHit">
 								<StackPanel Margin="0,2">
 									<TextBlock Text="{Binding Title}"
+											   Foreground="{DynamicResource Text}"
 											   FontWeight="SemiBold"
 											   TextTrimming="CharacterEllipsis" />
 									<TextBlock Text="{Binding Snippet}"
+											   Foreground="{DynamicResource Muted}"
 											   FontSize="11"
-											   Opacity="0.6"
 											   MaxLines="2"
 											   TextWrapping="Wrap" />
 								</StackPanel>

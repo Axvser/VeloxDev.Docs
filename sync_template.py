@@ -132,7 +132,8 @@ def sync_files(source: Path, target: Path) -> None:
 def main() -> None:
     repo_root = Path(__file__).resolve().parent
 
-    has_git = (repo_root / ".git").is_dir()
+    # A submodule checkout stores .git as a file, not a directory.
+    has_git = (repo_root / ".git").exists()
     if not has_git:
         log("Warning: No .git directory found. Template files will be synced, but version history (.git) will not be copied.")
 

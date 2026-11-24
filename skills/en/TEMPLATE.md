@@ -11,11 +11,11 @@ Strictly follow the workflow defined in this SKILL to produce Wiki documentation
 
 > CloudGlyph_Git:[https://github.com/Axvser/CloudGlyph][ReadOnly][Template Repository] - Cloud Glyph repository address
 
-> CloudGlyph_Child_Git:[request] - Local Wiki repository root. This Wiki repository is an independent repo created from the Cloud Glyph:[Template Repository]. It is not counted in Wiki analysis or writing.
+> CloudGlyph_Child_Git:[request] - Checkout of the wiki repo: an independent repo created from the Cloud Glyph:[Template Repository] and mounted as a git submodule at `Wiki/` inside the host repo (Project_Root). It is not counted in Wiki analysis or writing.
 
-> Project_Root:[request] - Root directory of the project to be documented
+> Project_Root:[request] - Root directory of the host repo to be documented; this is the repo that contains the `Wiki/` submodule
 
-> MainSKILL_Path:[CloudGlyph_Child_Git/skills/SKILL.md] - Path to the current skill
+> MainSKILL_Path:[request] - Path to the installed copy of this skill. It does not locate the wiki repo
 
 > Wiki_Root:[CloudGlyph_Child_Git/src/CloudGlyph/Assets/Docs/content/{languages}/] - Root directory for output documentation, dynamically divided by language.
 
@@ -149,7 +149,7 @@ Wiki_Root/
 
 ⚙ **Every page title is written in the wiki's own language.** When a language tree is produced, each directory segment and each page heading must be translated — `00_workflow-system` becomes `00_工作流系统`, not a copy of the English folder. This is not optional polish: the sidebar renders the directory name, so an untranslated segment shows up as stray English in an otherwise translated wiki.
 
-⚙ **The one exception is a code identifier.** A segment that *is* a public type, attribute, namespace or API name in the source — `MVVM`, `AOP`, `Tickable`, `00_VeloxPropertyAttribute`, `00_transitionsystem` — stays verbatim in every language, because translating it would break the reader's ability to grep for it. The test is mechanical, not aesthetic: **does this exact token appear in the source code as a type/namespace/API name?** If yes, keep it. If it is a descriptive English phrase (`prerequisites`, `install`, `complete-code`, `attached-behaviors`, `patterns-overview`), it is a translation gap and MUST be translated.
+⚙ **The one exception is a code identifier.** A segment that *is* a public type, attribute, namespace or API name in the source — `MVVM`, `AOP`, `MonoBehaviour`, `00_VeloxPropertyAttribute`, `00_transitionsystem` — stays verbatim in every language, because translating it would break the reader's ability to grep for it. The test is mechanical, not aesthetic: **does this exact token appear in the source code as a type/namespace/API name?** If yes, keep it. If it is a descriptive English phrase (`prerequisites`, `install`, `complete-code`, `attached-behaviors`, `patterns-overview`), it is a translation gap and MUST be translated.
 
 ⚙ The two languages must stay aligned in *structure* (same numeric-prefix topology, machine-checked by `validate-structure.py`) and in *meaning* — a page's title in one language is the translation of its title in the other, at the same position in the tree.
 

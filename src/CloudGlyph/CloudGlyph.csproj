@@ -16,7 +16,8 @@
     <PackageReference Include="Avalonia.Fonts.Inter" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="AvalonMarkdown" />
-    <PackageReference Include="VeloxDev.Avalonia" />
+    <!-- Pins the transitive WebView to the latest release instead of AvalonMarkdown's 12.0.0 floor. -->
+    <PackageReference Include="Avalonia.Controls.WebView" />
   </ItemGroup>
 
   <!--

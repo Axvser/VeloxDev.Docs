@@ -8,7 +8,10 @@
         x:Class="CloudGlyph.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="{Binding Document.Title}"
+        Background="{DynamicResource Window}"
         Width="1200"
-        Height="800">
+        Height="800"
+        MinWidth="960"
+        MinHeight="600">
         <views:MainView />
 </Window>

@@ -13,11 +13,11 @@ description: 分析工程源码，产出美观、规范的Wiki文档
 
 > CloudGlyph_Git:[https://github.com/Axvser/CloudGlyph][ReadOnly][Template Repository] - Cloud Glyph 仓库地址
 
-> CloudGlyph_Child_Git:[request] - 本地Wiki仓库根目录，该Wiki仓库是基于Cloud Glyph:[Template Repository]创建的独立仓库，自身不计入Wiki分析或编写
+> CloudGlyph_Child_Git:[request] - Wiki 仓库的检出目录：基于 Cloud Glyph:[Template Repository] 创建的独立仓库，作为 git 子模块挂载在宿主仓库（Project_Root）的 `Wiki/` 下，自身不计入 Wiki 分析或编写
 
-> Project_Root:[request] - 待文档化的项目的根目录
+> Project_Root:[request] - 待文档化的宿主仓库根目录，也就是包含 `Wiki/` 子模块的仓库
 
-> MainSKILL_Path:[CloudGlyph_Child_Git/skills/SKILL.md] - 当前技能所在路径
+> MainSKILL_Path:[request] - 当前技能的已安装副本路径，不再用于定位 Wiki 仓库
 
 > Wiki_Root:[CloudGlyph_Child_Git/src/CloudGlyph/Assets/Docs/content/{languages}/] - 产出文档的根目录，按language划分的动态变量，例如编写英语时，它就是CloudGlyph_Child_Git/src/CloudGlyph/Assets/Docs/content/en/，Agent仅允许在Wiki_Root下编辑文档内容
 
@@ -151,7 +151,7 @@ Wiki_Root/
 
 ⚙ **每一个页面标题都用本 Wiki 自身的语言书写。** 产出某个语言树时，每个目录名与每个页面标题都必须翻译——`00_workflow-system` 要写成 `00_工作流系统`，而不是照抄英文目录。这并非可选的润色：侧边栏渲染的正是目录名，未翻译的目录名会在整篇已翻译的 Wiki 里直接显示为突兀的英文。
 
-⚙ **唯一的例外是代码标识符。** 若某个目录名**本身就是**源码中的公开类型、特性、命名空间或 API 名称——`MVVM`、`AOP`、`Tickable`、`00_VeloxPropertyAttribute`、`00_transitionsystem`——则它在所有语言中都原样保留，因为翻译它会让读者无法按名检索。判定标准是机械的、而非审美的：**该字面量是否作为类型/命名空间/API 名出现在源码中？** 是，则保留；若它只是一个描述性英文短语（`prerequisites`、`install`、`complete-code`、`attached-behaviors`、`patterns-overview`），那就是翻译遗漏，必须翻译。
+⚙ **唯一的例外是代码标识符。** 若某个目录名**本身就是**源码中的公开类型、特性、命名空间或 API 名称——`MVVM`、`AOP`、`MonoBehaviour`、`00_VeloxPropertyAttribute`、`00_transitionsystem`——则它在所有语言中都原样保留，因为翻译它会让读者无法按名检索。判定标准是机械的、而非审美的：**该字面量是否作为类型/命名空间/API 名出现在源码中？** 是，则保留；若它只是一个描述性英文短语（`prerequisites`、`install`、`complete-code`、`attached-behaviors`、`patterns-overview`），那就是翻译遗漏，必须翻译。
 
 ⚙ 两种语言必须在**结构**上对齐（数字前缀拓扑一致，由 `validate-structure.py` 机器校验），并在**语义**上对齐——一种语言中某页的标题，就是另一种语言中同一位置标题的译文。
 
