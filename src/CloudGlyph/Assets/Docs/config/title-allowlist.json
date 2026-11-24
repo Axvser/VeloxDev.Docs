@@ -76,7 +76,16 @@
     "WeakDelegate",
     "WeakQueue",
     "WeakStack",
-    "WeakCache"
+    "WeakCache",
+
+    "WPF",
+    "Avalonia",
+    "WinUI",
+    "MAUI",
+    "WinForms",
+    "Razor",
+    "Jalium",
+    "Windows"
   ],
   "where": {
     "VeloxDev.MVVM namespace; `Src/Core/VeloxDev.Core/MVVM/`": ["MVVM"],
@@ -133,6 +142,10 @@
     ],
     "`Src/Core/VeloxDev.Core/WeakTypes/*.cs`": [
       "WeakDelegate", "WeakQueue", "WeakStack", "WeakCache"
-    ]
+    ],
+    "`Src/Adapters/VeloxDev.{WPF,Avalonia,WinUI,MAUI,WinForms,Razor,Jalium}/` — the seven adapter packages": [
+      "WPF", "Avalonia", "WinUI", "MAUI", "WinForms", "Razor", "Jalium"
+    ],
+    "`net10.0-windows*` TFMs and the MAUI adapter's Windows wheel hook": ["Windows"]
   }
 }

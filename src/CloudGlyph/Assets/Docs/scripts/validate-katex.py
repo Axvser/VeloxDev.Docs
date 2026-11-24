@@ -4,8 +4,9 @@ validate-katex.py
 Deterministic validation of KaTeX math delimiters in Markdown wiki content.
 Use this in the skill's Review phase instead of relying on the agent's eye.
 
-The scanner ignores content inside fenced code blocks, because `$` there is usually
-not math (e.g. C# string interpolation `$"..."` in code) and produced false positives.
+The scanner ignores content inside fenced code blocks and inline code spans, because
+`$` there is usually not math (e.g. C# string interpolation `$"..."` or the JSON keys
+`$type` / `$id`) and produced false positives.
 
 Checks:
   ERROR  odd count of `$$` block-math delimiters across a file (unbalanced $$ ... $$)
@@ -80,6 +81,27 @@ def _math_spans(line: str):
         i = end + (2 if dbl else 1)
 
 
+def _mask_inline_code(line: str) -> str:
+    """Blank out `` `...` `` spans (same length, so column-based checks stay aligned)."""
+    out = list(line)
+    i, n = 0, len(line)
+    while i < n:
+        if line[i] != "`":
+            i += 1
+            continue
+        j = i
+        while j < n and line[j] == "`":
+            j += 1
+        ticks = line[i:j]
+        end = line.find(ticks, j)
+        if end == -1:
+            break  # unmatched run: leave the rest untouched
+        for k in range(i, end + len(ticks)):
+            out[k] = " "
+        i = end + len(ticks)
+    return "".join(out)
+
+
 def split_fences(lines):
     """Return (code_fenced, prose) tuples: (in_code, line)."""
     out = []
@@ -96,9 +118,11 @@ def split_fences(lines):
 def validate_file(lines):
     issues = []
     fenced = split_fences(lines)
-    prose = "\n".join(line for in_code, line in fenced if not in_code)
+    # Inline code spans are not math either: mask them before every `$` / CJK check.
+    masked = [(in_code, line if in_code else _mask_inline_code(line)) for in_code, line in fenced]
+    prose = "\n".join(line for in_code, line in masked if not in_code)
     # re-fence aware prose line indices for reporting
-    prose_line_numbers = [i + 1 for i, (in_code, _) in enumerate(fenced) if not in_code]
+    prose_line_numbers = [i + 1 for i, (in_code, _) in enumerate(masked) if not in_code]
 
     # block math: $$ ... $$
     dd = len(DOLLAR_DOLLAR_RE.findall(prose))
@@ -116,14 +140,14 @@ def validate_file(lines):
     for m in re.finditer(r'\$"', prose):
         issues.append(("WARN", "C#-style $\" interpolated string outside a code fence"))
     for ln in prose_line_numbers:
-        line = fenced[ln - 1][1] if 0 <= ln - 1 < len(fenced) else ""
+        line = masked[ln - 1][1] if 0 <= ln - 1 < len(masked) else ""
         # currency: `$` + digits + NOT a math continuation (math like `$2S$` has a letter
         # right after the digits and must not be flagged)
         if re.search(r"\$[\d]+(?=[\s.,;:!?]|$)", line):
             issues.append(("WARN", f"line {ln}: '$' followed by digits — likely currency, verify it is math"))
 
     # Renderer-compatibility checks (the CloudGlyph viewer = AvalonMarkdown block parser):
-    for i, (in_code, line) in enumerate(fenced):
+    for i, (in_code, line) in enumerate(masked):
         if in_code:
             continue
         ln = i + 1

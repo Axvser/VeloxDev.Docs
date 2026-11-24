@@ -4,8 +4,9 @@
  *
  * Every `$...$` / `$$...$$` expression in prose is rendered with the actual
  * `katex` package (throwOnError). Invalid math throws with the exact error —
- * ground truth, not a heuristic. Content inside code fences is skipped
- * (`$` there is usually C# interpolation, not math).
+ * ground truth, not a heuristic. Content inside code fences and inline code
+ * spans is skipped (`$` there is usually C# interpolation or a JSON key like
+ * `$type`, not math).
  *
  * Usage:
  *   node validate-katex.js                    # auto-detect content root
@@ -25,6 +26,23 @@ const INLINE = /\$(.+?)\$/g; // $ ... $ (single line)
 function isMathSpan(open, close, s, start) {
   // crude guard: a `$` that is part of `$$` is handled by BLOCK pass first
   return true;
+}
+
+// Blank out `...` spans (same length, so per-line column checks stay aligned).
+function maskInlineCode(line) {
+  const chars = line.split("");
+  let i = 0;
+  while (i < line.length) {
+    if (line[i] !== "`") { i++; continue; }
+    let j = i;
+    while (j < line.length && line[j] === "`") j++;
+    const ticks = line.slice(i, j);
+    const end = line.indexOf(ticks, j);
+    if (end === -1) break; // unmatched run: leave the rest untouched
+    for (let k = i; k < end + ticks.length; k++) chars[k] = " ";
+    i = end + ticks.length;
+  }
+  return chars.join("");
 }
 
 function walk(dir, out = []) {
@@ -111,7 +129,7 @@ function main() {
         inCode = !inCode;
         continue;
       }
-      if (!inCode) proseLines.push({ n: i + 1, line: lines[i] });
+      if (!inCode) proseLines.push({ n: i + 1, line: maskInlineCode(lines[i]) });
     }
     const proseText = proseLines.map((p) => p.line).join("\n");
     for (const { display, math } of renderAll(proseText)) {
