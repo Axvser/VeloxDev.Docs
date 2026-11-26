@@ -10,7 +10,7 @@
 2. [手势行为](01_手势行为/index.md) —— `WorkflowNodeDragBehavior`、`WorkflowSlotConnectionBehavior`、`WorkflowSlotLayoutBehavior`。
 3. [覆盖层](02_覆盖层/index.md) —— `WorkflowMinimapOverlay`、`WorkflowInfoOverlay`、`IWorkflowMinimapScrollSource`。
 4. [视图宿主](03_视图宿主/index.md) —— 为 Easel 闭合的 Core 视图池与小地图层。
-5. [过渡与动画](04_过渡与动画/index.md) —— `Interpolator`、`Transition<T>`、采样器集合与 `EaselAnimationBootstrap`。
+5. [过渡与动画](04_过渡与动画/index.md) —— `Interpolator`、`Transition<T>` 与采样器集合。
 6. [主题转换器](05_主题转换器/index.md) —— 面向 `System.Drawing` 与 WinForms 值类型的 `IThemeValueConverter` 实现。
 
 表面在模板上解析的名称在七家适配器中保持一致：`PART_Canvas`、`PART_ScrollViewer`、`PART_GridDecorator`、`PART_SurfaceBorder`、`PART_MinimapOverlay`、`PART_InfoOverlay` 以及 `WorkflowTemplateSelector` 资源键。

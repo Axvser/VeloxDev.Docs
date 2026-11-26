@@ -67,6 +67,6 @@ The host passes control names to the setters, and the behavior resolves them lat
 
 ## Design notes
 
-- `EaselAnimationBootstrap` runs as a `[ModuleInitializer]`, so the Easel animation bridge is installed before any form uses transitions (`XamlAnimation/EaselVisualAnimator.cs:329-333`).
+- Easel visual elements animate through Easel's built-in `Easel.Animation` engine; the adapter no longer installs a module initializer, animator or bridge.
 - Theme conversion uses System.Drawing converters in `DynamicTheme/ThemeValueConverters.cs`.
 - The headless suite in `Src/Test/Headless` covers this adapter.

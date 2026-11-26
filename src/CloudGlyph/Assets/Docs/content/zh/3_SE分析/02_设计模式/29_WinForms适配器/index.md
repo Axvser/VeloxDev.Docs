@@ -67,6 +67,6 @@ WinForms 合并了其它适配器分开的两个契约：小地图同时实现 `
 
 ## 设计要点
 
-- `EaselAnimationBootstrap` 以 `[ModuleInitializer]` 运行，使 Easel 动画桥在任何窗体使用过渡之前就安装好（`XamlAnimation/EaselVisualAnimator.cs:329-333`）。
+- Easel 视觉元素由 Easel 内置的 `Easel.Animation` 驱动；适配器不再安装模块初始化器、动画器或桥。
 - 主题转换使用 `DynamicTheme/ThemeValueConverters.cs` 中的 System.Drawing 转换器。
 - `Src/Test/Headless` 中的无头套件覆盖该适配器。

@@ -1,8 +1,8 @@
 # Transition and animation
 
-Namespaces: `VeloxDev.TransitionSystem`, `VeloxDev.Adapters.NativeSamplers`, `VeloxDev.WinForms.XamlAnimation`.
+Namespaces: `VeloxDev.TransitionSystem`, `VeloxDev.Adapters.NativeSamplers`.
 
-The WinForms adapter closes the shared transition engine over Easel visuals. The fluent declaration, chaining and easing families are the same surface documented for Transition Animation; this page lists the adapter's concrete types and its Easel bridge.
+The WinForms adapter exposes the shared transition engine for plain WinForms code and its workflow surfaces. Easel visual elements use Easel's built-in `Easel.Animation` engine; this adapter no longer installs an Easel bridge or an animation backend. The fluent declaration, chaining and easing families are the same surface documented for Transition Animation.
 
 ## Class: Transition
 
@@ -85,28 +85,6 @@ Namespace `VeloxDev.Adapters.NativeSamplers`. Every sampler implements `ISampler
 | `PaddingSampler` | `Padding`. |
 | `ThicknessSampler` | `Easel.Controls.Thickness`. |
 | `Transform3DSampler` | `Easel.Transform3D`. |
-
-## Class: EaselAnimationBootstrap
-
-`public static class EaselAnimationBootstrap` — namespace `VeloxDev.WinForms.XamlAnimation`.
-
-| Signature | Returns | Description |
-| --- | --- | --- |
-| `EnsureRegistered()` | `void` | Assigns the VeloxDev animator unless the host already supplied one. |
-
-A module initializer calls `EnsureRegistered` when code from the assembly first runs. A host that installs the package only for the animation backend and never touches another type should call it once at startup.
-
-### Example
-
-```csharp
-EaselAnimationBootstrap.EnsureRegistered();
-// Source: source
-```
-
-### Notes
-
-- The bridge uses `Transition<EaselVisualElement>` so runs are registered and `TransitionCore.Exit` can stop them.
-- `Interpolator`'s static constructor must run before `CanAnimate` checks the registry; the animator triggers it explicitly.
 
 ## Theme value converters
 

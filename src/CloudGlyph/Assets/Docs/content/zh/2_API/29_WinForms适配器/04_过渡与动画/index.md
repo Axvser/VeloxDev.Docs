@@ -1,8 +1,8 @@
 # 过渡与动画
 
-命名空间：`VeloxDev.TransitionSystem`、`VeloxDev.Adapters.NativeSamplers`、`VeloxDev.WinForms.XamlAnimation`。
+命名空间：`VeloxDev.TransitionSystem`、`VeloxDev.Adapters.NativeSamplers`。
 
-WinForms 适配器在 Easel 视觉之上闭合共享过渡引擎。流畅声明、链式与缓动家族与 Transition Animation 记录的接口相同；本页列出适配器的具体类型与 Easel 桥。
+WinForms 适配器为普通 WinForms 代码与其 workflow 表面提供共享过渡引擎。Easel 视觉元素使用 Easel 内置的 `Easel.Animation`；适配器不再安装 Easel 桥或动画后端。流畅声明、链式与缓动家族与 Transition Animation 记录的接口相同。
 
 ## 类：Transition
 
@@ -85,28 +85,6 @@ WinForms 适配器在 Easel 视觉之上闭合共享过渡引擎。流畅声明�
 | `PaddingSampler` | `Padding`。 |
 | `ThicknessSampler` | `Easel.Controls.Thickness`。 |
 | `Transform3DSampler` | `Easel.Transform3D`。 |
-
-## 类：EaselAnimationBootstrap
-
-`public static class EaselAnimationBootstrap` —— 命名空间 `VeloxDev.WinForms.XamlAnimation`。
-
-| 签名 | 返回 | 说明 |
-| --- | --- | --- |
-| `EnsureRegistered()` | `void` | 宿主未提供后端时，装入 VeloxDev 动画器。 |
-
-代码第一次执行本程序集时，模块初始化器会调用 `EnsureRegistered`。只为动画后端安装包、从不触碰其他类型的宿主，应在启动时主动调用一次。
-
-### 示例
-
-```csharp
-EaselAnimationBootstrap.EnsureRegistered();
-// Source: source
-```
-
-### 备注
-
-- 桥使用 `Transition<EaselVisualElement>`，运行因此被登记，`TransitionCore.Exit` 能停掉它们。
-- `CanAnimate` 查注册表前必须先跑 `Interpolator` 的静态构造函数；动画器会显式触发。
 
 ## 主题值转换器
 
