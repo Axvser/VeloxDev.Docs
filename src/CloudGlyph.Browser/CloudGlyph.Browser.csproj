@@ -5,6 +5,9 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>
 	<PublishTrimmed>false</PublishTrimmed>
+    <!-- Set here, not by a package: the workload's manifest is evaluated before package targets,
+         and WasmBuildNative is one of the switches that loads the native linking targets. -->
+    <WasmBuildNative>true</WasmBuildNative>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,5 +21,15 @@
   <ItemGroup>
     <ProjectReference Include="..\CloudGlyph\CloudGlyph.csproj" />
   </ItemGroup>
-	
+
+  <!--
+    A publish whose SDK cannot see the wasm-tools workload skips native linking without failing:
+    dotnet.native.wasm stays at the runtime pack's ~3 MB and libSkiaSharp never gets linked, so the
+    site dies at startup with DllNotFoundException. Refuse to produce such a bundle.
+  -->
+  <Target Name="_RequireWasmNativeLinking" BeforeTargets="Build"
+          Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
+    <Error Condition="'@(NativeFileReference->Count())' == '0'"
+           Text="NativeFileReference is empty; libSkiaSharp would not be linked into dotnet.native.wasm." />
+  </Target>
 </Project>

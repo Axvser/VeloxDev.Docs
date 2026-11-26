@@ -9,6 +9,7 @@ on:
     paths:
       - "src/**"
       - "Directory.Packages.props"
+      - "global.json"
       - ".github/workflows/publish.yml"
   workflow_dispatch:
 
@@ -45,16 +46,52 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: | 
-              8.0.x
-              9.0.x
-              10.0.x
+          # Pinned by global.json so the workload install and the publish use the same SDK band.
+          dotnet-version: '10.0.401'
 
       - name: Install workloads
-        run: dotnet workload install wasm-tools
+        run: dotnet workload install wasm-tools --skip-manifest-update
+
+      - name: Restore
+        run: dotnet restore src/CloudGlyph.Browser/CloudGlyph.Browser.csproj
+
+      # Without the workload the SDK skips native linking and still exits 0, which ships a
+      # dotnet.native.wasm without libSkiaSharp. Retrying as root covers the user-local install
+      # case; the publish check below is the hard gate.
+      - name: Ensure wasm-tools is visible to the SDK
+        run: |
+          set -euo pipefail
+          probe() {
+            dotnet msbuild src/CloudGlyph.Browser/CloudGlyph.Browser.csproj -nologo \
+              -getProperty:NETCoreSdkVersion -getProperty:WasmNativeWorkloadAvailable | tee wasm-props.json
+          }
+          if ! probe || ! grep -q '"WasmNativeWorkloadAvailable": "true"' wasm-props.json; then
+            echo "::warning::wasm-tools is not visible to SDK $(dotnet --version); reinstalling as root"
+            sudo -E env "PATH=$PATH" "$(command -v dotnet)" workload install wasm-tools --skip-manifest-update
+            probe
+            grep -q '"WasmNativeWorkloadAvailable": "true"' wasm-props.json \
+              || echo "::warning::wasm-tools is still not visible; the native-linking check will fail the build"
+          fi
+          dotnet workload list
 
       - name: Publish Avalonia Browser
         run: dotnet publish src/CloudGlyph.Browser/CloudGlyph.Browser.csproj -c Release -o publish
+
+      - name: Verify native libraries are linked
+        run: |
+          set -euo pipefail
+          wasm=$(ls publish/wwwroot/_framework/dotnet.native.*.wasm | head -n1)
+          size=$(stat -c%s "$wasm")
+          echo "dotnet.native.wasm = $size bytes"
+          if [ "$size" -lt 5000000 ]; then
+            echo "::error::$wasm is $size bytes: libSkiaSharp was not linked into the runtime."
+            exit 1
+          fi
+          rsp=$(find src/CloudGlyph.Browser/obj -path '*for-publish*' -name emcc-link.rsp | head -n1)
+          test -n "$rsp"
+          grep -q 'libSkiaSharp' "$rsp"
+          grep -q 'libHarfBuzzSharp' "$rsp"
+          echo "native libraries linked via $rsp"
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
