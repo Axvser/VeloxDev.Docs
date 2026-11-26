@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    Avalonia.Controls.WebView 12.1.2 still gates its static assets on the 12.0-era switch that
+    Avalonia.Browser 12.2 no longer sets, so av-webview.mjs is never deployed. The switch and the
+    location have to be true before package props are imported, hence Directory.Build.props.
+  -->
+  <PropertyGroup>
+    <ShouldIncludeAvaloniaStaticAssets Condition="'$(ShouldIncludeAvaloniaStaticAssets)' == ''">true</ShouldIncludeAvaloniaStaticAssets>
+    <WasmRuntimeAssetsLocation Condition="'$(WasmRuntimeAssetsLocation)' == ''">_framework</WasmRuntimeAssetsLocation>
+  </PropertyGroup>
+</Project>

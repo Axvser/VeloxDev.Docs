@@ -91,6 +91,7 @@ jobs:
           test -n "$rsp"
           grep -q 'libSkiaSharp' "$rsp"
           grep -q 'libHarfBuzzSharp' "$rsp"
+          test -f publish/wwwroot/_framework/av-webview.mjs
           echo "native libraries linked via $rsp"
 
       - name: Setup Pages
