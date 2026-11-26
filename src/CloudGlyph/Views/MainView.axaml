@@ -60,20 +60,6 @@
 					</TextBox.InnerRightContent>
 				</TextBox>
 
-				<!-- 右：文档语言 -->
-				<StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10"
-							HorizontalAlignment="Right" VerticalAlignment="Center">
-					<ComboBox ItemsSource="{Binding Document.TopLanguages}"
-							  SelectedItem="{Binding Document.SelectedLanguage}"
-							  ToolTip.Tip="Document language"
-							  MinWidth="150">
-						<ComboBox.ItemTemplate>
-							<DataTemplate x:DataType="vm:LanguageOption">
-								<TextBlock Text="{Binding DisplayName}" />
-							</DataTemplate>
-						</ComboBox.ItemTemplate>
-					</ComboBox>
-				</StackPanel>
 			</Grid>
 		</Border>
 
@@ -90,12 +76,25 @@
 					BorderBrush="{DynamicResource Border}"
 					BorderThickness="0,0,1,0">
 				<DockPanel LastChildFill="True">
-					<TextBlock DockPanel.Dock="Top"
-							   Text="Navigation"
-							   Margin="16,14,16,8"
-							   Foreground="{DynamicResource Accent}"
-							   FontSize="11"
-							   FontWeight="SemiBold" />
+					<StackPanel DockPanel.Dock="Top" Margin="16,14,16,8" Spacing="8">
+						<TextBlock Text="Navigation"
+								   Foreground="{DynamicResource Accent}"
+								   FontSize="11"
+								   FontWeight="SemiBold" />
+						<!-- 语言选择器放在侧栏而不是顶栏：下拉是 Avalonia 画布内容，而 Markdown 预览是
+							 盖在画布上的 DOM iframe（NativeControlHost）。顶栏右侧展开时会落进 iframe
+							 的矩形里被遮住；在侧栏宽度内展开则始终可见。 -->
+						<ComboBox ItemsSource="{Binding Document.TopLanguages}"
+								  SelectedItem="{Binding Document.SelectedLanguage}"
+								  ToolTip.Tip="Document language"
+								  HorizontalAlignment="Stretch">
+							<ComboBox.ItemTemplate>
+								<DataTemplate x:DataType="vm:LanguageOption">
+									<TextBlock Text="{Binding DisplayName}" />
+								</DataTemplate>
+							</ComboBox.ItemTemplate>
+						</ComboBox>
+					</StackPanel>
 					<TreeView ItemsSource="{Binding Document.Nodes}"
 							  SelectedItem="{Binding Document.SelectedNode}"
 							  Margin="8,0,8,8"
